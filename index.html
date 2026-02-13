@@ -11,11 +11,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
+    <!-- Preload da imagem de fundo para carregar mais rápido -->
+    <link rel="preload" as="image"
+        href="https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/unnamed22.jpg">
+
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
     <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
 
     <style>
         /* Badge AZUL para Status Atualizado */
@@ -416,11 +422,30 @@
             position: fixed;
             inset: 0;
             z-index: 2100;
-            background: #1a1a1a url('https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/SOP-INICIAL-2.jpg') no-repeat center center / cover;
+            /* Fundo com imagem e gradiente overlay para melhorar leitura e "profissionalismo" */
+            background:
+                linear-gradient(135deg, rgba(0, 40, 20, 0.85), rgba(0, 20, 40, 0.75)),
+                url('https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/unnamed22.jpg') no-repeat center center;
+            background-size: cover;
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: 'Montserrat', sans-serif;
+
+            /* Animação sutil de entrada (opcional) */
+            animation: fadeInBackground 1.2s ease-out;
+        }
+
+        @keyframes fadeInBackground {
+            from {
+                opacity: 0;
+                transform: scale(1.02);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         .landing-card {
@@ -2939,6 +2964,46 @@
                 </div>
             </div>
 
+            <!-- Modal Vincular Fiscal (Admin) -->
+            <div class="modal fade" id="modalVincularFiscal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title"><i class="bi bi-link-45deg me-2"></i>Vincular Usuário a Fiscal</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning small mb-3">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> ATENÇÃO: O nome do usuário <strong
+                                    id="vincular-usuario-nome">...</strong> não corresponde a nenhum fiscal da lista
+                                oficial.
+                            </div>
+                            <p class="small mb-2">
+                                Para ativar o perfil de <strong>FISCAL</strong>, você deve vincular este cadastro a um
+                                nome da lista oficial abaixo.
+                            </p>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Selecione o Nome Oficial:</label>
+                                <select id="vincular-fiscal-select" class="form-select">
+                                    <option value="">Selecione...</option>
+                                    <!-- Populated by JS -->
+                                </select>
+                            </div>
+                            <p class="text-muted small fst-italic mb-0" style="font-size: 0.75rem;">
+                                * Ao confirmar, o nome de exibição do usuário será atualizado permanentemente para o
+                                nome selecionado.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-secondary"
+                                data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="btn-confirmar-vinculo">Confirmar
+                                Vínculo</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Modal de Login (usuário/senha) -->
             <div class="modal fade" id="modalLogin" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -4632,12 +4697,86 @@
                     }
                 }
 
-                async function aprovarUsuario(email, role = 'externo') {
-                    if (!confirm(`Confirmar aprovação de ${email} como ${role.toUpperCase()}?`)) return;
+                // --- VARIÁVEIS DE CONTROLE PARA VÍNCULO DE FISCAL ---
+                let _vincularContext = null;
+
+                document.addEventListener('DOMContentLoaded', () => {
+                    const btnConfirmar = document.getElementById('btn-confirmar-vinculo');
+                    if (btnConfirmar) {
+                        btnConfirmar.addEventListener('click', async () => {
+                            if (!_vincularContext) return;
+
+                            const select = document.getElementById('vincular-fiscal-select');
+                            const novoNome = select.value;
+
+                            if (!novoNome) {
+                                alert("Por favor, selecione um nome da lista.");
+                                return;
+                            }
+
+                            try {
+                                btnConfirmar.disabled = true;
+                                btnConfirmar.innerHTML = "Salvando...";
+
+                                // Atualiza nome no banco
+                                const partes = novoNome.split(' ');
+                                const nome = partes[0];
+                                const sobrenome = partes.slice(1).join(' ');
+
+                                const { error } = await sbClient.from('app_users').update({
+                                    full_name: novoNome,
+                                    nome: nome,
+                                    sobrenome: sobrenome
+                                }).eq('email', _vincularContext.email);
+
+                                if (error) throw error;
+
+                                // Sucesso na atualização do nome
+                                alert(`✅ Usuário vinculado a "${novoNome}" com sucesso!`);
+
+                                // Fecha modal
+                                const modalEL = document.getElementById('modalVincularFiscal');
+                                const modal = bootstrap.Modal.getInstance(modalEL);
+                                modal.hide();
+
+                                // Retoma a ação original (sem confirmação extra)
+                                if (_vincularContext.action === 'aprovar') {
+                                    aprovarUsuario(_vincularContext.email, _vincularContext.role, true); // true = skipConfirm
+                                } else if (_vincularContext.action === 'update') {
+                                    updateUserRole(_vincularContext.email, _vincularContext.role, true); // true = skipConfirm
+                                }
+
+                            } catch (e) {
+                                alert("Erro ao vincular: " + e.message);
+                            } finally {
+                                btnConfirmar.disabled = false;
+                                btnConfirmar.innerHTML = "Confirmar Vínculo";
+                            }
+                        });
+                    }
+                });
+
+                function abrirModalVinculo(nomeAtual, email, role, action) {
+                    _vincularContext = { email, role, action };
+                    document.getElementById('vincular-usuario-nome').textContent = nomeAtual || email;
+
+                    const sel = document.getElementById('vincular-fiscal-select');
+                    sel.innerHTML = '<option value="">Selecione...</option>';
+                    FISCAIS_LIST.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f;
+                        opt.textContent = f;
+                        sel.appendChild(opt);
+                    });
+
+                    new bootstrap.Modal(document.getElementById('modalVincularFiscal')).show();
+                }
+
+                async function aprovarUsuario(email, role = 'externo', skipConfirm = false) {
+                    if (!skipConfirm && !confirm(`Confirmar aprovação de ${email} como ${role.toUpperCase()}?`)) return;
                     try {
                         // Se for fiscal, encontra e valida o nome correspondente na FISCAIS_LIST
                         if (role === 'fiscal') {
-                            // Busca os dados do usuário para pegar nome e sobrenome
                             const { data: userData, error: userError } = await sbClient
                                 .from('app_users')
                                 .select('nome, sobrenome, full_name')
@@ -4653,12 +4792,14 @@
                                 }
 
                                 if (nomeCompleto) {
-                                    // Encontra o match na FISCAIS_LIST
+                                    // Match na FISCAIS_LIST
                                     const fiscalFromList = findFiscalNameInList(nomeCompleto);
                                     console.log('[ADMIN] Usuário:', nomeCompleto, '-> Match na lista:', fiscalFromList);
 
                                     if (!fiscalFromList) {
-                                        alert(`⚠️ Aviso: O usuário "${nomeCompleto}" não foi encontrado na lista de fiscais. Ele poderá não visualizar processos.\n\nDeseja continuar mesmo assim?`);
+                                        // AQUI ENTRA O MODAL DE VÍNCULO EM VEZ DO ALERT
+                                        abrirModalVinculo(nomeCompleto, email, role, 'aprovar');
+                                        return; // Interrompe para aguardar o modal
                                     }
                                 }
                             }
@@ -4666,7 +4807,9 @@
 
                         const { error } = await sbClient.from('app_users').update({ role: role }).eq('email', email);
                         if (error) throw error;
-                        alert('Usuário aprovado com sucesso!');
+
+                        if (!skipConfirm) alert('Usuário aprovado com sucesso!'); // Só alerta se for fluxo manual
+
                         loadAllUsers();
                         if (typeof fetchPendingCount === 'function') fetchPendingCount();
                     } catch (e) { alert('Erro ao aprovar: ' + e.message); }
@@ -4691,15 +4834,13 @@
                     });
                 }
 
-                async function updateUserRole(email, newRole) {
-                    if (!confirm(`Alterar perfil de ${email} para ${newRole.toUpperCase()}?`)) {
+                async function updateUserRole(email, newRole, skipConfirm = false) {
+                    if (!skipConfirm && !confirm(`Alterar perfil de ${email} para ${newRole.toUpperCase()}?`)) {
                         loadAllUsers();
                         return;
                     }
                     try {
-                        // Se for fiscal, encontra e valida o nome correspondente na FISCAIS_LIST
                         if (newRole === 'fiscal') {
-                            // Busca os dados do usuário para pegar nome e sobrenome
                             const { data: userData, error: userError } = await sbClient
                                 .from('app_users')
                                 .select('nome, sobrenome, full_name')
@@ -4715,12 +4856,13 @@
                                 }
 
                                 if (nomeCompleto) {
-                                    // Encontra o match na FISCAIS_LIST
                                     const fiscalFromList = findFiscalNameInList(nomeCompleto);
                                     console.log('[ADMIN] Usuário:', nomeCompleto, '-> Match na lista:', fiscalFromList);
 
                                     if (!fiscalFromList) {
-                                        alert(`⚠️ Aviso: O usuário "${nomeCompleto}" não foi encontrado na lista de fiscais. Ele poderá não visualizar processos.\n\nDeseja continuar mesmo assim?`);
+                                        // MODAL DE VÍNCULO
+                                        abrirModalVinculo(nomeCompleto, email, newRole, 'update');
+                                        return;
                                     }
                                 }
                             }
@@ -4728,7 +4870,8 @@
 
                         const { error } = await sbClient.from('app_users').update({ role: newRole }).eq('email', email);
                         if (error) throw error;
-                        alert('Perfil atualizado!');
+
+                        if (!skipConfirm) alert('Perfil atualizado!');
                         loadAllUsers();
                     } catch (e) { alert('Erro ao atualizar cargo: ' + e.message); }
                 }
@@ -7267,9 +7410,343 @@
                 }
 
                 // --------------------------------------------------------------
-                // FUNÇÃO GERAR PDF (Profissional) - Com Opção de Visualizar (blob)
+                // FUNÇÃO GERAR PDF (Profissional) - Com Template SOP (pdf-lib)
                 // --------------------------------------------------------------
                 async function gerarPDF_Profissional(dados, options = {}) {
+                    // options: { output: 'save' | 'open' }
+                    const mode = options.output || 'save';
+                    const { jsPDF } = window.jspdf;
+                    const { PDFDocument } = PDFLib;
+
+                    // 1. Carregar o PDF de Fundo (Timbrado)
+                    let backgroundPdfBytes = null;
+                    try {
+                        const bgUrl = "https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/Timbrado_em_branco-Vertical2023-2026.pdf";
+                        const res = await fetch(bgUrl);
+                        if (!res.ok) throw new Error("Falha ao baixar timbrado");
+                        backgroundPdfBytes = await res.arrayBuffer();
+                    } catch (e) {
+                        console.error("Erro ao carregar background:", e);
+                        alert("Atenção: Não foi possível carregar o timbrado oficial. O PDF será gerado sem fundo.");
+                    }
+
+                    // 2. Gerar Conteúdo com jsPDF
+                    const doc = new jsPDF();
+                    const larguraPagina = doc.internal.pageSize.getWidth();
+
+                    // --- TÍTULO (Ajustado para o Timbrado) ---
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(16);
+                    doc.setTextColor(0, 143, 61); // Verde SOP
+                    doc.text("COMPOSIÇÃO ANALÍTICA", larguraPagina / 2, 45, { align: "center" });
+
+                    // --- DADOS DA COMPOSIÇÃO ---
+                    let yPos = 55;
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+
+                    const formatarDataExtenso = (dataStr) => {
+                        if (!dataStr) return '-';
+                        const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+                        let dia, mes, ano;
+                        if (dataStr.includes('-')) {
+                            const partes = dataStr.split('-');
+                            if (partes.length === 3) { ano = partes[0]; mes = parseInt(partes[1]) - 1; dia = partes[2]; }
+                        } else {
+                            const partes = dataStr.split('/');
+                            if (partes.length >= 2) {
+                                dia = partes.length === 3 ? partes[0] : '01';
+                                mes = parseInt(partes.length === 3 ? partes[1] : partes[0]) - 1;
+                                ano = partes.length === 3 ? partes[2] : partes[1];
+                            }
+                        }
+                        if (dia && meses[mes] && ano) return `${dia} de ${meses[mes]} de ${ano}`;
+                        return dataStr;
+                    };
+
+                    const addField = (label, value, x, y) => {
+                        doc.setFont("helvetica", "bold");
+                        doc.text(label, x, y);
+                        doc.setFont("helvetica", "normal");
+                        doc.text(value, x + doc.getTextWidth(label) + 2, y);
+                    };
+
+                    addField("CÓDIGO:", dados.codigo || '-', 20, yPos);
+                    addField("UNIDADE:", dados.unidade || '-', 150, yPos);
+                    yPos += 6;
+
+                    doc.setFont("helvetica", "bold"); doc.text("DESCRIÇÃO:", 20, yPos);
+                    doc.setFont("helvetica", "normal");
+                    const desc = dados.descricao || '-';
+                    const descLines = doc.splitTextToSize(desc, 150);
+                    doc.text(descLines, 45, yPos);
+                    yPos += (descLines.length * 4) + 2;
+
+                    const dataExtenso = formatarDataExtenso(dados.data_base);
+                    if (dataExtenso) addField("DATA BASE:", dataExtenso, 20, yPos);
+
+                    addField("BDI:", (dados.bdi || '0,00') + "%", 100, yPos);
+                    addField("DESCONTO:", (dados.desconto || '0,00') + "%", 150, yPos);
+
+                    yPos += 8;
+
+                    // --- TABELA ---
+                    const itensOrdenados = [...(dados.itens || [])].sort((a, b) => {
+                        const ordem = { 'MAO_DE_OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVICO': 4 };
+                        return (ordem[a.grupo] || 99) - (ordem[b.grupo] || 99);
+                    });
+
+                    let tableBody = [];
+                    let currentGroup = '';
+                    const labelGrupos = { 'MAO_DE_OBRA': 'MÃO DE OBRA', 'MATERIAL': 'MATERIAL', 'EQUIPAMENTOS': 'EQUIPAMENTOS', 'SERVICO': 'SERVIÇO' };
+                    let sumMat = 0, sumMao = 0, sumEquip = 0, sumServ = 0;
+                    const itensComMemoria = [];
+
+                    itensOrdenados.forEach(item => {
+                        const itemGroup = labelGrupos[item.grupo] || (item.grupo || 'MATERIAL').replace(/_/g, ' ');
+
+                        if (itemGroup !== currentGroup) {
+                            currentGroup = itemGroup;
+                            tableBody.push([{ content: currentGroup, colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
+                        }
+
+                        let precoUnitarioBase = item.preco;
+                        if (item.fonte === 'MERCADO' && item.retroativo) {
+                            const r = item.retroativo;
+                            const baseVal = parseFloat(r.base || 0);
+                            const indCotacao = parseFloat(r.indIni || 1);
+                            const indDataBase = parseFloat(r.indFin || 1);
+                            const fator = indDataBase / indCotacao;
+                            precoUnitarioBase = Math.round((baseVal * fator) * 100) / 100;
+                            itensComMemoria.push({ item, origem: item.fonte });
+                        }
+                        const totalItem = Math.round((precoUnitarioBase * item.coeficiente) * 100) / 100;
+
+                        const g = item.grupo || 'MATERIAL';
+                        if (g === 'MAO_DE_OBRA') sumMao += totalItem;
+                        else if (g === 'EQUIPAMENTOS') sumEquip += totalItem;
+                        else if (g === 'SERVICO') sumServ += totalItem;
+                        else sumMat += totalItem;
+
+                        const origem = item.fonte + (item.referencia ? ` (${item.referencia})` : '');
+                        tableBody.push([
+                            origem,
+                            item.codigo,
+                            item.descricao,
+                            item.unidade,
+                            item.coeficiente.toLocaleString('pt-BR', { minimumFractionDigits: 4 }),
+                            totalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                        ]);
+                    });
+
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['Origem', 'Código', 'Descrição', 'Unid', 'Coef', 'Total (R$)']],
+                        body: tableBody,
+                        theme: 'grid',
+                        styles: { fontSize: 8, cellPadding: 2 },
+                        headStyles: { fillColor: [51, 51, 51], textColor: [255, 255, 255] },
+                        columnStyles: {
+                            0: { cellWidth: 25 },
+                            1: { cellWidth: 20 },
+                            2: { cellWidth: 'auto' },
+                            3: { cellWidth: 15, halign: 'center' },
+                            4: { cellWidth: 20, halign: 'center' },
+                            5: { cellWidth: 25, halign: 'right' }
+                        },
+                        margin: { top: 50, bottom: 20 }
+                    });
+
+                    // --- TOTAIS ---
+                    let finalY = doc.lastAutoTable.finalY + 10;
+                    if (finalY > 250) { doc.addPage(); finalY = 50; }
+
+                    const bdiVal = parseFloat((dados.bdi || '0').toString().replace(',', '.')) / 100 || 0;
+                    const descVal = parseFloat((dados.desconto || '0').toString().replace(',', '.')) / 100 || 0;
+
+                    const totalSemBDI = sumMat + sumMao + sumEquip + sumServ;
+                    const totalComBDI = totalSemBDI * (1 + bdiVal);
+                    const valorBDI = totalComBDI - totalSemBDI;
+                    const valorDesconto = totalComBDI * descVal;
+                    const totalGeral = totalComBDI - valorDesconto;
+
+                    doc.setFontSize(9);
+                    const printTotal = (label, val, y) => {
+                        if (val > 0) {
+                            doc.text(label, 140, y);
+                            // Ajuste para evitar quebra de linha: alinhar à direita com margem segura
+                            doc.text(val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, y, { align: 'right' });
+                            return y + 5;
+                        }
+                        return y;
+                    };
+
+                    finalY = printTotal("Total Material:", sumMat, finalY);
+                    finalY = printTotal("Total Mão de Obra:", sumMao, finalY);
+                    finalY = printTotal("Total Equipamentos:", sumEquip, finalY);
+                    finalY = printTotal("Total Serviços:", sumServ, finalY);
+
+                    doc.setFont("helvetica", "bold");
+                    // BDI sempre mostra se maior que 0
+                    if (valorBDI > 0) {
+                        doc.text(`BDI (${(bdiVal * 100).toFixed(2)}%):`, 140, finalY);
+                        doc.text(valorBDI.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY, { align: 'right' });
+                        finalY += 5;
+                    }
+
+                    if (valorDesconto > 0) {
+                        doc.text(`Desconto (${(descVal * 100).toFixed(2)}%):`, 140, finalY);
+                        doc.text(valorDesconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY, { align: 'right' });
+                        finalY += 5;
+                    }
+
+                    doc.setFontSize(11);
+                    doc.setTextColor(0, 143, 61);
+                    doc.text("PREÇO TOTAL UNITÁRIO:", 140, finalY + 2);
+                    doc.text(totalGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY + 2, { align: 'right' });
+
+                    // --- MEMÓRIA DE CÁLCULO DETALHADA (Restaurada) ---
+                    if (itensComMemoria.length > 0) {
+                        doc.addPage();
+
+                        // Layout Constants
+                        const mLeft = 14;
+                        const mWidth = larguraPagina - 28;
+                        let cy = 50;
+
+                        // Title 1
+                        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
+                        doc.text("Metodologia de Cálculo de Insumo Não Tabelado (Cotação de Mercado)", mLeft, cy);
+                        cy += 8;
+
+                        // Body 1 & 2 (Justificado)
+                        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
+                        const txt1 = "O presente custo unitário foi obtido através de cotação de mercado, visto que o insumo não consta nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do valor cotado.";
+                        const txt2 = "O objetivo é compatibilizar o preço de mercado atual (data da cotação) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.";
+
+                        const textOptions = { maxWidth: mWidth, align: "justify", lineHeightFactor: 1.5 };
+
+                        doc.text(txt1, mLeft, cy, textOptions);
+                        const dim1 = doc.getTextDimensions(txt1, textOptions);
+                        cy += dim1.h + 8;
+
+                        doc.text(txt2, mLeft, cy, textOptions);
+                        const dim2 = doc.getTextDimensions(txt2, textOptions);
+                        cy += dim2.h + 12;
+
+                        // Title 2
+                        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
+                        doc.text("Memória de Cálculo e Compatibilização de Preços", mLeft, cy);
+                        cy += 8;
+
+                        // Body 3 & 4
+                        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
+                        const txt3 = "Considerando a defasagem temporal entre a data desta cotação de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores.";
+                        const txt4 = "O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na tabela abaixo. Este procedimento visa equiparar o poder de compra da moeda à época da licitação, demonstrado analiticamente abaixo:";
+
+                        doc.text(txt3, mLeft, cy, textOptions);
+                        const dim3 = doc.getTextDimensions(txt3, textOptions);
+                        cy += dim3.h + 8;
+
+                        doc.text(txt4, mLeft, cy, textOptions);
+                        const dim4 = doc.getTextDimensions(txt4, textOptions);
+                        cy += dim4.h + 12;
+
+                        // Loop Items
+                        itensComMemoria.forEach(({ item }) => {
+                            if (cy > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); cy = 50; }
+
+                            const r = item.retroativo;
+                            const baseVal = parseFloat(r.base || 0);
+                            const indCotacao = parseFloat(r.indIni || 1); // Source (Ini)
+                            const indDataBase = parseFloat(r.indFin || 1); // Target (Fin)
+
+                            // Calc Logic: Fator = Ind.Base / Ind.Cotacao
+                            const fator = indDataBase / indCotacao;
+                            const valAdotado = Math.round((baseVal * fator) * 100) / 100;
+
+                            const dCotacao = r.dataIni ? r.dataIni.split('-').reverse().join('/') : '-';
+                            const dDataBase = r.dataFin ? r.dataFin.split('-').reverse().join('/') : '-';
+
+                            doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(0);
+                            doc.text(`Item: ${item.codigo} - ${item.descricao}`, mLeft, cy);
+                            cy += 5;
+
+                            // Tabela Detalhada com os Parâmetros (A-G)
+                            const rows = [
+                                ["A. Valor Cotado (Preço de Mercado)", `R$ ${baseVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+                                ["B. Data da Cotação", dCotacao],
+                                ["C. Índice na Data da Cotação", indCotacao.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })],
+                                ["D. Data-Base do Orçamento", dDataBase],
+                                ["E. Índice na Data-Base", indDataBase.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })],
+                                ["F. Fator de Ajuste (E ÷ C)", fator.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })],
+                                ["G. Preço Adotado (A x F)", `R$ ${valAdotado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]
+                            ];
+
+                            doc.autoTable({
+                                head: [["Parâmetro", "Valor / Descrição"]],
+                                body: rows,
+                                startY: cy,
+                                theme: 'grid',
+                                headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
+                                styles: { fontSize: 9, cellPadding: 2 },
+                                columnStyles: { 0: { cellWidth: 80 } },
+                                margin: { left: mLeft }
+                            });
+                            cy = doc.lastAutoTable.finalY + 10;
+                        });
+                    }
+
+                    // --- PÁGINAÇÃO ---
+                    const pageCount = doc.internal.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150);
+                        doc.text(`Página ${i} de ${pageCount}`, larguraPagina - 20, doc.internal.pageSize.getHeight() - 10);
+                        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 20, doc.internal.pageSize.getHeight() - 10);
+                    }
+
+                    // 3. MERGE COM PDF-LIB
+                    if (backgroundPdfBytes) {
+                        try {
+                            const contentPdfBytes = doc.output('arraybuffer');
+                            const pdfDoc = await PDFDocument.create();
+                            const backgroundPdf = await PDFDocument.load(backgroundPdfBytes);
+
+                            const [bgPage] = await pdfDoc.copyPages(backgroundPdf, [0]);
+                            const bgDims = bgPage.getSize();
+
+                            const contentPdfLoaded = await PDFDocument.load(contentPdfBytes);
+                            const contentPages = await pdfDoc.copyPages(contentPdfLoaded, contentPdfLoaded.getPageIndices());
+
+                            for (const contentPage of contentPages) {
+                                const page = pdfDoc.addPage([bgDims.width, bgDims.height]);
+
+                                const embeddedBg = await pdfDoc.embedPage(bgPage);
+                                page.drawPage(embeddedBg, { x: 0, y: 0, width: bgDims.width, height: bgDims.height });
+
+                                const embeddedContent = await pdfDoc.embedPage(contentPage);
+                                page.drawPage(embeddedContent, { x: 0, y: 0, width: bgDims.width, height: bgDims.height });
+                            }
+
+                            const pdfBytes = await pdfDoc.save();
+                            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = `${dados.codigo}_Analitica.pdf`;
+                            link.click();
+                        } catch (err) {
+                            console.error("Erro no Merge:", err);
+                            doc.save(`${dados.codigo}_Analitica.pdf`); // Fallback
+                        }
+                    } else {
+                        doc.save(`${dados.codigo}_Analitica.pdf`);
+                    }
+                }
+
+                // --------------------------------------------------------------
+                // FUNÇÃO GERAR PDF (Profissional) - Com Opção de Visualizar (blob)
+                // --------------------------------------------------------------
+                async function gerarPDF_Profissional_Old(dados, options = {}) {
                     // options: { output: 'save' | 'open' }
                     const mode = options.output || 'save';
                     const { jsPDF } = window.jspdf;
@@ -7305,38 +7782,76 @@
                         return dataStr;
                     };
 
-                    doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0, 50, 100);
-                    doc.text("GECOPE - GERÊNCIA DE CUSTOS E OPERAÇÕES", larguraPagina / 2, 15, { align: "center" });
-                    doc.setFontSize(12); doc.setTextColor(0);
-                    doc.text("RELATÓRIO DE COMPOSIÇÃO ANALÍTICA", larguraPagina / 2, 22, { align: "center" });
-                    doc.setDrawColor(200); doc.line(14, 25, larguraPagina - 14, 25);
+                    // --- CABEÇALHO SOP ---
+                    doc.setFillColor(0, 143, 61); // Verde SOP (#008F3D)
+                    doc.rect(0, 0, 10, 297, 'F'); // Faixa lateral esquerda
+
+                    doc.setFillColor(0, 143, 61);
+                    doc.rect(10, 10, 190, 2, 'F'); // Linha superior fina
+
+                    // Títulos
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(16);
+                    doc.setTextColor(51, 51, 51);
+                    doc.text("GOVERNO DO ESTADO DO CEARÁ", 20, 25);
+
+                    doc.setFontSize(12);
+                    doc.text("SUPERINTENDÊNCIA DE OBRAS PÚBLICAS - SOP", 20, 32);
 
                     doc.setFontSize(10);
-                    doc.setFont("helvetica", "bold"); doc.text("CÓDIGO:", 18, 35);
-                    doc.setFont("helvetica", "normal"); doc.text(dados.codigo || '-', 40, 35);
-                    doc.setFont("helvetica", "bold"); doc.text("DESCRIÇÃO:", 70, 35);
+                    doc.setFont("helvetica", "normal");
+                    doc.text("DIRETORIA DE PLANEJAMENTO E GESTÃO", 20, 38);
+
+                    // Título do Documento
+                    doc.setFontSize(18);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(0, 143, 61); // Verde
+                    doc.text("COMPOSIÇÃO ANALÍTICA", 105, 55, { align: "center" });
+
+                    // Linha separadora
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(20, 60, 190, 60);
+
+                    // --- DADOS DA COMPOSIÇÃO ---
+                    let yPos = 70;
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+
+                    // Função auxiliar para negrito/normal
+                    const addField = (label, value, x, y) => {
+                        doc.setFont("helvetica", "bold");
+                        doc.text(label, x, y);
+                        doc.setFont("helvetica", "normal");
+                        // Ajuste simples para valor após label
+                        doc.text(value, x + doc.getTextWidth(label) + 2, y);
+                    };
+
+                    addField("CÓDIGO:", dados.codigo || '-', 20, yPos);
+                    addField("UNIDADE:", dados.unidade || '-', 150, yPos);
+                    yPos += 7;
+
+                    // Descrição com quebra de linha
+                    doc.setFont("helvetica", "bold");
+                    doc.text("DESCRIÇÃO:", 20, yPos);
                     doc.setFont("helvetica", "normal");
 
                     const desc = dados.descricao || '-';
-                    const descLines = doc.splitTextToSize(desc, larguraPagina - 105);
-                    doc.text(descLines, 95, 35);
+                    const descLines = doc.splitTextToSize(desc, 150);
+                    doc.text(descLines, 45, yPos);
+
                     const descHeight = (descLines.length * 4);
-                    const linha2Y = 35 + Math.max(descHeight, 5) + 5;
+                    yPos += Math.max(descHeight, 7) + 3;
 
                     const dataExtenso = formatarDataExtenso(dados.data_base);
-                    const boxHeight = linha2Y + 5 - 28;
-                    doc.setFillColor(248, 249, 250); doc.rect(14, 28, larguraPagina - 28, boxHeight, 'F');
+                    if (dataExtenso) {
+                        addField("DATA BASE:", dataExtenso, 20, yPos);
+                    }
+                    addField("BDI:", (dados.bdi || '0,00') + "%", 100, yPos);
+                    addField("DESCONTO:", (dados.desconto || '0,00') + "%", 150, yPos);
 
-                    // Rewrite text over box
-                    doc.setFont("helvetica", "bold"); doc.text("CÓDIGO:", 18, 35);
-                    doc.setFont("helvetica", "normal"); doc.text(dados.codigo || '-', 40, 35);
-                    doc.setFont("helvetica", "bold"); doc.text("DESCRIÇÃO:", 70, 35);
-                    doc.setFont("helvetica", "normal"); doc.text(descLines, 95, 35);
-
-                    doc.setFont("helvetica", "bold"); doc.text("DATA BASE:", 18, linha2Y);
-                    doc.setFont("helvetica", "normal"); doc.text(dataExtenso, 42, linha2Y);
-                    doc.setFont("helvetica", "bold"); doc.text("UNIDADE:", larguraPagina - 50, linha2Y, { align: "right" });
-                    doc.setFont("helvetica", "normal"); doc.text(dados.unidade || '-', larguraPagina - 20, linha2Y, { align: "right" });
+                    const linha2Y = yPos + 5; // Para compatibilidade com restante do código (se usar linha2Y)
+                    // Mas o código original usa linha2Y para startY da tabela. 
+                    // Vamos ignorar linha2Y e ajustar startY da tabela abaixo.
 
                     let startY = linha2Y + 10;
                     const tableColumn = ["Origem", "Código", "Descrição", "Unid", "Coef.", "Preço", "Total"];
@@ -8422,3 +8937,19 @@
 </body>
 
 </html>
+<script>
+    // Inicialização da aba Composições
+    document.addEventListener('DOMContentLoaded', function () {
+        const tabComposicoes = document.querySelector('button[data-bs-target="#pane-composicoes"]');
+        if (tabComposicoes) {
+            tabComposicoes.addEventListener('shown.bs.tab', function (e) {
+                if (typeof listarComposicoes === 'function') {
+                    console.log("Carregando composições...");
+                    listarComposicoes();
+                } else {
+                    console.warn("Função listarComposicoes não encontrada.");
+                }
+            });
+        }
+    });
+</script>
