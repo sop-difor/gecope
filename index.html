@@ -7507,7 +7507,7 @@
 
                         if (itemGroup !== currentGroup) {
                             currentGroup = itemGroup;
-                            tableBody.push([{ content: currentGroup, colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
+                            tableBody.push([{ content: currentGroup, colSpan: 7, styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
                         }
 
                         let precoUnitarioBase = item.preco;
@@ -7535,24 +7535,26 @@
                             item.descricao,
                             item.unidade,
                             item.coeficiente.toLocaleString('pt-BR', { minimumFractionDigits: 4 }),
+                            precoUnitarioBase.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
                             totalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
                         ]);
                     });
 
                     doc.autoTable({
                         startY: yPos,
-                        head: [['Origem', 'Código', 'Descrição', 'Unid', 'Coef', 'Total (R$)']],
+                        head: [['Origem', 'Código', 'Descrição', 'Unid', 'Coef', 'Preço Unit.', 'Total (R$)']],
                         body: tableBody,
                         theme: 'grid',
                         styles: { fontSize: 8, cellPadding: 2 },
                         headStyles: { fillColor: [51, 51, 51], textColor: [255, 255, 255] },
                         columnStyles: {
-                            0: { cellWidth: 25 },
+                            0: { cellWidth: 22 },
                             1: { cellWidth: 20 },
                             2: { cellWidth: 'auto' },
-                            3: { cellWidth: 15, halign: 'center' },
-                            4: { cellWidth: 20, halign: 'center' },
-                            5: { cellWidth: 25, halign: 'right' }
+                            3: { cellWidth: 12, halign: 'center' },
+                            4: { cellWidth: 16, halign: 'center' },
+                            5: { cellWidth: 22, halign: 'right' },
+                            6: { cellWidth: 22, halign: 'right' }
                         },
                         margin: { top: 50, bottom: 20 }
                     });
@@ -7602,7 +7604,7 @@
 
                     doc.setFontSize(11);
                     doc.setTextColor(0, 143, 61);
-                    doc.text("PREÇO TOTAL UNITÁRIO:", 140, finalY + 2);
+                    doc.text("PREÇO TOTAL UNITÁRIO:", 110, finalY + 2);
                     doc.text(totalGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY + 2, { align: 'right' });
 
                     // --- MEMÓRIA DE CÁLCULO DETALHADA (Restaurada) ---
@@ -7612,7 +7614,7 @@
                         // Layout Constants
                         const mLeft = 14;
                         const mWidth = larguraPagina - 28;
-                        let cy = 50;
+                        let cy = 35;
 
                         // Title 1
                         doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
