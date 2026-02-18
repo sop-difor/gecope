@@ -15,12 +15,13 @@
     <link rel="preload" as="image"
         href="https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/unnamed22.jpg">
 
-    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"
+        defer></script>
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js" defer></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer></script>
 
 
     <style>
@@ -1340,6 +1341,66 @@
 </div>
 
 <body>
+
+    <!-- OVERLAY DE LOGIN (Renderizado diretamente no HTML para aparecer imediatamente) -->
+    <div id="landingOverlay" class="landing-overlay">
+
+        <!-- CARTÃO DE LOGIN CENTRAL -->
+        <div id="container-login" class="landing-card">
+            <div class="landing-card-header">
+                <h2>GECOPE</h2>
+            </div>
+            <div class="landing-card-body">
+                <form id="landingLoginForm">
+                    <div class="landing-input-group">
+                        <i class="bi bi-person"></i>
+                        <input id="landing-matricula" type="text" placeholder="Matrícula"
+                            class="form-control landing-input" required />
+                    </div>
+                    <div class="landing-input-group">
+                        <i class="bi bi-lock"></i>
+                        <input id="landing-password" type="password" placeholder="Senha"
+                            class="form-control landing-input" required />
+                    </div>
+                    <div id="landing-feedback" class="alert alert-danger py-2 px-3 small" style="display: none;"></div>
+                    <button class="btn btn-landing-submit" type="submit">Entrar</button>
+                    <div class="text-center mt-3 d-flex flex-column gap-2">
+                        <a href="#" id="btn-show-register"
+                            class="text-decoration-none small text-success fw-bold">Primeiro acesso? Cadastre-se</a>
+                        <a href="#" class="text-decoration-none small text-muted">Esqueci minha senha</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- CARTÃO DE REGISTRO -->
+        <div id="container-register" class="landing-card" style="display: none;">
+            <div class="landing-card-header" style="background: #018ABD;">
+                <h2>CADASTRO</h2>
+            </div>
+            <div class="landing-card-body">
+                <form id="landingRegisterForm">
+                    <div class="row g-2 mb-3">
+                        <div class="col"><input id="reg-nome" type="text" placeholder="Nome" class="form-control"
+                                required /></div>
+                        <div class="col"><input id="reg-sobrenome" type="text" placeholder="Sobrenome"
+                                class="form-control" required /></div>
+                    </div>
+                    <div class="mb-3"><input id="reg-matricula" type="text" placeholder="Matrícula" class="form-control"
+                            required /></div>
+                    <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha" class="form-control"
+                            required /></div>
+                    <div id="reg-feedback" class="alert alert-danger py-2 px-3 small" style="display: none;"></div>
+                    <button class="btn btn-primary w-100 fw-bold py-2" type="submit">Solicitar Cadastro</button>
+                    <div class="text-center mt-3">
+                        <a href="#" id="btn-show-login" class="text-decoration-none small text-muted fw-bold">Voltar ao
+                            Login</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
 
     <div class="top-bar">PORTAL SOP-CE • GOVERNO DO ESTADO DO CEARÁ • SISTEMA DE ADITIVOS DE OBRAS</div>
 
@@ -3048,64 +3109,9 @@
                 /* HTML do overlay será injetado dinamicamente para não alterar a ordem do arquivo
                    (mas já podemos defini-lo aqui para facilitar alteração futura). */
 
-                const landingHTML = `
-            <div id="landingOverlay" class="landing-overlay">
-                
-                <!-- CARTÃO DE LOGIN CENTRAL -->
-                <div id="container-login" class="landing-card">
-                    <div class="landing-card-header">
-                        <h2>GECOPE</h2>
-                    </div>
-                    <div class="landing-card-body">
-                        <form id="landingLoginForm">
-                            <div class="landing-input-group">
-                                <i class="bi bi-person"></i>
-                                <input id="landing-matricula" type="text" placeholder="Matrícula" class="form-control landing-input" required />
-                            </div>
-                            <div class="landing-input-group">
-                                <i class="bi bi-lock"></i>
-                                <input id="landing-password" type="password" placeholder="Senha" class="form-control landing-input" required />
-                            </div>
-                            <div id="landing-feedback" class="alert alert-danger py-2 px-3 small" style="display: none;"></div>
-                            
-                            <button class="btn btn-landing-submit" type="submit">Entrar</button>
-                            
-                            <div class="text-center mt-3 d-flex flex-column gap-2">
-                                <a href="#" id="btn-show-register" class="text-decoration-none small text-success fw-bold">Primeiro acesso? Cadastre-se</a>
-                                <a href="#" class="text-decoration-none small text-muted">Esqueci minha senha</a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- CARTÃO DE REGISTRO (MANTIDO PARA LÓGICA DE SISTEMA, MAS INVISÍVEL INICIALMENTE) -->
-                <div id="container-register" class="landing-card" style="display: none;">
-                    <div class="landing-card-header" style="background: #018ABD;">
-                        <h2>CADASTRO</h2>
-                    </div>
-                    <div class="landing-card-body">
-                        <form id="landingRegisterForm">
-                            <div class="row g-2 mb-3">
-                                <div class="col"><input id="reg-nome" type="text" placeholder="Nome" class="form-control" required /></div>
-                                <div class="col"><input id="reg-sobrenome" type="text" placeholder="Sobrenome" class="form-control" required /></div>
-                            </div>
-                            <div class="mb-3"><input id="reg-matricula" type="text" placeholder="Matrícula" class="form-control" required /></div>
-                            <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha" class="form-control" required /></div>
-                            <div id="reg-feedback" class="alert alert-danger py-2 px-3 small" style="display: none;"></div>
-                            
-                            <button class="btn btn-primary w-100 fw-bold py-2" type="submit">Solicitar Cadastro</button>
-                            <div class="text-center mt-3">
-                                <a href="#" id="btn-show-login" class="text-decoration-none small text-muted fw-bold">Voltar ao Login</a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-            </div>`;
-
-                // Injeta o overlay no final do body
+                // Overlay de login agora está no HTML estático (logo após <body>).
+                // Aqui apenas registramos os event listeners.
                 document.addEventListener('DOMContentLoaded', () => {
-                    document.body.insertAdjacentHTML('beforeend', landingHTML);
 
                     // Toggle Logic
                     const containerLogin = document.getElementById('container-login');
@@ -3207,7 +3213,62 @@
                 // CORREÇÃO: Usamos 'sbClient' para não conflitar com a biblioteca 'supabase' global
                 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-                const FISCAIS_LIST = ['ANTÔNIO EDSON', 'ANTÔNIO ELDER', 'ANTÔNIO ROLIM', 'ARTHUR EDÍSIO', 'ÁGABE SOUSA', 'CLOVIS FONTENELE', 'CRISTIANA PALÁCIO', 'CRISTIANO GUILHERME', 'DAVI BRAGA', 'DAVI GADELHA', 'DAVID MACHADO', 'DIEGO DEMÉTRIO', 'EDGAR PEIXOTO', 'EDILSON JR.', 'EDUARDO CIDRÃO', 'EDUARDO STÊNIO', 'EMMANUEL AUGUSTO', 'FÁBIO BONFIM', 'FLÁVIO COLARES', 'FLEURY NAPOLEÃO', 'FRANCISCO GOIANA', 'FRANCISCO PARENTE', 'FRANCISCO TALES', 'GUILHERME MAIA', 'HERBERT ALAN', 'JOHN HERBERT', 'JOSÉ MICHELL', 'JOSÉ MUNIZ', 'JOSÉ ROSEMBERG', 'JOSÉ WILLIAN', 'JOSUÉ JOHAB', 'JURANDIR VIANA', 'GECOPE DIFOR', 'JUSTINIANO CAMURÇA', 'KERLON', 'LEANDRO LESSA', 'LEONARDI', 'LEXANDRE HORTÊNCIO', 'LUCAS ARAÚJO', 'LUCIANO DENIZARDY', 'MANOEL LUCAS', 'MÁRCIO MONTENEGRO', 'MÁRIO EDSON', 'NERTAN FONSECA', 'PAULO LOIOLA', 'ROBERTO BRINGEL', 'ROBERTO HOLANDA', 'ROBERTO XAVIER', 'RUI DE PAULA', 'SAULLO MARINHO', 'VIRNA DE PAULA', 'WEBER TEIXEIRA', 'WILSON MACHADO'].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+                // Lista de Fiscais agora é dinâmica (carregada do banco)
+                let FISCAIS_LIST = [];
+
+                async function carregarListaFiscais() {
+                    try {
+                        const { data, error } = await sbClient
+                            .from('app_users')
+                            .select('nome, sobrenome')
+                            .order('nome', { ascending: true });
+
+                        if (error) throw error;
+
+                        if (data) {
+                            FISCAIS_LIST = data.map(u => {
+                                const nome = u.nome || '';
+                                const sobre = u.sobrenome || '';
+                                return `${nome} ${sobre}`.trim().toUpperCase();
+                            }).filter(n => n.length > 0);
+
+                            // Remove duplicatas e ordena
+                            FISCAIS_LIST = [...new Set(FISCAIS_LIST)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+                            console.log('Lista de Usuários carregada:', FISCAIS_LIST.length);
+
+                            // Atualiza dropdowns que dependem dessa lista (ex: cad-fiscal) se já existirem na tela
+                            atualizarDropdownsFiscais();
+                        }
+                    } catch (err) {
+                        console.error('Erro ao carregar lista de fiscais:', err);
+                    }
+                }
+
+                function atualizarDropdownsFiscais() {
+                    // Atualiza apenas dropdowns estáticos que precisam ser populados logo após o carregamento
+                    // Modais como 'share-user-select' ou 'coment-fiscal' são populados ao abrir, usando a FISCAIS_LIST atualizada
+                    const ids = ['cad-fiscal'];
+
+                    ids.forEach(id => {
+                        const sel = document.getElementById(id);
+                        if (sel) {
+                            const valAtual = sel.value;
+                            // Limpa mantendo a primeira opção (Selecione...)
+                            const firstOpt = sel.options[0];
+                            sel.innerHTML = '';
+                            if (firstOpt) sel.appendChild(firstOpt);
+
+                            FISCAIS_LIST.forEach(f => {
+                                const opt = document.createElement('option');
+                                opt.value = f; opt.textContent = f; sel.appendChild(opt);
+                            });
+
+                            if (valAtual && Array.from(sel.options).some(o => o.value === valAtual)) {
+                                sel.value = valAtual;
+                            }
+                        }
+                    });
+                }
 
                 // --- FUNÇÃO: ENCONTRAR FISCAL NA LISTA (MATCHING INTELIGENTE) ---
                 function findFiscalNameInList(nomeCompleto) {
@@ -3732,8 +3793,8 @@
                     console.log('[DEBUG] Executando carregarDadosSupabase()...');
                     carregarDadosSupabase();
 
-                    const sel = document.getElementById('cad-fiscal');
-                    if (sel) { FISCAIS_LIST.forEach(f => { const opt = document.createElement('option'); opt.value = f; opt.textContent = f; sel.appendChild(opt); }); }
+                    // Carrega lista de fiscais/usuários do Banco
+                    carregarListaFiscais();
 
                     document.querySelectorAll('.mask-date').forEach(input => {
                         input.addEventListener('input', function (e) {
@@ -5615,8 +5676,12 @@
                         document.querySelector('#formComentarioOrcamento textarea[name="MENSAGEM"]').value = '';
 
                         const sel = document.getElementById('coment-fiscal');
-                        sel.innerHTML = '<option value="">Selecione...</option>';
-                        FISCAIS_LIST.forEach(f => sel.innerHTML += `<option value="${f}">${f}</option>`);
+                        // Preenche automaticamente com o usuário logado
+                        const currentUserName = localStorage.getItem('sop_user_name') || localStorage.getItem('sop_user') || 'Usuário';
+                        sel.innerHTML = `<option value="${currentUserName}" selected>${currentUserName}</option>`;
+                        // Visualmente "readonly"
+                        sel.style.backgroundColor = '#e9ecef';
+                        sel.style.pointerEvents = 'none';
 
                         const chatContainer = document.getElementById('historico-comentarios');
                         const comentarios = data.comentarios_revisao || [];
@@ -5939,11 +6004,14 @@
                         const payload = {
                             categoria: categoria.toUpperCase(),
                             subcategoria: subcategoria.toUpperCase(),
-                            nome_obra: obra.toUpperCase(), // Usamos 'nome_obra' para manter padrão ou 'nome_composicao' se preferir, mas 'nome_obra' facilita reuso
+                            nome_obra: obra.toUpperCase(),
                             status: formData.get('STATUS'),
                             versao_atual: 'V1',
                             arquivo_url: publicUrlData.publicUrl,
                             arquivo_path: storagePath,
+                            criador_email: localStorage.getItem('sop_user') || 'sistema',
+                            criador_nome: localStorage.getItem('sop_user_name') || 'SISTEMA',
+                            criador_role: localStorage.getItem('sop_role') || 'fiscal',
                             historico_versoes: [{
                                 versao: 'V1',
                                 data: new Date().toISOString(),
@@ -6045,11 +6113,16 @@
                         document.querySelector('#formComentarioComposicao textarea[name="MENSAGEM"]').value = '';
 
                         const sel = document.getElementById('coment-fiscal-comp');
-                        sel.innerHTML = '<option value="">Selecione...</option>';
-                        FISCAIS_LIST.forEach(f => sel.innerHTML += `<option value="${f}">${f}</option>`);
+                        // Preenche automaticamente com o usuário logado
+                        const currentUserNameComp = localStorage.getItem('sop_user_name') || localStorage.getItem('sop_user') || 'Usuário';
+                        sel.innerHTML = `<option value="${currentUserNameComp}" selected>${currentUserNameComp}</option>`;
+                        // Visualmente "readonly"
+                        sel.style.backgroundColor = '#e9ecef';
+                        sel.style.pointerEvents = 'none';
 
                         const chat = document.getElementById('historico-comentarios-comp');
                         const comments = data.comentarios_revisao || [];
+
                         chat.innerHTML = comments.length ? comments.map(c => `
                             <div class="mb-2 border-bottom pb-1">
                                 <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${c.autor}</strong><span class="text-muted" style="font-size:0.7rem">${new Date(c.data).toLocaleDateString()}</span></div>
@@ -6205,6 +6278,101 @@
                     }
                 }
 
+                // 1.5.1 COMPARTILHAMENTO DE COMPOSIÇÃO (USING NATIVE COLUMNS)
+                async function abrirModalCompartilharComposicao(id) {
+                    try {
+                        const modalEl = document.getElementById('modalCompartilharComposicao');
+                        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+
+                        document.getElementById('share-id-comp').value = id;
+                        const select = document.getElementById('share-user-select');
+
+                        // Busca dados atuais
+                        const { data: comp, error } = await sbClient.from('composicoes_biblioteca').select('is_public, compartilhado_com').eq('id', id).single();
+                        if (error) throw error;
+
+                        // Limpa select
+                        select.innerHTML = '';
+
+                        // Opção Privado
+                        const optPriv = document.createElement('option');
+                        optPriv.value = 'private';
+                        optPriv.text = '⛔ Apenas Eu (Privado)';
+                        select.appendChild(optPriv);
+
+                        // Opção Todos
+                        const optAll = document.createElement('option');
+                        optAll.value = 'todos';
+                        optAll.text = '🌍 Todos os Usuários (Público)';
+                        select.appendChild(optAll);
+
+                        // Separador
+                        const optSep = document.createElement('option');
+                        optSep.disabled = true;
+                        optSep.text = '--- Usuários Específicos ---';
+                        select.appendChild(optSep);
+
+                        // Popula Users
+                        const userList = (typeof FISCAIS_LIST !== 'undefined' && Array.isArray(FISCAIS_LIST)) ? FISCAIS_LIST : [];
+                        userList.forEach(u => {
+                            const opt = document.createElement('option');
+                            opt.value = u;
+                            opt.text = u;
+                            select.appendChild(opt);
+                        });
+
+                        // Define valor atual
+                        if (comp.is_public) {
+                            select.value = 'todos';
+                        } else if (comp.compartilhado_com && comp.compartilhado_com.length > 0) {
+                            const firstUser = comp.compartilhado_com[0];
+                            if (!Array.from(select.options).some(o => o.value === firstUser)) {
+                                const optTemp = document.createElement('option');
+                                optTemp.value = firstUser;
+                                optTemp.text = firstUser;
+                                select.appendChild(optTemp);
+                            }
+                            select.value = firstUser;
+                        } else {
+                            select.value = 'private';
+                        }
+
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                    } catch (err) {
+                        alert("Erro ao abrir compartilhamento: " + err.message);
+                    }
+                }
+
+                async function salvarCompartilhamento() {
+                    const id = document.getElementById('share-id-comp').value;
+                    const choice = document.getElementById('share-user-select').value;
+
+                    if (!choice) return;
+
+                    const payload = {
+                        is_public: false,
+                        compartilhado_com: [] // Reset to empty array (Postgres text[])
+                    };
+
+                    if (choice === 'todos') {
+                        payload.is_public = true;
+                    } else if (choice !== 'private') {
+                        // Usuário específico
+                        payload.compartilhado_com = [choice];
+                    }
+
+                    try {
+                        const { error } = await sbClient.from('composicoes_biblioteca').update(payload).eq('id', id);
+                        if (error) throw error;
+
+                        alert("Compartilhamento atualizado com sucesso!");
+                        bootstrap.Modal.getInstance(document.getElementById('modalCompartilharComposicao')).hide();
+                        carregarComposicoes();
+                    } catch (err) {
+                        alert("Erro ao salvar: " + err.message);
+                    }
+                }
+
                 // 1.2 CARREGAR COMPOSIÇÕES (CORRIGIDO)
                 async function carregarComposicoes() {
                     const container = document.getElementById('accordionComposicoes');
@@ -6258,8 +6426,16 @@
                                     autorV1.toLowerCase().includes('sistema') ||
                                     item.criador_role === 'admin';
 
-                                // Regra: Admins veem tudo. Fiscais veem o seu + o de admin.
-                                if (role !== 'admin' && !isOwner && !isAdminWork) return;
+                                // Regra: Admins veem tudo. Fiscais veem o seu + o de admin + COMPARTILHADO.
+                                const isPublic = !!item.is_public;
+                                const sharedList = item.compartilhado_com || [];
+
+                                // Verifica se o usuário atual está na lista de compartilhados
+                                const isShared = isPublic ||
+                                    (currentUserName && sharedList.includes(currentUserName)) ||
+                                    (currentFiscalName && sharedList.includes(currentFiscalName));
+
+                                if (role !== 'admin' && !isOwner && !isAdminWork && !isShared) return;
 
                                 const catKey = item.categoria || 'OUTROS';
                                 const subKey = item.subcategoria || 'GERAL';
@@ -6360,6 +6536,8 @@
                                             ` : ''}
                                             
                                             <button class="btn btn-action-icon" onclick="prepararComentarioComposicao(${obra.id})" title="Adicionar Comentário"><i class="bi bi-chat-left-text-fill text-warning"></i></button>
+                                            
+                                            ${(isOwnerRendering || isAdmin) ? `<button class="btn btn-action-icon ms-1" onclick="abrirModalCompartilharComposicao(${obra.id})" title="Compartilhar"><i class="bi bi-share-fill text-info"></i></button>` : ''}
                                             
                                             ${(isAdmin || isOwnerRendering) ? `
                                             <button class="btn btn-action-icon" onclick="deletarComposicao(${obra.id}, '${obra.arquivo_path}')" title="Excluir Composição"><i class="bi bi-trash-fill icon-trash"></i></button>
@@ -8753,6 +8931,48 @@
                 </div>
             </div>
 
+            <!-- 7. MODAL COMPARTILHAR COMPOSIÇÃO -->
+            <div class="modal fade" id="modalCompartilharComposicao" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-info-subtle">
+                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-share-fill me-2"></i>COMPARTILHAR
+                                COMPOSIÇÃO</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="formCompartilhar">
+                                <input type="hidden" id="share-id-comp">
+                                <p class="small text-muted mb-3">Defina quem pode visualizar esta composição além de
+                                    você.</p>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">COMPARTILHAR COM:</label>
+                                    <select class="form-select" id="share-user-select">
+                                        <option value="todos">Todos os Usuários (Público)</option>
+                                        <option value="selecionar" disabled>--- Selecione um Usuário ---</option>
+                                        <!-- Preenchido dinamicamente -->
+                                    </select>
+                                </div>
+
+                                <div class="alert alert-light border-info small text-info">
+                                    <i class="bi bi-info-circle-fill me-1"></i>
+                                    Ao selecionar "Todos", a composição ficará visível para qualquer usuário do sistema.
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary btn-sm fw-bold"
+                                onclick="salvarCompartilhamento()">
+                                <i class="bi bi-check-lg"></i> Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <script>
                 // Inserido: função G_cp_ge e utilitários associados (fornecido pelo usuário)
                 function G_cp_ge(a, b, c) {
@@ -8945,11 +9165,11 @@
         const tabComposicoes = document.querySelector('button[data-bs-target="#pane-composicoes"]');
         if (tabComposicoes) {
             tabComposicoes.addEventListener('shown.bs.tab', function (e) {
-                if (typeof listarComposicoes === 'function') {
+                if (typeof carregarComposicoes === 'function') {
                     console.log("Carregando composições...");
-                    listarComposicoes();
+                    carregarComposicoes();
                 } else {
-                    console.warn("Função listarComposicoes não encontrada.");
+                    console.warn("Função carregarComposicoes não encontrada.");
                 }
             });
         }
