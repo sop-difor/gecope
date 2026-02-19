@@ -432,21 +432,6 @@
             align-items: center;
             justify-content: center;
             font-family: 'Montserrat', sans-serif;
-
-            /* Animação sutil de entrada (opcional) */
-            animation: fadeInBackground 1.2s ease-out;
-        }
-
-        @keyframes fadeInBackground {
-            from {
-                opacity: 0;
-                transform: scale(1.02);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
         }
 
         .landing-card {
@@ -2591,6 +2576,27 @@
                                     style="background-color: #fffae6; border: 1px solid #f0e68c; font-size: 0.95rem; resize: vertical; min-height: 200px;"
                                     placeholder="Digite aqui observações sobre este processo. Elas ficarão salvas apenas neste computador."></textarea>
                             </div>
+
+                            <div class="col-12 mt-4 pt-2 border-top">
+                                <h6 class="text-secondary small fw-bold mb-3"><i
+                                        class="bi bi-clock-history me-1"></i>HISTÓRICO DE AÇÕES</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted" style="font-size: 0.75rem;">CRIADO
+                                            POR</label>
+                                        <input type="text" class="form-control form-control-sm bg-light text-secondary"
+                                            id="det_criador" readonly>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted" style="font-size: 0.75rem;">ÚLTIMA
+                                            ATUALIZAÇÃO</label>
+                                        <input type="text" class="form-control form-control-sm bg-light text-secondary"
+                                            id="det_atualizacao" readonly>
+                                    </div>
+                                </div>
+                            </div>
+
+
                         </div>
                     </form>
                     <div id="msg-detalhes" class="mt-3" style="display:none"></div>
@@ -3213,35 +3219,66 @@
                 // CORREÇÃO: Usamos 'sbClient' para não conflitar com a biblioteca 'supabase' global
                 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-                // Lista de Fiscais agora é dinâmica (carregada do banco)
-                let FISCAIS_LIST = [];
+                // LISTA DE FISCAIS (FIXA - SOLICITAÇÃO USUÁRIO)
+                const FISCAIS_LIST = [
+                    'ANTÔNIO EDSON', 'ANTÔNIO ELDER', 'ANTÔNIO ROLIM', 'ARTHUR EDÍSIO', 'ÁGABE SOUSA', 'CLOVIS FONTENELE',
+                    'CRISTIANA PALÁCIO', 'CRISTIANO GUILHERME', 'DAVI BRAGA', 'DAVI GADELHA', 'DAVID MACHADO', 'DIEGO DEMÉTRIO',
+                    'EDGAR PEIXOTO', 'EDILSON JR.', 'EDUARDO CIDRÃO', 'EDUARDO STÊNIO', 'EMMANUEL AUGUSTO', 'FÁBIO BONFIM',
+                    'FLÁVIO COLARES', 'FLEURY NAPOLEÃO', 'FRANCISCO GOIANA', 'FRANCISCO PARENTE', 'FRANCISCO TALES',
+                    'GUILHERME MAIA', 'HERBERT ALAN', 'JOHN HERBERT', 'JOSÉ MICHELL', 'JOSÉ MUNIZ', 'JOSÉ ROSEMBERG',
+                    'JOSÉ WILLIAN', 'JOSUÉ JOHAB', 'JURANDIR VIANA', 'GECOPE DIFOR', 'JUSTINIANO CAMURÇA', 'KERLON',
+                    'LEANDRO LESSA', 'LEONARDI', 'LEXANDRE HORTÊNCIO', 'LUCAS ARAÚJO', 'LUCIANO DENIZARDY', 'MANOEL LUCAS',
+                    'MÁRCIO MONTENEGRO', 'MÁRIO EDSON', 'NERTAN FONSECA', 'PAULO LOIOLA', 'ROBERTO BRINGEL', 'ROBERTO HOLANDA',
+                    'ROBERTO XAVIER', 'RUI DE PAULA', 'SAULLO MARINHO', 'VIRNA DE PAULA', 'WEBER TEIXEIRA', 'WILSON MACHADO'
+                ];
 
-                async function carregarListaFiscais() {
-                    try {
-                        const { data, error } = await sbClient
-                            .from('app_users')
-                            .select('nome, sobrenome')
-                            .order('nome', { ascending: true });
+                function carregarListaFiscais() {
+                    console.log('Lista de Usuários carregada (Estática):', FISCAIS_LIST.length);
+                    atualizarDropdownsFiscais();
+                }
 
-                        if (error) throw error;
+                // --- 1. MÁSCARA PROCESSO ---
+                function mascaraProcesso(val) {
+                    val = val.replace(/\D/g, '');
+                    val = val.replace(/^(\d{5})(\d)/, '$1.$2');
+                    val = val.replace(/^(\d{5})\.(\d{6})(\d)/, '$1.$2/$3');
+                    val = val.replace(/^(\d{5})\.(\d{6})\/(\d{4})(\d)/, '$1.$2/$3-$4');
+                    if (val.length > 20) val = val.substring(0, 20);
+                    return val;
+                }
 
-                        if (data) {
-                            FISCAIS_LIST = data.map(u => {
-                                const nome = u.nome || '';
-                                const sobre = u.sobrenome || '';
-                                return `${nome} ${sobre}`.trim().toUpperCase();
-                            }).filter(n => n.length > 0);
-
-                            // Remove duplicatas e ordena
-                            FISCAIS_LIST = [...new Set(FISCAIS_LIST)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-                            console.log('Lista de Usuários carregada:', FISCAIS_LIST.length);
-
-                            // Atualiza dropdowns que dependem dessa lista (ex: cad-fiscal) se já existirem na tela
-                            atualizarDropdownsFiscais();
-                        }
-                    } catch (err) {
-                        console.error('Erro ao carregar lista de fiscais:', err);
+                document.addEventListener('input', function (e) {
+                    // Máscara Processo
+                    if (e.target.id === 'cad-processo') {
+                        e.target.value = mascaraProcesso(e.target.value);
                     }
+
+                    // 2. Cálculo Automático de Repercussão
+                    if (e.target.classList.contains('calc-fiscal')) calcRepercussao('fisc');
+                    if (e.target.classList.contains('calc-gecope')) calcRepercussao('gec');
+                });
+
+                function calcRepercussao(tipo) {
+                    const elAcresc = document.getElementById(tipo === 'fisc' ? 'acresc_fisc' : 'acresc_gec');
+                    const elSupres = document.getElementById(tipo === 'fisc' ? 'supres_fisc' : 'supres_gec');
+                    const elReperc = document.getElementById(tipo === 'fisc' ? 'reperc_fisc' : 'reperc_gec');
+
+                    if (!elAcresc || !elSupres || !elReperc) return;
+
+                    const vAcresc = moedaParaNumero(elAcresc.value) || 0;
+                    const vSupres = moedaParaNumero(elSupres.value) || 0;
+
+                    // Repercussão = Acréscimo + Supressão
+                    // (O usuário informou que a Supressão já é registrada como valor negativo, então soma-se os valores)
+                    const vReperc = vAcresc + vSupres;
+
+                    if (isNaN(vReperc)) {
+                        elReperc.value = 'R$ 0,00';
+                        return;
+                    }
+
+                    const valFormatado = vReperc.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    elReperc.value = 'R$ ' + valFormatado;
                 }
 
                 function atualizarDropdownsFiscais() {
@@ -3409,6 +3446,15 @@
 
                         if (!data || data.length === 0) {
                             console.warn('[AVISO] Nenhum dado retornado. Tabela vazia ou não existe.');
+                        } else {
+                            // FILTRO DE EXCLUÍDOS (Soft Delete)
+                            // Remove processos marcados como 'EXCLUÍDO' da visualização principal
+                            const countBefore = data.length;
+                            data = data.filter(d => d.status !== 'EXCLUÍDO' && d.status !== 'EXCLUIDO');
+                            const countAfter = data.length;
+                            if (countBefore !== countAfter) {
+                                console.log(`[AUDIT] ${countBefore - countAfter} processos excluídos ocultados da lista.`);
+                            }
                         }
                     } catch (err) {
                         console.error('[ERRO] Falha ao carregar dados:', err.message || err);
@@ -3535,7 +3581,15 @@
                             repercFiscal: Number(r.reperc_fiscal) || 0,
                             acrescGecope: Number(r.acresc_gecope) || 0,
                             supressGecope: Number(r.supress_gecope) || 0,
-                            repercGecope: Number(r.reperc_gecope) || 0
+                            repercGecope: Number(r.reperc_gecope) || 0,
+
+                            // Audit Data Mapping
+                            criador: r.criador,
+                            created_at: r.created_at,
+                            atualizado_por: r.atualizado_por,
+                            ultima_atualizacao: r.ultima_atualizacao, // timestamp
+                            excluido_por: r.excluido_por,
+                            data_exclusao: r.data_exclusao
                         };
                     });
 
@@ -3563,15 +3617,55 @@
                     if (!form.checkValidity()) { form.reportValidity(); return; }
 
                     const formData = new FormData(form);
-                    const numProcesso = formData.get("PROCESSO N.");
+                    const numProcessoRaw = formData.get("PROCESSO N.");
+                    const numProcesso = numProcessoRaw ? numProcessoRaw.trim() : "";
 
-                    const existe = allData.some(d => d.processo === numProcesso);
-                    if (existe) {
-                        alert("Erro: Este número de processo já existe no banco de dados.");
+                    // 1. Validação de Formato Rigorosa (00000.000000/0000-00)
+                    const formatRegex = /^\d{5}\.\d{6}\/\d{4}-\d{2}$/;
+                    if (!formatRegex.test(numProcesso)) {
+                        alert("Formato inválido!\nO número deve seguir estritamente o padrão: 00000.000000/0000-00");
                         return;
                     }
 
+                    // 2. Verificação Local (Feedback Instantâneo)
+                    const existeLocal = allData.some(d => d.processo === numProcesso);
+                    if (existeLocal) {
+                        alert("Este número de processo já consta na lista local.");
+                        return;
+                    }
+
+                    // Salva texto/estado do botão
                     btn.disabled = true;
+                    const btnTextoOriginal = btn.innerText;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> VERIFICANDO...';
+
+                    // 3. Verificação no Servidor (Garantia de Unicidade)
+                    try {
+                        const { data: dbCheck, error: checkError } = await sbClient
+                            .from('processos')
+                            .select('id')
+                            .eq('processo', numProcesso)
+                            .maybeSingle();
+
+                        if (checkError) {
+                            throw checkError; // Joga para o catch
+                        }
+
+                        if (dbCheck) {
+                            alert("ERRO CRÍTICO: Este processo já existe no banco de dados.");
+                            btn.disabled = false;
+                            btn.innerHTML = btnTextoOriginal;
+                            return;
+                        }
+
+                    } catch (err) {
+                        console.error("Erro ao verificar duplicidade:", err);
+                        alert("Erro de conexão/verificação. Tente novamente.");
+                        btn.disabled = false;
+                        btn.innerHTML = btnTextoOriginal;
+                        return;
+                    }
+
                     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> SALVANDO...';
 
                     const payload = {
@@ -3593,7 +3687,12 @@
                         reperc_fiscal: moedaParaNumero(formData.get("REPERCUSSÃO FISCALIZAÇÃO")),
                         acresc_gecope: moedaParaNumero(formData.get("ACRÉSCIMO GECOPE")),
                         supress_gecope: moedaParaNumero(formData.get("SUPRESSÃO GECOPE")),
-                        reperc_gecope: moedaParaNumero(formData.get("REPERCUSSÃO GECOPE"))
+                        reperc_gecope: moedaParaNumero(formData.get("REPERCUSSÃO GECOPE")),
+
+                        // Audit: Criação
+                        criador: localStorage.getItem('sop_user_name') || 'Sistema',
+
+
                     };
 
                     const { data, error } = await sbClient.from('processos').insert([payload]);
@@ -3672,6 +3771,20 @@
                     document.getElementById('btn-atualizar').innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
                     document.getElementById('btn-excluir').innerHTML = '<i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO';
 
+                    // Audit Info Display
+                    const dtCriacao = row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : '';
+                    const txtCriador = row.criador || 'Não Registrado';
+                    document.getElementById('det_criador').value = dtCriacao ? `${txtCriador} em ${dtCriacao}` : txtCriador;
+
+                    let txtUpdate = 'Sem alterações recentes';
+                    if (row.atualizado_por) {
+                        const dt = row.ultima_atualizacao ? new Date(row.ultima_atualizacao).toLocaleString('pt-BR') : '';
+                        txtUpdate = `${row.atualizado_por} em ${dt}`;
+                    }
+                    document.getElementById('det_atualizacao').value = txtUpdate;
+
+
+
                     const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
                     modal.show();
                 }
@@ -3688,12 +3801,20 @@
                     const idUnico = registroOriginal.id;
 
                     if (actionType === 'delete') {
-                        if (!confirm("TEM CERTEZA? Isso apagará permanentemente do banco.")) return;
+                        if (!confirm("TEM CERTEZA? O processo será movido para EXCLUÍDOS e sairá da lista principal.")) return;
                         const btn = document.getElementById('btn-excluir');
                         btn.innerHTML = "EXCLUINDO...";
                         btn.disabled = true;
 
-                        const { error } = await sbClient.from('processos').delete().eq('id', idUnico);
+                        // Soft Delete com Auditoria
+                        const userName = localStorage.getItem('sop_user_name') || 'Usuário Desconhecido';
+                        const updates = {
+                            status: 'EXCLUÍDO',
+                            excluido_por: userName,
+                            data_exclusao: new Date().toISOString()
+                        };
+
+                        const { error } = await sbClient.from('processos').update(updates).eq('id', idUnico);
 
                         if (error) {
                             alert("Erro ao excluir: " + error.message);
@@ -3731,7 +3852,11 @@
                             reperc_fiscal: moedaParaNumero(formData.get("REPERCUSSÃO FISCALIZAÇÃO")),
                             acresc_gecope: moedaParaNumero(formData.get("ACRÉSCIMO GECOPE")),
                             supress_gecope: moedaParaNumero(formData.get("SUPRESSÃO GECOPE")),
-                            reperc_gecope: moedaParaNumero(formData.get("REPERCUSSÃO GECOPE"))
+                            reperc_gecope: moedaParaNumero(formData.get("REPERCUSSÃO GECOPE")),
+
+                            // Audit: Atualização
+                            atualizado_por: localStorage.getItem('sop_user_name') || 'Usuário Desconhecido',
+                            ultima_atualizacao: new Date().toISOString()
                         };
 
                         const btn = document.getElementById('btn-atualizar');
@@ -9172,6 +9297,11 @@
                     console.warn("Função carregarComposicoes não encontrada.");
                 }
             });
+        }
+
+        // Ensure Fiscais List is populated on load
+        if (typeof carregarListaFiscais === 'function') {
+            carregarListaFiscais();
         }
     });
 </script>
