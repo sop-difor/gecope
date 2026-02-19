@@ -9303,5 +9303,47 @@
         if (typeof carregarListaFiscais === 'function') {
             carregarListaFiscais();
         }
+
+        // --- FIX: Cálculo Automático de Repercussão (Gerenciar Processo) ---
+        const inputsCalculo = [
+            { a: 'det_acresc_f', s: 'det_supress_f', r: 'det_reperc_f' }, // Fiscalização
+            { a: 'det_acresc_g', s: 'det_supress_g', r: 'det_reperc_g' }  // GECOPE
+        ];
+
+        function calcularRepercussaoDetalhes(acrescId, supressId, repercId) {
+            const elA = document.getElementById(acrescId);
+            const elS = document.getElementById(supressId);
+            const elR = document.getElementById(repercId);
+
+            if (!elA || !elS || !elR) return;
+
+            // Função helper segura para converter moeda
+            const parseMoney = (v) => {
+                if (!v) return 0;
+                // Remove tudo que não é dígito ou vírgula/ponto, depois padroniza
+                // Assumindo formato pt-BR: 1.000,00
+                // Se usar a função global moedaParaNumero existente seria melhor, 
+                // mas vamos garantir que funcione mesmo se o escopo for complexo.
+                // Mas como vimos moedaParaNumero global, vamos tentar usar ela se existir, senão fallback.
+                if (typeof moedaParaNumero === 'function') return moedaParaNumero(v);
+
+                const clean = v.replace(/\./g, '').replace(',', '.');
+                return parseFloat(clean) || 0;
+            };
+
+            const valA = parseMoney(elA.value);
+            const valS = parseMoney(elS.value);
+            const valR = valA + valS;
+
+            elR.value = valR.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        inputsCalculo.forEach(group => {
+            const elA = document.getElementById(group.a);
+            const elS = document.getElementById(group.s);
+
+            if (elA) elA.addEventListener('input', () => calcularRepercussaoDetalhes(group.a, group.s, group.r));
+            if (elS) elS.addEventListener('input', () => calcularRepercussaoDetalhes(group.a, group.s, group.r));
+        });
     });
 </script>
