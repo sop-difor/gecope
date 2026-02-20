@@ -28,11 +28,12 @@
         /* Badge AZUL para Status Atualizado */
         .badge-status-atualizado {
             background-color: #0d6efd;
-            /* Azul Royal */
             color: #fff;
             font-size: 0.65rem;
             margin-left: 8px;
             border: 1px solid #0a58ca;
+            padding: 2px 6px;
+            border-radius: 4px;
         }
 
         /* Garante que o modal fique sempre na frente de tudo */
@@ -55,7 +56,6 @@
 
         body.is-admin .admin-only {
             display: inline-block !important;
-            /* ou block/flex conforme necessidade */
         }
 
         /* Regra para esconder elementos do Fiscal */
@@ -63,14 +63,7 @@
             display: none !important;
         }
 
-        /* Badge Status Atualizado (Novo) */
-        .badge-status-atualizado {
-            background-color: #0d6efd;
-            /* Azul forte */
-            color: #fff;
-            font-size: 0.65rem;
-            margin-left: 8px;
-        }
+
 
         /* Badge Status Em Revisão (Ajuste) */
         .badge-status-revisao {
@@ -155,14 +148,7 @@
 
         /* Vermelho */
 
-        /* Ajuste na linha para garantir alinhamento vertical */
-        .orcamento-item-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15px 20px;
-            /* Mais espaçamento interno */
-        }
+
 
         /* --- CABEÇALHO HERO (ORÇAMENTOS) --- */
 
@@ -1059,18 +1045,7 @@
             text-decoration: underline;
         }
 
-        /* --- SISTEMA DE PERMISSÕES --- */
 
-        /* Por padrão, elementos restritos não aparecem */
-        .admin-only {
-            display: none !important;
-        }
-
-        /* Quando o corpo da página tiver a classe 'is-admin', eles aparecem */
-        body.is-admin .admin-only {
-            display: inline-block !important;
-            /* ou block, dependendo do elemento */
-        }
 
         /* Estilo do botão de cadeado */
         .btn-admin-login {
@@ -3166,6 +3141,16 @@
                         containerLogin.style.display = 'block';
                         document.getElementById('landingRegisterForm').reset();
                     });
+                    // Listeners de Abas
+                    const tabComposicoes = document.querySelector('button[data-bs-target="#pane-composicoes"]');
+                    if (tabComposicoes) {
+                        tabComposicoes.addEventListener('shown.bs.tab', () => {
+                            if (typeof carregarComposicoes === 'function') carregarComposicoes();
+                        });
+                    }
+
+                    // Inicialização
+                    if (typeof carregarListaFiscais === 'function') carregarListaFiscais();
                 });
 
 
@@ -3247,39 +3232,38 @@
                     return val;
                 }
 
-                document.addEventListener('input', function (e) {
-                    // Máscara Processo
-                    if (e.target.id === 'cad-processo') {
-                        e.target.value = mascaraProcesso(e.target.value);
-                    }
+                function calcRepercussao(acrescId, supressId, repercId) {
+                    const elA = document.getElementById(acrescId);
+                    const elS = document.getElementById(supressId);
+                    const elR = document.getElementById(repercId);
 
-                    // 2. Cálculo Automático de Repercussão
-                    if (e.target.classList.contains('calc-fiscal')) calcRepercussao('fisc');
-                    if (e.target.classList.contains('calc-gecope')) calcRepercussao('gec');
-                });
+                    if (!elA || !elS || !elR) return;
 
-                function calcRepercussao(tipo) {
-                    const elAcresc = document.getElementById(tipo === 'fisc' ? 'acresc_fisc' : 'acresc_gec');
-                    const elSupres = document.getElementById(tipo === 'fisc' ? 'supres_fisc' : 'supres_gec');
-                    const elReperc = document.getElementById(tipo === 'fisc' ? 'reperc_fisc' : 'reperc_gec');
+                    const valA = moedaParaNumero(elA.value) || 0;
+                    const valS = moedaParaNumero(elS.value) || 0;
+                    const valR = valA + valS;
 
-                    if (!elAcresc || !elSupres || !elReperc) return;
-
-                    const vAcresc = moedaParaNumero(elAcresc.value) || 0;
-                    const vSupres = moedaParaNumero(elSupres.value) || 0;
-
-                    // Repercussão = Acréscimo + Supressão
-                    // (O usuário informou que a Supressão já é registrada como valor negativo, então soma-se os valores)
-                    const vReperc = vAcresc + vSupres;
-
-                    if (isNaN(vReperc)) {
-                        elReperc.value = 'R$ 0,00';
-                        return;
-                    }
-
-                    const valFormatado = vReperc.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    elReperc.value = 'R$ ' + valFormatado;
+                    elR.value = 'R$ ' + valR.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
+
+                document.addEventListener('input', (e) => {
+                    if (e.target.id === 'cad-processo') e.target.value = mascaraProcesso(e.target.value);
+
+                    if (e.target.classList.contains('calc-fiscal')) calcRepercussao('acresc_fisc', 'supres_fisc', 'reperc_fisc');
+                    if (e.target.classList.contains('calc-gecope')) calcRepercussao('acresc_gec', 'supres_gec', 'reperc_gec');
+
+                    // Detalhes (Gerenciar Processo)
+                    const detailsMap = {
+                        'det_acresc_f': ['det_acresc_f', 'det_supress_f', 'det_reperc_f'],
+                        'det_supress_f': ['det_acresc_f', 'det_supress_f', 'det_reperc_f'],
+                        'det_acresc_g': ['det_acresc_g', 'det_supress_g', 'det_reperc_g'],
+                        'det_supress_g': ['det_acresc_g', 'det_supress_g', 'det_reperc_g']
+                    };
+                    if (detailsMap[e.target.id]) {
+                        const [a, s, r] = detailsMap[e.target.id];
+                        calcRepercussao(a, s, r);
+                    }
+                });
 
                 function atualizarDropdownsFiscais() {
                     // Atualiza apenas dropdowns estáticos que precisam ser populados logo após o carregamento
@@ -5871,51 +5855,113 @@
                     await sbClient.from('orcamentos_biblioteca').update({ comentarios_revisao: novoArr }).eq('id', id);
                 }
 
-                // Helper para deletar (Admin) - CORRIGIDO
-                async function deletarOrcamento(id, path) {
-                    // 1. Confirmação de segurança
-                    if (!confirm("⚠️ TEM CERTEZA?\n\nIsso apagará permanentemente este orçamento do Banco de Dados e o arquivo associado.\n\nClique em OK para confirmar.")) return;
+                /* --- MOTORES GENÉRICOS (OTIMIZAÇÃO) --- */
 
-                    // Feedback visual de carregamento
-                    document.body.style.cursor = 'wait';
+                async function processarDecisaoGenerica(config) {
+                    const { table, id, index, decision, respText, modalId, callback } = config;
+                    const btn = document.querySelector(`#${modalId} .btn-success, #${modalId} .btn-danger`);
+                    const txtOrig = btn?.innerHTML || "Confirmar";
+
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
+                    }
 
                     try {
-                        // 2. Remove arquivo do Storage (se existir caminho salvo)
-                        // Fazemos isso primeiro para não deixar arquivos "órfãos", mas não paramos se der erro aqui
-                        if (path) {
-                            const { error: storageError } = await sbClient.storage
-                                .from('orcamentos')
-                                .remove([path]);
-
-                            if (storageError) {
-                                console.warn("Aviso: Erro ao deletar arquivo físico (pode já ter sido deletado):", storageError.message);
-                            }
+                        const { data } = await sbClient.from(table).select('comentarios_revisao').eq('id', id).single();
+                        const hist = data.comentarios_revisao || [];
+                        if (hist[index]) {
+                            hist[index].decisao = decision;
+                            hist[index].resp_admin = respText || (decision === 'atendido' ? "Solicitação atendida." : "Solicitação não acatada.");
+                            hist[index].data_resp = new Date().toISOString();
                         }
+                        const { error } = await sbClient.from(table).update({ comentarios_revisao: hist }).eq('id', id);
+                        if (error) throw error;
 
-                        // 3. Remove o registro do Banco de Dados (AQUI É A EXCLUSÃO REAL)
-                        const { error: dbError } = await sbClient
-                            .from('orcamentos_biblioteca')
-                            .delete()
-                            .eq('id', id); // Garante que apaga SOMENTE o item com este ID
-
-                        // Se o Supabase retornar erro (ex: permissão negada), lançamos para o catch
-                        if (dbError) {
-                            throw new Error(dbError.message);
-                        }
-
-                        // 4. Sucesso
-                        alert("✅ Registro excluído do Banco de Dados!");
-
-                        // Atualiza a lista na tela
-                        carregarOrcamentos();
-
+                        alert("Ação realizada com sucesso!");
+                        bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+                        if (callback) callback();
                     } catch (err) {
-                        console.error("Erro fatal na exclusão:", err);
-                        alert("❌ Erro ao excluir: " + err.message + "\n\nVerifique se o usuário tem permissão de exclusão no Supabase (Policies).");
+                        alert("Erro: " + err.message);
+                    } finally {
+                        if (btn) { btn.disabled = false; btn.innerHTML = txtOrig; }
+                    }
+                }
+
+                function abrirModalDecisao(modalId, id, idx, idInput, idxInput, formId) {
+                    const modalEl = document.getElementById(modalId);
+                    if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+                    document.getElementById(idInput).value = id;
+                    document.getElementById(idxInput).value = idx;
+                    document.getElementById(formId)?.reset();
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+
+                async function processarAtendimento() {
+                    const id = document.getElementById('atender-id-orcamento').value;
+                    const index = document.getElementById('atender-index-comentario').value;
+                    const resp = document.getElementById('textoAtender').value;
+                    await processarDecisaoGenerica({
+                        table: 'orcamentos_biblioteca', id, index, decision: 'atendido',
+                        respText: resp, modalId: 'modalAtenderRevisao', callback: carregarOrcamentos
+                    });
+                }
+
+                async function processarRecusa() {
+                    const id = document.getElementById('recusar-id-orcamento').value;
+                    const index = document.getElementById('recusar-index-comentario').value;
+                    const resp = document.getElementById('textoRecusar').value;
+                    await processarDecisaoGenerica({
+                        table: 'orcamentos_biblioteca', id, index, decision: 'recusado',
+                        respText: resp, modalId: 'modalRecusarRevisao', callback: carregarOrcamentos
+                    });
+                }
+
+                async function processarAtendimentoComposicao() {
+                    const id = document.getElementById('atender-id-composicao').value;
+                    const index = document.getElementById('atender-index-comentario-comp').value;
+                    const resp = document.getElementById('textoAtenderComp').value;
+                    await processarDecisaoGenerica({
+                        table: 'composicoes_biblioteca', id, index, decision: 'atendido',
+                        respText: resp, modalId: 'modalAtenderComposicao', callback: carregarComposicoes
+                    });
+                }
+
+                async function processarRecusaComposicao() {
+                    const id = document.getElementById('recusar-id-composicao').value;
+                    const index = document.getElementById('recusar-index-comentario-comp').value;
+                    const resp = document.getElementById('textoRecusarComp').value;
+                    await processarDecisaoGenerica({
+                        table: 'composicoes_biblioteca', id, index, decision: 'recusado',
+                        respText: resp, modalId: 'modalRecusarComposicao', callback: carregarComposicoes
+                    });
+                }
+
+                async function deletarRegistroGenerico(table, bucket, id, path, callback) {
+                    if (!confirm("⚠️ TEM CERTEZA?\n\nIsso apagará permanentemente o registro e o arquivo associado.")) return;
+                    document.body.style.cursor = 'wait';
+                    try {
+                        if (path) await sbClient.storage.from(bucket).remove([path]);
+                        const { error } = await sbClient.from(table).delete().eq('id', id);
+                        if (error) throw error;
+                        alert("✅ Excluído com sucesso!");
+                        if (callback) callback();
+                    } catch (err) {
+                        alert("Erro ao excluir: " + err.message);
                     } finally {
                         document.body.style.cursor = 'default';
                     }
                 }
+
+                async function deletarOrcamento(id, path) {
+                    await deletarRegistroGenerico('orcamentos_biblioteca', 'orcamentos', id, path, carregarOrcamentos);
+                }
+
+                async function deletarComposicao(id, path) {
+                    await deletarRegistroGenerico('composicoes_biblioteca', 'composicoes_biblioteca', id, path, carregarComposicoes);
+                }
+
+
 
 
 
@@ -5923,161 +5969,15 @@
 
                 // 1. ABRIR MODAL ATENDER
                 function abrirModalAtender(id, index) {
-                    const modalEl = document.getElementById('modalAtenderRevisao');
-
-                    // CORREÇÃO ESSENCIAL: Move o modal para ser filho direto do body.
-                    // Isso evita que o backdrop (fundo escuro) fique por cima do modal.
-                    if (modalEl.parentElement !== document.body) {
-                        document.body.appendChild(modalEl);
-                    }
-
-                    document.getElementById('atender-id-orcamento').value = id;
-                    document.getElementById('atender-index-comentario').value = index;
-                    document.getElementById('formAtender').reset();
-
-                    // Usa getOrCreateInstance para evitar conflitos de instância
-                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                    modal.show();
+                    abrirModalDecisao('modalAtenderRevisao', id, index, 'atender-id-orcamento', 'atender-index-comentario', 'formAtender');
                 }
 
                 // 2. PROCESSAR ATENDIMENTO
-                // 1. PROCESSAR ATENDIMENTO
-                async function processarAtendimento() {
-                    // Pega os IDs ocultos no modal
-                    const id = document.getElementById('atender-id-orcamento').value;
-                    const index = document.getElementById('atender-index-comentario').value;
 
-                    // Pega o texto (agora opcional)
-                    const textoResp = document.getElementById('textoAtender').value;
-
-                    // Botão para efeito de loading
-                    const btn = document.querySelector('#modalAtenderRevisao .btn-success');
-                    const textoOriginal = btn.innerHTML;
-
-                    // Bloqueia botão
-                    btn.disabled = true;
-                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
-
-                    try {
-                        // A. Busca o histórico atual no banco
-                        const { data: currentData } = await sbClient
-                            .from('orcamentos_biblioteca')
-                            .select('comentarios_revisao')
-                            .eq('id', id)
-                            .single();
-
-                        // B. Atualiza o item específico do histórico
-                        const historico = currentData.comentarios_revisao || [];
-
-                        if (historico[index]) {
-                            historico[index].decisao = 'atendido';
-                            historico[index].resp_admin = textoResp || "Solicitação atendida."; // Texto padrão se vazio
-                            historico[index].data_resp = new Date().toISOString();
-                        }
-
-                        // C. Salva no Banco (Sem pedir arquivo, sem mudar versão)
-                        const { error: updateError } = await sbClient
-                            .from('orcamentos_biblioteca')
-                            .update({
-                                comentarios_revisao: historico
-                                // Se quiser que o status mude de "Em Revisão" para "Disponível", descomente a linha abaixo:
-                                // status: 'Disponível' 
-                            })
-                            .eq('id', id);
-
-                        if (updateError) throw updateError;
-
-                        // Sucesso
-                        alert("✅ Solicitação marcada como ATENDIDA!");
-
-                        // Fecha o Modal
-                        const modalEl = document.getElementById('modalAtenderRevisao');
-                        bootstrap.Modal.getInstance(modalEl).hide();
-
-                        // Recarrega a lista
-                        carregarOrcamentos();
-
-                    } catch (err) {
-                        console.error(err);
-                        alert("Erro: " + err.message);
-                    } finally {
-                        // Restaura o botão
-                        btn.disabled = false;
-                        btn.innerHTML = textoOriginal;
-                    }
-                }
 
                 // 3. ABRIR MODAL RECUSAR
                 function abrirModalRecusar(id, index) {
-                    const modalEl = document.getElementById('modalRecusarRevisao');
-
-                    // CORREÇÃO ESSENCIAL: Move o modal para ser filho direto do body
-                    if (modalEl.parentElement !== document.body) {
-                        document.body.appendChild(modalEl);
-                    }
-
-                    document.getElementById('recusar-id-orcamento').value = id;
-                    document.getElementById('recusar-index-comentario').value = index;
-                    document.getElementById('formRecusar').reset();
-
-                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                    modal.show();
-                }
-
-                // 4. PROCESSAR RECUSA
-                async function processarRecusa() {
-                    // Pega os IDs
-                    const id = document.getElementById('recusar-id-orcamento').value;
-                    const index = document.getElementById('recusar-index-comentario').value;
-
-                    // Pega o motivo (Opcional)
-                    const motivo = document.getElementById('textoRecusar').value;
-
-                    const btn = document.querySelector('#modalRecusarRevisao .btn-danger');
-                    const textoOriginal = btn.innerHTML;
-
-                    // *** REMOVIDA A VALIDAÇÃO DE OBRIGATORIEDADE ***
-
-                    btn.disabled = true;
-                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
-
-                    try {
-                        const { data: currentData } = await sbClient
-                            .from('orcamentos_biblioteca')
-                            .select('comentarios_revisao')
-                            .eq('id', id)
-                            .single();
-
-                        const historico = currentData.comentarios_revisao || [];
-
-                        if (historico[index]) {
-                            historico[index].decisao = 'recusado';
-                            historico[index].resp_admin = motivo || "Solicitação não acatada."; // Texto padrão
-                            historico[index].data_resp = new Date().toISOString();
-                        }
-
-                        // Atualiza banco
-                        const { error } = await sbClient
-                            .from('orcamentos_biblioteca')
-                            .update({ comentarios_revisao: historico })
-                            .eq('id', id);
-
-                        if (error) throw error;
-
-                        alert("✅ Solicitação marcada como NÃO ACATADA.");
-
-                        const modalEl = document.getElementById('modalRecusarRevisao');
-                        bootstrap.Modal.getInstance(modalEl).hide();
-
-                        carregarOrcamentos();
-
-                    } catch (err) {
-                        console.error(err);
-                        alert("Erro: " + err.message);
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = textoOriginal;
-                    }
+                    abrirModalDecisao('modalRecusarRevisao', id, index, 'recusar-id-orcamento', 'recusar-index-comentario', 'formRecusar');
                 }
 
                 /* ==========================================================================
@@ -6304,55 +6204,12 @@
                     }
                 }
 
-                // 1.5 ADMIN DECISIONS COMPOSIÇÃO
                 function abrirModalAtenderComposicao(id, index) {
-                    if (document.getElementById('modalAtenderComposicao').parentElement !== document.body) document.body.appendChild(document.getElementById('modalAtenderComposicao'));
-                    document.getElementById('atender-id-composicao').value = id;
-                    document.getElementById('atender-index-comentario-comp').value = index;
-                    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAtenderComposicao')).show();
-                }
-
-                async function processarAtendimentoComposicao() {
-                    const id = document.getElementById('atender-id-composicao').value;
-                    const idx = document.getElementById('atender-index-comentario-comp').value;
-                    const resp = document.getElementById('textoAtenderComp').value;
-
-                    const { data } = await sbClient.from('composicoes_biblioteca').select('comentarios_revisao').eq('id', id).single();
-                    const hist = data.comentarios_revisao || [];
-                    if (hist[idx]) {
-                        hist[idx].decisao = 'atendido';
-                        hist[idx].resp_admin = resp || "Atendido.";
-                        hist[idx].data_resp = new Date().toISOString();
-                    }
-                    await sbClient.from('composicoes_biblioteca').update({ comentarios_revisao: hist }).eq('id', id);
-                    alert("Atendido!");
-                    bootstrap.Modal.getInstance(document.getElementById('modalAtenderComposicao')).hide();
-                    carregarComposicoes();
+                    abrirModalDecisao('modalAtenderComposicao', id, index, 'atender-id-composicao', 'atender-index-comentario-comp', 'formAtenderComp');
                 }
 
                 function abrirModalRecusarComposicao(id, index) {
-                    if (document.getElementById('modalRecusarComposicao').parentElement !== document.body) document.body.appendChild(document.getElementById('modalRecusarComposicao'));
-                    document.getElementById('recusar-id-composicao').value = id;
-                    document.getElementById('recusar-index-comentario-comp').value = index;
-                    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRecusarComposicao')).show();
-                }
-
-                async function processarRecusaComposicao() {
-                    const id = document.getElementById('recusar-id-composicao').value;
-                    const idx = document.getElementById('recusar-index-comentario-comp').value;
-                    const motivo = document.getElementById('textoRecusarComp').value;
-
-                    const { data } = await sbClient.from('composicoes_biblioteca').select('comentarios_revisao').eq('id', id).single();
-                    const hist = data.comentarios_revisao || [];
-                    if (hist[idx]) {
-                        hist[idx].decisao = 'recusado';
-                        hist[idx].resp_admin = motivo || "Não acatado.";
-                        hist[idx].data_resp = new Date().toISOString();
-                    }
-                    await sbClient.from('composicoes_biblioteca').update({ comentarios_revisao: hist }).eq('id', id);
-                    alert("Recusado!");
-                    bootstrap.Modal.getInstance(document.getElementById('modalRecusarComposicao')).hide();
-                    carregarComposicoes();
+                    abrirModalDecisao('modalRecusarComposicao', id, index, 'recusar-id-composicao', 'recusar-index-comentario-comp', 'formRecusarComp');
                 }
 
                 async function deletarComposicao(id, path) {
@@ -6403,100 +6260,7 @@
                     }
                 }
 
-                // 1.5.1 COMPARTILHAMENTO DE COMPOSIÇÃO (USING NATIVE COLUMNS)
-                async function abrirModalCompartilharComposicao(id) {
-                    try {
-                        const modalEl = document.getElementById('modalCompartilharComposicao');
-                        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
 
-                        document.getElementById('share-id-comp').value = id;
-                        const select = document.getElementById('share-user-select');
-
-                        // Busca dados atuais
-                        const { data: comp, error } = await sbClient.from('composicoes_biblioteca').select('is_public, compartilhado_com').eq('id', id).single();
-                        if (error) throw error;
-
-                        // Limpa select
-                        select.innerHTML = '';
-
-                        // Opção Privado
-                        const optPriv = document.createElement('option');
-                        optPriv.value = 'private';
-                        optPriv.text = '⛔ Apenas Eu (Privado)';
-                        select.appendChild(optPriv);
-
-                        // Opção Todos
-                        const optAll = document.createElement('option');
-                        optAll.value = 'todos';
-                        optAll.text = '🌍 Todos os Usuários (Público)';
-                        select.appendChild(optAll);
-
-                        // Separador
-                        const optSep = document.createElement('option');
-                        optSep.disabled = true;
-                        optSep.text = '--- Usuários Específicos ---';
-                        select.appendChild(optSep);
-
-                        // Popula Users
-                        const userList = (typeof FISCAIS_LIST !== 'undefined' && Array.isArray(FISCAIS_LIST)) ? FISCAIS_LIST : [];
-                        userList.forEach(u => {
-                            const opt = document.createElement('option');
-                            opt.value = u;
-                            opt.text = u;
-                            select.appendChild(opt);
-                        });
-
-                        // Define valor atual
-                        if (comp.is_public) {
-                            select.value = 'todos';
-                        } else if (comp.compartilhado_com && comp.compartilhado_com.length > 0) {
-                            const firstUser = comp.compartilhado_com[0];
-                            if (!Array.from(select.options).some(o => o.value === firstUser)) {
-                                const optTemp = document.createElement('option');
-                                optTemp.value = firstUser;
-                                optTemp.text = firstUser;
-                                select.appendChild(optTemp);
-                            }
-                            select.value = firstUser;
-                        } else {
-                            select.value = 'private';
-                        }
-
-                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
-                    } catch (err) {
-                        alert("Erro ao abrir compartilhamento: " + err.message);
-                    }
-                }
-
-                async function salvarCompartilhamento() {
-                    const id = document.getElementById('share-id-comp').value;
-                    const choice = document.getElementById('share-user-select').value;
-
-                    if (!choice) return;
-
-                    const payload = {
-                        is_public: false,
-                        compartilhado_com: [] // Reset to empty array (Postgres text[])
-                    };
-
-                    if (choice === 'todos') {
-                        payload.is_public = true;
-                    } else if (choice !== 'private') {
-                        // Usuário específico
-                        payload.compartilhado_com = [choice];
-                    }
-
-                    try {
-                        const { error } = await sbClient.from('composicoes_biblioteca').update(payload).eq('id', id);
-                        if (error) throw error;
-
-                        alert("Compartilhamento atualizado com sucesso!");
-                        bootstrap.Modal.getInstance(document.getElementById('modalCompartilharComposicao')).hide();
-                        carregarComposicoes();
-                    } catch (err) {
-                        alert("Erro ao salvar: " + err.message);
-                    }
-                }
 
                 // 1.2 CARREGAR COMPOSIÇÕES (CORRIGIDO)
                 async function carregarComposicoes() {
@@ -6535,32 +6299,7 @@
 
                                 if (termoBusca && !nomeObra.includes(termoBusca) && !categoria.includes(termoBusca)) return;
 
-                                // Restrição de Visualização (Req: Ver as próprias e as de Admin)
-                                const historicoV = item.historico_versoes || [];
-                                const autorV1 = (historicoV[0] && historicoV[0].autor) ? historicoV[0].autor : (item.criador_nome || item.criador_email || '');
-                                const autorV1Upper = autorV1.toUpperCase();
 
-                                // Verificação robusta de dono (isOwner)
-                                const isOwner =
-                                    (userEmail && autorV1Upper.includes(userEmail.toUpperCase())) ||
-                                    (currentUserName && autorV1Upper.includes(currentUserName)) ||
-                                    (currentFiscalName && autorV1Upper.includes(currentFiscalName));
-
-                                // É trabalho de Admin se for do SISTEMA, se não tiver autor ou se o role for admin
-                                const isAdminWork = !autorV1 ||
-                                    autorV1.toLowerCase().includes('sistema') ||
-                                    item.criador_role === 'admin';
-
-                                // Regra: Admins veem tudo. Fiscais veem o seu + o de admin + COMPARTILHADO.
-                                const isPublic = !!item.is_public;
-                                const sharedList = item.compartilhado_com || [];
-
-                                // Verifica se o usuário atual está na lista de compartilhados
-                                const isShared = isPublic ||
-                                    (currentUserName && sharedList.includes(currentUserName)) ||
-                                    (currentFiscalName && sharedList.includes(currentFiscalName));
-
-                                if (role !== 'admin' && !isOwner && !isAdminWork && !isShared) return;
 
                                 const catKey = item.categoria || 'OUTROS';
                                 const subKey = item.subcategoria || 'GERAL';
@@ -6650,10 +6389,10 @@
                                             </div>
                                         </div>
                                         <div class="orcamento-actions">
-                                            ${obra.arquivo_url ? `<button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url}')" title="Baixar Documento"><i class="bi bi-file-earmark-text"></i> Baixar</button>` : ''}
+                                            <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Baixar Arquivo"><i class="bi bi-download"></i> Baixar</button>
                                             <button class="btn btn-action-icon ms-1" onclick="visualizarComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Visualizar Documento"><i class="bi bi-eye-fill text-primary"></i></button>
                                             
-                                            ${(isAdmin || isOwnerRendering) ? `
+                                            ${(isOwnerRendering) ? `
                                                 ${isAnalytical ?
                                                 `<button class="btn btn-action-icon" onclick="editarComposicaoAnalitica(${obra.id})" title="Alterar Composição"><i class="bi bi-pencil-square text-primary"></i></button>` :
                                                 `<button class="btn btn-action-icon" onclick="prepararNovaVersaoComposicao(${obra.id})" title="Alterar Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>`
@@ -6662,9 +6401,7 @@
                                             
                                             <button class="btn btn-action-icon" onclick="prepararComentarioComposicao(${obra.id})" title="Adicionar Comentário"><i class="bi bi-chat-left-text-fill text-warning"></i></button>
                                             
-                                            ${(isOwnerRendering || isAdmin) ? `<button class="btn btn-action-icon ms-1" onclick="abrirModalCompartilharComposicao(${obra.id})" title="Compartilhar"><i class="bi bi-share-fill text-info"></i></button>` : ''}
-                                            
-                                            ${(isAdmin || isOwnerRendering) ? `
+                                            ${(isOwnerRendering) ? `
                                             <button class="btn btn-action-icon" onclick="deletarComposicao(${obra.id}, '${obra.arquivo_path}')" title="Excluir Composição"><i class="bi bi-trash-fill icon-trash"></i></button>
                                             ` : ''}
                                         </div>
@@ -7689,15 +7426,61 @@
 
                 async function prepararExportacaoComposicao(id, urlArquivo) {
                     try {
-                        // Cache busting: ?t=TIMESTAMP
-                        const finalUrl = `${urlArquivo}?t=${new Date().getTime()}`;
-                        const response = await fetch(finalUrl);
-                        const dados = await response.json();
-                        compositionDataToExport = dados;
-                        const modalEl = document.getElementById('modalExportarComposicao');
-                        if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
-                        new bootstrap.Modal(modalEl).show();
-                    } catch (e) { alert("Erro ao carregar"); }
+                        let docData = null;
+
+                        // 1. Se não temos URL ou ela é nula (Composição Analítica Direta no Banco)
+                        if (!urlArquivo || urlArquivo === 'undefined' || urlArquivo === 'null' || urlArquivo === '') {
+                            const { data, error } = await sbClient.from('composicoes_biblioteca').select('*').eq('id', id).single();
+                            if (error || !data) throw new Error("Documento não encontrado no banco.");
+
+                            if (data.itens) {
+                                docData = {
+                                    meta: {
+                                        codigo: data.codigo || 'S/C',
+                                        descricao: data.nome_obra,
+                                        unidade: data.unidade || '-',
+                                        data_base: data.data_base,
+                                        bdi: data.bdi,
+                                        desconto: data.desconto,
+                                        totais: null
+                                    },
+                                    itens: data.itens || []
+                                };
+                            } else {
+                                urlArquivo = data.arquivo_url;
+                            }
+                        }
+
+                        // 2. Se temos URL e NÃO termina em .json, é um arquivo direto (PDF/XLS) -> BAIXAR DIRETO
+                        if (urlArquivo && !urlArquivo.toLowerCase().includes('.json')) {
+                            const link = document.createElement('a');
+                            link.href = urlArquivo;
+                            link.download = ''; // Sugere o nome original do arquivo
+                            link.target = '_blank';
+                            link.click();
+                            return;
+                        }
+
+                        // 3. Se temos URL e É um .json, buscamos o conteúdo
+                        if (urlArquivo && urlArquivo.toLowerCase().includes('.json')) {
+                            const finalUrl = `${urlArquivo}?t=${new Date().getTime()}`;
+                            const response = await fetch(finalUrl);
+                            if (!response.ok) throw new Error("Erro ao baixar dados da composição.");
+                            docData = await response.json();
+                        }
+
+                        if (docData) {
+                            compositionDataToExport = docData;
+                            const modalEl = document.getElementById('modalExportarComposicao');
+                            if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
+                            new bootstrap.Modal(modalEl).show();
+                        } else {
+                            alert("Esta composição não possui arquivo nem dados analíticos.");
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        alert("Erro ao carregar: " + e.message);
+                    }
                 }
 
                 function exportarComposicao(formato) {
@@ -8035,16 +7818,30 @@
 
                             const pdfBytes = await pdfDoc.save();
                             const blob = new Blob([pdfBytes], { type: "application/pdf" });
-                            const link = document.createElement('a');
-                            link.href = URL.createObjectURL(blob);
-                            link.download = `${dados.codigo}_Analitica.pdf`;
-                            link.click();
+                            const pdfUrl = URL.createObjectURL(blob);
+
+                            if (mode === 'open') {
+                                window.open(pdfUrl, '_blank');
+                            } else {
+                                const link = document.createElement('a');
+                                link.href = pdfUrl;
+                                link.download = `${dados.codigo}_Analitica.pdf`;
+                                link.click();
+                            }
                         } catch (err) {
                             console.error("Erro no Merge:", err);
-                            doc.save(`${dados.codigo}_Analitica.pdf`); // Fallback
+                            if (mode === 'open') {
+                                window.open(doc.output('bloburl'), '_blank');
+                            } else {
+                                doc.save(`${dados.codigo}_Analitica.pdf`); // Fallback
+                            }
                         }
                     } else {
-                        doc.save(`${dados.codigo}_Analitica.pdf`);
+                        if (mode === 'open') {
+                            window.open(doc.output('bloburl'), '_blank');
+                        } else {
+                            doc.save(`${dados.codigo}_Analitica.pdf`);
+                        }
                     }
                 }
 
@@ -9056,47 +8853,7 @@
                 </div>
             </div>
 
-            <!-- 7. MODAL COMPARTILHAR COMPOSIÇÃO -->
-            <div class="modal fade" id="modalCompartilharComposicao" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header bg-info-subtle">
-                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-share-fill me-2"></i>COMPARTILHAR
-                                COMPOSIÇÃO</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form id="formCompartilhar">
-                                <input type="hidden" id="share-id-comp">
-                                <p class="small text-muted mb-3">Defina quem pode visualizar esta composição além de
-                                    você.</p>
 
-                                <div class="mb-3">
-                                    <label class="form-label small fw-bold">COMPARTILHAR COM:</label>
-                                    <select class="form-select" id="share-user-select">
-                                        <option value="todos">Todos os Usuários (Público)</option>
-                                        <option value="selecionar" disabled>--- Selecione um Usuário ---</option>
-                                        <!-- Preenchido dinamicamente -->
-                                    </select>
-                                </div>
-
-                                <div class="alert alert-light border-info small text-info">
-                                    <i class="bi bi-info-circle-fill me-1"></i>
-                                    Ao selecionar "Todos", a composição ficará visível para qualquer usuário do sistema.
-                                </div>
-                            </form>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                data-bs-dismiss="modal">Cancelar</button>
-                            <button type="button" class="btn btn-primary btn-sm fw-bold"
-                                onclick="salvarCompartilhamento()">
-                                <i class="bi bi-check-lg"></i> Salvar Alterações
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <script>
                 // Inserido: função G_cp_ge e utilitários associados (fornecido pelo usuário)
@@ -9284,66 +9041,3 @@
 </body>
 
 </html>
-<script>
-    // Inicialização da aba Composições
-    document.addEventListener('DOMContentLoaded', function () {
-        const tabComposicoes = document.querySelector('button[data-bs-target="#pane-composicoes"]');
-        if (tabComposicoes) {
-            tabComposicoes.addEventListener('shown.bs.tab', function (e) {
-                if (typeof carregarComposicoes === 'function') {
-                    console.log("Carregando composições...");
-                    carregarComposicoes();
-                } else {
-                    console.warn("Função carregarComposicoes não encontrada.");
-                }
-            });
-        }
-
-        // Ensure Fiscais List is populated on load
-        if (typeof carregarListaFiscais === 'function') {
-            carregarListaFiscais();
-        }
-
-        // --- FIX: Cálculo Automático de Repercussão (Gerenciar Processo) ---
-        const inputsCalculo = [
-            { a: 'det_acresc_f', s: 'det_supress_f', r: 'det_reperc_f' }, // Fiscalização
-            { a: 'det_acresc_g', s: 'det_supress_g', r: 'det_reperc_g' }  // GECOPE
-        ];
-
-        function calcularRepercussaoDetalhes(acrescId, supressId, repercId) {
-            const elA = document.getElementById(acrescId);
-            const elS = document.getElementById(supressId);
-            const elR = document.getElementById(repercId);
-
-            if (!elA || !elS || !elR) return;
-
-            // Função helper segura para converter moeda
-            const parseMoney = (v) => {
-                if (!v) return 0;
-                // Remove tudo que não é dígito ou vírgula/ponto, depois padroniza
-                // Assumindo formato pt-BR: 1.000,00
-                // Se usar a função global moedaParaNumero existente seria melhor, 
-                // mas vamos garantir que funcione mesmo se o escopo for complexo.
-                // Mas como vimos moedaParaNumero global, vamos tentar usar ela se existir, senão fallback.
-                if (typeof moedaParaNumero === 'function') return moedaParaNumero(v);
-
-                const clean = v.replace(/\./g, '').replace(',', '.');
-                return parseFloat(clean) || 0;
-            };
-
-            const valA = parseMoney(elA.value);
-            const valS = parseMoney(elS.value);
-            const valR = valA + valS;
-
-            elR.value = valR.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        inputsCalculo.forEach(group => {
-            const elA = document.getElementById(group.a);
-            const elS = document.getElementById(group.s);
-
-            if (elA) elA.addEventListener('input', () => calcularRepercussaoDetalhes(group.a, group.s, group.r));
-            if (elS) elS.addEventListener('input', () => calcularRepercussaoDetalhes(group.a, group.s, group.r));
-        });
-    });
-</script>
