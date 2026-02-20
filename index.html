@@ -6656,17 +6656,31 @@
                         let options = [];
                         elVersao.innerHTML = '<option value="">Verificando...</option>';
 
-                        // Define candidates to check against DB
-                        const candidates = ['DEZ/2025', 'NOV/2025', 'OUT/2025'];
+                        // Define candidates to check against DB (Dynamic 12 months)
+                        const mapMes = { 'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12' };
+                        const mapMesLabels = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+
+                        let candidates = [];
+                        if (fonte === 'SEINFRA') {
+                            candidates = ["30", "29", "28", "27", "26"];
+                        } else {
+                            const now = new Date();
+                            for (let i = 0; i < 12; i++) {
+                                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                                candidates.push(`${mapMesLabels[d.getMonth()]}/${d.getFullYear()}`);
+                            }
+                        }
 
                         if (fonte === 'SEINFRA') {
-                            options = ['28', '27']; // SEINFRA kept static/known for now
+                            const results = await Promise.all(candidates.map(async v => {
+                                const { count } = await sbClient.from('seinfra_itens').select('*', { count: 'exact', head: true }).eq('referencia', v);
+                                return { v, count: count || 0 };
+                            }));
+                            options = results.filter(r => r.count > 0).map(r => r.v);
+                            if (options.length === 0) options = ['28', '27'];
                         }
                         else if (fonte === 'SINAPI' || fonte === 'ORSE') {
                             options = [];
-                            // Map text to Numeric for DB Check
-                            const mapMes = { 'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12' };
-
                             // Parallel checks for speed
                             const checks = candidates.map(async (label) => {
                                 const parts = label.split('/');
@@ -6678,7 +6692,7 @@
                                     .select('*', { count: 'exact', head: true })
                                     .eq('referencia', dbDate); // Check if THIS version exists
 
-                                return { label, count };
+                                return { label, count: count || 0 };
                             });
 
                             const results = await Promise.all(checks);
@@ -7354,25 +7368,96 @@
                     }
                 }
 
-                function atualizarSelectVersao() {
+                async function atualizarSelectVersao() {
                     const fonte = document.getElementById('busca-fonte').value;
                     const selectVersao = document.getElementById('busca-versao');
                     const selectRef = document.getElementById('busca-ref');
 
-                    selectVersao.innerHTML = '';
-                    if (fonte === 'SEINFRA') {
-                        ["28", "27"].forEach(t => selectVersao.add(new Option(`Tabela 0${t}`, t)));
-                        selectRef.disabled = false;
-                    }
-                    else if (fonte === 'SINAPI') {
-                        selectVersao.add(new Option("Dez/2025", "122025"));
-                        selectRef.disabled = false;
-                    }
-                    else if (fonte === 'ORSE') {
-                        selectVersao.add(new Option("Dez/2025", "12/2025"));
-                        // ORSE apenas possui Onerada
-                        selectRef.value = 'onerada';
-                        selectRef.disabled = true;
+                    if (!selectVersao) return;
+
+                    // Mostra estado de carregamento
+                    selectVersao.innerHTML = '<option value="">Buscando...</option>';
+                    selectVersao.disabled = true;
+
+                    try {
+                        if (fonte === 'SEINFRA') {
+                            // Verifica versões recentes da SEINFRA (Tabelas de referência do Ceará)
+                            const candidates = ["30", "29", "28", "27", "26"];
+                            const checks = await Promise.all(candidates.map(async v => {
+                                // Verifica se existe dados para esta referência
+                                const { count } = await sbClient.from('seinfra_itens').select('*', { count: 'exact', head: true }).eq('referencia', v);
+                                return { v, count: count || 0 };
+                            }));
+
+                            selectVersao.innerHTML = '';
+                            const valids = checks.filter(r => r.count > 0);
+                            if (valids.length > 0) {
+                                valids.forEach(r => selectVersao.add(new Option(`Tabela 0${r.v}`, r.v)));
+                            } else {
+                                // Fallback estático
+                                ["28", "27"].forEach(t => selectVersao.add(new Option(`Tabela 0${t}`, t)));
+                            }
+                            selectRef.disabled = false;
+                        }
+                        else if (fonte === 'SINAPI' || fonte === 'ORSE') {
+                            const tabela = (fonte === 'SINAPI') ? 'sinapi_itens' : 'orse_itens';
+                            const mapMesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+                            const now = new Date();
+                            const candidates = [];
+
+                            // Verifica os últimos 12 meses para encontrar versões disponíveis no banco
+                            // Isso garante que se o administrador carregar nov/2025, o sistema detecta sozinho
+                            for (let i = 0; i < 12; i++) {
+                                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                                const mesIdx = d.getMonth();
+                                const ano = d.getFullYear();
+                                const mesStr = String(mesIdx + 1).padStart(2, '0');
+
+                                candidates.push({
+                                    label: `${mapMesLabels[mesIdx]}/${ano}`,
+                                    dbDate: `${ano}-${mesStr}-01`,
+                                    sinapiVal: `${mesStr}${ano}`, // Formato MMYYYY esperado pela busca
+                                    orseVal: `${mesStr}/${ano}`   // Formato MM/YYYY esperado pela busca
+                                });
+                            }
+
+                            const checks = await Promise.all(candidates.map(async c => {
+                                const { count } = await sbClient.from(tabela).select('*', { count: 'exact', head: true }).eq('referencia', c.dbDate);
+                                return { ...c, count: count || 0 };
+                            }));
+
+                            selectVersao.innerHTML = '';
+                            const valids = checks.filter(r => r.count > 0);
+                            if (valids.length > 0) {
+                                valids.forEach(r => {
+                                    const val = (fonte === 'SINAPI') ? r.sinapiVal : r.orseVal;
+                                    selectVersao.add(new Option(r.label, val));
+                                });
+                            } else {
+                                // Fallback se a internet/banco falhar
+                                if (fonte === 'SINAPI') selectVersao.add(new Option("Dez/2025", "122025"));
+                                else selectVersao.add(new Option("Dez/2025", "12/2025"));
+                            }
+
+                            if (fonte === 'ORSE') {
+                                selectRef.value = 'onerada';
+                                selectRef.disabled = true;
+                            } else {
+                                selectRef.disabled = false;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Erro ao atualizar versões:", err);
+                        // Fallback genérico
+                        if (fonte === 'SEINFRA') {
+                            selectVersao.innerHTML = '';
+                            ["28", "27"].forEach(t => selectVersao.add(new Option(`Tabela 0${t}`, t)));
+                        } else {
+                            selectVersao.innerHTML = `<option value="${fonte === 'SINAPI' ? '122025' : '12/2025'}">Dez/2025</option>`;
+                        }
+                    } finally {
+                        selectVersao.disabled = false;
                     }
                 }
                 document.addEventListener('DOMContentLoaded', atualizarSelectVersao);
