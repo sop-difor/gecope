@@ -54,7 +54,9 @@
             display: none !important;
         }
 
-        body.is-admin .admin-only {
+        body.is-admin .admin-only,
+        body.role-admin .admin-only,
+        body.role-gerente .admin-only {
             display: inline-block !important;
         }
 
@@ -4670,6 +4672,10 @@
                     document.body.classList.add(`role-${role}`);
                     if (role === 'admin') document.body.classList.add('is-admin');
 
+                    // Desativar todas as abas ao entrar/aplicar role (conforme solicitado pelo usuário)
+                    document.querySelectorAll('#dashboardTabs .nav-link').forEach(btn => btn.classList.remove('active'));
+                    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
+
                     // 1. Visibilidade de Abas por Atributo data-roles
                     document.querySelectorAll('[data-roles]').forEach(el => {
                         const allowed = el.getAttribute('data-roles').split(',');
@@ -5366,7 +5372,7 @@
                     if (btn) btn.disabled = true;
 
                     try {
-                        const { data, error } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao').eq('id', id).single();
+                        const { data, error } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao, versao_atual').eq('id', id).single();
                         if (error) throw error;
 
                         let historico = data.comentarios_revisao || [];
@@ -5382,10 +5388,20 @@
 
                         let payloadUpdate = { comentarios_revisao: historico };
 
-                        // SE O HISTÓRICO FICOU VAZIO, RESETA O STATUS PARA "Disponível"
+                        // --- LÓGICA DE STATUS DINÂMICO ---
+                        const temPendentes = historico.some(c => c.decisao === 'pendente');
+
+                        if (temPendentes) {
+                            payloadUpdate.status = 'Em Revisão';
+                        } else {
+                            // Se não há pendentes, checa se há versões além da V1 para manter "Atualizado" ou voltar para "Disponível"
+                            const currentV = parseInt(data.versao_atual?.replace(/[^0-9]/g, '')) || 1;
+                            payloadUpdate.status = (currentV > 1) ? 'Atualizado' : 'Disponível';
+                        }
+
                         if (historico.length === 0) {
-                            payloadUpdate.status = 'Disponível';
-                            alert("O histórico ficou vazio. O status voltou para 'Disponível'.");
+                            const currentV = parseInt(data.versao_atual?.replace(/[^0-9]/g, '')) || 1;
+                            payloadUpdate.status = (currentV > 1) ? 'Atualizado' : 'Disponível';
                         }
 
                         const { error: updateError } = await sbClient.from('orcamentos_biblioteca').update(payloadUpdate).eq('id', id);
@@ -5403,7 +5419,8 @@
                 async function carregarOrcamentos() {
                     const container = document.getElementById('accordionOrcamentos');
                     const termoBusca = document.getElementById('orcamento-search').value.toLowerCase();
-                    const isAdmin = document.body.classList.contains('is-admin') || localStorage.getItem('sop_role') === 'admin';
+                    const role = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                    const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
 
                     const { data, error } = await sbClient
                         .from('orcamentos_biblioteca')
@@ -5455,11 +5472,14 @@
                                 const iconSymbol = obra.arquivo_url && obra.arquivo_url.endsWith('.pdf') ? '<i class="bi bi-file-earmark-pdf"></i>' : '<i class="bi bi-file-earmark-spreadsheet"></i>';
                                 const dataFormatada = new Date(obra.created_at).toLocaleDateString('pt-BR');
 
-                                // --- 1. BADGES DE STATUS (CORRIGIDO) ---
+                                // --- 1. BADGES DE STATUS (DINÂMICO) ---
                                 let badgeStatus = '';
-                                if (obra.status === 'Em Revisão') {
+                                const historicoParaStatus = obra.comentarios_revisao || [];
+                                const temPendenteReal = historicoParaStatus.some(c => c.decisao === 'pendente');
+
+                                if (temPendenteReal) {
                                     badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
-                                } else if (obra.status === 'Atualizado') {
+                                } else if (obra.status === 'Atualizado' || parseInt(obra.versao_atual?.replace(/[^0-9]/g, '')) > 1) {
                                     // Badge Azul solicitado
                                     badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
                                 }
@@ -5523,7 +5543,7 @@
 
                                         let btnExcluirHist = '';
                                         if (isAdmin) {
-                                            btnExcluirHist = `<button class="btn btn-sm text-danger border-0 p-0 ms-2" title="Excluir Registro" onclick="deletarItemHistoricoOrcamento(${obra.id}, ${index})"><i class="bi bi-x-lg"></i></button>`;
+                                            btnExcluirHist = `<button class="btn btn-sm text-danger border-0 p-0 ms-2 admin-only" title="Excluir Registro" onclick="deletarItemHistoricoOrcamento(${obra.id}, ${index})"><i class="bi bi-x-lg"></i></button>`;
                                         }
 
                                         return `
@@ -5573,7 +5593,7 @@
                             <button class="btn btn-action-icon admin-only" onclick="prepararNovaVersao(${obra.id})" title="Nova Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>
                             <!-- Comentário: VISÍVEL PARA TODOS -->
                             <button class="btn btn-action-icon" onclick="prepararComentario(${obra.id})" title="Adicionar Comentário"><i class="bi bi-chat-left-text-fill text-warning"></i></button>
-                            <!-- Excluir: APENAS ADMIN -->
+                            <!-- Excluir: APENAS ADMIN E NÃO FISCAL -->
                             <button class="btn btn-action-icon admin-only" onclick="deletarOrcamento(${obra.id}, '${obra.arquivo_path}')"><i class="bi bi-trash-fill icon-trash"></i></button>
                         </div>
                     </div>
@@ -5588,104 +5608,6 @@
 
                 /* --- FUNÇÕES DE DECISÃO (ATUALIZADAS E SIMPLIFICADAS) --- */
 
-                // 2. PROCESSAR ATENDIMENTO (SEM UPLOAD OBRIGATÓRIO)
-                async function processarAtendimento() {
-                    const id = document.getElementById('atender-id-orcamento').value;
-                    const index = document.getElementById('atender-index-comentario').value;
-                    const textoResp = document.getElementById('textoAtender').value; // Opcional
-
-                    const btn = document.querySelector('#modalAtenderRevisao .btn-success');
-                    const textoOriginal = btn.innerHTML;
-
-                    btn.disabled = true;
-                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
-
-                    try {
-                        // A. Buscar dados atuais
-                        const { data: currentData } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao').eq('id', id).single();
-
-                        // B. Atualizar o array de comentários (Marcar como ATENDIDO)
-                        const historico = currentData.comentarios_revisao || [];
-
-                        if (historico[index]) {
-                            historico[index].decisao = 'atendido';
-                            historico[index].resp_admin = textoResp || "Solicitação atendida."; // Texto padrão se vazio
-                            historico[index].data_resp = new Date().toISOString();
-                        }
-
-                        // C. Salvar no Banco (Apenas atualiza o histórico, não muda versão)
-                        const { error: updateError } = await sbClient
-                            .from('orcamentos_biblioteca')
-                            .update({
-                                comentarios_revisao: historico
-                                // Opcional: Se quiser tirar o status de "Em Revisão", descomente abaixo:
-                                // status: 'Disponível' 
-                            })
-                            .eq('id', id);
-
-                        if (updateError) throw updateError;
-
-                        alert("Solicitação marcada como ATENDIDA com sucesso!");
-
-                        // Fechar Modal
-                        const modalEl = document.getElementById('modalAtenderRevisao');
-                        bootstrap.Modal.getInstance(modalEl).hide();
-
-                        carregarOrcamentos(); // Atualiza a tela
-
-                    } catch (err) {
-                        console.error(err);
-                        alert("Erro: " + err.message);
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = textoOriginal;
-                    }
-                }
-
-                // 4. PROCESSAR RECUSA (JUSTIFICATIVA FACULTATIVA)
-                async function processarRecusa() {
-                    const id = document.getElementById('recusar-id-orcamento').value;
-                    const index = document.getElementById('recusar-index-comentario').value;
-                    const motivo = document.getElementById('textoRecusar').value; // Opcional
-
-                    const btn = document.querySelector('#modalRecusarRevisao .btn-danger');
-                    const textoOriginal = btn.innerHTML;
-
-                    // Removemos a validação de obrigatoriedade do motivo
-
-                    btn.disabled = true;
-                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
-
-                    try {
-                        const { data: currentData } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao').eq('id', id).single();
-                        const historico = currentData.comentarios_revisao || [];
-
-                        if (historico[index]) {
-                            historico[index].decisao = 'recusado';
-                            historico[index].resp_admin = motivo || "Solicitação não acatada."; // Texto padrão se vazio
-                            historico[index].data_resp = new Date().toISOString();
-                        }
-
-                        // Atualiza banco
-                        await sbClient
-                            .from('orcamentos_biblioteca')
-                            .update({ comentarios_revisao: historico })
-                            .eq('id', id);
-
-                        alert("Solicitação marcada como NÃO ACATADA.");
-
-                        const modalEl = document.getElementById('modalRecusarRevisao');
-                        bootstrap.Modal.getInstance(modalEl).hide();
-
-                        carregarOrcamentos();
-
-                    } catch (err) {
-                        alert("Erro: " + err.message);
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = textoOriginal;
-                    }
-                }
 
                 // Hook para buscar ao digitar (debounce simples)
                 document.getElementById('orcamento-search').addEventListener('input', () => {
@@ -5868,14 +5790,31 @@
                     }
 
                     try {
-                        const { data } = await sbClient.from(table).select('comentarios_revisao').eq('id', id).single();
+                        const { data } = await sbClient.from(table).select('comentarios_revisao, status, versao_atual').eq('id', id).single();
                         const hist = data.comentarios_revisao || [];
                         if (hist[index]) {
                             hist[index].decisao = decision;
                             hist[index].resp_admin = respText || (decision === 'atendido' ? "Solicitação atendida." : "Solicitação não acatada.");
                             hist[index].data_resp = new Date().toISOString();
                         }
-                        const { error } = await sbClient.from(table).update({ comentarios_revisao: hist }).eq('id', id);
+
+                        // --- RECÁLCULO DE STATUS ---
+                        const temPendentes = hist.some(c => c.decisao === 'pendente');
+                        let novoStatus = data.status || 'Disponível';
+
+                        if (temPendentes) {
+                            novoStatus = 'Em Revisão';
+                        } else {
+                            // Se resolveu todos os pendentes, volta para "Atualizado" (se for V2+) ou "Disponível"
+                            const vStr = data.versao_atual || 'V1';
+                            const vNum = parseInt(vStr.replace(/[^0-9]/g, '')) || 1;
+                            novoStatus = (vNum > 1) ? 'Atualizado' : 'Disponível';
+                        }
+
+                        const { error } = await sbClient.from(table).update({
+                            comentarios_revisao: hist,
+                            status: novoStatus
+                        }).eq('id', id);
                         if (error) throw error;
 
                         alert("Ação realizada com sucesso!");
@@ -6229,7 +6168,7 @@
                     if (btn) btn.disabled = true;
 
                     try {
-                        const { data, error } = await sbClient.from('composicoes_biblioteca').select('comentarios_revisao').eq('id', id).single();
+                        const { data, error } = await sbClient.from('composicoes_biblioteca').select('comentarios_revisao, versao_atual').eq('id', id).single();
                         if (error) throw error;
 
                         let historico = data.comentarios_revisao || [];
@@ -6242,10 +6181,18 @@
 
                         let payloadUpdate = { comentarios_revisao: historico };
 
-                        // SE O HISTÓRICO FICOU VAZIO, RESETA O STATUS PARA "Disponível"
+                        // --- LÓGICA DE STATUS DINÂMICO ---
+                        const temPendentes = historico.some(c => c.decisao === 'pendente');
+                        if (temPendentes) {
+                            payloadUpdate.status = 'Em Revisão';
+                        } else {
+                            const currentV = parseInt(data.versao_atual?.replace(/[^0-9]/g, '')) || 1;
+                            payloadUpdate.status = (currentV > 1) ? 'Atualizado' : 'Disponível';
+                        }
+
                         if (historico.length === 0) {
-                            payloadUpdate.status = 'Disponível';
-                            alert("O histórico ficou vazio. O status voltou para 'Disponível'.");
+                            const currentV = parseInt(data.versao_atual?.replace(/[^0-9]/g, '')) || 1;
+                            payloadUpdate.status = (currentV > 1) ? 'Atualizado' : 'Disponível';
                         }
 
                         const { error: updateError } = await sbClient.from('composicoes_biblioteca').update(payloadUpdate).eq('id', id);
@@ -6266,8 +6213,8 @@
                 async function carregarComposicoes() {
                     const container = document.getElementById('accordionComposicoes');
                     const termoBusca = document.getElementById('comp-search').value.toLowerCase();
-                    const isAdmin = document.body.classList.contains('is-admin') || localStorage.getItem('sop_role') === 'admin';
-                    const role = localStorage.getItem('sop_role');
+                    const role = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                    const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
                     const userEmail = localStorage.getItem('sop_user');
                     const currentUserName = (localStorage.getItem('sop_user_name') || '').toUpperCase();
                     const currentFiscalName = (localStorage.getItem('sop_fiscal_name') || '').toUpperCase();
@@ -6335,9 +6282,15 @@
                                     const historico = obra.comentarios_revisao || [];
                                     const qtdComentarios = historico.length;
 
+                                    // Badges de Status (Dinâmico)
                                     let badgeStatus = '';
-                                    if (qtdComentarios > 0) badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
-                                    else if (obra.status === 'Atualizado') badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
+                                    const temPendenteComp = historico.some(c => c.decisao === 'pendente');
+
+                                    if (temPendenteComp) {
+                                        badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
+                                    } else if (obra.status === 'Atualizado' || parseInt(obra.versao_atual?.replace(/[^0-9]/g, '')) > 1) {
+                                        badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
+                                    }
                                     const histId = `hist_comp_${obra.id}`;
                                     let botaoHistorico = qtdComentarios > 0 ? `<button class="btn-toggle-history" type="button" data-bs-toggle="collapse" data-bs-target="#${histId}"><i class="bi bi-clock-history"></i> Histórico (${qtdComentarios}) <i class="bi bi-chevron-down ms-1"></i></button>` : '';
 
@@ -6361,7 +6314,7 @@
                                                 botoesAcaoAdmin = `<div class="admin-decision-actions"><button class="btn btn-sm btn-outline-success" onclick="abrirModalAtenderComposicao(${obra.id}, ${index})"><i class="bi bi-check-lg"></i> Atender</button><button class="btn btn-sm btn-outline-danger" onclick="abrirModalRecusarComposicao(${obra.id}, ${index})"><i class="bi bi-x-lg"></i> Não Acatar</button></div>`;
                                             }
                                             let btnAnexo = c.arquivo ? `<a href="${c.arquivo}" target="_blank" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória/Anexo</a>` : '';
-                                            let btnExcluirHist = isAdmin ? `<button class="btn btn-sm text-danger border-0 p-0 ms-2" title="Excluir Registro" onclick="deletarItemHistoricoComposicao(${obra.id}, ${index})"><i class="bi bi-x-lg"></i></button>` : '';
+                                            let btnExcluirHist = isAdmin ? `<button class="btn btn-sm text-danger border-0 p-0 ms-2 admin-only" title="Excluir Registro" onclick="deletarItemHistoricoComposicao(${obra.id}, ${index})"><i class="bi bi-x-lg"></i></button>` : '';
                                             return `<div class="history-card-item ${classeStatus}"><div class="history-card-header"><div><strong>${c.autor}</strong> <span class="fw-normal ms-1">- ${dataComent}</span></div><div class="d-flex align-items-center">${badgeDecisao}${btnExcluirHist}</div></div><div class="history-card-body"><div>${c.mensagem}</div>${btnAnexo}${respostaAdminHTML}${botoesAcaoAdmin}</div></div>`;
                                         }).join('');
                                         containerHistorico = `<div class="collapse" id="${histId}"><div class="history-collapse-box">${listaComentarios}</div></div>`;
@@ -6392,7 +6345,7 @@
                                             <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Baixar Arquivo"><i class="bi bi-download"></i> Baixar</button>
                                             <button class="btn btn-action-icon ms-1" onclick="visualizarComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Visualizar Documento"><i class="bi bi-eye-fill text-primary"></i></button>
                                             
-                                            ${(isOwnerRendering) ? `
+                                            ${(isOwnerRendering || isAdmin) ? `
                                                 ${isAnalytical ?
                                                 `<button class="btn btn-action-icon" onclick="editarComposicaoAnalitica(${obra.id})" title="Alterar Composição"><i class="bi bi-pencil-square text-primary"></i></button>` :
                                                 `<button class="btn btn-action-icon" onclick="prepararNovaVersaoComposicao(${obra.id})" title="Alterar Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>`
@@ -6401,7 +6354,7 @@
                                             
                                             <button class="btn btn-action-icon" onclick="prepararComentarioComposicao(${obra.id})" title="Adicionar Comentário"><i class="bi bi-chat-left-text-fill text-warning"></i></button>
                                             
-                                            ${(isOwnerRendering) ? `
+                                            ${(isOwnerRendering || isAdmin) ? `
                                             <button class="btn btn-action-icon" onclick="deletarComposicao(${obra.id}, '${obra.arquivo_path}')" title="Excluir Composição"><i class="bi bi-trash-fill icon-trash"></i></button>
                                             ` : ''}
                                         </div>
