@@ -5966,9 +5966,9 @@
                         const { data: publicUrlData } = sbClient.storage.from('composicoes_biblioteca').getPublicUrl(storagePath);
 
                         const payload = {
-                            categoria: categoria.toUpperCase(),
+                            usuario: categoria.toUpperCase(),
                             subcategoria: subcategoria.toUpperCase(),
-                            nome_obra: obra.toUpperCase(),
+                            descricao: obra.toUpperCase(),
                             status: formData.get('STATUS'),
                             versao_atual: 'V1',
                             arquivo_url: publicUrlData.publicUrl,
@@ -6073,7 +6073,7 @@
                         const { data, error } = await sbClient.from('composicoes_biblioteca').select('*').eq('id', id).single();
                         if (error) throw error;
 
-                        document.getElementById('coment-nome-composicao').value = data.nome_obra || '';
+                        document.getElementById('coment-nome-composicao').value = data.descricao || '';
                         document.querySelector('#formComentarioComposicao textarea[name="MENSAGEM"]').value = '';
 
                         const sel = document.getElementById('coment-fiscal-comp');
@@ -6226,9 +6226,9 @@
                         const { data, error } = await sbClient
                             .from('composicoes_biblioteca')
                             .select('*')
-                            .order('categoria', { ascending: true })
+                            .order('usuario', { ascending: true })
                             .order('subcategoria', { ascending: true })
-                            .order('nome_obra', { ascending: true });
+                            .order('descricao', { ascending: true });
 
                         if (error) {
                             console.error('[ERRO Composições]', error);
@@ -6241,14 +6241,14 @@
                         const arvore = {};
                         data.forEach(item => {
                             try {
-                                const nomeObra = (item.nome_obra || "").toLowerCase();
-                                const categoria = (item.categoria || "").toLowerCase();
+                                const nomeObra = (item.descricao || "").toLowerCase();
+                                const categoria = (item.usuario || "").toLowerCase();
 
                                 if (termoBusca && !nomeObra.includes(termoBusca) && !categoria.includes(termoBusca)) return;
 
 
 
-                                const catKey = item.categoria || 'OUTROS';
+                                const catKey = item.usuario || 'OUTROS';
                                 const subKey = item.subcategoria || 'GERAL';
 
                                 if (!arvore[catKey]) arvore[catKey] = {};
@@ -6269,7 +6269,7 @@
 
                             for (const [sub, itens] of Object.entries(subcats)) {
                                 subHtml += `<div class="subcategoria-header" style="margin-left: 10px;">${sub}</div>`;
-                                itens.sort((a, b) => a.nome_obra.localeCompare(b.nome_obra, 'pt-BR', { numeric: true }));
+                                itens.sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR', { numeric: true }));
 
                                 itens.forEach(obra => {
                                     const isAnalytical = !!(obra.itens && Array.isArray(obra.itens));
@@ -6333,7 +6333,7 @@
                                             <div class="file-icon-box ${iconClass}">${iconSymbol}</div>
                                             <div>
                                                 <div class="d-flex align-items-center flex-wrap">
-                                                    <span class="fw-bold text-dark" style="font-size:0.95rem;">${obra.nome_obra || "Sem Nome"}</span>
+                                                    <span class="fw-bold text-dark" style="font-size:0.95rem;">${obra.descricao || "Sem Nome"}</span>
                                                     <span class="badge bg-secondary ms-2" style="font-size:0.7rem;">${obra.versao_atual || 'V1'}</span>
                                                     ${badgeStatus}
                                                 </div>
@@ -6460,7 +6460,7 @@
                         // Preencher campos básicos
                         document.getElementById('edit-id-composicao').value = data.id;
                         document.getElementById('comp-codigo').value = data.codigo || '';
-                        document.getElementById('comp-descricao').value = data.nome_obra || '';
+                        document.getElementById('comp-descricao').value = data.descricao || '';
                         document.getElementById('comp-unidade').value = data.unidade || '';
                         document.getElementById('comp-data').value = data.data_base || '';
                         document.getElementById('comp-bdi').value = data.bdi || '0,00';
@@ -7082,7 +7082,7 @@
 
                     try {
                         const formData = new FormData(form);
-                        const nomeObra = (formData.get('descricao') || formData.get('nome_obra') || 'SEM DESCRIÇÃO').toUpperCase();
+                        const nomeObra = (formData.get('descricao') || 'SEM DESCRIÇÃO').toUpperCase();
 
                         // --- LÓGICA DE AUTO-CATEGORIZAÇÃO PARA USUÁRIO ---
                         let userEmail = localStorage.getItem('sop_user') || 'SISTEMA';
@@ -7137,8 +7137,8 @@
 
                         // Salva no Banco - payload completo para suporte analítico
                         const payload = {
-                            nome_obra: nomeObra,
-                            categoria: categoriaFinal,
+                            descricao: nomeObra,
+                            usuario: categoriaFinal,
                             subcategoria: subcategoriaFinal,
                             codigo: formData.get('codigo') || 'S/C',
                             unidade: formData.get('unidade') || '-',
@@ -7475,7 +7475,7 @@
                                 docData = {
                                     meta: {
                                         codigo: data.codigo || 'S/C',
-                                        descricao: data.nome_obra,
+                                        descricao: data.descricao,
                                         unidade: data.unidade || '-',
                                         data_base: data.data_base,
                                         bdi: data.bdi,
@@ -8217,7 +8217,7 @@
                                 // É uma composição analítica salva em colunas JSONB
                                 docData = {
                                     codigo: data.codigo || 'S/C',
-                                    descricao: data.nome_obra,
+                                    descricao: data.descricao,
                                     unidade: data.unidade || '-',
                                     data_base: data.data_base,
                                     bdi: data.bdi,
