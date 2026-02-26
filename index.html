@@ -20,8 +20,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"
         defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
     <script src="https://unpkg.com/docx@7.1.0/build/index.js" defer></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js" defer></script>
 
 
     <style>
@@ -603,6 +605,66 @@
             gap: 8px;
         }
 
+        /* --- ESTILOS DE IMPRESSÃO PARA RELATÓRIOS --- */
+        @media print {
+
+            /* Ocultar TUDO exceto o corpo do relatório */
+            body>* {
+                display: none !important;
+            }
+
+            #modalDetalheComposicao {
+                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                visibility: visible !important;
+            }
+
+            #modalDetalheComposicao .modal-dialog {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            #modalDetalheComposicao .modal-content {
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            #modalDetalheComposicao .modal-header,
+            #modalDetalheComposicao .modal-footer,
+            #modalDetalheComposicao .btn-close {
+                display: none !important;
+            }
+
+            #modal-report-body {
+                display: block !important;
+                visibility: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .report-print-area {
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+            }
+
+            /* Forçar cores na impressão */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .print-page-break {
+                page-break-before: always !important;
+                margin-top: 2cm !important;
+            }
+        }
+
         .panel-subheader-title {
             font-size: 1.0rem;
             font-weight: 600;
@@ -924,6 +986,22 @@
         .badge-meta-atrasado {
             background-color: #DC3545;
             color: #fff;
+        }
+
+        /* Checkbox Prioritário */
+        .checkbox-prioritario {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--sop-green);
+        }
+
+        .checkbox-prioritario:hover {
+            opacity: 0.8;
+        }
+
+        .checkbox-prioritario:checked {
+            box-shadow: 0 0 4px rgba(13, 110, 253, 0.5);
         }
 
         /* CSS MULTI-SELECT */
@@ -1941,7 +2019,7 @@
 
                     <div class="bg-white p-3 rounded border shadow-sm mb-3">
                         <div class="row g-2 align-items-end">
-                            <div class="col-6 col-md-2">
+                            <div class="col-12 col-md-2">
                                 <label class="form-label small text-muted fw-bold text-uppercase mb-1">Metas</label>
                                 <select class="form-select form-select-sm border-secondary-subtle"
                                     id="meetingMetaSelect">
@@ -1952,23 +2030,24 @@
                                     <option value="Sem meta">Sem meta</option>
                                 </select>
                             </div>
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-2">
+                                <label class="form-label small text-muted fw-bold text-uppercase mb-1">Prioritário</label>
+                                <select class="form-select form-select-sm border-secondary-subtle"
+                                    id="meetingPrioritarioSelect">
+                                    <option value="">Todos</option>
+                                    <option value="Sim">Prioritário</option>
+                                    <option value="Não">Não Prioritário</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-2">
                                 <label class="form-label small text-muted fw-bold text-uppercase mb-1">Fiscal</label>
                                 <select class="form-select form-select-sm border-secondary-subtle fw-bold text-primary"
                                     id="meetingFiscalSelect"></select>
                             </div>
-                            <div class="col-6 col-md-2">
+                            <div class="col-12 col-md-2">
                                 <label class="form-label small text-muted fw-bold text-uppercase mb-1">Status</label>
                                 <select class="form-select form-select-sm border-secondary-subtle"
                                     id="meetingStatusSelect"></select>
-                            </div>
-                            <div class="col-auto">
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPrevFiscal"><i
-                                            class="bi bi-caret-left-fill"></i> Anterior</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm"
-                                        id="btnNextFiscal">Próximo <i class="bi bi-caret-right-fill"></i></button>
-                                </div>
                             </div>
                             <div class="col">
                                 <label class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
@@ -2635,56 +2714,6 @@
                 </div>
             </div>
 
-            <div class="modal fade" id="modalDetalheComposicao" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header bg-dark text-white py-2">
-                            <div>
-                                <span class="badge bg-primary me-2" id="modal-det-fonte">SEINFRA</span>
-                                <span class="fw-bold" style="font-size: 0.9rem;">DETALHAMENTO DA COMPOSIÇÃO</span>
-                            </div>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3 border-bottom pb-3">
-                                <div>
-                                    <h5 class="fw-bold text-dark mb-1" id="modal-det-desc">ALVENARIA DE TIJOLO COMUM
-                                    </h5>
-                                    <div class="text-muted small">CÓDIGO: <strong id="modal-det-cod"
-                                            class="text-dark">C0074</strong></div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="small text-muted text-uppercase">Preço Unitário</div>
-                                    <h3 class="fw-bold text-success mb-0" id="modal-det-preco">R$ 62,30</h3>
-                                    <span class="badge bg-light text-secondary border" id="modal-det-unid">UN: M2</span>
-                                </div>
-                            </div>
-
-                            <h6 class="small fw-bold text-secondary mb-2">ITENS DA COMPOSIÇÃO (INSUMOS/MÃO DE OBRA)</h6>
-                            <div class="table-responsive border rounded">
-                                <table class="table table-sm table-striped mb-0" style="font-size: 0.85rem;">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Tipo</th>
-                                            <th>Cod</th>
-                                            <th>Descrição do Insumo</th>
-                                            <th class="text-center">Coef.</th>
-                                            <th class="text-end">Preço</th>
-                                            <th class="text-end">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="modal-det-itens">
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="modal-footer py-1 bg-light">
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                data-bs-dismiss="modal">Fechar</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
 
             <!-- MODAL CRIAR COMPOSIÇÃO ANALÍTICA -->
@@ -3084,6 +3113,9 @@
                 data-bs-target="#modalNovaVersao"></button>
 
             <script>
+                // Variáveis globais de estado
+                let currentCompositionData = null;
+
 
                 /* --------------------------------------------------------------
                    OVERLAY DE BOAS-VINDAS / LOGIN (TELA INICIAL)
@@ -4205,7 +4237,7 @@
                 }
 
                 // LOGIC: REUNIÃO
-                const mt = { meta: document.getElementById("meetingMetaSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), prev: document.getElementById("btnPrevFiscal"), next: document.getElementById("btnNextFiscal"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
+                const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: document.getElementById("meetingPrioritarioSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
                 let mtBase = [];
                 function getMetaDate(row, setD) {
                     const key = `meta:${row.processo}`;
@@ -4229,11 +4261,27 @@
                     if ((s.includes("EM ANALIS") || s === "ANALISE") && !s.includes("FISCAL") && !s.includes("REAN")) return 4;
                     if (s.includes("AGUAR") && s.includes("APROVA")) return 5;
                     if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO")) return 6;
-                    if (s.includes("DEVOLVIDO") || s.includes("CONTRATANTE")) return 7;
-                    if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 8;
-                    if (s.includes("ARQUIVADO")) return 9;
+                    if (s.includes("DEVOLVIDO")) return 7;
+                    if (s.includes("CONTRATANTE")) return 8;
+                    if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
+                    if (s.includes("ARQUIVADO")) return 10;
                     return 99;
                 }
+
+                // Funções para gerenciar processos prioritários (marcador simples)
+                function isPrioritario(row) {
+                    const key = `prioritario:${row.processo}`;
+                    return localStorage.getItem(key) === 'true';
+                }
+                function setPrioritario(processo, isPriority) {
+                    const key = `prioritario:${processo}`;
+                    if (isPriority) {
+                        localStorage.setItem(key, 'true');
+                    } else {
+                        localStorage.removeItem(key);
+                    }
+                }
+
                 let currentSort = { col: null, dir: 'asc' };
                 function changeSort(columnKey) {
                     if (currentSort.col === columnKey) { currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc'; }
@@ -4303,11 +4351,13 @@
                     const f = getSelectedValues(mt.fiscal).filter(v => v !== "");
                     const s = getSelectedValues(mt.status).filter(v => v !== "");
                     const m = getSelectedValues(mt.meta).filter(v => v !== "");
+                    const priorFilt = getSelectedValues(mt.prioritario).filter(v => v !== "");
                     const q = mt.search.value.toLowerCase();
 
                     if (uRole !== 'fiscal' && f.length > 0) rows = rows.filter(d => f.includes(d.fiscal));
                     if (s.length > 0) rows = rows.filter(d => s.includes(d.status));
                     if (m.length > 0) rows = rows.filter(d => m.includes(getMetaSt(d)));
+                    if (priorFilt.length > 0) rows = rows.filter(d => priorFilt.includes(isPrioritario(d) ? "Sim" : "Não"));
                     if (q) {
                         rows = rows.filter(d => {
                             const proc = (d.processo || "").toLowerCase(); const contrat = (d.contratante || "").toLowerCase(); const desc = (d.descricao || "").toLowerCase(); const analistaNome = (d.nomeAnalista || "").toLowerCase();
@@ -4323,7 +4373,7 @@
                     document.getElementById("card_proc_dias").textContent = maxDias;
 
                     const columns = [
-                        { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
+                        { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prioritário", width: "80px", key: null, align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
                         { title: "Status", width: "146px", key: "status", align: "start" }, { title: "Analista", width: "100px", key: "analista", align: "center" }, { title: "Abertura", width: "100px", key: "abertura", align: "center" },
                         { title: "Dias", width: "100px", key: "dias", align: "center" }, { title: "Contratante", width: "100px", key: "contratante", align: "start" }, { title: "Contratada", width: "100px", key: "contratada", align: "start" }, { title: "Descrição", width: "auto", key: "descricao", align: "start" }
                     ];
@@ -4381,6 +4431,7 @@
                         return `
         <tr style="vertical-align: middle;">
             <td class="text-center">${uRole !== 'fiscal' ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : ''}</td>
+            <td class="text-center"><input type="checkbox" class="checkbox-prioritario" data-proc="${escapeHTML(d.processo)}" ${isPrioritario(d) ? 'checked' : ''} title="Marcar como prioritário" /></td>
             <td><div style="font-weight: 700; font-size: 0.95rem; color: #000; white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1 text-muted" style="font-size: 0.75rem; font-weight: 500;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
             <td><div class="mb-1"><span class="badge rounded-pill ${mCls}" style="font-size: 0.75rem;">${mSt}</span></div><input type="date" class="form-control form-control-sm" style="font-size: 0.75rem; padding: 2px 4px; height: auto;" data-proc="${escapeHTML(d.processo)}" value="${mIso}" title="Alterar Meta" ${uRole !== 'admin' ? 'disabled' : ''} /></td>
             <td><span class="badge rounded-pill ${stCls} badge-custom-size">${d.status}</span></td>
@@ -4401,18 +4452,13 @@
                             updateReuniao();
                         }
                     }));
-                }
-                function moveMeetingFiscal(d) {
-                    const fs = Array.from(new Set(mtBase.map(r => r.fiscal).filter(Boolean))).sort();
-                    const currentSelected = getSelectedValues(mt.fiscal);
-                    let idx = -1;
-                    if (currentSelected.length === 1) idx = fs.indexOf(currentSelected[0]);
-                    if (idx === -1) idx = d > 0 ? 0 : fs.length - 1; else idx += d;
-                    if (idx < 0) idx = fs.length - 1; if (idx >= fs.length) idx = 0;
-                    Array.from(mt.fiscal.options).forEach(o => o.selected = false);
-                    const newVal = fs[idx]; const opt = Array.from(mt.fiscal.options).find(o => o.value === newVal);
-                    if (opt) opt.selected = true;
-                    renderMultiSelectUI(mt.fiscal); updateReuniao();
+
+                    // Event listener para checkboxes de prioritário
+                    mt.body.querySelectorAll('.checkbox-prioritario').forEach(checkbox => checkbox.addEventListener('change', (e) => {
+                        const processo = e.target.dataset.proc;
+                        setPrioritario(processo, e.target.checked);
+                        updateReuniao();
+                    }));
                 }
                 function populateAllTabFilters() {
                     populateFinanceiroFilters();
@@ -4429,13 +4475,13 @@
                     ger.clear.addEventListener("click", (e) => { e.preventDefault(); clearGerencial(); });
                     pr.fiscal.addEventListener("change", updatePrazos); pr.status.addEventListener("change", updatePrazos);
                     pr.clear.addEventListener("click", (e) => { e.preventDefault(); clearPrazos(); });
-                    mt.meta.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao); mt.prev.addEventListener("click", () => moveMeetingFiscal(-1)); mt.next.addEventListener("click", () => moveMeetingFiscal(1));
+                    mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
                     // Debounce no search de reunião
                     mt.search.addEventListener("input", debounce(updateReuniao, 300));
 
                     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
                         e.preventDefault(); mt.search.value = "";
-                        [mt.meta, mt.fiscal, mt.status].forEach(el => { Array.from(el.options).forEach(o => o.selected = false); renderMultiSelectUI(el); });
+                        [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => { Array.from(el.options).forEach(o => o.selected = false); renderMultiSelectUI(el); });
                         currentSort = { col: null, dir: 'asc' }; updateReuniao();
                     });
 
@@ -6241,141 +6287,160 @@
                         const arvore = {};
                         data.forEach(item => {
                             try {
-                                const nomeObra = (item.descricao || "").toLowerCase();
-                                const categoria = (item.usuario || "").toLowerCase();
+                                const desc = (item.descricao || "").toLowerCase();
+                                const user = (item.usuario || "").toLowerCase();
+                                const code = (item.codigo || "").toLowerCase();
 
-                                if (termoBusca && !nomeObra.includes(termoBusca) && !categoria.includes(termoBusca)) return;
+                                if (termoBusca && !desc.includes(termoBusca) && !user.includes(termoBusca) && !code.includes(termoBusca)) return;
 
-
-
-                                const catKey = item.usuario || 'OUTROS';
-                                const subKey = item.subcategoria || 'GERAL';
-
-                                if (!arvore[catKey]) arvore[catKey] = {};
-                                if (!arvore[catKey][subKey]) arvore[catKey][subKey] = [];
-                                arvore[catKey][subKey].push(item);
+                                const userKey = (item.usuario || 'OUTROS').toUpperCase();
+                                if (!arvore[userKey]) arvore[userKey] = [];
+                                arvore[userKey].push(item);
                             } catch (e) {
                                 console.error('[ERRO Item Composicao]', e, item);
                             }
                         });
 
+                        const sortedUsers = Object.keys(arvore).sort((a, b) => {
+                            if (a === 'SOP') return -1;
+                            if (b === 'SOP') return 1;
+                            const isMeA = (a === currentUserName || a === currentFiscalName || (userEmail && a.toUpperCase().includes(userEmail.toUpperCase())));
+                            const isMeB = (b === currentUserName || b === currentFiscalName || (userEmail && b.toUpperCase().includes(userEmail.toUpperCase())));
+                            if (isMeA) return -1;
+                            if (isMeB) return 1;
+                            return a.localeCompare(b, 'pt-BR');
+                        });
+
                         let html = '';
-                        let catIndex = 1100;
+                        let uIndex = 2000;
 
-                        for (const [cat, subcats] of Object.entries(arvore)) {
-                            catIndex++;
-                            const collapseId = `collapseCompCat${catIndex}`;
-                            let subHtml = '';
+                        for (const userKey of sortedUsers) {
+                            uIndex++;
+                            const collapseId = `collapseCompUser${uIndex}`;
+                            const itens = arvore[userKey];
 
-                            for (const [sub, itens] of Object.entries(subcats)) {
-                                subHtml += `<div class="subcategoria-header" style="margin-left: 10px;">${sub}</div>`;
-                                itens.sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR', { numeric: true }));
+                            const isMe = (userKey === currentUserName || userKey === currentFiscalName || (userEmail && userKey.toUpperCase().includes(userEmail.toUpperCase())));
+                            const isSop = (userKey === 'SOP');
 
-                                itens.forEach(obra => {
-                                    const isAnalytical = !!(obra.itens && Array.isArray(obra.itens));
-                                    const iconClass = obra.arquivo_url && obra.arquivo_url.endsWith('.pdf') ? 'icon-pdf' : (isAnalytical ? 'icon-generic' : 'icon-xls');
-                                    const iconSymbol = obra.arquivo_url && obra.arquivo_url.endsWith('.pdf') ? '<i class="bi bi-file-earmark-pdf"></i>' : (isAnalytical ? '<i class="bi bi-calculator"></i>' : '<i class="bi bi-file-earmark-spreadsheet"></i>');
+                            let accordionStyle = '';
+                            let iconClassHeader = 'bi bi-folder2-open me-2 text-success';
+                            let titleLabel = userKey;
 
-                                    const dataFormatada = new Date(obra.created_at || obra.data).toLocaleDateString('pt-BR');
+                            if (isMe) {
+                                accordionStyle = 'background-color: #dcfce7 !important; color: #166534 !important; font-weight: 700; border: 1px solid #bbf7d0;';
+                                iconClassHeader = 'bi bi-person-fill-check me-2 text-success';
+                                titleLabel = `MINHAS COMPOSIÇÕES (${userKey})`;
+                            } else if (isSop) {
+                                accordionStyle = 'background-color: #f8f9fa !important; color: #334155 !important; font-weight: 800; border: 1px solid #e2e8f0;';
+                                iconClassHeader = 'bi bi-building-fill-check me-2 text-primary';
+                                titleLabel = 'SOP (OFICIAL)';
+                            }
 
-                                    // Histórico
-                                    const historico = obra.comentarios_revisao || [];
-                                    const qtdComentarios = historico.length;
+                            let itensHtml = '';
+                            itens.sort((a, b) => {
+                                const codeA = (a.codigo || "").toUpperCase();
+                                const codeB = (b.codigo || "").toUpperCase();
+                                if (codeA && codeB) return codeA.localeCompare(codeB, 'pt-BR', { numeric: true });
+                                return (a.descricao || "").localeCompare(b.descricao || "", 'pt-BR', { numeric: true });
+                            });
 
-                                    // Badges de Status (Dinâmico)
-                                    let badgeStatus = '';
-                                    const temPendenteComp = historico.some(c => c.decisao === 'pendente');
+                            itens.forEach(obra => {
+                                const isAnalytical = !!(obra.itens && Array.isArray(obra.itens));
+                                const iconClassRow = obra.arquivo_url && obra.arquivo_url.endsWith('.pdf') ? 'icon-pdf' : (isAnalytical ? 'icon-generic' : 'icon-xls');
+                                const iconSymbol = obra.arquivo_url && obra.arquivo_url.endsWith('.pdf') ? '<i class="bi bi-file-earmark-pdf"></i>' : (isAnalytical ? '<i class="bi bi-calculator"></i>' : '<i class="bi bi-file-earmark-spreadsheet"></i>');
+                                const dataFormatada = new Date(obra.created_at || obra.data).toLocaleDateString('pt-BR');
 
-                                    if (temPendenteComp) {
-                                        badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
-                                    } else if (obra.status === 'Atualizado' || parseInt(obra.versao_atual?.replace(/[^0-9]/g, '')) > 1) {
-                                        badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
-                                    }
-                                    const histId = `hist_comp_${obra.id}`;
-                                    let botaoHistorico = qtdComentarios > 0 ? `<button class="btn-toggle-history" type="button" data-bs-toggle="collapse" data-bs-target="#${histId}"><i class="bi bi-clock-history"></i> Histórico (${qtdComentarios}) <i class="bi bi-chevron-down ms-1"></i></button>` : '';
+                                const historico = obra.comentarios_revisao || [];
+                                const qtdComentarios = historico.length;
+                                let badgeStatus = '';
+                                const temPendenteComp = historico.some(c => c.decisao === 'pendente');
+                                if (temPendenteComp) {
+                                    badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
+                                } else if (obra.status === 'Atualizado' || parseInt(String(obra.versao_atual || '').replace(/[^0-9]/g, '')) > 1) {
+                                    badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
+                                }
 
-                                    let containerHistorico = '';
-                                    if (qtdComentarios > 0) {
-                                        const listaComentarios = historico.map((c, index) => {
-                                            const dataComent = c.data ? new Date(c.data).toLocaleDateString('pt-BR') : '-';
-                                            let classeStatus = '', badgeDecisao = '', respostaAdminHTML = '', botoesAcaoAdmin = '';
-                                            const isSystemLog = (c.autor && c.autor.toLowerCase().includes('sistema'));
-                                            if (isSystemLog) classeStatus = 'system-log-entry';
+                                const histId = `hist_comp_v2_${obra.id}`;
+                                let botaoHistorico = qtdComentarios > 0 ? `<button class="btn-toggle-history" type="button" data-bs-toggle="collapse" data-bs-target="#${histId}"><i class="bi bi-clock-history"></i> Histórico (${qtdComentarios}) <i class="bi bi-chevron-down ms-1"></i></button>` : '';
 
-                                            if (c.decisao === 'atendido') {
-                                                classeStatus = 'status-atendido';
-                                                badgeDecisao = `<span class="badge-decision badge-atendido"><i class="bi bi-check-lg"></i> ATENDIDO</span>`;
-                                                if (c.resp_admin) respostaAdminHTML = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${c.resp_admin}</div>`;
-                                            } else if (c.decisao === 'recusado') {
-                                                classeStatus = 'status-recusado';
-                                                badgeDecisao = `<span class="badge-decision badge-recusado"><i class="bi bi-x-lg"></i> NÃO ACATADO</span>`;
-                                                if (c.resp_admin) respostaAdminHTML = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${c.resp_admin}</div>`;
-                                            } else if (isAdmin && !isSystemLog) {
-                                                botoesAcaoAdmin = `<div class="admin-decision-actions"><button class="btn btn-sm btn-outline-success" onclick="abrirModalAtenderComposicao(${obra.id}, ${index})"><i class="bi bi-check-lg"></i> Atender</button><button class="btn btn-sm btn-outline-danger" onclick="abrirModalRecusarComposicao(${obra.id}, ${index})"><i class="bi bi-x-lg"></i> Não Acatar</button></div>`;
-                                            }
-                                            let btnAnexo = c.arquivo ? `<a href="${c.arquivo}" target="_blank" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória/Anexo</a>` : '';
-                                            let btnExcluirHist = isAdmin ? `<button class="btn btn-sm text-danger border-0 p-0 ms-2 admin-only" title="Excluir Registro" onclick="deletarItemHistoricoComposicao(${obra.id}, ${index})"><i class="bi bi-x-lg"></i></button>` : '';
-                                            return `<div class="history-card-item ${classeStatus}"><div class="history-card-header"><div><strong>${c.autor}</strong> <span class="fw-normal ms-1">- ${dataComent}</span></div><div class="d-flex align-items-center">${badgeDecisao}${btnExcluirHist}</div></div><div class="history-card-body"><div>${c.mensagem}</div>${btnAnexo}${respostaAdminHTML}${botoesAcaoAdmin}</div></div>`;
-                                        }).join('');
-                                        containerHistorico = `<div class="collapse" id="${histId}"><div class="history-collapse-box">${listaComentarios}</div></div>`;
-                                    }
-                                    const historicoObra = obra.historico_versoes || [];
-                                    const autorObraV1 = String((historicoObra[0] && historicoObra[0].autor) ? historicoObra[0].autor : (obra.criador_nome || obra.criador_email || 'Administrador/Legado'));
-                                    const isOwnerRendering =
-                                        (userEmail && autorObraV1.toUpperCase().includes(userEmail.toUpperCase())) ||
-                                        (currentUserName && autorObraV1.toUpperCase().includes(currentUserName)) ||
-                                        (currentFiscalName && autorObraV1.toUpperCase().includes(currentFiscalName));
+                                let containerHistoricoHtml = '';
+                                if (qtdComentarios > 0) {
+                                    const listaComentarios = historico.map((c, idx) => {
+                                        const dC = c.data ? new Date(c.data).toLocaleDateString('pt-BR') : '-';
+                                        let clSt = '', bD = '', rA = '', bAA = '';
+                                        if (c.autor && c.autor.toLowerCase().includes('sistema')) clSt = 'system-log-entry';
+                                        if (c.decisao === 'atendido') {
+                                            clSt = 'status-atendido'; bD = `<span class="badge-decision badge-atendido"><i class="bi bi-check-lg"></i> ATENDIDO</span>`;
+                                            if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${c.resp_admin}</div>`;
+                                        } else if (c.decisao === 'recusado') {
+                                            clSt = 'status-recusado'; bD = `<span class="badge-decision badge-recusado"><i class="bi bi-x-lg"></i> NÃO ACATADO</span>`;
+                                            if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${c.resp_admin}</div>`;
+                                        } else if (isAdmin && !clSt.includes('system')) {
+                                            bAA = `<div class="admin-decision-actions"><button class="btn btn-sm btn-outline-success" onclick="abrirModalAtenderComposicao(${obra.id}, ${idx})"><i class="bi bi-check-lg"></i> Atender</button><button class="btn btn-sm btn-outline-danger" onclick="abrirModalRecusarComposicao(${obra.id}, ${idx})"><i class="bi bi-x-lg"></i> Não Acatar</button></div>`;
+                                        }
+                                        let bAnex = c.arquivo ? `<a href="${c.arquivo}" target="_blank" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória Anexo</a>` : '';
+                                        let bExc = isAdmin ? `<button class="btn btn-sm text-danger border-0 p-0 ms-2 admin-only" title="Excluir Registro" onclick="deletarItemHistoricoComposicao(${obra.id}, ${idx})"><i class="bi bi-x-lg"></i></button>` : '';
+                                        return `<div class="history-card-item ${clSt}"><div class="history-card-header"><div><strong>${c.autor}</strong> <span class="fw-normal ms-1">- ${dC}</span></div><div class="d-flex align-items-center">${bD}${bExc}</div></div><div class="history-card-body"><div>${c.mensagem}</div>${bAnex}${rA}${bAA}</div></div>`;
+                                    }).join('');
+                                    containerHistoricoHtml = `<div class="collapse" id="${histId}"><div class="history-collapse-box">${listaComentarios}</div></div>`;
+                                }
 
-                                    subHtml += `
+                                const historicoObra = obra.historico_versoes || [];
+                                const autorV1 = String((historicoObra[0] && historicoObra[0].autor) ? historicoObra[0].autor : (obra.criador_nome || obra.criador_email || 'Administrador/Legado'));
+                                const isOwner = (userEmail && autorV1.toUpperCase().includes(userEmail.toUpperCase())) || (currentUserName && autorV1.toUpperCase().includes(currentUserName)) || (currentFiscalName && autorV1.toUpperCase().includes(currentFiscalName));
+
+                                itensHtml += `
                                 <div class="mb-2">
                                     <div class="orcamento-item-row" style="margin-bottom:0; border-radius: 8px 8px ${qtdComentarios > 0 ? '0 0' : '8px 8px'};">
                                         <div class="d-flex align-items-center">
-                                            <div class="file-icon-box ${iconClass}">${iconSymbol}</div>
-                                            <div>
-                                                <div class="d-flex align-items-center flex-wrap">
-                                                    <span class="fw-bold text-dark" style="font-size:0.95rem;">${obra.descricao || "Sem Nome"}</span>
-                                                    <span class="badge bg-secondary ms-2" style="font-size:0.7rem;">${obra.versao_atual || 'V1'}</span>
+                                            <div class="file-icon-box ${iconClassRow}">${iconSymbol}</div>
+                                            <div style="flex: 1; min-width: 0;">
+                                                <div class="d-flex align-items-center mb-1">
+                                                    <span class="text-secondary small me-2" style="font-family: monospace; font-weight: 700; letter-spacing: 0.5px;">#${obra.codigo || 'S/C'}</span>
+                                                    <span class="badge bg-dark ms-1" style="font-size:0.65rem; font-weight: 700; border-radius: 4px; padding: 2px 6px;">${obra.versao_atual || 'V1'}</span>
                                                     ${badgeStatus}
                                                 </div>
-                                                  <div class="text-muted mt-1" style="font-size:0.75rem;">Criado por: ${autorObraV1} em ${dataFormatada}</div>
+                                                <div class="fw-bold text-dark pe-3" style="font-size:0.95rem; text-align: justify; line-height: 1.4;">
+                                                    ${obra.descricao || "Sem Descrição"}
+                                                </div>
+                                                <div class="text-muted mt-1" style="font-size:0.75rem;">
+                                                    ${isSop ? ' • Criado por: Setor de Orçamento da SOP' : `Subcategoria: ${obra.subcategoria || 'GERAL'} • Criado por: ${autorV1} em ${dataFormatada}`}
+                                                </div>
                                                 ${botaoHistorico}
                                             </div>
                                         </div>
                                         <div class="orcamento-actions">
-                                            <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Baixar Arquivo"><i class="bi bi-download"></i> Baixar</button>
+                                            <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Baixar Composição"><i class="bi bi-download"></i> Baixar</button>
                                             <button class="btn btn-action-icon ms-1" onclick="visualizarComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Visualizar Documento"><i class="bi bi-eye-fill text-primary"></i></button>
-                                            
-                                            ${(isOwnerRendering || isAdmin) ? `
+                                            ${(isOwner || isAdmin) ? `
                                                 ${isAnalytical ?
-                                                `<button class="btn btn-action-icon" onclick="editarComposicaoAnalitica(${obra.id})" title="Alterar Composição"><i class="bi bi-pencil-square text-primary"></i></button>` :
-                                                `<button class="btn btn-action-icon" onclick="prepararNovaVersaoComposicao(${obra.id})" title="Alterar Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>`
-                                            }
+                                            `<button class="btn btn-action-icon" onclick="editarComposicaoAnalitica(${obra.id})" title="Alterar Composição"><i class="bi bi-pencil-square text-primary"></i></button>` :
+                                            `<button class="btn btn-action-icon" onclick="prepararNovaVersaoComposicao(${obra.id})" title="Alterar Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>`
+                                        }
                                             ` : ''}
-                                            
                                             <button class="btn btn-action-icon" onclick="prepararComentarioComposicao(${obra.id})" title="Adicionar Comentário"><i class="bi bi-chat-left-text-fill text-warning"></i></button>
-                                            
-                                            ${(isOwnerRendering || isAdmin) ? `
-                                            <button class="btn btn-action-icon" onclick="deletarComposicao(${obra.id}, '${obra.arquivo_path}')" title="Excluir Composição"><i class="bi bi-trash-fill icon-trash"></i></button>
+                                            ${(isOwner || isAdmin) ? `
+                                                <button class="btn btn-action-icon" onclick="deletarComposicao(${obra.id}, '${obra.arquivo_path}')" title="Excluir Composição"><i class="bi bi-trash-fill icon-trash"></i></button>
                                             ` : ''}
                                         </div>
                                     </div>
-                                    ${containerHistorico}
+                                    ${containerHistoricoHtml}
                                 </div>`;
-                                });
-                            }
+                            });
+
                             html += `
-                        <div class="accordion-custom-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button accordion-custom-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                                    <i class="bi bi-folder2-open me-2 text-success"></i> ${cat}
-                                </button>
-                            </h2>
-                            <div id="${collapseId}" class="accordion-collapse collapse">
-                                <div class="accordion-body bg-white pt-2">
-                                    ${subHtml}
+                            <div class="accordion-custom-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button accordion-custom-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" style="${accordionStyle}">
+                                        <i class="${iconClassHeader}"></i> ${titleLabel} <span class="badge bg-white text-dark ms-2 opacity-75" style="font-size: 0.65rem;">${itens.length}</span>
+                                    </button>
+                                </h2>
+                                <div id="${collapseId}" class="accordion-collapse collapse">
+                                    <div class="accordion-body bg-white pt-2">
+                                        ${itensHtml}
+                                    </div>
                                 </div>
-                            </div>
-                        </div>`;
+                            </div>`;
                         }
                         container.innerHTML = html || '<div class="text-center py-5 text-muted">Nenhuma composição disponível.</div>';
                     } catch (err) {
@@ -7342,7 +7407,14 @@
                                         <div class="small text-muted">CÓDIGO: <strong>${dadosPai.codigo}</strong> | UNIDADE: <strong>${dadosPai.unidade}</strong></div>
                                      </div><hr>`;
                         }
-                        const { data: itens } = await sbClient.from('tabelas_itens').select('*').eq('fonte', fonte).eq('versao', versao).eq('referencia_pai_cod', codigo);
+                        // 1. Tenta carregar a composição a partir da nova coluna JSON 'composicao' no registro pai
+                        let itens = (dadosPai && dadosPai.composicao) ? dadosPai.composicao : [];
+
+                        // 2. Fallback: Se não houver dados no JSON, busca na tabela auxiliar 'tabelas_itens' (método antigo)
+                        if (itens.length === 0) {
+                            const { data: itensDB } = await sbClient.from('tabelas_itens').select('*').eq('fonte', fonte).eq('versao', versao).eq('referencia_pai_cod', codigo);
+                            itens = itensDB || [];
+                        }
 
                         if (itens && itens.length > 0) {
                             html += `<div class="table-responsive">
@@ -7462,6 +7534,10 @@
                 }
                 document.addEventListener('DOMContentLoaded', atualizarSelectVersao);
 
+                // Removida baixarComposicaoPDF pois agora usamos a impressão HTML unificada
+
+
+
                 async function prepararExportacaoComposicao(id, urlArquivo) {
                     try {
                         let docData = null;
@@ -7508,10 +7584,19 @@
                         }
 
                         if (docData) {
-                            compositionDataToExport = docData;
-                            const modalEl = document.getElementById('modalExportarComposicao');
-                            if (modalEl.parentNode !== document.body) document.body.appendChild(modalEl);
-                            new bootstrap.Modal(modalEl).show();
+                            const meta = docData.meta || {};
+                            const dados = {
+                                codigo: meta.codigo || 'S/C',
+                                descricao: meta.descricao,
+                                unidade: meta.unidade || '-',
+                                data_base: meta.data_base,
+                                bdi: meta.bdi,
+                                desconto: meta.desconto,
+                                itens: docData.itens || [],
+                                totais: meta.totais,
+                                versao_atual: meta.versao || ''
+                            };
+                            gerarPDF_Profissional(dados);
                         } else {
                             alert("Esta composição não possui arquivo nem dados analíticos.");
                         }
@@ -7533,995 +7618,908 @@
                     bootstrap.Modal.getInstance(document.getElementById('modalExportarComposicao')).hide();
                 }
 
-                // --------------------------------------------------------------
-                // FUNÇÃO GERAR PDF (Profissional) - Com Template SOP (pdf-lib)
-                // --------------------------------------------------------------
-                async function gerarPDF_Profissional(dados, options = {}) {
-                    // options: { output: 'save' | 'open' }
-                    const mode = options.output || 'save';
-                    const { jsPDF } = window.jspdf;
-                    const { PDFDocument } = PDFLib;
+                const formatarVersao = (texto) => {
+                    if (!texto || texto === '-') return '-';
+                    const txt = texto.toString().toUpperCase().trim();
 
-                    // 1. Carregar o PDF de Fundo (Timbrado)
-                    let backgroundPdfBytes = null;
+                    // Lista de abreviações dos meses
+                    const mesesAbrev = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+                    // Mapa de nomes completos para abreviações
+                    const mesesMap = {
+                        'JANEIRO': 'Jan', 'FEVEREIRO': 'Fev', 'MARÇO': 'Mar', 'ABRIL': 'Abr',
+                        'MAIO': 'Mai', 'JUNHO': 'Jun', 'JULHO': 'Jul', 'AGOSTO': 'Ago',
+                        'SETEMBRO': 'Set', 'OUTUBRO': 'Out', 'NOVEMBRO': 'Nov', 'DEZEMBRO': 'Dez'
+                    };
+
+                    // Caso 1: Detecção de números de versão (Ex: "28.1", "30") -> Manter inalterado
+                    if (/^\d+(\.\d+)?$/.test(txt)) return txt;
+
+                    // Caso 2: Tenta encontrar nome do mês por extenso ou abreviado (Ex: "SETEMBRO DE 2024" ou "FEV. DE 2026")
+                    const mesesAbrevMap = {
+                        'JAN': 'Jan', 'FEV': 'Fev', 'MAR': 'Mar', 'ABR': 'Abr',
+                        'MAI': 'Mai', 'JUN': 'Jun', 'JUL': 'Jul', 'AGO': 'Ago',
+                        'SET': 'Set', 'OUT': 'Out', 'NOV': 'Nov', 'DEZ': 'Dez'
+                    };
+
+                    // Primeiro tenta meses completos (para não casar "MAR" em "MARÇO")
+                    for (let mes in mesesMap) {
+                        if (txt.includes(mes)) {
+                            const anoMatch = txt.match(/\d{4}/);
+                            if (anoMatch) return `${mesesMap[mes]}/${anoMatch[0].substring(2)}`;
+                        }
+                    }
+
+                    // Depois tenta abreviações
+                    for (let abrev in mesesAbrevMap) {
+                        if (txt.includes(abrev)) {
+                            const anoMatch = txt.match(/\d{4}/);
+                            if (anoMatch) return `${mesesAbrevMap[abrev]}/${anoMatch[0].substring(2)}`;
+                        }
+                    }
+
+                    // Caso 3: Parse de datas ISO (YYYY-MM-DD) ou BR (DD/MM/YYYY)
+                    let d = null;
+                    if (txt.includes('-')) {
+                        const p = txt.split('-');
+                        if (p.length === 3) d = new Date(p[0], p[1] - 1, p[2]);
+                        else if (p.length === 2) d = new Date(p[0], p[1] - 1, 1);
+                    } else if (txt.includes('/')) {
+                        const p = txt.split('/');
+                        if (p.length === 3) d = new Date(p[2], p[1] - 1, p[0]);
+                        else if (p.length === 2) {
+                            // Se for MM/YYYY (SINAPI/ORSE)
+                            const mes = parseInt(p[0]);
+                            const ano = p[1];
+                            if (mes >= 1 && mes <= 12 && ano.length === 4) {
+                                return `${mesesAbrev[mes - 1]}/${ano.substring(2)}`;
+                            }
+                        }
+                    }
+
+                    if (d && !isNaN(d.getTime())) {
+                        return `${mesesAbrev[d.getMonth()]}/${d.getFullYear().toString().substring(2)}`;
+                    }
+
+                    return texto; // Retorno padrão
+                };
+
+                const normalizarItemParaPDF = (item) => {
+                    const precoUnit = Number(item.preco_unitario || item.preco || item.p || 0);
+                    const coef = Number(item.coeficiente || item.coef || item.c || 0);
+                    const total = Number(item.total || item.total_item || item.t || (precoUnit * coef)) || 0;
+
+                    // Mapeamento de nomes de grupo para padrão de exibição
+                    const rawGrupo = (item.tipo_grupo || item.grupo || item.g || 'GERAL').toUpperCase();
+                    let grupoDisplay = rawGrupo;
+                    if (rawGrupo === 'MAO_DE_OBRA' || rawGrupo === 'MAO DE OBRA') grupoDisplay = 'MÃO DE OBRA';
+                    else if (rawGrupo === 'SERVICO' || rawGrupo === 'SERVICOS') grupoDisplay = 'SERVIÇO';
+                    else if (rawGrupo === 'MATERIAL' || rawGrupo === 'MATERIAIS') grupoDisplay = 'MATERIAL';
+
+                    // Fallbacks para Código e Descrição
+                    const codigo = item.codigo_insumo || item.codigo_item || item.codigo || item.cod || '-';
+                    const descricao = item.descricao_insumo || item.descricao_item || item.descricao || item.desc || '-';
+                    const fonte = item.origem || item.fonte || item.fonte_insumo || item.tabela || (item.retroativo ? 'COTAÇÃO' : '-');
+
+                    return {
+                        origem: fonte,
+                        versao: formatarVersao(item.versao || item.data_tabela || item.data_referencia || item.referencia_tabela || item.retroativo?.dataIni || '-'),
+                        codigo: codigo,
+                        descricao: descricao,
+                        unidade: item.unidade || item.unid || '-',
+                        coeficiente: coef,
+                        preco_unitario: precoUnit,
+                        total: total,
+                        grupo: grupoDisplay,
+                        referencia: item.referencia || item.tipo_encargo || '',
+                        retroativo: item.retroativo || null
+                    };
+                };
+
+                // --------------------------------------------------------------
+                // FUNÇÃO GERAR PDF (Clone Visual 1:1) - Utilizando html2pdf.js
+                // --------------------------------------------------------------
+                async function gerarPDF_Profissional(rawInput) {
+                    if (!rawInput) return;
+
+                    // Feedback visual instantâneo
+                    const btnsBaixar = document.querySelectorAll('.btn-action-baixar, .btn-outline-success');
+                    const originalTexts = Array.from(btnsBaixar).map(b => b.innerHTML);
+                    btnsBaixar.forEach(b => {
+                        b.disabled = true;
+                        b.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+                    });
+
                     try {
-                        const bgUrl = "https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/Timbrado_em_branco-Vertical2023-2026.pdf";
-                        const res = await fetch(bgUrl);
-                        if (!res.ok) throw new Error("Falha ao baixar timbrado");
-                        backgroundPdfBytes = await res.arrayBuffer();
+                        const { jsPDF } = window.jspdf;
+                        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                        const verdeSOP = [0, 143, 61];
+                        const cinzaHeader = [242, 242, 242];
+                        const cinzaTexto = [100, 100, 100];
+
+                        const fCur = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        const fNum4 = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+
+                        // 1. Cabeçalho Institucional SOP (Fidelidade Absoluta com a Modal)
+                        doc.setFillColor(...verdeSOP); doc.roundedRect(14, 10, 20, 10, 1, 1, 'F');
+                        doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.setFont("helvetica", "bold");
+                        doc.text("SOP-CE", 24, 16.5, { align: "center" });
+
+                        doc.setTextColor(...verdeSOP); doc.setFontSize(10); doc.text("ESTADO DO CEARÁ", 38, 14);
+                        doc.setTextColor(60, 60, 60); doc.setFontSize(7); doc.text("SUPERINTENDÊNCIA DE OBRAS PÚBLICAS", 38, 18);
+
+                        doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.text("COMPOSIÇÃO ANALÍTICA", 196, 14, { align: "right" });
+                        doc.setTextColor(...cinzaTexto); doc.setFontSize(6); doc.text("GEROA - GERÊNCIA DE ORÇAMENTOS E AVALIAÇÃO DE IMÓVEIS", 196, 18, { align: "right" });
+
+                        doc.setDrawColor(200); doc.line(14, 22, 196, 22);
+
+                        // 2. Metadados Grid - Clone idêntico da Imagem 01 (Otimização Máxima de Espaço Central)
+                        doc.setDrawColor(220); doc.setFillColor(255);
+                        doc.rect(14, 25, 182, 17, 'D');
+                        doc.line(34, 25, 34, 42); // Barra 1 (Muito Reduzido)
+                        doc.line(170, 25, 170, 42); // Barra 2 (Máximo Expandida: Descrição)
+                        doc.line(182, 25, 182, 42); // Barra 3 (Mínimo Unit)
+
+                        doc.setFontSize(5); doc.setTextColor(150); doc.setFont("helvetica", "bold");
+                        doc.text("CÓDIGO / VERSÃO", 15.5, 29);
+                        doc.text("DESCRIÇÃO DA COMPOSIÇÃO", 36, 29);
+                        doc.text("UNID:", 171, 29);
+
+                        doc.setFontSize(8.5); doc.setTextColor(0); doc.setFont("helvetica", "bold");
+                        doc.text(rawInput.codigo || 'S/C', 15.5, 35);
+                        if (rawInput.versao_atual) {
+                            doc.setFontSize(5); doc.roundedRect(26.5, 33, 6, 3, 0.5, 0.5, 'D');
+                            doc.text(rawInput.versao_atual, 29.5, 35.2, { align: "center" });
+                        }
+
+                        doc.setFontSize(8.5); doc.setTextColor(0);
+                        const descLines = doc.splitTextToSize((rawInput.descricao || '').toUpperCase(), 130);
+                        doc.text(descLines, 36, 34, { align: "justify" });
+
+                        doc.setFontSize(10); doc.text(rawInput.unidade || '-', 176, 37.5, { align: "center" });
+
+                        // Área BDI (182 a 196)
+                        doc.setFontSize(6.5);
+                        doc.setTextColor(120); doc.text("BDI:", 183.5, 33);
+                        doc.setTextColor(0, 80, 200); doc.setFont("helvetica", "bold"); doc.text(`${rawInput.bdi || '0,00'}%`, 194.5, 33, { align: "right" });
+                        doc.setTextColor(120); doc.setFont("helvetica", "normal"); doc.text("DESC:", 183.5, 38.5);
+                        doc.setTextColor(200, 0, 0); doc.setFont("helvetica", "bold"); doc.text(`${rawInput.desconto || '0,00'}%`, 194.5, 38.5, { align: "right" });
+
+                        // 3. Preparação dos Itens (Utilizando normalizarItemParaPDF para consistência total com a Modal)
+                        const itensRaw = rawInput.itens || [];
+                        const itens = itensRaw.map(normalizarItemParaPDF);
+                        const retroativos = [];
+
+                        const body = [];
+                        const ordemGrupos = ['MÃO DE OBRA', 'MATERIAL', 'EQUIPAMENTOS', 'SERVIÇO', 'GERAL'];
+                        const itensAgrupados = itens.reduce((acc, item) => {
+                            const g = item.grupo || 'GERAL';
+                            if (!acc[g]) acc[g] = [];
+                            acc[g].push(item);
+                            return acc;
+                        }, {});
+
+                        const gruposDisponiveis = Object.keys(itensAgrupados).sort((a, b) => {
+                            const idxA = ordemGrupos.indexOf(a);
+                            const idxB = ordemGrupos.indexOf(b);
+                            return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                        });
+
+                        let totalSimples = 0;
+
+                        gruposDisponiveis.forEach(g => {
+                            body.push([{ content: g.toUpperCase(), colSpan: 8, styles: { halign: 'center', fillColor: cinzaHeader, fontStyle: 'bold', textColor: 0 } }]);
+
+                            let subtotalGrupo = 0;
+                            itensAgrupados[g].forEach(i => {
+                                let fonteStr = i.origem;
+                                if ((i.origem === 'SEINFRA' || i.origem === 'SINAPI') && i.referencia) {
+                                    const refLabel = i.referencia.toLowerCase().includes('deson') ? 'Desonerada' : 'Onerada';
+                                    fonteStr += `\n${refLabel}`;
+                                }
+
+                                body.push([
+                                    fonteStr,
+                                    i.versao || '-',
+                                    i.codigo || '-',
+                                    i.descricao || '-',
+                                    i.unidade || '-',
+                                    fNum4(i.coeficiente),
+                                    fCur(i.preco_unitario),
+                                    fCur(i.total)
+                                ]);
+                                subtotalGrupo += i.total;
+                                totalSimples += i.total;
+                                if (i.retroativo) retroativos.push({ ...i, codInsumo: i.codigo, descInsumo: i.descricao });
+                            });
+
+                            body.push([{
+                                content: `TOTAL ${g}`,
+                                colSpan: 7,
+                                styles: { halign: 'right', fontStyle: 'bold', textColor: cinzaTexto, fontSize: 6.5 }
+                            }, {
+                                content: fCur(subtotalGrupo),
+                                styles: { halign: 'right', fontStyle: 'bold' }
+                            }]);
+                        });
+
+                        doc.autoTable({
+                            startY: 45,
+                            head: [['FONTE', 'VERSÃO', 'CÓDIGO', 'DESCRIÇÃO DO INSUMO', 'UNID', 'COEF.', 'P. UNIT.', 'TOTAL']],
+                            body: body,
+                            theme: 'grid',
+                            styles: { fontSize: 7, cellPadding: 1.5, valign: 'middle', overflow: 'linebreak' },
+                            headStyles: { fillColor: cinzaHeader, textColor: 0, halign: 'center', fontStyle: 'bold' },
+                            columnStyles: {
+                                0: { halign: 'center', cellWidth: 'auto' }, // FONTE
+                                1: { halign: 'center', cellWidth: 'auto' }, // VERSÃO
+                                2: { halign: 'center', cellWidth: 'auto' }, // CÓDIGO
+                                3: { cellWidth: '*' }, // DESCRIÇÃO DO INSUMO (Ocupa o resto)
+                                4: { halign: 'center', cellWidth: 'auto' }, // UNID
+                                5: { halign: 'center', cellWidth: 'auto' }, // COEF.
+                                6: { halign: 'right', cellWidth: 'auto' },  // P. UNIT.
+                                7: { halign: 'right', cellWidth: 'auto' }   // TOTAL
+                            },
+                            margin: { left: 14, right: 14 },
+                            didDrawPage: (data) => {
+                                doc.setFontSize(6); doc.setTextColor(150);
+                                doc.text(`Painel GECOPE/SOP | Página ${data.pageNumber} | Código: ${rawInput.codigo || '-'}`, 14, 285);
+                            }
+                        });
+
+                        // 4. Totais Finais
+                        let y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 45) + 6;
+                        const drawTot = (label, val, col = [0, 0, 0], bold = false) => {
+                            if (y > 270) { doc.addPage(); y = 20; }
+                            doc.setTextColor(...col); doc.setFontSize(bold ? 10 : 7); doc.setFont("helvetica", bold ? "bold" : "normal");
+                            doc.text(label.toUpperCase(), 155, y, { align: 'right' });
+                            doc.text(`R$ ${fCur(val)}`, 196, y, { align: 'right' });
+                            y += bold ? 8 : 5;
+                        };
+
+                        const bdiVal = (totalSimples * (parseFloat(rawInput.bdi || 0) / 100));
+                        const tBDI = totalSimples + bdiVal;
+                        const descVal = (tBDI * (parseFloat(rawInput.desconto || 0) / 100));
+                        const pFinal = tBDI - descVal;
+
+                        drawTot("Total Simples", totalSimples);
+                        if (bdiVal > 0) drawTot(`(+) BDI (${rawInput.bdi}%)`, bdiVal, [0, 80, 200]);
+                        if (descVal > 0) drawTot(`(-) Desconto (${rawInput.desconto}%)`, descVal, [200, 0, 0]);
+                        doc.setDrawColor(...verdeSOP); doc.line(135, y - 2, 196, y - 2); y += 3;
+                        drawTot("Preço Total Unitário", pFinal, verdeSOP, true);
+
+                        // 5. Memória de Cálculo (Página Extra conforme Modal)
+                        if (retroativos.length > 0) {
+                            doc.addPage();
+                            doc.setTextColor(...verdeSOP); doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                            doc.text("METODOLOGIA DE CÁLCULO (RETROAÇÃO DE PREÇOS)", 14, 20);
+
+                            doc.setTextColor(80, 80, 80); doc.setFontSize(8); doc.setFont("helvetica", "normal");
+                            const intro = "Os custos obtidos via cotação de mercado foram retroagidos financeiramente para a Data-Base do orçamento, garantindo a homogeneidade temporal dos preços.";
+                            doc.text(doc.splitTextToSize(intro, 182), 14, 26);
+
+                            let currentY = 35;
+                            retroativos.forEach(r => {
+                                if (currentY > 240) { doc.addPage(); currentY = 20; }
+                                doc.setTextColor(0); doc.setFontSize(9); doc.setFont("helvetica", "bold");
+                                doc.text(`Item: ${r.codInsumo} - ${r.descInsumo}`, 14, currentY);
+                                currentY += 5;
+
+                                const ret = r.retroativo;
+                                const fator = (Number(ret.indFin) / Number(ret.indIni)) || 1;
+                                doc.autoTable({
+                                    startY: currentY,
+                                    head: [['Parâmetro', 'Descrição / Valor']],
+                                    body: [
+                                        ['Valor Cotado (A)', `R$ ${fCur(ret.base)}`],
+                                        ['Data Cotação / Índice (C)', `${ret.dataIni?.split('-').reverse().join('/') || '-'} | ${fNum4(ret.indIni)}`],
+                                        ['Data-Base / Índice (E)', `${ret.dataFin?.split('-').reverse().join('/') || '-'} | ${fNum4(ret.indFin)}`],
+                                        ['Fator (E/C)', fator.toFixed(4)],
+                                        ['Preço Adotado (A x Fator)', { content: `R$ ${fCur(Number(ret.base) * fator)}`, styles: { fontStyle: 'bold', textColor: verdeSOP } }]
+                                    ],
+                                    theme: 'grid',
+                                    styles: { fontSize: 8, cellPadding: 2 },
+                                    headStyles: { fillColor: cinzaHeader, textColor: 0 },
+                                    margin: { left: 14, right: 70 }
+                                });
+                                currentY = doc.lastAutoTable.finalY + 12;
+                            });
+                        }
+
+                        doc.save(`${rawInput.codigo || 'SOP'}_Analitica.pdf`);
                     } catch (e) {
-                        console.error("Erro ao carregar background:", e);
-                        alert("Atenção: Não foi possível carregar o timbrado oficial. O PDF será gerado sem fundo.");
-                    }
-
-                    // 2. Gerar Conteúdo com jsPDF
-                    const doc = new jsPDF();
-                    const larguraPagina = doc.internal.pageSize.getWidth();
-
-                    // --- TÍTULO (Ajustado para o Timbrado) ---
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(16);
-                    doc.setTextColor(0, 143, 61); // Verde SOP
-                    doc.text("COMPOSIÇÃO ANALÍTICA", larguraPagina / 2, 45, { align: "center" });
-
-                    // --- DADOS DA COMPOSIÇÃO ---
-                    let yPos = 55;
-                    doc.setFontSize(10);
-                    doc.setTextColor(0, 0, 0);
-
-                    const formatarDataExtenso = (dataStr) => {
-                        if (!dataStr) return '-';
-                        const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-                        let dia, mes, ano;
-                        if (dataStr.includes('-')) {
-                            const partes = dataStr.split('-');
-                            if (partes.length === 3) { ano = partes[0]; mes = parseInt(partes[1]) - 1; dia = partes[2]; }
-                        } else {
-                            const partes = dataStr.split('/');
-                            if (partes.length >= 2) {
-                                dia = partes.length === 3 ? partes[0] : '01';
-                                mes = parseInt(partes.length === 3 ? partes[1] : partes[0]) - 1;
-                                ano = partes.length === 3 ? partes[2] : partes[1];
-                            }
-                        }
-                        if (dia && meses[mes] && ano) return `${dia} de ${meses[mes]} de ${ano}`;
-                        return dataStr;
-                    };
-
-                    const addField = (label, value, x, y) => {
-                        doc.setFont("helvetica", "bold");
-                        doc.text(label, x, y);
-                        doc.setFont("helvetica", "normal");
-                        doc.text(value, x + doc.getTextWidth(label) + 2, y);
-                    };
-
-                    addField("CÓDIGO:", dados.codigo || '-', 20, yPos);
-                    addField("UNIDADE:", dados.unidade || '-', 150, yPos);
-                    yPos += 6;
-
-                    doc.setFont("helvetica", "bold"); doc.text("DESCRIÇÃO:", 20, yPos);
-                    doc.setFont("helvetica", "normal");
-                    const desc = dados.descricao || '-';
-                    const descLines = doc.splitTextToSize(desc, 150);
-                    doc.text(descLines, 45, yPos);
-                    yPos += (descLines.length * 4) + 2;
-
-                    const dataExtenso = formatarDataExtenso(dados.data_base);
-                    if (dataExtenso) addField("DATA BASE:", dataExtenso, 20, yPos);
-
-                    addField("BDI:", (dados.bdi || '0,00') + "%", 100, yPos);
-                    addField("DESCONTO:", (dados.desconto || '0,00') + "%", 150, yPos);
-
-                    yPos += 8;
-
-                    // --- TABELA ---
-                    const itensOrdenados = [...(dados.itens || [])].sort((a, b) => {
-                        const ordem = { 'MAO_DE_OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVICO': 4 };
-                        return (ordem[a.grupo] || 99) - (ordem[b.grupo] || 99);
-                    });
-
-                    let tableBody = [];
-                    let currentGroup = '';
-                    const labelGrupos = { 'MAO_DE_OBRA': 'MÃO DE OBRA', 'MATERIAL': 'MATERIAL', 'EQUIPAMENTOS': 'EQUIPAMENTOS', 'SERVICO': 'SERVIÇO' };
-                    let sumMat = 0, sumMao = 0, sumEquip = 0, sumServ = 0;
-                    const itensComMemoria = [];
-
-                    itensOrdenados.forEach(item => {
-                        const itemGroup = labelGrupos[item.grupo] || (item.grupo || 'MATERIAL').replace(/_/g, ' ');
-
-                        if (itemGroup !== currentGroup) {
-                            currentGroup = itemGroup;
-                            tableBody.push([{ content: currentGroup, colSpan: 7, styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
-                        }
-
-                        let precoUnitarioBase = item.preco;
-                        if (item.fonte === 'MERCADO' && item.retroativo) {
-                            const r = item.retroativo;
-                            const baseVal = parseFloat(r.base || 0);
-                            const indCotacao = parseFloat(r.indIni || 1);
-                            const indDataBase = parseFloat(r.indFin || 1);
-                            const fator = indDataBase / indCotacao;
-                            precoUnitarioBase = Math.round((baseVal * fator) * 100) / 100;
-                            itensComMemoria.push({ item, origem: item.fonte });
-                        }
-                        const totalItem = Math.round((precoUnitarioBase * item.coeficiente) * 100) / 100;
-
-                        const g = item.grupo || 'MATERIAL';
-                        if (g === 'MAO_DE_OBRA') sumMao += totalItem;
-                        else if (g === 'EQUIPAMENTOS') sumEquip += totalItem;
-                        else if (g === 'SERVICO') sumServ += totalItem;
-                        else sumMat += totalItem;
-
-                        const origem = item.fonte + (item.referencia ? ` (${item.referencia})` : '');
-                        tableBody.push([
-                            origem,
-                            item.codigo,
-                            item.descricao,
-                            item.unidade,
-                            item.coeficiente.toLocaleString('pt-BR', { minimumFractionDigits: 4 }),
-                            precoUnitarioBase.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-                            totalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-                        ]);
-                    });
-
-                    doc.autoTable({
-                        startY: yPos,
-                        head: [['Origem', 'Código', 'Descrição', 'Unid', 'Coef', 'Preço Unit.', 'Total (R$)']],
-                        body: tableBody,
-                        theme: 'grid',
-                        styles: { fontSize: 8, cellPadding: 2 },
-                        headStyles: { fillColor: [51, 51, 51], textColor: [255, 255, 255] },
-                        columnStyles: {
-                            0: { cellWidth: 22 },
-                            1: { cellWidth: 20 },
-                            2: { cellWidth: 'auto' },
-                            3: { cellWidth: 12, halign: 'center' },
-                            4: { cellWidth: 16, halign: 'center' },
-                            5: { cellWidth: 22, halign: 'right' },
-                            6: { cellWidth: 22, halign: 'right' }
-                        },
-                        margin: { top: 50, bottom: 20 }
-                    });
-
-                    // --- TOTAIS ---
-                    let finalY = doc.lastAutoTable.finalY + 10;
-                    if (finalY > 250) { doc.addPage(); finalY = 50; }
-
-                    const bdiVal = parseFloat((dados.bdi || '0').toString().replace(',', '.')) / 100 || 0;
-                    const descVal = parseFloat((dados.desconto || '0').toString().replace(',', '.')) / 100 || 0;
-
-                    const totalSemBDI = sumMat + sumMao + sumEquip + sumServ;
-                    const totalComBDI = totalSemBDI * (1 + bdiVal);
-                    const valorBDI = totalComBDI - totalSemBDI;
-                    const valorDesconto = totalComBDI * descVal;
-                    const totalGeral = totalComBDI - valorDesconto;
-
-                    doc.setFontSize(9);
-                    const printTotal = (label, val, y) => {
-                        if (val > 0) {
-                            doc.text(label, 140, y);
-                            // Ajuste para evitar quebra de linha: alinhar à direita com margem segura
-                            doc.text(val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, y, { align: 'right' });
-                            return y + 5;
-                        }
-                        return y;
-                    };
-
-                    finalY = printTotal("Total Material:", sumMat, finalY);
-                    finalY = printTotal("Total Mão de Obra:", sumMao, finalY);
-                    finalY = printTotal("Total Equipamentos:", sumEquip, finalY);
-                    finalY = printTotal("Total Serviços:", sumServ, finalY);
-
-                    doc.setFont("helvetica", "bold");
-                    // BDI sempre mostra se maior que 0
-                    if (valorBDI > 0) {
-                        doc.text(`BDI (${(bdiVal * 100).toFixed(2)}%):`, 140, finalY);
-                        doc.text(valorBDI.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY, { align: 'right' });
-                        finalY += 5;
-                    }
-
-                    if (valorDesconto > 0) {
-                        doc.text(`Desconto (${(descVal * 100).toFixed(2)}%):`, 140, finalY);
-                        doc.text(valorDesconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY, { align: 'right' });
-                        finalY += 5;
-                    }
-
-                    doc.setFontSize(11);
-                    doc.setTextColor(0, 143, 61);
-                    doc.text("PREÇO TOTAL UNITÁRIO:", 110, finalY + 2);
-                    doc.text(totalGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 195, finalY + 2, { align: 'right' });
-
-                    // --- MEMÓRIA DE CÁLCULO DETALHADA (Restaurada) ---
-                    if (itensComMemoria.length > 0) {
-                        doc.addPage();
-
-                        // Layout Constants
-                        const mLeft = 14;
-                        const mWidth = larguraPagina - 28;
-                        let cy = 35;
-
-                        // Title 1
-                        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
-                        doc.text("Metodologia de Cálculo de Insumo Não Tabelado (Cotação de Mercado)", mLeft, cy);
-                        cy += 8;
-
-                        // Body 1 & 2 (Justificado)
-                        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
-                        const txt1 = "O presente custo unitário foi obtido através de cotação de mercado, visto que o insumo não consta nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do valor cotado.";
-                        const txt2 = "O objetivo é compatibilizar o preço de mercado atual (data da cotação) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.";
-
-                        const textOptions = { maxWidth: mWidth, align: "justify", lineHeightFactor: 1.5 };
-
-                        doc.text(txt1, mLeft, cy, textOptions);
-                        const dim1 = doc.getTextDimensions(txt1, textOptions);
-                        cy += dim1.h + 8;
-
-                        doc.text(txt2, mLeft, cy, textOptions);
-                        const dim2 = doc.getTextDimensions(txt2, textOptions);
-                        cy += dim2.h + 12;
-
-                        // Title 2
-                        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
-                        doc.text("Memória de Cálculo e Compatibilização de Preços", mLeft, cy);
-                        cy += 8;
-
-                        // Body 3 & 4
-                        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
-                        const txt3 = "Considerando a defasagem temporal entre a data desta cotação de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores.";
-                        const txt4 = "O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na tabela abaixo. Este procedimento visa equiparar o poder de compra da moeda à época da licitação, demonstrado analiticamente abaixo:";
-
-                        doc.text(txt3, mLeft, cy, textOptions);
-                        const dim3 = doc.getTextDimensions(txt3, textOptions);
-                        cy += dim3.h + 8;
-
-                        doc.text(txt4, mLeft, cy, textOptions);
-                        const dim4 = doc.getTextDimensions(txt4, textOptions);
-                        cy += dim4.h + 12;
-
-                        // Loop Items
-                        itensComMemoria.forEach(({ item }) => {
-                            if (cy > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); cy = 50; }
-
-                            const r = item.retroativo;
-                            const baseVal = parseFloat(r.base || 0);
-                            const indCotacao = parseFloat(r.indIni || 1); // Source (Ini)
-                            const indDataBase = parseFloat(r.indFin || 1); // Target (Fin)
-
-                            // Calc Logic: Fator = Ind.Base / Ind.Cotacao
-                            const fator = indDataBase / indCotacao;
-                            const valAdotado = Math.round((baseVal * fator) * 100) / 100;
-
-                            const dCotacao = r.dataIni ? r.dataIni.split('-').reverse().join('/') : '-';
-                            const dDataBase = r.dataFin ? r.dataFin.split('-').reverse().join('/') : '-';
-
-                            doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(0);
-                            doc.text(`Item: ${item.codigo} - ${item.descricao}`, mLeft, cy);
-                            cy += 5;
-
-                            // Tabela Detalhada com os Parâmetros (A-G)
-                            const rows = [
-                                ["A. Valor Cotado (Preço de Mercado)", `R$ ${baseVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-                                ["B. Data da Cotação", dCotacao],
-                                ["C. Índice na Data da Cotação", indCotacao.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })],
-                                ["D. Data-Base do Orçamento", dDataBase],
-                                ["E. Índice na Data-Base", indDataBase.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })],
-                                ["F. Fator de Ajuste (E ÷ C)", fator.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })],
-                                ["G. Preço Adotado (A x F)", `R$ ${valAdotado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]
-                            ];
-
-                            doc.autoTable({
-                                head: [["Parâmetro", "Valor / Descrição"]],
-                                body: rows,
-                                startY: cy,
-                                theme: 'grid',
-                                headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
-                                styles: { fontSize: 9, cellPadding: 2 },
-                                columnStyles: { 0: { cellWidth: 80 } },
-                                margin: { left: mLeft }
-                            });
-                            cy = doc.lastAutoTable.finalY + 10;
-                        });
-                    }
-
-                    // --- PÁGINAÇÃO ---
-                    const pageCount = doc.internal.getNumberOfPages();
-                    for (let i = 1; i <= pageCount; i++) {
-                        doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150);
-                        doc.text(`Página ${i} de ${pageCount}`, larguraPagina - 20, doc.internal.pageSize.getHeight() - 10);
-                        doc.text(`Gerado em: ${new Date().toLocaleString()}`, 20, doc.internal.pageSize.getHeight() - 10);
-                    }
-
-                    // 3. MERGE COM PDF-LIB
-                    if (backgroundPdfBytes) {
-                        try {
-                            const contentPdfBytes = doc.output('arraybuffer');
-                            const pdfDoc = await PDFDocument.create();
-                            const backgroundPdf = await PDFDocument.load(backgroundPdfBytes);
-
-                            const [bgPage] = await pdfDoc.copyPages(backgroundPdf, [0]);
-                            const bgDims = bgPage.getSize();
-
-                            const contentPdfLoaded = await PDFDocument.load(contentPdfBytes);
-                            const contentPages = await pdfDoc.copyPages(contentPdfLoaded, contentPdfLoaded.getPageIndices());
-
-                            for (const contentPage of contentPages) {
-                                const page = pdfDoc.addPage([bgDims.width, bgDims.height]);
-
-                                const embeddedBg = await pdfDoc.embedPage(bgPage);
-                                page.drawPage(embeddedBg, { x: 0, y: 0, width: bgDims.width, height: bgDims.height });
-
-                                const embeddedContent = await pdfDoc.embedPage(contentPage);
-                                page.drawPage(embeddedContent, { x: 0, y: 0, width: bgDims.width, height: bgDims.height });
-                            }
-
-                            const pdfBytes = await pdfDoc.save();
-                            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-                            const pdfUrl = URL.createObjectURL(blob);
-
-                            if (mode === 'open') {
-                                window.open(pdfUrl, '_blank');
-                            } else {
-                                const link = document.createElement('a');
-                                link.href = pdfUrl;
-                                link.download = `${dados.codigo}_Analitica.pdf`;
-                                link.click();
-                            }
-                        } catch (err) {
-                            console.error("Erro no Merge:", err);
-                            if (mode === 'open') {
-                                window.open(doc.output('bloburl'), '_blank');
-                            } else {
-                                doc.save(`${dados.codigo}_Analitica.pdf`); // Fallback
-                            }
-                        }
-                    } else {
-                        if (mode === 'open') {
-                            window.open(doc.output('bloburl'), '_blank');
-                        } else {
-                            doc.save(`${dados.codigo}_Analitica.pdf`);
-                        }
-                    }
-                }
-
-                // --------------------------------------------------------------
-                // FUNÇÃO GERAR PDF (Profissional) - Com Opção de Visualizar (blob)
-                // --------------------------------------------------------------
-                async function gerarPDF_Profissional_Old(dados, options = {}) {
-                    // options: { output: 'save' | 'open' }
-                    const mode = options.output || 'save';
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-                    const larguraPagina = doc.internal.pageSize.getWidth();
-
-                    // FORMATADOR DE DATA CORRIGIDO (FIXED)
-                    const formatarDataExtenso = (dataStr) => {
-                        if (!dataStr) return '-';
-                        const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-
-                        let dia, mes, ano;
-                        if (dataStr.includes('-')) {
-                            const partes = dataStr.split('-');
-                            if (partes.length === 3) {
-                                // YYYY-MM-DD
-                                ano = partes[0];
-                                mes = parseInt(partes[1]) - 1;
-                                dia = partes[2];
-                            }
-                        } else {
-                            const partes = dataStr.split('/');
-                            if (partes.length >= 2) {
-                                dia = partes.length === 3 ? partes[0] : '01';
-                                mes = parseInt(partes.length === 3 ? partes[1] : partes[0]) - 1;
-                                ano = partes.length === 3 ? partes[2] : partes[1];
-                            }
-                        }
-
-                        if (dia && meses[mes] && ano) {
-                            return `${dia} de ${meses[mes]} de ${ano}`;
-                        }
-                        return dataStr;
-                    };
-
-                    // --- CABEÇALHO SOP ---
-                    doc.setFillColor(0, 143, 61); // Verde SOP (#008F3D)
-                    doc.rect(0, 0, 10, 297, 'F'); // Faixa lateral esquerda
-
-                    doc.setFillColor(0, 143, 61);
-                    doc.rect(10, 10, 190, 2, 'F'); // Linha superior fina
-
-                    // Títulos
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(16);
-                    doc.setTextColor(51, 51, 51);
-                    doc.text("GOVERNO DO ESTADO DO CEARÁ", 20, 25);
-
-                    doc.setFontSize(12);
-                    doc.text("SUPERINTENDÊNCIA DE OBRAS PÚBLICAS - SOP", 20, 32);
-
-                    doc.setFontSize(10);
-                    doc.setFont("helvetica", "normal");
-                    doc.text("DIRETORIA DE PLANEJAMENTO E GESTÃO", 20, 38);
-
-                    // Título do Documento
-                    doc.setFontSize(18);
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(0, 143, 61); // Verde
-                    doc.text("COMPOSIÇÃO ANALÍTICA", 105, 55, { align: "center" });
-
-                    // Linha separadora
-                    doc.setDrawColor(200, 200, 200);
-                    doc.line(20, 60, 190, 60);
-
-                    // --- DADOS DA COMPOSIÇÃO ---
-                    let yPos = 70;
-                    doc.setFontSize(10);
-                    doc.setTextColor(0, 0, 0);
-
-                    // Função auxiliar para negrito/normal
-                    const addField = (label, value, x, y) => {
-                        doc.setFont("helvetica", "bold");
-                        doc.text(label, x, y);
-                        doc.setFont("helvetica", "normal");
-                        // Ajuste simples para valor após label
-                        doc.text(value, x + doc.getTextWidth(label) + 2, y);
-                    };
-
-                    addField("CÓDIGO:", dados.codigo || '-', 20, yPos);
-                    addField("UNIDADE:", dados.unidade || '-', 150, yPos);
-                    yPos += 7;
-
-                    // Descrição com quebra de linha
-                    doc.setFont("helvetica", "bold");
-                    doc.text("DESCRIÇÃO:", 20, yPos);
-                    doc.setFont("helvetica", "normal");
-
-                    const desc = dados.descricao || '-';
-                    const descLines = doc.splitTextToSize(desc, 150);
-                    doc.text(descLines, 45, yPos);
-
-                    const descHeight = (descLines.length * 4);
-                    yPos += Math.max(descHeight, 7) + 3;
-
-                    const dataExtenso = formatarDataExtenso(dados.data_base);
-                    if (dataExtenso) {
-                        addField("DATA BASE:", dataExtenso, 20, yPos);
-                    }
-                    addField("BDI:", (dados.bdi || '0,00') + "%", 100, yPos);
-                    addField("DESCONTO:", (dados.desconto || '0,00') + "%", 150, yPos);
-
-                    const linha2Y = yPos + 5; // Para compatibilidade com restante do código (se usar linha2Y)
-                    // Mas o código original usa linha2Y para startY da tabela. 
-                    // Vamos ignorar linha2Y e ajustar startY da tabela abaixo.
-
-                    let startY = linha2Y + 10;
-                    const tableColumn = ["Origem", "Código", "Descrição", "Unid", "Coef.", "Preço", "Total"];
-                    const tableRows = [];
-                    const itensComMemoria = []; // Novo array para anexo
-                    const ordemGrupos = { 'MAO_DE_OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVICO': 4 };
-                    const itensOrdenados = [...(dados.itens || [])].sort((a, b) => (ordemGrupos[a.grupo] || 99) - (ordemGrupos[b.grupo] || 99));
-
-                    let currentGroup = '';
-                    let sumMat = 0, sumMao = 0, sumEquip = 0, sumServ = 0;
-
-                    const labelGrupos = { 'MAO_DE_OBRA': 'MÃO DE OBRA', 'MATERIAL': 'MATERIAL', 'EQUIPAMENTOS': 'EQUIPAMENTOS', 'SERVICO': 'SERVIÇO' };
-
-                    itensOrdenados.forEach(item => {
-                        const itemGroup = labelGrupos[item.grupo] || (item.grupo || 'MATERIAL').replace(/_/g, ' ');
-                        if (itemGroup !== currentGroup) {
-                            currentGroup = itemGroup;
-                            tableRows.push([{ content: currentGroup, colSpan: 7, styles: { halign: 'center', fontStyle: 'bold', fillColor: [240, 240, 240] } }]);
-                        }
-
-                        const bdiVal = parseFloat((dados.bdi || '0').toString().replace(',', '.')) / 100 || 0;
-                        const descVal = parseFloat((dados.desconto || '0').toString().replace(',', '.')) / 100 || 0;
-
-                        let precoUnitarioBase = item.preco;
-
-                        // Sincronizar com a Memória de Cálculo se for MERCADO + retroativo
-                        if (item.fonte === 'MERCADO' && item.retroativo) {
-                            const r = item.retroativo;
-                            const baseVal = parseFloat(r.base || 0);
-                            const indCotacao = parseFloat(r.indIni || 1);
-                            const indDataBase = parseFloat(r.indFin || 1);
-                            const fator = indDataBase / indCotacao;
-                            // Sincronizar com arredondamento de 2 casas da calculadora
-                            precoUnitarioBase = Math.round((baseVal * fator) * 100) / 100;
-                        }
-
-                        const precoFinal = precoUnitarioBase;
-                        const totalItem = Math.round((precoFinal * item.coeficiente) * 100) / 100;
-
-                        // Acumular Totais para o rodapé do PDF (Garante consistência)
-                        const g = item.grupo || 'MATERIAL';
-                        if (g === 'MAO_DE_OBRA') sumMao = Math.round((sumMao + totalItem) * 100) / 100;
-                        else if (g === 'EQUIPAMENTOS') sumEquip = Math.round((sumEquip + totalItem) * 100) / 100;
-                        else if (g === 'SERVICO') sumServ = Math.round((sumServ + totalItem) * 100) / 100;
-                        else sumMat = Math.round((sumMat + totalItem) * 100) / 100;
-
-                        const refShort = (item.referencia || '').includes('desonerada') ? 'DESONERADA' : 'ONERADA';
-                        const origem = `${item.fonte} ${(item.versao || '').replace('Tabela ', '')}\n${refShort}`;
-
-                        let descCompleta = item.descricao;
-                        if (item.fonte === 'MERCADO' && item.retroativo) {
-                            // Armazena para pág de anexo, não mostra na tabela principal
-                            itensComMemoria.push({ item, origem });
-                            descCompleta += ' (Ver Memória de Cálculo em Anexo)';
-                        }
-
-                        tableRows.push([
-                            origem, item.codigo, descCompleta, item.unidade,
-                            item.coeficiente.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-                            precoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-                            totalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-                        ]);
-                    });
-
-                    doc.autoTable({
-                        head: [tableColumn], body: tableRows, startY: startY, theme: 'striped',
-                        styles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
-                        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-                        columnStyles: { 0: { cellWidth: 26 }, 2: { cellWidth: 'auto' } }
-                    });
-
-                    // Totais Recalculados
-                    let finalY = doc.lastAutoTable.finalY + 10;
-                    const xLabel = larguraPagina - 80;
-
-                    const totalSemBDI = sumMat + sumMao + sumEquip + sumServ;
-                    const bdiVal = parseFloat((dados.bdi || '0').toString().replace(',', '.')) / 100 || 0;
-                    const descVal = parseFloat((dados.desconto || '0').toString().replace(',', '.')) / 100 || 0;
-
-                    const totalComBDI = Math.round((totalSemBDI * (1 + bdiVal)) * 100) / 100;
-                    const valorBDI = Math.round((totalComBDI - totalSemBDI) * 100) / 100;
-                    const valorDesconto = Math.round((totalComBDI * descVal) * 100) / 100;
-                    const totalGeral = Math.round((totalComBDI - valorDesconto) * 100) / 100;
-
-                    const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                    doc.setFontSize(9); doc.setFont("helvetica", "bold");
-
-                    const addTotal = (l, v, numericVal) => {
-                        if (numericVal > 0) {
-                            doc.text(l, xLabel, finalY);
-                            doc.text(v || 'R$ 0,00', larguraPagina - 14, finalY, { align: 'right' });
-                            finalY += 5;
-                        }
-                    };
-                    addTotal("Total Material:", fmt(sumMat), sumMat);
-                    addTotal("Total Mão de Obra:", fmt(sumMao), sumMao);
-                    addTotal("Total Equipamentos:", fmt(sumEquip), sumEquip);
-                    addTotal("Total Serviços:", fmt(sumServ), sumServ);
-                    addTotal(`Valor BDI (${dados.bdi}%):`, fmt(valorBDI), valorBDI);
-                    addTotal(`Valor Desconto (${dados.desconto}%):`, fmt(valorDesconto), valorDesconto);
-
-                    finalY += 3;
-                    doc.setTextColor(0, 100, 0); doc.setFontSize(11);
-                    doc.text("PREÇO TOTAL:", larguraPagina - 85, finalY);
-                    doc.text(fmt(totalGeral), larguraPagina - 14, finalY, { align: 'right' });
-
-                    // SECTION: MEMÓRIA DE CÁLCULO (NOVA PÁGINA)
-                    if (itensComMemoria.length > 0) {
-                        doc.addPage();
-
-                        // Layout Constants
-                        const mLeft = 14;
-                        const mWidth = larguraPagina - 28;
-                        let cy = 20;
-
-                        // Title 1
-                        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
-                        doc.text("Metodologia de Cálculo de Insumo Não Tabelado (Cotação de Mercado)", mLeft, cy);
-                        cy += 8;
-
-                        // Body 1 & 2
-                        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
-                        const txt1 = "O presente custo unitário foi obtido através de cotação de mercado, visto que o insumo não consta nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do valor cotado.";
-                        const txt2 = "O objetivo é compatibilizar o preço de mercado atual (data da cotação) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.";
-
-                        const textOptions = { maxWidth: mWidth, align: "justify", lineHeightFactor: 1.8 };
-
-                        doc.text(txt1, mLeft, cy, textOptions);
-                        const dim1 = doc.getTextDimensions(txt1, textOptions);
-                        cy += dim1.h + 8;
-
-                        doc.text(txt2, mLeft, cy, textOptions);
-                        const dim2 = doc.getTextDimensions(txt2, textOptions);
-                        cy += dim2.h + 12;
-
-                        // Title 2
-                        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 50, 100);
-                        doc.text("Memória de Cálculo e Compatibilização de Preços", mLeft, cy);
-                        cy += 8;
-
-                        // Body 3 & 4
-                        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
-                        const txt3 = "Considerando a defasagem temporal entre a data desta cotação de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores.";
-                        const txt4 = "O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na tabela abaixo. Este procedimento visa equiparar o poder de compra da moeda à época da licitação, demonstrado analiticamente abaixo:";
-
-                        doc.text(txt3, mLeft, cy, textOptions);
-                        const dim3 = doc.getTextDimensions(txt3, textOptions);
-                        cy += dim3.h + 8;
-
-                        doc.text(txt4, mLeft, cy, textOptions);
-                        const dim4 = doc.getTextDimensions(txt4, textOptions);
-                        cy += dim4.h + 12;
-
-                        // Loop Items
-                        itensComMemoria.forEach(({ item }) => {
-                            if (cy > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); cy = 20; }
-
-                            const r = item.retroativo;
-                            const baseVal = parseFloat(r.base || 0);
-                            const indCotacao = parseFloat(r.indIni || 1); // Source (Ini)
-                            const indDataBase = parseFloat(r.indFin || 1); // Target (Fin)
-
-                            // Calc Logic: Fator = Ind.Base / Ind.Cotacao
-                            const fator = indDataBase / indCotacao;
-                            const valAdotado = Math.round((baseVal * fator) * 100) / 100;
-
-                            const dCotacao = r.dataIni ? r.dataIni.split('-').reverse().join('/') : '-';
-                            const dDataBase = r.dataFin ? r.dataFin.split('-').reverse().join('/') : '-';
-
-                            doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(0);
-                            doc.text(`Composição/Insumo: ${item.codigo} - ${item.descricao}`, mLeft, cy);
-                            cy += 5;
-
-                            const rows = [
-                                ["A. Valor Cotado (Preço de Mercado)", `R$ ${baseVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-                                ["B. Data da Cotação", dCotacao],
-                                ["C. Índice na Data da Cotação", indCotacao.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })],
-                                ["D. Data-Base do Orçamento", dDataBase],
-                                ["E. Índice na Data-Base", indDataBase.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })],
-                                ["F. Fator de Ajuste (E ÷ C)", fator.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })],
-                                ["G. Preço Adotado (A x F)", `R$ ${valAdotado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]
-                            ];
-
-                            doc.autoTable({
-                                head: [["Parâmetro", "Valor / Descrição"]],
-                                body: rows,
-                                startY: cy,
-                                theme: 'grid',
-                                headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: 'bold' },
-                                styles: { fontSize: 9, cellPadding: 2 },
-                                columnStyles: { 0: { cellWidth: 80 } }
-                            });
-                            cy = doc.lastAutoTable.finalY + 10;
-                        });
-                    }
-
-                    // REST: NO ATTACHMENTS LOOP
-
-                    const pageCount = doc.internal.getNumberOfPages();
-                    for (let i = 1; i <= pageCount; i++) {
-                        doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150);
-                        doc.text(`Página ${i} de ${pageCount}`, larguraPagina - 20, doc.internal.pageSize.getHeight() - 10);
-                    }
-
-                    if (mode === 'open') {
-                        window.open(doc.output('bloburl'), '_blank');
-                    } else {
-                        doc.save(`${dados.codigo}_Analitica.pdf`);
+                        alert("Erro: " + e.message);
+                    } finally {
+                        btnsBaixar.forEach((b, i) => { b.disabled = false; b.innerHTML = originalTexts[i]; });
                     }
                 }
 
                 // NOVA FUNÇÃO: VISUALIZAR COMPOSIÇÃO (Fetch JSON -> Gerar PDF Blob)
-                async function visualizarComposicao(id, url) {
+                // NOVA FUNÇÃO: VISUALIZAR COMPOSIÇÃO (SOP) - Versão Relatório Professional
+                async function visualizarComposicao(id, url, options = {}) {
                     try {
-                        let docData = null;
-
-                        // 1. Se não temos URL ou ela é nula (Composição Analítica Direta no Banco)
-                        if (!url || url === 'undefined' || url === 'null' || url === '') {
-                            const { data, error } = await sbClient.from('composicoes_biblioteca').select('*').eq('id', id).single();
-                            if (error || !data) throw new Error("Documento não encontrado no banco.");
-
-                            if (data.itens) {
-                                // É uma composição analítica salva em colunas JSONB
-                                docData = {
-                                    codigo: data.codigo || 'S/C',
-                                    descricao: data.descricao,
-                                    unidade: data.unidade || '-',
-                                    data_base: data.data_base,
-                                    bdi: data.bdi,
-                                    desconto: data.desconto,
-                                    itens: data.itens || [],
-                                    totais: null
-                                };
-                            } else {
-                                url = data.arquivo_url;
-                            }
-                        }
-
-                        // 2. Se temos URL e NÃO termina em .json, é um arquivo direto (PDF/XLS)
-                        if (url && !url.toLowerCase().includes('.json')) {
-                            window.open(url, '_blank');
+                        const modalEl = document.getElementById('modalDetalheComposicao');
+                        if (!modalEl) {
+                            console.error("Modal modalDetalheComposicao não encontrado!");
                             return;
                         }
 
-                        // 3. Se temos URL e É um .json, buscamos o conteúdo
-                        if (url && url.toLowerCase().includes('.json')) {
-                            const finalUrl = `${url}?t=${new Date().getTime()}`;
-                            const response = await fetch(finalUrl);
-                            if (!response.ok) throw new Error("Erro ao baixar arquivo JSON.");
+                        // Garante que o modal esteja no body para evitar problemas de posicionamento
+                        if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
 
-                            const json = await response.json();
-                            const meta = json.meta || {};
-                            docData = {
-                                codigo: meta.codigo || 'S/C',
-                                descricao: meta.descricao,
-                                unidade: meta.unidade,
-                                data_base: meta.data_base,
-                                bdi: meta.bdi,
-                                desconto: meta.desconto,
-                                itens: json.itens || [],
-                                totais: meta.totais
-                            };
-                        }
+                        const modalBody = document.getElementById('modal-report-body');
 
-                        if (docData) {
-                            await gerarPDF_Profissional(docData, { output: 'open' });
-                        } else {
-                            if (!url) alert("Esta composição não possui arquivo nem dados analíticos.");
+                        // Limpa e mostra loader
+                        if (modalBody) {
+                            modalBody.innerHTML = `
+                                <div class="p-5 text-center text-muted">
+                                    <div class="spinner-border text-success mb-3" style="width: 3rem; height: 3rem;"></div>
+                                    <h5 class="fw-bold">Carregando Relatório SOP...</h5>
+                                    <p>Aguarde enquanto processamos os dados técnicos.</p>
+                                </div>
+                            `;
+                            let docData = null;
+                            let sourceSOP = false;
+
+                            // 1. Caso 1: Composição Analítica elaborada no sistema (Direto do Banco)
+                            if (!url || url === 'undefined' || url === 'null' || url === '') {
+                                const { data, error } = await sbClient.from('composicoes_biblioteca').select('*').eq('id', id).single();
+                                if (error || !data) throw new Error("Documento não encontrado no banco.");
+
+                                if (data.itens) {
+                                    sourceSOP = false;
+                                    docData = data; // Passamos o objeto completo
+                                } else {
+                                    url = data.arquivo_url;
+                                }
+                            }
+
+                            // 2. Arquivos PDF/XLS Diretos
+                            if (url && !url.toLowerCase().includes('.json')) {
+                                window.open(url, '_blank');
+                                return;
+                            }
+
+                            // 3. Caso 2: Composição Importada (JSON SOP)
+                            if (url && url.toLowerCase().includes('.json')) {
+                                const finalUrl = `${url}?t=${new Date().getTime()}`;
+                                const response = await fetch(finalUrl);
+                                if (!response.ok) throw new Error("Erro ao baixar arquivo JSON.");
+
+                                const json = await response.json();
+                                const meta = json.meta || {};
+                                sourceSOP = true;
+                                docData = {
+                                    ...json, // Mantém todos os campos originais
+                                    codigo: meta.codigo || 'S/C',
+                                    descricao: meta.descricao,
+                                    unidade: meta.unidade,
+                                    data_base: meta.data_base,
+                                    bdi: meta.bdi,
+                                    desconto: meta.desconto,
+                                    versao_atual: meta.versao || meta.versao_projeto || '',
+                                    itens: json.itens || []
+                                };
+                            }
+
+                            if (docData) {
+                                currentCompositionData = docData; // Salva para download via modal
+                                if (docData.itens && Array.isArray(docData.itens)) {
+                                    // Versão Relatório HTML Premium (Imagem 01)
+                                    if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+                                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+                                    // Mostra loader
+                                    modalBody.innerHTML = `<div class="p-5 text-center text-muted"><div class="spinner-border text-success mb-3"></div><p>Carregando Relatório GECOPE...</p></div>`;
+                                    modal.show();
+
+                                    renderizarRelatorioSOP_HTML(docData, modalBody);
+                                } else {
+                                    // Caso não seja analítica (ex: apenas arquivo PDF/XLS arquivado)
+                                    if (url) window.open(url, '_blank');
+                                    else throw new Error("Documento não possui dados analíticos.");
+                                }
+                            } else {
+                                if (!url) {
+                                    if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+                                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                                    modalBody.innerHTML = '<div class="alert alert-warning m-4 fw-bold text-center">Esta composição não possui arquivo nem dados analíticos para visualização.</div>';
+                                    modal.show();
+                                }
+                            }
                         }
 
                     } catch (err) {
                         console.error(err);
+                        // Garante que o modal feche se houver erro para não travar a tela, apenas se estiver aberto
+                        const modalEl = document.getElementById('modalDetalheComposicao');
+                        const inst = bootstrap.Modal.getInstance(modalEl);
+                        if (inst && inst._isShown) inst.hide();
                         alert("Erro ao visualizar: " + err.message);
                     }
                 }
 
-                function gerarDOCX_Profissional(dados) {
-                    const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, HeadingLevel, TextRun, AlignmentType } = window.docx;
-
-                    // FORMATADOR DE DATA CORRIGIDO (Igual PDF)
-                    const formatarDataExtenso = (dataStr) => {
-                        if (!dataStr) return '-';
-                        const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-                        let dia, mes, ano;
-                        if (dataStr.includes('-')) {
-                            const partes = dataStr.split('-');
-                            if (partes.length === 3) {
-                                ano = partes[0];
-                                mes = parseInt(partes[1]) - 1;
-                                dia = partes[2];
-                            }
-                        } else {
-                            const partes = dataStr.split('/');
-                            if (partes.length >= 2) {
-                                dia = partes.length === 3 ? partes[0] : '01';
-                                mes = parseInt(partes.length === 3 ? partes[1] : partes[0]) - 1;
-                                ano = partes.length === 3 ? partes[2] : partes[1];
-                            }
+                function renderizarRelatorioSOP_HTML(dados, container) {
+                    const parseLocalNum = (v) => {
+                        if (v === undefined || v === null || v === '') return 0;
+                        if (typeof v === 'number') return v;
+                        let str = v.toString().trim();
+                        // Só remove pontos se houver vírgula (formato brasileiro 1.234,56)
+                        // Se não houver vírgula, o ponto provavelmente já é o separador decimal (formato US 1234.56)
+                        if (str.includes(',')) {
+                            return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
                         }
-                        if (dia && meses[mes] && ano) return `${dia} de ${meses[mes]} de ${ano}`;
-                        return dataStr;
+                        return parseFloat(str) || 0;
                     };
-                    const dataExtenso = formatarDataExtenso(dados.data_base);
 
-                    // SORTING LOGIC (Missing in DOCX)
-                    const ordemGrupos = { 'MAO_DE_OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVICO': 4 };
-                    const itensOrdenados = [...(dados.itens || [])].sort((a, b) => (ordemGrupos[a.grupo] || 99) - (ordemGrupos[b.grupo] || 99));
+                    const safeLoc = (val, dec = 2) => {
+                        const n = (typeof val === 'string') ? parseLocalNum(val) : (Number(val) || 0);
+                        return n.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+                    };
 
+                    // Cabeçalho da Composição
+                    const codigo = dados.codigo || 'N/A';
+                    const descricao = dados.descricao || 'SEM DESCRIÇÃO';
+                    const unidade = dados.unidade || 'N/A';
+                    const dataBase = dados.data_base || 'N/A';
+                    const bdiText = (dados.bdi !== null && dados.bdi !== undefined) ? (dados.bdi + '%') : '0,00%';
+                    const descText = (dados.desconto !== null && dados.desconto !== undefined) ? (dados.desconto + '%') : '0,00%';
 
-                    // Estilo Headers
-                    const makeHeaderCell = (text) => new TableCell({
-                        children: [new Paragraph({ text, bold: true, size: 16 })], // 8pt
-                        shading: { fill: "E9ECEF" }
+                    // Agrupamento EXCLUSIVO por grupo (após normalização)
+                    const itensRaw = dados.itens || [];
+                    const itens = itensRaw.map(normalizarItemParaPDF);
+
+                    const itensAgrupados = itens.reduce((acc, item) => {
+                        const grupo = item.grupo || 'GERAL';
+                        if (!acc[grupo]) acc[grupo] = [];
+                        acc[grupo].push(item);
+                        return acc;
+                    }, {});
+
+                    let totalSimples = 0;
+                    let tableRows = '';
+                    const retroativos = [];
+
+                    // Iteração sobre Grupos e Insumos
+                    // Ordem desejada de grupos
+                    const ordemGrupos = ['MÃO DE OBRA', 'MATERIAL', 'EQUIPAMENTOS', 'SERVIÇO', 'GERAL'];
+                    const gruposOrdenados = Object.keys(itensAgrupados).sort((a, b) => {
+                        const idxA = ordemGrupos.indexOf(a);
+                        const idxB = ordemGrupos.indexOf(b);
+                        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
                     });
 
-                    const headerRow = new TableRow({
-                        children: [
-                            makeHeaderCell("Origem"), makeHeaderCell("Código"), makeHeaderCell("Descrição"),
-                            makeHeaderCell("Unid"), makeHeaderCell("Coef."), makeHeaderCell("Preço"), makeHeaderCell("Total")
+                    gruposOrdenados.forEach((nomeGrupo) => {
+                        const insumosDoGrupo = itensAgrupados[nomeGrupo];
+                        let subtotalGrupo = 0;
+
+                        // Título do Grupo (Linha Centralizada)
+                        tableRows += `
+                            <tr class="table-secondary">
+                                <td colspan="8" class="text-center fw-bold py-2 text-uppercase" style="background-color: #f2f2f2; letter-spacing: 1px;">${nomeGrupo}</td>
+                            </tr>
+                        `;
+
+                        // Renderização dos Itens do Grupo
+                        insumosDoGrupo.map(item => {
+                            subtotalGrupo += item.total;
+                            totalSimples += item.total;
+
+                            if (item.retroativo) {
+                                retroativos.push({ ...item, codInsumo: item.codigo, descInsumo: item.descricao });
+                            }
+
+                            // Lógica de exibição da Fonte com Referência (Onerada/Desonerada)
+                            let fonteDisplay = `<div class="fw-bold">${item.origem}</div>`;
+                            if ((item.origem === 'SEINFRA' || item.origem === 'SINAPI') && item.referencia) {
+                                const refLabel = item.referencia.toLowerCase().includes('deson') ? 'Desonerada' : 'Onerada';
+                                fonteDisplay += `<div class="text-muted" style="font-size: 0.65rem; margin-top: 1px;">${refLabel}</div>`;
+                            }
+
+                            tableRows += `
+                                <tr style="font-size: 0.85rem;">
+                                    <td class="text-center">${fonteDisplay}</td>
+                                    <td class="text-center">${item.versao}</td>
+                                    <td class="text-center">${item.codigo}</td>
+                                    <td style="text-align: justify;">
+                                        <div class="text-dark">${item.descricao}</div>
+                                        ${item.retroativo ? '<div class="text-success fw-bold mt-1" style="font-size: 0.65rem;"><i class="bi bi-info-circle me-1"></i> Ver Memória de Cálculo na Pág. 02</div>' : ''}
+                                    </td>
+                                    <td class="text-center">${item.unidade}</td>
+                                    <td class="text-center">${safeLoc(item.coeficiente, 4)}</td>
+                                    <td class="text-end">${safeLoc(item.preco_unitario)}</td>
+                                    <td class="text-end">${safeLoc(item.total)}</td>
+                                </tr>
+                            `;
+                        });
+
+                        // Rodapé do Grupo (Subtotal)
+                        tableRows += `
+                            <tr class="fw-bold" style="background-color: #f8f9fa;">
+                                <td colspan="7" class="text-end pe-3 text-muted" style="font-size: 0.8rem;">TOTAL ${nomeGrupo}</td>
+                                <td class="text-end" style="border-bottom: 2px solid #dee2e6;">${safeLoc(subtotalGrupo)}</td>
+                            </tr>
+                        `;
+                    });
+
+                    // Cálculos de Rodapé
+                    const bdiVal = parseLocalNum(dados.bdi) / 100;
+                    const descVal = parseLocalNum(dados.desconto) / 100;
+
+                    const valorBDI = (totalSimples || 0) * (bdiVal || 0);
+                    const totalComBDI = (totalSimples || 0) + valorBDI;
+                    const valorDesconto = totalComBDI * (descVal || 0);
+                    const precoFinal = totalComBDI - valorDesconto;
+
+                    // Metodologia (Página 02)
+                    let explicitMemoryHTML = '';
+                    if (retroativos.length > 0) {
+                        explicitMemoryHTML = `
+                            <div class="print-page-break p-4">
+                                <h6 class="fw-bold text-primary mb-3">Metodologia de Cálculo de Insumo Não Tabelado (Cotação de Mercado)</h6>
+                                <p class="text-muted" style="font-size: 0.82rem; text-align: justify;">
+                                    O presente custo unitário foi obtido através de cotação de mercado, visto que o insumo não consta nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do valor cotado.
+                                </p>
+                                <p class="text-muted" style="font-size: 0.82rem; text-align: justify;">
+                                    O objetivo é compatibilizar o preço de mercado atual (data da cotação) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.
+                                </p>
+
+                                <h6 class="fw-bold mt-4 mb-2">Memória de Cálculo e Compatibilização de Preços</h6>
+                                <p class="text-muted mb-4" style="font-size: 0.82rem; text-align: justify;">
+                                    Considerando a defasagem temporal entre a data desta cotação de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores. O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na tabela abaixo:
+                                </p>
+
+                                ${retroativos.map(r => {
+                            const ret = r.retroativo;
+                            const base = parseLocalNum(ret.base);
+                            const iIni = parseLocalNum(ret.indIni);
+                            const iFin = parseLocalNum(ret.indFin);
+                            const fator = (iFin / iIni) || 1;
+                            const dCot = ret.dataIni ? (ret.dataIni.split('-').length === 3 ? ret.dataIni.split('-').reverse().slice(1).join('/') : ret.dataIni.split('-').reverse().join('/')) : '-';
+                            const dBase = ret.dataFin ? (ret.dataFin.split('-').length === 3 ? ret.dataFin.split('-').reverse().slice(1).join('/') : ret.dataFin.split('-').reverse().join('/')) : '-';
+
+                            return `
+                                    <div class="mb-5 border-bottom pb-4">
+                                        <div class="fw-bold text-dark mb-2" style="font-size: 0.9rem;">Item: ${r.codInsumo} - ${r.descInsumo}</div>
+                                        <table class="table table-bordered table-sm" style="font-size: 0.78rem; max-width: 600px;">
+                                            <thead class="bg-light">
+                                                <tr class="text-center">
+                                                    <th style="width: 70%">Parâmetro</th>
+                                                    <th>Valor / Descrição</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr><td>A. Valor Cotado (Preço de Mercado)</td><td class="text-center fw-bold">R$ ${safeLoc(base)}</td></tr>
+                                                <tr><td>B. Data da Cotação</td><td class="text-center">${dCot || '-'}</td></tr>
+                                                <tr><td>C. Índice na Data da Cotação</td><td class="text-center">${safeLoc(iIni, 3)}</td></tr>
+                                                <tr><td>D. Data-Base do Orçamento</td><td class="text-center">${dBase || '-'}</td></tr>
+                                                <tr><td>E. Índice na Data-Base</td><td class="text-center">${safeLoc(iFin, 3)}</td></tr>
+                                                <tr><td>F. Fator de Ajuste (E / C)</td><td class="text-center fw-bold">${fator.toFixed(4)}</td></tr>
+                                                <tr><td>G. Preço Adotado (A x F)</td><td class="text-center fw-bold text-success">R$ ${safeLoc(base * fator)}</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    `;
+                        }).join('')}
+                            </div>
+                        `;
+                    }
+
+                    container.innerHTML = `
+                        <div class="p-4 report-print-area">
+                            <!-- Cabeçalho Institucional Compacto -->
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-success text-white p-2 rounded me-3 fw-bold fs-5" style="background-color: #008F3D !important; min-width: 80px; text-align: center;">SOP-CE</div>
+                                    <div>
+                                        <div class="fw-bold fs-6" style="color: #008F3D; line-height: 1.2;">ESTADO DO CEARÁ</div>
+                                        <div class="text-dark fw-bold" style="font-size: 0.75rem;">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <h5 class="fw-bold mb-0 text-dark">COMPOSIÇÃO ANALÍTICA</h5>
+                                    <div class="text-muted fw-bold" style="font-size: 0.7rem;">GEROA - GERÊNCIA DE ORÇAMENTOS E AVALIAÇÃO DE IMÓVEIS</div>
+                                </div>
+                            </div>
+
+                            <!-- Metadados da Composição (Estilo Imagem 01 - Espaçamento Lateral Mínimo & Descrição Máxima) -->
+                            <div class="row g-0 mb-4 p-3 border rounded bg-white shadow-sm align-items-stretch" style="min-height: 85px;">
+                                <!-- 1. Código e Versão (Mínimo: 90px) -->
+                                <div class="pe-2 border-end d-flex flex-column justify-content-start" style="width: 95px; flex-shrink: 0;">
+                                    <div class="text-muted fw-bold text-uppercase mb-2" style="font-size: 0.52rem; letter-spacing: 0.5px; white-space: nowrap;">CÓDIGO / VERSÃO</div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="fw-bold text-dark" style="font-size: 0.85rem;">${codigo}</span>
+                                        ${dados.versao_atual ? `<span class="badge rounded-pill bg-secondary text-white fw-bold" style="font-size: 0.5rem; padding: 2px 4px;">${dados.versao_atual}</span>` : ''}
+                                    </div>
+                                </div>
+                                
+                                <!-- 2. Descrição da Composição (Flex: Ocupa todo o resto) -->
+                                <div class="col px-4 border-end d-flex flex-column justify-content-start">
+                                    <div class="text-muted fw-bold text-uppercase mb-2 text-start" style="font-size: 0.55rem; letter-spacing: 0.5px;">DESCRIÇÃO DA COMPOSIÇÃO</div>
+                                    <div class="fw-bold text-dark text-uppercase" style="font-size: 1rem; line-height: 1.4; text-align: justify; border: none;">${descricao}</div>
+                                </div>
+
+                                <!-- 3. Unidade (Mínimo: 65px) -->
+                                <div class="px-2 border-end d-flex flex-column justify-content-start text-center" style="width: 65px; flex-shrink: 0;">
+                                    <div class="text-muted fw-bold text-uppercase mb-2 text-start" style="font-size: 0.55rem; letter-spacing: 0.5px; width: 100%;">UNID:</div>
+                                    <div class="fw-bold text-dark mt-auto mb-auto" style="font-size: 1.2rem;">${unidade}</div>
+                                </div>
+
+                                <!-- 4. BDI e Desconto (Mínimo: 110px) -->
+                                <div class="ps-3 d-flex flex-column justify-content-center" style="width: 110px; flex-shrink: 0;">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-muted fw-bold" style="font-size: 0.6rem;">BDI:</span>
+                                        <span class="fw-bold text-primary" style="font-size: 0.85rem;">${bdiText}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted fw-bold" style="font-size: 0.6rem;">DESC:</span>
+                                        <span class="fw-bold text-danger" style="font-size: 0.85rem;">${descText}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tabela de Itens (Compacta com table-sm) -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm align-middle mb-0" style="font-size: 0.82rem;">
+                                    <thead class="text-dark text-center" style="background-color: #f2f2f2 !important; border-bottom: 2px solid #dee2e6;">
+                                        <tr style="font-size: 0.75rem;">
+                                            <th style="width: 7%">FONTE</th>
+                                            <th style="width: 6%">VERSÃO</th>
+                                            <th style="width: 6%">CÓDIGO</th>
+                                            <th style="width: 50%">DESCRIÇÃO DO INSUMO</th>
+                                            <th style="width: 6%">UNID</th>
+                                            <th style="width: 6%">COEF.</th>
+                                            <th style="width: 6%">P. UNIT.</th>
+                                            <th style="width: 6%">TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${tableRows}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="bg-light border-top-0">
+                                            <td colspan="5" class="text-end fw-bold py-2 text-uppercase pe-4" style="font-size: 0.75rem; color: #6c757d;">Total Simples (Insumos)</td>
+                                            <td colspan="3" class="text-end fw-bold py-2 pe-3" style="font-size: 0.85rem;">R$ ${safeLoc(totalSimples)}</td>
+                                        </tr>
+                                        ${valorBDI > 0 ? `
+                                        <tr class="bg-white">
+                                            <td colspan="5" class="text-end fw-bold py-2 text-uppercase pe-4 text-primary" style="font-size: 0.75rem;">(+) BDI Aplicado (${bdiText})</td>
+                                            <td colspan="3" class="text-end fw-bold py-2 pe-3 text-primary" style="font-size: 0.85rem;">R$ ${safeLoc(valorBDI)}</td>
+                                        </tr>` : ''}
+                                        ${valorDesconto > 0 ? `
+                                        <tr class="bg-white">
+                                            <td colspan="5" class="text-end fw-bold py-2 text-uppercase pe-4 text-danger" style="font-size: 0.75rem;">(-) Desconto Aplicado (${descText})</td>
+                                            <td colspan="3" class="text-end fw-bold py-2 pe-3 text-danger" style="font-size: 0.85rem;">R$ ${safeLoc(valorDesconto)}</td>
+                                        </tr>` : ''}
+                                        <tr style="background-color: #f8fdf9 !important; border-top: 2px solid #008F3D !important;">
+                                            <td colspan="5" class="text-end fw-bold py-3 text-uppercase pe-4 fs-5" style="color: #008F3D; letter-spacing: 1px;">Preço Total Unitário</td>
+                                            <td colspan="3" class="text-end py-3 pe-3" style="color: #008F3D;">
+                                                <div class="d-flex align-items-baseline justify-content-end gap-1">
+                                                    <span class="fw-bold fs-6">R$</span>
+                                                    <span class="fw-bold fs-2" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${safeLoc(precoFinal)}</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            <div class="mt-4 pt-2 border-top d-flex justify-content-between text-muted" style="font-size: 0.65rem;">
+                                <div>Gerado eletronicamente via Painel GECOPE/SOP</div>
+                                <div>Página 1 de 1</div>
+                                <div>${new Date().toLocaleString('pt-BR')}</div>
+                            </div>
+                        </div>
+
+                        ${explicitMemoryHTML}
+                    `;
+                }
+
+
+                function gerarDOCX_Profissional(dados) {
+                    const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, HeadingLevel, TextRun, AlignmentType, VerticalAlign, BorderStyle } = window.docx;
+
+                    const formatarNumero = (v, d = 2) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+                    // CONFIGURAÇÃO DE BORDAS INVISÍVEIS PARA CABEÇALHO
+                    const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+
+                    // 1. CONSTRUÇÃO DO CABEÇALHO (SIMULANDO O LAYOUT DO MODAL)
+                    const headerTable = new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        borders: { top: noBorder, bottom: { style: BorderStyle.SINGLE, size: 1, color: "DEE2E6" }, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    // Lado Esquerdo: Logo e Governo
+                                    new TableCell({
+                                        width: { size: 60, type: WidthType.PERCENTAGE },
+                                        children: [
+                                            new Paragraph({
+                                                children: [
+                                                    new TextRun({ text: "SOP-CE", bold: true, color: "FFFFFF", size: 24, shading: { fill: "008F3D" } }),
+                                                    new TextRun({ text: "  ESTADO DO CEARÁ", bold: true, color: "008F3D", size: 22 }),
+                                                ],
+                                                spacing: { after: 100 }
+                                            }),
+                                            new Paragraph({
+                                                children: [
+                                                    new TextRun({ text: "SUPERINTENDÊNCIA DE OBRAS PÚBLICAS", bold: true, color: "343A40", size: 16 })
+                                                ]
+                                            })
+                                        ]
+                                    }),
+                                    // Lado Direito: Título
+                                    new TableCell({
+                                        width: { size: 40, type: WidthType.PERCENTAGE },
+                                        verticalAlign: VerticalAlign.CENTER,
+                                        children: [
+                                            new Paragraph({
+                                                children: [
+                                                    new TextRun({ text: "COMPOSIÇÃO ANALÍTICA", bold: true, color: "212529", size: 28 })
+                                                ],
+                                                alignment: AlignmentType.RIGHT
+                                            }),
+                                            new Paragraph({
+                                                children: [
+                                                    new TextRun({ text: "GEROA - GERÊNCIA DE ORÇAMENTOS E AVALIAÇÃO DE IMÓVEIS", bold: true, color: "6C757D", size: 14 })
+                                                ],
+                                                alignment: AlignmentType.RIGHT
+                                            })
+                                        ]
+                                    })
+                                ]
+                            })
                         ]
                     });
 
-                    let currentGroupDocx = '';
-                    const itensComMemoriaDocx = []; // Array DOCX
-
-                    const itemRows = [];
-
-                    let sumMat = 0, sumMao = 0, sumEquip = 0, sumServ = 0;
-                    const labelGruposDocx = { 'MAO_DE_OBRA': 'MÃO DE OBRA', 'MATERIAL': 'MATERIAL', 'EQUIPAMENTOS': 'EQUIPAMENTOS', 'SERVICO': 'SERVIÇO' };
-
-                    itensOrdenados.forEach(item => {
-                        const itemGroup = labelGruposDocx[item.grupo] || (item.grupo || 'MATERIAL').replace(/_/g, ' ');
-
-                        // Adicionar linha de cabeçalho do grupo se mudar
-                        if (itemGroup !== currentGroupDocx) {
-                            currentGroupDocx = itemGroup;
-                            itemRows.push(new TableRow({
+                    // 2. METADADOS (BOXED GRID)
+                    const metaTable = new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        rows: [
+                            new TableRow({
                                 children: [
                                     new TableCell({
-                                        children: [new Paragraph({ text: currentGroupDocx, bold: true, alignment: AlignmentType.CENTER, size: 18 })],
-                                        columnSpan: 7,
-                                        shading: { fill: "F0F0F0" }
+                                        shading: { fill: "F8F9FA" },
+                                        children: [
+                                            new Paragraph({ children: [new TextRun({ text: "CÓDIGO", bold: true, size: 12, color: "6C757D" })] }),
+                                            new Paragraph({ children: [new TextRun({ text: dados.codigo || '-', bold: true, size: 18 })] })
+                                        ]
+                                    }),
+                                    new TableCell({
+                                        width: { size: 50, type: WidthType.PERCENTAGE },
+                                        shading: { fill: "F8F9FA" },
+                                        children: [
+                                            new Paragraph({ children: [new TextRun({ text: "DESCRIÇÃO DA COMPOSIÇÃO", bold: true, size: 12, color: "6C757D" })] }),
+                                            new Paragraph({ children: [new TextRun({ text: (dados.descricao || '-').toUpperCase(), bold: true, size: 18 })] })
+                                        ]
+                                    }),
+                                    new TableCell({
+                                        shading: { fill: "F8F9FA" },
+                                        children: [
+                                            new Paragraph({ children: [new TextRun({ text: "UNID.", bold: true, size: 12, color: "6C757D" })] }),
+                                            new Paragraph({ children: [new TextRun({ text: dados.unidade || '-', bold: true, size: 18 })] })
+                                        ]
+                                    }),
+                                    new TableCell({
+                                        shading: { fill: "F8F9FA" },
+                                        children: [
+                                            new Paragraph({ children: [new TextRun({ text: "TAXAS", bold: true, size: 12, color: "6C757D" })] }),
+                                            new Paragraph({ children: [new TextRun({ text: `BDI: ${dados.bdi || '0,00'}%`, bold: true, size: 14, color: "007BFF" })] }),
+                                            new Paragraph({ children: [new TextRun({ text: `DESC: ${dados.desconto || '0,00'}%`, bold: true, size: 14, color: "DC3545" })] })
+                                        ]
                                     })
                                 ]
+                            })
+                        ]
+                    });
+
+                    // 3. TABELA DE ITENS
+                    const headerRow = new TableRow({
+                        children: [
+                            "FONTE", "VERSÃO", "CÓDIGO", "DESCRIÇÃO DO INSUMO", "UNID", "COEF.", "P. UNIT.", "TOTAL"
+                        ].map(h => new TableCell({
+                            shading: { fill: "343A40" },
+                            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: "FFFFFF", size: 14 })], alignment: AlignmentType.CENTER })]
+                        }))
+                    });
+
+                    const itemRows = [];
+                    let currentGroup = '';
+                    let subtotalSimples = 0;
+
+                    const itensRaw = dados.itens || [];
+                    const itens = itensRaw.map(normalizarItemParaPDF);
+
+                    const itensOrdenados = [...itens].sort((a, b) => {
+                        const ordem = { 'MÃO DE OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVIÇO': 4, 'GERAL': 99 };
+                        return (ordem[a.grupo] || 99) - (ordem[b.grupo] || 99);
+                    });
+
+                    itensOrdenados.forEach(item => {
+                        const grupo = item.grupo;
+                        subtotalSimples += item.total;
+
+                        if (grupo !== currentGroup) {
+                            currentGroup = grupo;
+                            itemRows.push(new TableRow({
+                                children: [new TableCell({
+                                    columnSpan: 8,
+                                    shading: { fill: "F2F2F2" },
+                                    children: [new Paragraph({ children: [new TextRun({ text: currentGroup.toUpperCase(), bold: true, size: 16 })], alignment: AlignmentType.CENTER })]
+                                })]
                             }));
                         }
 
-                        const bdiVal = parseFloat((dados.bdi || '0').toString().replace(',', '.')) / 100 || 0;
-                        const descVal = parseFloat((dados.desconto || '0').toString().replace(',', '.')) / 100 || 0;
+                        // Descrição com Memória
+                        const descChildren = [new Paragraph({ children: [new TextRun({ text: item.descricao, bold: true, size: 16 })], alignment: AlignmentType.JUSTIFIED })];
 
-                        let precoUnitarioBase = item.preco;
-
-                        // Sincronizar com a Memória de Cálculo se for MERCADO + retroativo
-                        if (item.fonte === 'MERCADO' && item.retroativo) {
+                        if (item.retroativo) {
                             const r = item.retroativo;
-                            const baseVal = parseFloat(r.base || 0);
-                            const indCotacao = parseFloat(r.indIni || 1);
-                            const indDataBase = parseFloat(r.indFin || 1);
-                            const fator = indDataBase / indCotacao;
-                            precoUnitarioBase = Math.round((baseVal * fator) * 100) / 100;
+                            const dCot = r.dataIni ? r.dataIni.split('-').reverse().join('/') : '-';
+                            const dBase = r.dataFin ? r.dataFin.split('-').reverse().join('/') : '-';
+                            const fator = (Number(r.indFin) / Number(r.indIni)) || 1;
+
+                            descChildren.push(new Paragraph({
+                                children: [
+                                    new TextRun({ text: "\n[MEMÓRIA DE CÁLCULO - RETROAÇÃO]", bold: true, color: "008F3D", size: 12 }),
+                                    new TextRun({ text: `\nValor Cotado: R$ ${formatarNumero(r.base)} | Data: ${dCot} | Índice Cot.: ${formatarNumero(r.indIni, 3)}`, size: 12 }),
+                                    new TextRun({ text: `\nData-Base: ${dBase} | Índice Base: ${formatarNumero(r.indFin, 3)} | Fator: ${fator.toFixed(4)}`, size: 12 })
+                                ],
+                                spacing: { before: 100 }
+                            }));
                         }
 
-                        const precoFinal = precoUnitarioBase;
-                        const totalItem = Math.round((precoFinal * item.coeficiente) * 100) / 100;
-
-                        // Acumular Totais para o resumo do DOCX
-                        const g = item.grupo || 'MATERIAL';
-                        if (g === 'MAO_DE_OBRA') sumMao = Math.round((sumMao + totalItem) * 100) / 100;
-                        else if (g === 'EQUIPAMENTOS') sumEquip = Math.round((sumEquip + totalItem) * 100) / 100;
-                        else if (g === 'SERVICO') sumServ = Math.round((sumServ + totalItem) * 100) / 100;
-                        else sumMat = Math.round((sumMat + totalItem) * 100) / 100;
-
-                        // Formatação Origem: SEINFRA 28 \n ONERADA
-                        const refShort = (item.referencia || '').toLowerCase().includes('desonerada') ? 'DESONERADA' : (item.referencia === 'COTAÇÃO' ? 'COTAÇÃO' : 'ONERADA');
-                        const verShort = (item.versao || '').replace('Tabela ', '');
-                        const origem = `${item.fonte} ${verShort}\n${refShort}`;
-
-                        // Formatação Descrição com Anexos e Memória
-                        let descCompleta = item.descricao;
-
-                        if (item.fonte === 'MERCADO' && item.retroativo) {
-                            // Adicionar a lista de memória, limpar descrição
-                            itensComMemoriaDocx.push(item);
-                            descCompleta += ' (Ver Memória de Cálculo ao final)';
+                        // Lógica de exibição da Fonte com Referência no DOCX
+                        const fonteChildren = [new Paragraph({ children: [new TextRun({ text: item.origem, size: 14 })], alignment: AlignmentType.CENTER })];
+                        if ((item.origem === 'SEINFRA' || item.origem === 'SINAPI') && item.referencia) {
+                            const refLabel = item.referencia.toLowerCase().includes('deson') ? 'Desonerada' : 'Onerada';
+                            fonteChildren.push(new Paragraph({ children: [new TextRun({ text: refLabel, size: 10, color: "6C757D" })], alignment: AlignmentType.CENTER }));
                         }
-
-
 
                         itemRows.push(new TableRow({
                             children: [
-                                new TableCell({ children: [new Paragraph({ text: origem, size: 14, alignment: AlignmentType.CENTER })] }), // Origem
-                                new TableCell({ children: [new Paragraph({ text: item.codigo, size: 16, alignment: AlignmentType.CENTER })] }), // Código
-                                new TableCell({ children: [new Paragraph({ text: descCompleta, size: 16, alignment: AlignmentType.JUSTIFIED })] }), // Descrição
-                                new TableCell({ children: [new Paragraph({ text: item.unidade, size: 16, alignment: AlignmentType.CENTER })] }),
-                                new TableCell({ children: [new Paragraph({ text: (typeof item.coeficiente === 'number' ? item.coeficiente : parseFloat(item.coeficiente || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), size: 16, alignment: AlignmentType.CENTER })] }),
-                                new TableCell({ children: [new Paragraph({ text: precoFinal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), size: 16, alignment: AlignmentType.CENTER })] }),
-                                new TableCell({ children: [new Paragraph({ text: totalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), size: 16, alignment: AlignmentType.CENTER })] })
+                                new TableCell({ children: fonteChildren }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: item.versao, size: 14 })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: item.codigo, bold: true, size: 16 })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: descChildren }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: item.unidade, size: 14 })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatarNumero(item.coeficiente, 4), size: 14 })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatarNumero(item.preco_unitario), size: 14 })], alignment: AlignmentType.RIGHT })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatarNumero(item.total), bold: true, size: 14 })], alignment: AlignmentType.RIGHT })] })
                             ]
                         }));
                     });
 
-                    const t = dados.totais || {};
-
-                    // SECTION: MEMÓRIA DE CÁLCULO DOCX
-                    const memoriaElements = [];
-                    if (itensComMemoriaDocx.length > 0) {
-                        memoriaElements.push(new Paragraph({ text: "", pageBreakBefore: true }));
-
-                        // Helper style
-                        const titleStyle = { bold: true, size: 24, color: "003264", spacing: { after: 200 } }; // 12pt
-                        const bodyStyle = { alignment: AlignmentType.JUSTIFIED, size: 20, spacing: { line: 360, after: 200 } }; // 10pt, line: 360 = 1.5 line spacing (standard is 240)
-
-                        // Header Texts
-                        memoriaElements.push(new Paragraph({ text: "Metodologia de Cálculo de Insumo Não Tabelado (Cotação de Mercado)", ...titleStyle }));
-                        memoriaElements.push(new Paragraph({ text: "O presente custo unitário foi obtido através de cotação de mercado, visto que o insumo não consta nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do valor cotado.", ...bodyStyle }));
-                        memoriaElements.push(new Paragraph({ text: "O objetivo é compatibilizar o preço de mercado atual (data da cotação) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.", ...bodyStyle }));
-
-                        memoriaElements.push(new Paragraph({ text: "Memória de Cálculo e Compatibilização de Preços", ...titleStyle, spacing: { before: 300, after: 200 } }));
-                        memoriaElements.push(new Paragraph({ text: "Considerando a defasagem temporal entre a data desta cotação de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores.", ...bodyStyle }));
-                        memoriaElements.push(new Paragraph({ text: "O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na tabela abaixo. Este procedimento visa equiparar o poder de compra da moeda à época da licitação, demonstrado analiticamente abaixo:", ...bodyStyle }));
-
-                        // Tables Loop
-                        itensComMemoriaDocx.forEach(item => {
-                            const r = item.retroativo;
-                            const baseVal = parseFloat(r.base || 0);
-                            const indCotacao = parseFloat(r.indIni || 1); // Source
-                            const indDataBase = parseFloat(r.indFin || 1); // Target
-
-                            const fator = indDataBase / indCotacao;
-                            const valAdotado = Math.round((baseVal * fator) * 100) / 100;
-
-                            const dCotacao = r.dataIni ? r.dataIni.split('-').reverse().join('/') : '-';
-                            const dDataBase = r.dataFin ? r.dataFin.split('-').reverse().join('/') : '-';
-
-                            memoriaElements.push(new Paragraph({ text: `Item: ${item.codigo} - ${item.descricao}`, bold: true, size: 20, spacing: { before: 400, after: 100 } }));
-
-                            const makeRow = (l, v) => new TableRow({
-                                children: [
-                                    new TableCell({ children: [new Paragraph({ text: l, size: 18 })], width: { size: 50, type: WidthType.PERCENTAGE } }),
-                                    new TableCell({ children: [new Paragraph({ text: v, size: 18 })], width: { size: 50, type: WidthType.PERCENTAGE } })
-                                ]
-                            });
-
-                            const table = new Table({
-                                rows: [
-                                    new TableRow({
-                                        children: [
-                                            new TableCell({ children: [new Paragraph({ text: "Parâmetro", bold: true, size: 18 })], shading: { fill: "E0E0E0" } }),
-                                            new TableCell({ children: [new Paragraph({ text: "Valor / Descrição", bold: true, size: 18 })], shading: { fill: "E0E0E0" } })
-                                        ]
-                                    }),
-                                    makeRow("A. Valor Cotado (Preço de Mercado)", `R$ ${baseVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`),
-                                    makeRow("B. Data da Cotação", dCotacao),
-                                    makeRow("C. Índice na Data da Cotação", indCotacao.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })),
-                                    makeRow("D. Data-Base do Orçamento", dDataBase),
-                                    makeRow("E. Índice na Data-Base", indDataBase.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })),
-                                    makeRow("F. Fator de Ajuste (E ÷ C)", fator.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })),
-                                    makeRow("G. Preço Adotado (A x F)", `R$ ${valAdotado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
-                                ],
-                                width: { size: 100, type: WidthType.PERCENTAGE }
-                            });
-                            memoriaElements.push(table);
-                        });
-                    }
+                    // 4. TOTAIS E RODAPÉ
+                    const bdiVal = parseFloat((dados.bdi || 0).toString().replace(',', '.')) / 100;
+                    const descVal = parseFloat((dados.desconto || 0).toString().replace(',', '.')) / 100;
+                    const valorBDI = subtotalSimples * bdiVal;
+                    const totalComBDI = subtotalSimples + valorBDI;
+                    const valorDesconto = totalComBDI * descVal;
+                    const precoFinal = totalComBDI - valorDesconto;
 
                     const doc = new Document({
                         sections: [{
                             properties: {},
                             children: [
-                                new Paragraph({ text: "GECOPE - GERÊNCIA DE CUSTOS E OPERAÇÕES", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER, color: "003264" }),
-                                new Paragraph({ text: "RELATÓRIO DE COMPOSIÇÃO ANALÍTICA", heading: HeadingLevel.HEADING_3, alignment: AlignmentType.CENTER }),
-                                new Paragraph({ text: "", spacing: { after: 200 } }), // Spacer
-
-                                // Row 1
-                                new Paragraph({
-                                    children: [
-                                        new TextRun({ text: "CÓDIGO: ", bold: true }),
-                                        new TextRun({ text: `${dados.codigo || '-'}     ` }),
-                                        new TextRun({ text: "DESCRIÇÃO: ", bold: true }),
-                                        new TextRun({ text: `${dados.descricao || '-'}` })
-                                    ]
-                                }),
-
-                                // Row 2
-                                new Paragraph({
-                                    children: [
-                                        new TextRun({ text: "DATA BASE: ", bold: true }),
-                                        new TextRun({ text: `${dataExtenso}                                                                                                 ` }), // Tab simulation
-                                        new TextRun({ text: "UNIDADE: ", bold: true }),
-                                        new TextRun({ text: `${dados.unidade || '-'}` })
-                                    ],
-                                    spacing: { after: 200 }
-                                }),
-
+                                headerTable,
+                                new Paragraph({ text: "", spacing: { after: 200 } }),
+                                metaTable,
+                                new Paragraph({ text: "", spacing: { after: 200 } }),
                                 new Table({
-                                    rows: [headerRow, ...itemRows],
-                                    width: { size: 100, type: WidthType.PERCENTAGE }
+                                    width: { size: 100, type: WidthType.PERCENTAGE },
+                                    rows: [headerRow, ...itemRows]
                                 }),
-
-                                new Paragraph({ text: "", spacing: { before: 200 } }),
-                                new Paragraph({ text: "RESUMO DOS VALORES:", bold: true }),
-
-                                (() => {
-                                    const totalSemBDI = sumMat + sumMao + sumEquip + sumServ;
-                                    const bdiVal = parseFloat((dados.bdi || '0').toString().replace(',', '.')) / 100 || 0;
-                                    const descVal = parseFloat((dados.desconto || '0').toString().replace(',', '.')) / 100 || 0;
-                                    const totalComBDI = Math.round((totalSemBDI * (1 + bdiVal)) * 100) / 100;
-                                    const valorBDI = Math.round((totalComBDI - totalSemBDI) * 100) / 100;
-                                    const valorDesconto = Math.round((totalComBDI * descVal) * 100) / 100;
-                                    const totalGeral = Math.round((totalComBDI - valorDesconto) * 100) / 100;
-                                    const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-                                    const rows = [];
-                                    if (sumMat > 0) rows.push(new Paragraph({ text: `Total Material: ${fmt(sumMat)}`, spacing: { before: 100 } }));
-                                    if (sumMao > 0) rows.push(new Paragraph({ text: `Total Mão de Obra: ${fmt(sumMao)}` }));
-                                    if (sumEquip > 0) rows.push(new Paragraph({ text: `Total Equipamentos: ${fmt(sumEquip)}` }));
-                                    if (sumServ > 0) rows.push(new Paragraph({ text: `Total Serviço: ${fmt(sumServ)}` }));
-                                    if (valorBDI > 0) rows.push(new Paragraph({ text: `Valor BDI (${dados.bdi}%): ${fmt(valorBDI)}`, spacing: { before: 100 } }));
-                                    if (valorDesconto > 0) rows.push(new Paragraph({ text: `Valor Desconto (${dados.desconto}%): ${fmt(valorDesconto)}` }));
-
-                                    rows.push(new Paragraph({ text: `PREÇO UNITÁRIO TOTAL: ${fmt(totalGeral)}`, bold: true, size: 24, color: "198754", spacing: { before: 200 } }));
-                                    return rows;
-                                })(),
-
-                                new Paragraph({ text: `Gerado em: ${new Date().toLocaleString()}`, size: 16, color: "888888", alignment: AlignmentType.RIGHT, spacing: { before: 400 } }),
-
-                                // Append Memória Elements
-                                ...memoriaElements
-                            ],
-                        }],
+                                new Paragraph({ text: "", spacing: { before: 400 } }),
+                                // Totais
+                                new Paragraph({ children: [new TextRun({ text: `TOTAL SIMPLES: R$ ${formatarNumero(subtotalSimples)}`, size: 16 })], alignment: AlignmentType.RIGHT }),
+                                ...(valorBDI > 0 ? [new Paragraph({ children: [new TextRun({ text: `BDI (${dados.bdi}%): R$ ${formatarNumero(valorBDI)}`, size: 16, color: "007BFF" })], alignment: AlignmentType.RIGHT })] : []),
+                                ...(valorDesconto > 0 ? [new Paragraph({ children: [new TextRun({ text: `DESCONTO (${dados.desconto}%): R$ ${formatarNumero(valorDesconto)}`, size: 16, color: "DC3545" })], alignment: AlignmentType.RIGHT })] : []),
+                                new Paragraph({ children: [new TextRun({ text: `PREÇO TOTAL UNITÁRIO: R$ ${formatarNumero(precoFinal)}`, bold: true, size: 24, color: "008F3D" })], alignment: AlignmentType.RIGHT, spacing: { before: 200 } }),
+                                new Paragraph({ children: [new TextRun({ text: `Gerado em: ${new Date().toLocaleString('pt-BR')}`, size: 12, color: "6C757D" })], alignment: AlignmentType.RIGHT, spacing: { before: 400 } })
+                            ]
+                        }]
                     });
 
                     Packer.toBlob(doc).then(blob => {
@@ -9075,6 +9073,36 @@
                 }
                 ;
             </script>
+
+
+            <!-- MODAL VISUALIZAR RELATÓRIO DA COMPOSIÇÃO (SOP) -->
+            <div class="modal fade" id="modalDetalheComposicao" tabindex="-1">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header bg-dark text-white py-2">
+                            <h6 class="modal-title fw-bold"><i class="bi bi-file-text me-2"></i>RELATÓRIO DE COMPOSIÇÃO
+                                ANALÍTICA</h6>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-0 bg-white" id="modal-report-body">
+                            <!-- O conteúdo do relatório será injetado aqui pelo JS -->
+                            <div class="p-5 text-center text-muted">
+                                <div class="spinner-border text-success mb-2"></div>
+                                <p>Carregando relatório...</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer py-2 bg-light d-print-none">
+                            <button type="button" class="btn btn-outline-success btn-sm"
+                                onclick="gerarPDF_Profissional(currentCompositionData)">
+                                <i class="bi bi-download me-1"></i> Baixar
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm ms-auto"
+                                data-bs-dismiss="modal">Fechar</button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
 
 </body>
 
