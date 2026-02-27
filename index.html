@@ -4840,7 +4840,7 @@
                             userInfoHeader.style.setProperty('display', 'flex', 'important');
                             const nameEl = document.getElementById('header-user-name');
                             const roleEl = document.getElementById('header-user-role');
-                            if (nameEl) nameEl.textContent = localStorage.getItem('sop_user_name') || 'Usuário';
+                            if (nameEl) nameEl.textContent = (localStorage.getItem('sop_user_name') || 'Usuário').toUpperCase();
                             if (roleEl) roleEl.textContent = role;
                         }
                     }
@@ -4869,8 +4869,25 @@
                         const { data, error } = await sbClient.from('app_users').select('*').order('created_at', { ascending: false });
                         if (error) throw error;
 
-                        const pendings = data.filter(u => u.role === 'pending');
+                        const pendings = data.filter(u => u.role === 'pending').sort((a, b) => {
+                            const nameA = (`${(a.nome || '')} ${(a.sobrenome || '')}`.trim() || a.full_name || '').toUpperCase();
+                            const nameB = (`${(b.nome || '')} ${(b.sobrenome || '')}`.trim() || b.full_name || '').toUpperCase();
+                            return nameA.localeCompare(nameB, 'pt-BR');
+                        });
                         const actives = data.filter(u => u.role !== 'pending');
+
+                        // 1. Clasificação por Função (Admin, Fiscal, Gerente, Externo)
+                        // 2. Classificação Alfabética dentro de cada função
+                        const roleOrder = { 'admin': 1, 'fiscal': 2, 'gerente': 3, 'externo': 4 };
+                        actives.sort((a, b) => {
+                            const orderA = roleOrder[a.role] || 99;
+                            const orderB = roleOrder[b.role] || 99;
+                            if (orderA !== orderB) return orderA - orderB;
+
+                            const nameA = (`${(a.nome || '')} ${(a.sobrenome || '')}`.trim() || a.full_name || '').toUpperCase();
+                            const nameB = (`${(b.nome || '')} ${(b.sobrenome || '')}`.trim() || b.full_name || '').toUpperCase();
+                            return nameA.localeCompare(nameB, 'pt-BR');
+                        });
 
                         // Atualiza Indicadores
                         if (statTotal) statTotal.textContent = data.length;
@@ -4886,7 +4903,8 @@
                         tbodyPending.innerHTML = '';
                         pendings.forEach(u => {
                             const dataSolic = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : 'N/A';
-                            const nomeComp = `${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'N/A';
+                            // 3. Nome sempre em caixa alta
+                            const nomeComp = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'N/A').toUpperCase();
 
                             const tr = document.createElement('tr');
                             tr.innerHTML = `
@@ -4923,7 +4941,8 @@
                         }
 
                         actives.forEach(u => {
-                            const fullNome = `${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'Não informado';
+                            // 3. Nome sempre em caixa alta
+                            const fullNome = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'Não informado').toUpperCase();
                             let roleColor = 'bg-secondary';
                             if (u.role === 'admin') roleColor = 'bg-danger';
                             else if (u.role === 'gerente') roleColor = 'bg-primary';
