@@ -1499,8 +1499,8 @@
 
         <ul class="nav nav-tabs mb-3" id="dashboardTabs" role="tablist"
             style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.06);">
-            <li class="nav-item" data-roles="admin,gerente"><button class="nav-link" data-bs-target="#pane-financeiro"
-                    data-bs-toggle="tab">Painel Financeiro</button></li>
+            <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
+                    data-bs-target="#pane-financeiro" data-bs-toggle="tab">Painel Financeiro</button></li>
             <li class="nav-item" data-roles="admin,gerente"><button class="nav-link" data-bs-target="#pane-gerencial"
                     data-bs-toggle="tab">Painel
                     Gerencial</button></li>
@@ -1707,7 +1707,7 @@
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-4">
+                        <div class="col-12 col-md-4 hide-fiscal">
                             <div class="kpi-card kpi-acresc-gecope">
                                 <div class="kpi-header">
                                     <div class="kpi-icon"
@@ -1721,7 +1721,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-md-4">
+                        <div class="col-12 col-md-4 hide-fiscal">
                             <div class="kpi-card kpi-supress-gecope">
                                 <div class="kpi-header">
                                     <div class="kpi-icon" style="background:rgba(211,84,0,0.2);color:#d35400;">↓</div>
@@ -1734,7 +1734,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-md-4">
+                        <div class="col-12 col-md-4 hide-fiscal">
                             <div class="kpi-card kpi-reperc-gecope">
                                 <div class="kpi-header">
                                     <div class="kpi-icon" style="background:rgba(0,95,138,0.18);color:#005f8a;">R$</div>
@@ -1747,7 +1747,7 @@
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-6 hide-fiscal">
                             <div class="kpi-card kpi-diff-abs">
                                 <div class="kpi-header">
                                     <div class="kpi-icon" style="background:rgba(142,68,173,0.18);color:#8e44ad;">Δ
@@ -1766,7 +1766,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-6 hide-fiscal">
                             <div class="kpi-card kpi-diff-perc">
                                 <div class="kpi-header">
                                     <div class="kpi-icon" style="background:rgba(192,57,43,0.18);color:#c0392b;">%</div>
@@ -4198,10 +4198,31 @@
                 }
                 function renderTotaisFinanceiro(rows) {
                     const base = applyPeriodo(rows, fin.totAno.value, fin.totMes.value);
+                    const isFiscal = localStorage.getItem('sop_role') === 'fiscal';
+
                     const render = (id, v1, v2, tit) => {
-                        const vs = [v1, v2]; const tp = vs.map(v => v >= 0 ? "outside" : "inside");
-                        const data = [{ x: ["Fiscalização", "GECOPE"], y: vs, type: "bar", marker: { color: ["#008F3D", "#018ABD"] }, text: vs.map(v => formatCompact(v)), textposition: tp, insidetextanchor: "end", textfont: { size: 11 }, cliponaxis: false, hovertemplate: "%{x}: R$ %{y:,.2f}<extra></extra>" }];
-                        const layout = { margin: { l: 95, r: 10, t: 10, b: 70 }, yaxis: { title: tit, tickprefix: "R$ ", separatethousands: true, automargin: true }, xaxis: { automargin: true, tickfont: { size: 11 } } };
+                        const labels = isFiscal ? ["Fiscalização"] : ["Fiscalização", "GECOPE"];
+                        const vs = isFiscal ? [v1] : [v1, v2];
+                        const colors = isFiscal ? ["#008F3D"] : ["#008F3D", "#018ABD"];
+
+                        const tp = vs.map(v => v >= 0 ? "outside" : "inside");
+                        const data = [{
+                            x: labels,
+                            y: vs,
+                            type: "bar",
+                            marker: { color: colors },
+                            text: vs.map(v => formatCompact(v)),
+                            textposition: tp,
+                            insidetextanchor: "end",
+                            textfont: { size: 11 },
+                            cliponaxis: false,
+                            hovertemplate: "%{x}: R$ %{y:,.2f}<extra></extra>"
+                        }];
+                        const layout = {
+                            margin: { l: 95, r: 10, t: 10, b: 70 },
+                            yaxis: { title: tit, tickprefix: "R$ ", separatethousands: true, automargin: true },
+                            xaxis: { automargin: true, tickfont: { size: 11 } }
+                        };
                         Plotly.react(document.getElementById(id), data, layout, { displayModeBar: false, responsive: true });
                     };
                     render("chart-acresc-total", sum(base, d => d.acrescFiscal), sum(base, d => d.acrescGecope), "Acréscimo");
@@ -7321,13 +7342,25 @@
                     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-success"></div><div class="mt-2 text-muted small">Buscando na base de dados...</div></td></tr>';
 
                     try {
-                        let query = sbClient.from(nomeTabela).select('*');
+                        let query = sbClient.from(nomeTabela).select('*, composicao');
                         if (fonte === 'SEINFRA') query = query.eq('referencia', versaoBase);
                         else query = query.eq('referencia', dataFormatada);
 
+                        // Ajuste para filtro de desoneração (SEINFRA pode usar termos diferentes)
+                        let filtroRef = tipoRef;
+                        if (fonte === 'SEINFRA') {
+                            // Tenta bater com 'onerada' ou 'não desonerada'
+                            if (tipoRef === 'onerada') {
+                                query = query.or('tipo_encargo.ilike.onerada,tipo_encargo.ilike.%não desonerada%');
+                            } else {
+                                query = query.ilike('tipo_encargo', 'desonerada');
+                            }
+                        } else {
+                            query = query.eq('tipo_encargo', tipoRef);
+                        }
+
                         // Busca por Código OU Descrição e limite estendido conforme solicitado (1000 itens)
-                        query = query.eq('tipo_encargo', tipoRef)
-                            .or(`codigo.ilike.%${termo}%,descricao.ilike.%${termo}%`)
+                        query = query.or(`codigo.ilike.%${termo}%,descricao.ilike.%${termo}%`)
                             .limit(1000);
 
                         const { data, error } = await query;
@@ -7372,9 +7405,15 @@
                     } catch (e) { console.error("Erro gerarLinkOrse", e); return "#"; }
                 }
 
-                function gerarLinkSeinfra(codigo, tipoRef) {
-                    const timestamp = Date.now();
-                    return `https://sin.seinfra.ce.gov.br/site-seinfra/siproce/${tipoRef.toLowerCase()}/html/${codigo}.html?a=${timestamp}`;
+                function gerarLinkSeinfra(codigo, ref) {
+                    const enc = (ref || '').toLowerCase().trim();
+                    // 'nao_desonerada' se contiver termos de negação ou for exatamente 'onerada'
+                    // Evita que 'desonerada' seja detectada como 'onerada' pelo .includes()
+                    const containsNao = enc.includes('não') || enc.includes('nao') || enc.includes('sem');
+                    const isOnerada = enc === 'onerada' || (containsNao && enc.includes('desonerada'));
+
+                    const statusUrl = isOnerada ? 'onerada' : 'desonerada';
+                    return `https://sin.seinfra.ce.gov.br/site-seinfra/siproce/${statusUrl}/html/${(codigo || '').trim()}.html?a=1698149826826`;
                 }
 
                 function renderTabelaResults(lista) {
@@ -7396,11 +7435,8 @@
                         if (fonte === 'ORSE') {
                             const link = gerarLinkOrse(item.codigo, item.referencia);
                             btnAction = `<a href="${link}" target="_blank" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a>`;
-                        } else if (fonte === 'SEINFRA') {
-                            const link = gerarLinkSeinfra(item.codigo, tipoRef);
-                            btnAction = `<a href="${link}" target="_blank" class="btn btn-sm btn-outline-primary" title="Ver Composição no SEINFRA"><i class="bi bi-box-arrow-up-right"></i></a>`;
                         } else {
-                            btnAction = `<button class="btn btn-sm btn-light border" onclick="abrirDetalheTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')"><i class="bi bi-chevron-right"></i></button>`;
+                            btnAction = `<button class="btn btn-sm btn-light border" onclick="abrirDetalheTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Ver Detalhes"><i class="bi bi-chevron-right"></i></button>`;
                         }
 
                         return `<tr>
@@ -7417,6 +7453,10 @@
                 function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                     if (!dadosPai || !dadosPai.composicao || !Array.isArray(dadosPai.composicao)) return;
 
+                    // Limpa ações extras do rodapé
+                    const footerExtra = document.getElementById('footer-extra-actions');
+                    if (footerExtra) footerExtra.innerHTML = '';
+
                     const formatCurrency = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
                     const formatDecimal = (v, d = 3) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
@@ -7424,6 +7464,9 @@
                     const descricao = (dadosPai.descricao || 'SEM DESCRIÇÃO').toUpperCase();
                     const unidade = dadosPai.unidade || 'N/A';
                     const versaoRef = formatarVersao(dadosPai.referencia || '');
+
+                    // Valor oficial do pai para evitar divergência de arredondamento de centavos
+                    const precoOficial = parseFloat(dadosPai.preco_unitario || dadosPai.valor_unitario || dadosPai.preco || dadosPai.valor || 0);
 
                     // Agrupamento por tipo (Insumo/Composição)
                     const grupos = {};
@@ -7488,16 +7531,16 @@
                             </div>
 
                             <!-- Metadados (Estilo SINAPI adaptado) -->
-                            <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: center; min-height: 100px; margin-bottom: 2rem;">
-                                <div style="flex: 0 0 15%; padding: 0 1.5rem; border-right: 1px solid #eee; text-align: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">CÓDIGO</small>
-                                    <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a;">${codigo}</div>
+                            <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
+                                <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
+                                    <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
-                                <div style="flex: 1; padding: 0 2rem;">
+                                <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
                                     <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">DESCRIÇÃO DA COMPOSIÇÃO</small>
                                     <div style="font-size: 1.05rem; font-weight: 800; color: #1a1a1a; text-transform: uppercase; text-align: justify;">${descricao}</div>
                                 </div>
-                                <div style="flex: 0 0 12%; padding: 0 1.5rem; border-left: 1px solid #eee; text-align: center;">
+                                <div style="flex: 0 0 8%; padding: 0 0.5rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; text-align: center;">
                                     <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">UNIDADE</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a;">${unidade}</div>
                                 </div>
@@ -7533,7 +7576,7 @@
                                     </div>
                                     <div class="col-4 text-end">
                                         <div style="font-size: 2.4rem; font-weight: 800;">
-                                            <span style="font-size: 1.2rem; vertical-align: middle;">R$</span> ${formatDecimal(totalGeral, 2)}
+                                            <span style="font-size: 1.2rem; vertical-align: middle;">R$</span> ${formatDecimal(precoOficial, 2)}
                                         </div>
                                     </div>
                                 </div>
@@ -7542,11 +7585,155 @@
                     `;
                 }
 
+                function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
+                    if (!dadosPai) return;
+
+                    // Adiciona botão "Ver no site" no rodapé
+                    const footerExtra = document.getElementById('footer-extra-actions');
+                    if (footerExtra) {
+                        // Prioriza o tipo selecionado na interface para garantir o link correto
+                        const linkSeinfra = gerarLinkSeinfra(dadosPai.codigo, tipoRef || dadosPai.tipo_encargo);
+                        footerExtra.innerHTML = `<a href="${linkSeinfra}" target="_blank" class="btn btn-outline-primary btn-sm fw-bold">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> SEINFRA
+                        </a>`;
+                    }
+
+                    const formatCurrency = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    const formatDecimal = (v, d = 3) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+                    const codigo = dadosPai.codigo || 'N/A';
+                    const descricao = (dadosPai.descricao || 'SEM DESCRIÇÃO').toUpperCase();
+                    const unidade = dadosPai.unidade || 'N/A';
+                    const versaoRef = formatarVersao(dadosPai.referencia || '');
+
+                    // Valor oficial do pai para evitar divergência de arredondamento de centavos
+                    const precoOficial = parseFloat(dadosPai.preco_unitario || dadosPai.valor_unitario || dadosPai.preco || dadosPai.valor || 0);
+
+                    // Agrupamento por tipo (Insumo/Composição)
+                    const grupos = {};
+                    const temComposicao = dadosPai.composicao && Array.isArray(dadosPai.composicao) && dadosPai.composicao.length > 0;
+
+                    if (temComposicao) {
+                        dadosPai.composicao.forEach(item => {
+                            const tipo = (item.tipo_item || 'INSUMO').toUpperCase().replace('COMPOSICAO', 'COMPOSIÇÃO');
+                            if (!grupos[tipo]) grupos[tipo] = [];
+                            const subtotal = (parseFloat(item.coeficiente) || 0) * (parseFloat(item.preco_unitario) || 0);
+                            grupos[tipo].push({ ...item, total: subtotal });
+                        });
+                    }
+
+                    let tableContent = '';
+                    if (!temComposicao) {
+                        tableContent = `<tr><td colspan="8" class="text-center py-5 text-muted fw-bold">Nenhum dado de composição analítica disponível para este item.</td></tr>`;
+                    } else {
+                        Object.keys(grupos).sort().forEach(tipo => {
+                            tableContent += `
+                                <tr style="background-color: #e8e8e8; font-size: 0.8rem; font-weight: bold;">
+                                    <td colspan="8" style="padding: 0.6rem 0.5rem; color: #333; text-align: center; text-uppercase;">${tipo}</td>
+                                </tr>
+                            `;
+
+                            grupos[tipo].forEach(item => {
+                                tableContent += `
+                                    <tr style="font-size: 0.8rem; border-bottom: 1px solid #eee;">
+                                        <td style="padding: 0.5rem 0.5rem; text-align: center;">SEINFRA</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: center;">${versaoRef}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: center; font-weight: bold;">${item.codigo_item || item.codigo}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: justify;">${(item.descricao_item || item.descricao || '').toUpperCase()}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: center;">${item.unidade || '-'}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: center;">${formatDecimal(item.coeficiente, 4)}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: right;">${formatDecimal(item.preco_unitario, 2)}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: right; font-weight: bold;">${formatDecimal(item.valor_total || item.total, 2)}</td>
+                                    </tr>
+                                `;
+                            });
+                        });
+                    }
+
+                    modalBody.innerHTML = `
+                        <div class="p-4 report-print-area" style="font-family: 'Montserrat', sans-serif;">
+                            <!-- Cabeçalho Institucional SOP-CE / SEINFRA -->
+                            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="text-white p-2 rounded me-3 fw-bold fs-5" style="background-color: #008F3D !important; min-width: 80px; text-align: center;">SEINFRA</div>
+                                    <div>
+                                        <div class="fw-bold fs-6" style="color: #008F3D; line-height: 1.2;">GOVERNO DO ESTADO DO CEARÁ</div>
+                                        <div class="text-dark fw-bold" style="font-size: 0.75rem;">SECRETARIA DA INFRAESTRUTURA</div>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <h5 class="fw-bold mb-0 text-dark">COMPOSIÇÃO ANALÍTICA</h5>
+                                    <div class="text-muted fw-bold" style="font-size: 0.7rem;">GECOPE - GERÊNCIA DE CONTROLE DE ADITIVOS</div>
+                                </div>
+                            </div>
+
+                            <!-- Metadados (Estilo SEINFRA adaptado) -->
+                            <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
+                                <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
+                                    <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
+                                </div>
+                                <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">DESCRIÇÃO DA COMPOSIÇÃO</small>
+                                    <div style="font-size: 1.05rem; font-weight: 800; color: #1a1a1a; text-transform: uppercase; text-align: justify;">${descricao}</div>
+                                </div>
+                                <div style="flex: 0 0 8%; padding: 0 0.5rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; text-align: center;">
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">UNIDADE</small>
+                                    <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a;">${unidade}</div>
+                                </div>
+                            </div>
+
+                            <!-- Tabela de Itens SEINFRA -->
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle" style="border-collapse: collapse; width: 100%;">
+                                    <thead>
+                                        <tr style="font-size: 0.75rem; background-color: #f5f5f5; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
+                                            <th style="width: 8%;" class="fw-bold text-uppercase p-2">FONTE</th>
+                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSÃO</th>
+                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CÓDIGO</th>
+                                            <th style="width: 48%;" class="fw-bold text-uppercase p-2">DESCRIÇÃO DO INSUMO</th>
+                                            <th style="width: 5%;" class="fw-bold text-uppercase text-center p-2">UNID.</th>
+                                            <th style="width: 7%;" class="fw-bold text-uppercase text-center p-2">COEF.</th>
+                                            <th style="width: 9%;" class="fw-bold text-uppercase text-end p-2">P. UNIT.</th>
+                                            <th style="width: 8%;" class="fw-bold text-uppercase text-end p-2">TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${tableContent}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Preço Total Unitário (Barra Verde SOP) -->
+                            <div class="mt-4" style="padding: 1.8rem 2rem; background: linear-gradient(135deg, #008F3D 0%, #007233 100%); color: white; border-radius: 12px;">
+                                <div class="row align-items-center">
+                                    <div class="col-8">
+                                        <small class="text-white-50 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase;">Preço Total Unitário (SEINFRA)</small>
+                                        <div style="font-size: 0.95rem; opacity: 0.9;">Referência: ${versaoRef}</div>
+                                    </div>
+                                    <div class="col-4 text-end">
+                                        <div style="font-size: 2.4rem; font-weight: 800;">
+                                            <span style="font-size: 1.2rem; vertical-align: middle;">R$</span> ${formatDecimal(precoOficial, 2)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+
+
                 async function abrirDetalheTabela(codigo, fonte, versao, tipoRef) {
                     const modalEl = document.getElementById('modalDetalheComposicao');
                     if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
                     const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
                     const modalBody = modalEl.querySelector('.modal-body');
+
+                    // Limpa ações extras do rodapé no início
+                    const footerExtra = document.getElementById('footer-extra-actions');
+                    if (footerExtra) footerExtra.innerHTML = '';
+
                     modalBody.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success"></div><div class="mt-2 small text-muted">Carregando detalhes...</div></div>';
                     modalInstance.show();
 
@@ -7558,13 +7745,20 @@
                             if (versao.length === 6) dataFormatada = `${versao.substring(2)}-${versao.substring(0, 2)}-01`;
                         }
 
-                        const { data: dadosPai, error } = await sbClient
-                            .from(nomeTabela)
-                            .select('*')
-                            .eq('codigo', codigo)
-                            .eq('referencia', dataFormatada)
-                            .eq('tipo_encargo', tipoRef)
-                            .single();
+                        let query = sbClient.from(nomeTabela).select('*, composicao');
+
+                        if (fonte === 'SEINFRA') {
+                            query = query.eq('referencia', dataFormatada);
+                            if (tipoRef === 'onerada') {
+                                query = query.or('tipo_encargo.ilike.onerada,tipo_encargo.ilike.%não desonerada%');
+                            } else {
+                                query = query.ilike('tipo_encargo', 'desonerada');
+                            }
+                        } else {
+                            query = query.eq('referencia', dataFormatada).eq('tipo_encargo', tipoRef);
+                        }
+
+                        const { data: dadosPai, error } = await query.eq('codigo', codigo).single();
 
                         if (error || !dadosPai) {
                             modalBody.innerHTML = '<div class="alert alert-warning m-4 fw-bold text-center">Composição não encontrada no banco de dados.</div>';
@@ -7574,6 +7768,12 @@
                         // ===== DESVIO PARA RENDERIZADOR SINAPI =====
                         if (fonte === 'SINAPI' && dadosPai.composicao && Array.isArray(dadosPai.composicao) && dadosPai.composicao.length > 0) {
                             renderizarComposicaoSINAPI(dadosPai, modalBody);
+                            return;
+                        }
+
+                        // ===== DESVIO PARA RENDERIZADOR SEINFRA (Gatilho 100% Conectado) =====
+                        if (fonte === 'SEINFRA') {
+                            renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef);
                             return;
                         }
 
@@ -8434,7 +8634,7 @@
                             </div>
 
                             <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
-                                <div style="flex: 0 0 10%; padding: 0 1.5rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
+                                <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
                                     <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
@@ -8444,18 +8644,18 @@
                                         ${descricao}
                                     </div>
                                 </div>
-                                <div style="flex: 0 0 10%; padding: 0 1rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; text-align: center;">
+                                <div style="flex: 0 0 8%; padding: 0 0.5rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; text-align: center;">
                                     <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">UNIDADE</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${unidade}</div>
                                 </div>
-                                <div style="flex: 0 0 14%; padding: 0 1.5rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted fw-bold" style="font-size: 0.65rem;">BDI:</small>
-                                        <span class="fw-bold text-primary" style="font-size: 0.9rem;">${bdiText}</span>
+                                <div style="flex: 0 0 14%; padding: 0 1.2rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; gap: 2px;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted fw-bold" style="font-size: 0.6rem; letter-spacing: 0.5px; width: 35px;">BDI:</small>
+                                        <span class="fw-bold text-primary" style="font-size: 1rem;">${bdiText}</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <small class="text-muted fw-bold" style="font-size: 0.65rem;">DESC:</small>
-                                        <span class="fw-bold text-danger" style="font-size: 0.9rem;">${descText}</span>
+                                        <small class="text-muted fw-bold" style="font-size: 0.6rem; letter-spacing: 0.5px; width: 35px;">DESC:</small>
+                                        <span class="fw-bold text-danger" style="font-size: 1rem;">${descText}</span>
                                     </div>
                                 </div>
                             </div>
@@ -9301,6 +9501,7 @@
                             </div>
                         </div>
                         <div class="modal-footer py-2 bg-light d-print-none">
+                            <div id="footer-extra-actions" class="me-2"></div>
                             <button type="button" class="btn btn-outline-success btn-sm"
                                 onclick="gerarPDF_Profissional(currentCompositionData)">
                                 <i class="bi bi-download me-1"></i> Baixar
