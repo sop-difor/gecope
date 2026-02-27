@@ -2054,7 +2054,7 @@
                                 <label class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
                                 <div class="input-group input-group-sm">
                                     <input type="text" class="form-control border-secondary-subtle" id="meetingSearch"
-                                        placeholder="Processo, Descrição, Analista...">
+                                        placeholder="Processo, Descrição, Analista, Fiscal, Status...">
                                     <span class="input-group-text bg-light text-muted border-secondary-subtle"><i
                                             class="bi bi-search"></i></span>
                                 </div>
@@ -4082,7 +4082,25 @@
 
                     const btnSpan = container.querySelector('button span');
                     const menu = container.querySelector('.dropdown-menu');
+                    const oldSearchValue = menu.querySelector('input')?.value || '';
                     menu.innerHTML = '';
+
+                    // Adiciona campo de busca interno se houver muitas opções
+                    const searchInput = document.createElement('input');
+                    searchInput.type = 'text';
+                    searchInput.className = 'form-control form-control-sm mx-2 my-1';
+                    searchInput.placeholder = 'Filtrar opções...';
+                    searchInput.style.width = 'calc(100% - 16px)';
+                    searchInput.value = oldSearchValue;
+                    searchInput.onclick = (e) => e.stopPropagation();
+                    searchInput.oninput = (e) => {
+                        const term = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        menu.querySelectorAll('.multiselect-option').forEach(opt => {
+                            const text = opt.textContent.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            opt.style.display = text.includes(term) ? '' : 'none';
+                        });
+                    };
+                    menu.appendChild(searchInput);
 
                     Array.from(selectEl.options).forEach(opt => {
                         if (!opt.value) return;
@@ -4394,8 +4412,14 @@
                     if (priorFilt.length > 0) rows = rows.filter(d => priorFilt.includes(isPrioritario(d) ? "Sim" : "Não"));
                     if (q) {
                         rows = rows.filter(d => {
-                            const proc = (d.processo || "").toLowerCase(); const contrat = (d.contratante || "").toLowerCase(); const desc = (d.descricao || "").toLowerCase(); const analistaNome = (d.nomeAnalista || "").toLowerCase();
-                            return proc.includes(q) || contrat.includes(q) || (d.contratada || "").toLowerCase().includes(q) || desc.includes(q) || analistaNome.includes(q);
+                            const proc = (d.processo || "").toLowerCase();
+                            const contrat = (d.contratante || "").toLowerCase();
+                            const desc = (d.descricao || "").toLowerCase();
+                            const analistaNome = (d.nomeAnalista || "").toLowerCase();
+                            const fiscal = (d.fiscal || "").toLowerCase();
+                            const status = (d.status || "").toLowerCase();
+                            const contratada = (d.contratada || "").toLowerCase();
+                            return proc.includes(q) || contrat.includes(q) || contratada.includes(q) || desc.includes(q) || analistaNome.includes(q) || fiscal.includes(q) || status.includes(q);
                         });
                     }
                     document.getElementById("meetingFooterNote").textContent = `Exibindo ${rows.length} processos`;
@@ -6372,7 +6396,7 @@
                             if (isMe) {
                                 accordionStyle = 'background-color: #dcfce7 !important; color: #166534 !important; font-weight: 700; border: 1px solid #bbf7d0;';
                                 iconClassHeader = 'bi bi-person-fill-check me-2 text-success';
-                                titleLabel = `MINHAS COMPOSIÇÕES (${userKey})`;
+                                titleLabel = `COMPOSIÇÕES PRÓPRIAS (${userKey})`;
                             } else if (isSop) {
                                 accordionStyle = 'background-color: #f8f9fa !important; color: #334155 !important; font-weight: 800; border: 1px solid #e2e8f0;';
                                 iconClassHeader = 'bi bi-building-fill-check me-2 text-primary';
@@ -6983,21 +7007,26 @@
                         return;
                     }
 
-                    // Auto-Detect Group based on Type or Source
+                    // Auto-Detect Group based on Category, Type or Source
                     let grupo = 'MATERIAL'; // Default
-                    const tipoUpper = (item.tipo || '').toUpperCase();
+                    const catUpper = (item.categoria || '').toUpperCase();
+                    const tipoUpper = (item.tipo || item.tipo_item || '').toUpperCase();
 
-                    if (tipoUpper.includes('MÃO') || tipoUpper.includes('MAO') || tipoUpper.includes('SERVENTE') || tipoUpper.includes('PEDREIRO')) {
+                    if (catUpper.includes('MÃO') || catUpper.includes('MAO') ||
+                        tipoUpper.includes('MÃO') || tipoUpper.includes('MAO') ||
+                        tipoUpper.includes('SERVENTE') || tipoUpper.includes('PEDREIRO')) {
                         grupo = 'MAO_DE_OBRA';
-                    } else if (tipoUpper.includes('EQUIP') || tipoUpper.includes('CAMINHAO') || tipoUpper.includes('BETONEIRA')) {
+                    } else if (catUpper.includes('EQUIP') || tipoUpper.includes('EQUIP') ||
+                        tipoUpper.includes('CAMINHAO') || tipoUpper.includes('BETONEIRA')) {
                         grupo = 'EQUIPAMENTOS';
-                    } else if (tipoUpper.includes('SERV')) {
+                    } else if (catUpper.includes('SERV') || tipoUpper.includes('SERV')) {
                         grupo = 'SERVICO';
-                    } else if (item.fonte === 'SINAPI' && item.tipo_item === 'COMPOSICAO') {
+                    } else if (item.fonte === 'SINAPI' && (item.tipo_item === 'COMPOSICAO' || item.tipo === 'COMPOSICAO')) {
                         grupo = 'MATERIAL';
                     }
 
                     item.grupo = grupo;
+
 
                     currentCompositionItems.push(item);
                     renderizarItensComposicao();
@@ -7426,7 +7455,8 @@
                     const versaoBase = document.getElementById('busca-versao').value;
                     contador.textContent = `${lista.length} itens`;
 
-                    tbody.innerHTML = lista.map(item => {
+                    // Função auxiliar para renderizar a linha
+                    const renderLinha = (item) => {
                         let valorBase = parseFloat(item.valor_unitario || item.preco_unitario || item.valor || item.preco || 0);
                         const valorFinal = valorBase * (1 + bdiVal / 100) * (1 - descVal / 100);
                         const stylePreco = (bdiVal > 0 || descVal > 0) ? 'color: #d63384 !important;' : 'color: var(--sop-gray-dark);';
@@ -7447,8 +7477,36 @@
                             <td class="text-end pe-3 fw-bold" style="${stylePreco}">${valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             <td class="text-end pe-3">${btnAction}</td>
                         </tr>`;
-                    }).join('');
+                    };
+
+                    // Agrupamento por Categoria (para SEINFRA seguir a planilha oficial)
+                    if (fonte === 'SEINFRA') {
+                        const grupos = {};
+                        lista.forEach(item => {
+                            const cat = (item.categoria || item.identificacao || 'GERAL').toUpperCase();
+                            if (!grupos[cat]) grupos[cat] = [];
+                            grupos[cat].push(item);
+                        });
+
+                        let html = '';
+                        Object.keys(grupos).sort().forEach(cat => {
+                            html += `
+                                <tr class="bg-light shadow-sm">
+                                    <td colspan="6" class="py-2 ps-3 fw-bold text-success border-bottom bg-light bg-gradient" style="font-size: 0.8rem; border-left: 4px solid #008F3D;">
+                                        <i class="bi bi-tag-fill me-1"></i> ${cat}
+                                    </td>
+                                </tr>
+                            `;
+                            grupos[cat].forEach(item => {
+                                html += renderLinha(item);
+                            });
+                        });
+                        tbody.innerHTML = html;
+                    } else {
+                        tbody.innerHTML = lista.map(item => renderLinha(item)).join('');
+                    }
                 }
+
 
                 function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                     if (!dadosPai || !dadosPai.composicao || !Array.isArray(dadosPai.composicao)) return;
@@ -7609,16 +7667,17 @@
                     // Valor oficial do pai para evitar divergência de arredondamento de centavos
                     const precoOficial = parseFloat(dadosPai.preco_unitario || dadosPai.valor_unitario || dadosPai.preco || dadosPai.valor || 0);
 
-                    // Agrupamento por tipo (Insumo/Composição)
+                    // Agrupamento por Categoria (Mão de Obra, Material, Equipamento, etc.)
                     const grupos = {};
                     const temComposicao = dadosPai.composicao && Array.isArray(dadosPai.composicao) && dadosPai.composicao.length > 0;
 
                     if (temComposicao) {
                         dadosPai.composicao.forEach(item => {
-                            const tipo = (item.tipo_item || 'INSUMO').toUpperCase().replace('COMPOSICAO', 'COMPOSIÇÃO');
-                            if (!grupos[tipo]) grupos[tipo] = [];
+                            // Prioriza o novo campo 'categoria', senão usa 'tipo_item' ou 'INSUMO' como fallback
+                            const categoria = (item.categoria || item.tipo_item || 'INSUMO').toUpperCase().replace('COMPOSICAO', 'COMPOSIÇÃO');
+                            if (!grupos[categoria]) grupos[categoria] = [];
                             const subtotal = (parseFloat(item.coeficiente) || 0) * (parseFloat(item.preco_unitario) || 0);
-                            grupos[tipo].push({ ...item, total: subtotal });
+                            grupos[categoria].push({ ...item, total: subtotal });
                         });
                     }
 
@@ -7626,14 +7685,27 @@
                     if (!temComposicao) {
                         tableContent = `<tr><td colspan="8" class="text-center py-5 text-muted fw-bold">Nenhum dado de composição analítica disponível para este item.</td></tr>`;
                     } else {
-                        Object.keys(grupos).sort().forEach(tipo => {
+                        // Ordenação personalizada para seguir o padrão da planilha oficial
+                        const ordemCategorias = ['MÃO DE OBRA', 'MATERIAL', 'EQUIPAMENTO', 'SERVIÇO', 'ENCARGOS COMPLEMENTARES'];
+                        const categoriasExistentes = Object.keys(grupos).sort((a, b) => {
+                            const idxA = ordemCategorias.findIndex(cat => a.includes(cat));
+                            const idxB = ordemCategorias.findIndex(cat => b.includes(cat));
+                            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                            if (idxA !== -1) return -1;
+                            if (idxB !== -1) return 1;
+                            return a.localeCompare(b);
+                        });
+
+                        categoriasExistentes.forEach(cat => {
                             tableContent += `
                                 <tr style="background-color: #e8e8e8; font-size: 0.8rem; font-weight: bold;">
-                                    <td colspan="8" style="padding: 0.6rem 0.5rem; color: #333; text-align: center; text-uppercase;">${tipo}</td>
+                                    <td colspan="8" style="padding: 0.6rem 0.5rem; color: #333; text-align: center; text-uppercase;">${cat}</td>
                                 </tr>
                             `;
 
-                            grupos[tipo].forEach(item => {
+                            let subtotalGrupo = 0;
+                            grupos[cat].forEach(item => {
+                                subtotalGrupo += item.total;
                                 tableContent += `
                                     <tr style="font-size: 0.8rem; border-bottom: 1px solid #eee;">
                                         <td style="padding: 0.5rem 0.5rem; text-align: center;">SEINFRA</td>
@@ -7647,8 +7719,17 @@
                                     </tr>
                                 `;
                             });
+
+                            // Adiciona linha de TOTAL por categoria (igual a planilha oficial)
+                            tableContent += `
+                                <tr style="font-size: 0.8rem; background-color: #f9f9f9; font-weight: bold; border-top: 1px solid #ddd;">
+                                    <td colspan="7" style="padding: 0.6rem 0.5rem; text-align: right; color: #666;">TOTAL ${cat}</td>
+                                    <td style="padding: 0.6rem 0.5rem; text-align: right; color: #333;">${formatDecimal(subtotalGrupo, 2)}</td>
+                                </tr>
+                            `;
                         });
                     }
+
 
                     modalBody.innerHTML = `
                         <div class="p-4 report-print-area" style="font-family: 'Montserrat', sans-serif;">
