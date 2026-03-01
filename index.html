@@ -62,6 +62,13 @@
             display: inline-block !important;
         }
 
+        /* Correção para cards flexíveis que são admin-only */
+        body.is-admin .home-action-card.admin-only,
+        body.role-admin .home-action-card.admin-only,
+        body.role-gerente .home-action-card.admin-only {
+            display: flex !important;
+        }
+
         /* Regra para esconder elementos do Fiscal */
         body.role-fiscal .hide-fiscal {
             display: none !important;
@@ -239,13 +246,306 @@
             --sop-green-light: #4CC17C;
             --sop-orange: #F28C00;
             --sop-blue: #018ABD;
-            --sop-gray-dark: #333333;
-            --sop-gray-mid: #777777;
-            --sop-gray-light: #F4F4F4;
+
+            /* SaaS Colors (Tailwind Slate/Gray scale) */
+            --sop-slate-900: #0f172a;
+            --sop-slate-800: #1e293b;
+            --sop-slate-700: #334155;
+            --sop-slate-600: #475569;
+            --sop-slate-500: #64748b;
+            --sop-slate-200: #e2e8f0;
+            --sop-slate-100: #f1f5f9;
+            --sop-slate-50: #f8fafc;
+
+            --sop-gray-dark: var(--sop-slate-900);
+            --sop-gray-mid: var(--sop-slate-500);
+            --sop-gray-light: var(--sop-slate-100);
             --sop-white: #FFFFFF;
-            --border-soft: #E2E6EA;
-            --radius-lg: 16px;
-            --radius-sm: 10px;
+
+            /* Design Tokens */
+            --border-soft: #f1f5f9;
+            --radius-xl: 20px;
+            --radius-2xl: 24px;
+
+            /* Elegant SaaS Shadows */
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+            --sop-card-shadow: var(--shadow-sm);
+            --sop-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* HOME DASHBOARD STYLES */
+        .home-welcome-section {
+            padding: 10px 0 5px;
+            margin-bottom: 15px;
+        }
+
+        .home-welcome-title {
+            font-size: 1.6rem;
+            /* Reduzido de 2.4rem para alinhar com o app */
+            font-weight: 700;
+            color: var(--sop-slate-900);
+            margin-bottom: 4px;
+            letter-spacing: -0.025em;
+        }
+
+        .home-welcome-subtitle {
+            font-size: 0.95rem;
+            /* Reduzido de 1.1rem */
+            color: var(--sop-slate-500);
+            font-weight: 400;
+        }
+
+        .home-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 35px;
+        }
+
+        .home-stat-card {
+            background: var(--sop-white);
+            border-radius: var(--radius-xl);
+            padding: 12px 18px;
+            /* Mais compacto */
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--sop-slate-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: var(--sop-transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .home-stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .home-stat-info h4 {
+            font-size: 0.75rem;
+            color: var(--sop-slate-500);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            /* Menor */
+            margin-top: 0;
+            letter-spacing: 0.05em;
+        }
+
+        .home-stat-value {
+            font-size: 1.5rem;
+            /* Reduzido de 2rem */
+            font-weight: 700;
+            color: var(--sop-slate-900);
+        }
+
+        .home-stat-icon {
+            width: 44px;
+            /* Reduzido */
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .bg-light-green {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .bg-light-blue {
+            background-color: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .bg-light-orange {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .home-quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            /* Mais compacto */
+            margin-bottom: 20px;
+        }
+
+        /* Responsividade para manter proporção */
+        @media (max-width: 1200px) {
+            .home-quick-actions-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .home-quick-actions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .home-action-card {
+            background: var(--sop-white);
+            border-radius: var(--radius-xl);
+            padding: 18px 14px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--sop-slate-100);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: var(--sop-transition);
+            text-decoration: none !important;
+            color: inherit !important;
+            min-height: 145px;
+            justify-content: center;
+        }
+
+        .home-action-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--sop-slate-200);
+        }
+
+        .home-action-icon {
+            width: 44px;
+            /* Aumentado de 38px */
+            height: 44px;
+            background: var(--sop-slate-50);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            /* Aumentado de 1.25rem */
+            color: var(--sop-green);
+            transition: var(--sop-transition);
+            border: 1px solid var(--sop-slate-100);
+        }
+
+        .home-action-card:hover .home-action-icon {
+            background: var(--sop-green);
+            color: var(--sop-white);
+        }
+
+        .home-action-text h3 {
+            font-size: 1.0rem;
+            /* Proporcional */
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--sop-slate-900);
+        }
+
+        .home-action-text p {
+            margin: 0;
+            color: var(--sop-slate-500);
+            font-size: 0.75rem;
+            /* Menor */
+            line-height: 1.2;
+        }
+
+        .btn-back-minimal {
+            background: none;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #666;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(0, 0, 0, 0.03);
+            background-color: rgba(0, 0, 0, 0.015);
+        }
+
+        .btn-back-minimal:hover {
+            color: var(--sop-green);
+            background-color: rgba(0, 143, 61, 0.05);
+            border-color: rgba(0, 143, 61, 0.1);
+            transform: translateX(-3px);
+        }
+
+        .btn-back-minimal i {
+            font-size: 1rem;
+        }
+
+        .home-activities-panel {
+            background: var(--sop-white);
+            border-radius: var(--radius-xl);
+            padding: 15px 20px;
+            /* Mais compacto */
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--sop-slate-200);
+            margin-bottom: 20px;
+        }
+
+        .home-activities-panel h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--sop-gray-dark);
+        }
+
+        .activities-list-container {
+            display: flex;
+            gap: 40px;
+            overflow-x: auto;
+            padding-bottom: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: #ddd transparent;
+        }
+
+        .activities-list-container::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .activities-list-container::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 3px;
+        }
+
+        .activity-item {
+            min-width: 280px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            position: relative;
+        }
+
+        .activity-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            right: -20px;
+            height: 35px;
+            width: 1px;
+            background-color: #eee;
+        }
+
+        .activity-time {
+            font-weight: 800;
+            color: var(--sop-gray-dark);
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+
+        .activity-desc {
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.4;
         }
 
         * {
@@ -256,8 +556,8 @@
             margin: 0;
             padding: 0;
             font-family: "Montserrat", system-ui, -apple-system, sans-serif;
-            background-color: var(--sop-gray-light);
-            color: var(--sop-gray-dark);
+            background-color: var(--sop-slate-50);
+            color: var(--sop-slate-900);
         }
 
         /* ------------------------------------------------------------------------
@@ -1474,7 +1774,7 @@
 
     <section class="panel-subheader">
         <div>
-            <div class="panel-subheader-title">
+            <div class="panel-subheader-title" id="main-subheader-title">
                 Painel Gerencial – Aditivos de Obras
             </div>
             <div class="panel-subheader-subtitle">Painel para acompanhamento de aditivo de contratos.</div>
@@ -1497,34 +1797,163 @@
             </div>
         </div>
 
-        <ul class="nav nav-tabs mb-3" id="dashboardTabs" role="tablist"
-            style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.06);">
+        <!-- NAVEGAÇÃO REMOVIDA (Substituída por Tiles no Início) -->
+        <ul class="nav nav-tabs mb-3 d-none" id="dashboardTabs" role="tablist">
+            <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
+                    data-bs-target="#pane-home" data-bs-toggle="tab">Início</button></li>
             <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
-                    data-bs-target="#pane-financeiro" data-bs-toggle="tab">Painel Financeiro</button></li>
+                    data-bs-target="#pane-financeiro" data-bs-toggle="tab">Financeiro</button></li>
             <li class="nav-item" data-roles="admin,gerente"><button class="nav-link" data-bs-target="#pane-gerencial"
-                    data-bs-toggle="tab">Painel
-                    Gerencial</button></li>
+                    data-bs-toggle="tab">Gerencial</button></li>
             <li class="nav-item" data-roles="admin,gerente"><button class="nav-link" data-bs-target="#pane-prazos"
-                    data-bs-toggle="tab">Prazos e
-                    Produtividade</button></li>
-            <li class="nav-item" data-roles="admin,gerente,fiscal" id="tab-processos"><button class="nav-link"
+                    data-bs-toggle="tab">Prazos</button></li>
+            <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
                     data-bs-target="#pane-reuniao" data-bs-toggle="tab">Processos</button></li>
             <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
-                    data-bs-target="#pane-orcamentos" data-bs-toggle="tab"><i class="bi bi-folder2-open me-1"></i>
-                    Orçamentos</button></li>
+                    data-bs-target="#pane-orcamentos" data-bs-toggle="tab">Orçamentos</button></li>
             <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
-                    data-bs-target="#pane-composicoes" data-bs-toggle="tab"><i class="bi bi-collection me-1"></i>
-                    Composições</button></li>
+                    data-bs-target="#pane-composicoes" data-bs-toggle="tab">Composições</button></li>
             <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
-                    data-bs-target="#pane-tabelas" data-bs-toggle="tab"><i class="bi bi-calculator me-1"></i>
-                    Tabelas</button></li>
-            <li class="nav-item" data-roles="admin" style="display:none"><button class="nav-link"
-                    data-bs-target="#pane-admin" data-bs-toggle="tab" onclick="loadAllUsers()"><i
-                        class="bi bi-shield-lock me-1"></i>
-                    Administração</button></li>
+                    data-bs-target="#pane-tabelas" data-bs-toggle="tab">Tabelas</button></li>
+            <li class="nav-item" data-roles="admin"><button class="nav-link" data-bs-target="#pane-admin"
+                    data-bs-toggle="tab">Administração</button></li>
+            <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
+                    data-bs-target="#pane-atividades" data-bs-toggle="tab">Últimas Atividades</button></li>
         </ul>
 
+        <!-- BOTÃO VOLTAR (Clean & Professional) -->
+        <div id="nav-back-container" style="display: none; margin-bottom: 15px;">
+            <button class="btn-back-minimal" onclick="showPane('pane-home')">
+                <i class="bi bi-arrow-left"></i>
+                <span>Painel Principal</span>
+            </button>
+        </div>
+
         <div class="tab-content">
+            <!-- PAINEL INICIAL (HOME) -->
+            <div class="tab-pane fade" id="pane-home">
+                <div class="home-welcome-section">
+                    <h1 class="home-welcome-title">Olá, <span id="home-user-name">usuário</span>.</h1>
+                    <div class="home-welcome-subtitle">Bem-vindo ao GECOPE. Hoje é <span
+                            id="home-current-date">Sexta-feira, 27 de Fevereiro de 2026</span>.</div>
+                </div>
+
+                <!-- Stats Cards Row -->
+                <div class="home-stats-grid">
+                    <div class="home-stat-card">
+                        <div class="home-stat-info">
+                            <h4>Processos em Andamento</h4>
+                            <div class="home-stat-value" id="stat-proc-andamento">0</div>
+                        </div>
+                        <div class="home-stat-icon bg-light-green">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </div>
+                    </div>
+                    <div class="home-stat-card">
+                        <div class="home-stat-info">
+                            <h4>Processos Em Análise</h4>
+                            <div class="home-stat-value" id="stat-proc-analise">0</div>
+                        </div>
+                        <div class="home-stat-icon bg-light-blue">
+                            <i class="bi bi-search"></i>
+                        </div>
+                    </div>
+                    <div class="home-stat-card">
+                        <div class="home-stat-info">
+                            <h4>Aditivos Aprovados no Mês</h4>
+                            <div class="home-stat-value" id="stat-proc-aprovados">0</div>
+                        </div>
+                        <div class="home-stat-icon bg-light-orange">
+                            <i class="bi bi-check2-circle"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hub de Navegação (Tiles) -->
+                <div class="home-quick-actions-grid">
+                    <!-- 1. Administração -->
+                    <div class="home-action-card admin-only" data-pane="pane-admin" onclick="showPane('pane-admin')">
+                        <div class="home-action-icon" style="color: #666;"><i class="bi bi-shield-lock"></i></div>
+                        <div class="home-action-text">
+                            <h3>Administração</h3>
+                            <p>Gerenciar Usuários e Permissões do Sistema</p>
+                        </div>
+                    </div>
+                    <!-- 2. Composições -->
+                    <div class="home-action-card" data-pane="pane-composicoes" onclick="showPane('pane-composicoes')">
+                        <div class="home-action-icon"><i class="bi bi-journal-text"></i></div>
+                        <div class="home-action-text">
+                            <h3>Composições</h3>
+                            <p>Consultar e Elaborar Composições</p>
+                        </div>
+                    </div>
+                    <!-- 3. Orçamentos -->
+                    <div class="home-action-card" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
+                        <div class="home-action-icon"><i class="bi bi-folder-check"></i></div>
+                        <div class="home-action-text">
+                            <h3>Orçamentos</h3>
+                            <p>Orçamentos Revisados pela GEROA</p>
+                        </div>
+                    </div>
+                    <!-- 4. Painel Financeiro -->
+                    <div class="home-action-card" data-pane="pane-financeiro" data-roles="admin,gerente,fiscal"
+                        onclick="showPane('pane-financeiro')">
+                        <div class="home-action-icon"><i class="bi bi-currency-dollar"></i></div>
+                        <div class="home-action-text">
+                            <h3>Painel Financeiro</h3>
+                            <p>Fluxo de Valores de Aditivos</p>
+                        </div>
+                    </div>
+                    <!-- 5. Painel Gerencial -->
+                    <div class="home-action-card" data-pane="pane-gerencial" data-roles="admin,gerente"
+                        onclick="showPane('pane-gerencial')">
+                        <div class="home-action-icon"><i class="bi bi-pie-chart"></i></div>
+                        <div class="home-action-text">
+                            <h3>Painel Gerencial</h3>
+                            <p>Indicadores de Desempenho e Estatísticas</p>
+                        </div>
+                    </div>
+                    <!-- 6. Prazos -->
+                    <div class="home-action-card" data-pane="pane-prazos" data-roles="admin,gerente"
+                        onclick="showPane('pane-prazos')">
+                        <div class="home-action-icon"><i class="bi bi-clock-history"></i></div>
+                        <div class="home-action-text">
+                            <h3>Prazos</h3>
+                            <p>Controle de Produtividade</p>
+                        </div>
+                    </div>
+                    <!-- 7. Processos -->
+                    <div class="home-action-card" data-pane="pane-reuniao" onclick="showPane('pane-reuniao')">
+                        <div class="home-action-icon"><i class="bi bi-file-earmark-text"></i></div>
+                        <div class="home-action-text">
+                            <h3>Processos</h3>
+                            <p>Gerenciar Processos de Aditivos</p>
+                        </div>
+                    </div>
+                    <!-- 8. Tabelas -->
+                    <div class="home-action-card" data-pane="pane-tabelas" onclick="showPane('pane-tabelas')">
+                        <div class="home-action-icon"><i class="bi bi-search"></i></div>
+                        <div class="home-action-text">
+                            <h3>Tabelas</h3>
+                            <p>Consultar Bases de Preços (SEINFRA/SINAPI/ORSE)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Latest Activities Panel -->
+                <div class="home-activities-panel" style="cursor: pointer;" onclick="showPane('pane-atividades')">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="m-0"><i class="bi bi-clock-history"></i>Últimas Atividades</h3>
+                        <span class="text-primary small fw-bold">Ver Tudo <i class="bi bi-chevron-right"></i></span>
+                    </div>
+                    <div class="activities-list-container" id="home-activities-list">
+                        <div class="text-center py-3 w-100 text-muted">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <span class="ms-2">Carregando atividades...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!-- PAINEL ADMINISTRAÇÃO -->
             <div class="tab-pane fade" id="pane-admin">
                 <div class="container-fluid py-4">
@@ -2193,7 +2622,7 @@
             <div class="tab-pane fade" id="pane-tabelas">
                 <div class="page-wrapper pt-0">
 
-                    <div class="mb-4 text-center">
+                    <div class="mb-3 text-center" style="margin-top: -15px;">
                         <h4 class="fw-bold" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE REFERÊNCIA</h4>
                         <p class="text-muted small">Consulte bases oficiais (SEINFRA, SINAPI, ORSE) atualizadas.</p>
                     </div>
@@ -2289,6 +2718,44 @@
                                 <tbody id="tabela-precos-body">
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAINEL DE ÚLTIMAS ATIVIDADES -->
+            <div class="tab-pane fade" id="pane-atividades">
+                <div class="page-wrapper pt-0">
+                    <div class="budget-hero-card mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="budget-title-large"><i class="bi bi-clock-history me-2"></i>Histórico
+                                    de Atividades</h2>
+                                <p class="budget-subtitle-text">Registro de movimentações no sistema nas últimas
+                                    24 horas.</p>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="carregarAtividades()">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Atualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 16px;">
+                        <div
+                            class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold mb-0 text-dark">Linha do Tempo (Últimas 24h)</h6>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-light text-dark border fw-normal" id="count-atividades-24h">0
+                                    registros</span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="full-activities-list" class="list-group list-group-flush">
+                                <div class="text-center py-5 text-muted">
+                                    <div class="spinner-border text-success mb-3" role="status"></div>
+                                    <div class="fw-bold">Buscando atividades recentes...</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3451,6 +3918,153 @@
                 }
 
                 // --- 3. CORE: CARREGAMENTO DE DADOS (READ) ---
+                /* --------------------------------------------------------------
+                   LÓGICA DE ÚLTIMAS ATIVIDADES (REGISTRO E LISTAGEM)
+                -------------------------------------------------------------- */
+
+                async function registrarAtividade(tipo, descricao, contexto = '', obra = '', fiscal = '') {
+                    try {
+                        const userName = localStorage.getItem('sop_user_name') || 'Sistema';
+                        const userRole = localStorage.getItem('sop_role') || 'guest';
+
+                        const payload = {
+                            usuario: userName,
+                            perfil: userRole,
+                            descricao,
+                            tipo,
+                            contexto,
+                            obra,
+                            fiscal: fiscal // Usado para filtrar para Fiscais
+                        };
+
+                        await sbClient.from('app_atividades').insert([payload]);
+                    } catch (err) {
+                        console.error("Erro ao registrar atividade:", err);
+                    }
+                }
+
+                async function carregarAtividades() {
+                    const listEl = document.getElementById('full-activities-list');
+                    const countEl = document.getElementById('count-atividades-24h');
+                    if (!listEl) return;
+
+                    const userRole = localStorage.getItem('sop_role') || 'guest';
+                    const userName = localStorage.getItem('sop_user_name') || '';
+
+                    // Filtro de 24h
+                    const ontem = new Date();
+                    ontem.setHours(ontem.getHours() - 24);
+
+                    try {
+                        let query = sbClient.from('app_atividades')
+                            .select('*')
+                            .gte('created_at', ontem.toISOString())
+                            .order('created_at', { ascending: false });
+
+                        // Se for fiscal, filtra apenas suas obras/processos
+                        if (userRole.toLowerCase() === 'fiscal' && userName) {
+                            // No caso de processos, filtramos pelo campo fiscal
+                            // No caso de outros (composição, orçamento), eles veem tudo? 
+                            // O usuário disse: "Na aba Processo... para os usuários fiscais essas informações só devem aparecer das suas respectivas obras, já os administradores e gerentes podem ver de todos os processos;"
+                            // "Na aba Orçamentos... as movimentações aparecem para todos."
+                            // "Na aba Composições... as movimentações aparecem para todos."
+                            // "Na aba Tabelas... as movimentações aparecem para todos."
+
+                            // Então o filtro é apenas para tipo PROCESSO.
+                            // Mas na query do Supabase é difícil fazer OR (tipo != PROCESSO OR fiscal == userName).
+                            // Vamos filtrar no JS para simplificar ou usar .or()
+                            query = query.or(`tipo.neq.PROCESSO,fiscal.eq.${userName}`);
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+
+                        countEl.textContent = `${data.length} registros`;
+
+                        if (data.length === 0) {
+                            listEl.innerHTML = '<div class="text-center py-5 text-muted">Nenhuma atividade registrada nas últimas 24h.</div>';
+                            return;
+                        }
+
+                        listEl.innerHTML = data.map(at => {
+                            const icon = getAtividadeIcon(at.tipo);
+                            const dataHora = new Date(at.created_at).toLocaleString('pt-BR');
+                            return `
+                                <div class="list-group-item p-3 border-0 border-bottom">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="home-action-icon" style="width: 40px; height: 40px; min-width: 40px; background: #f8f9fa;">
+                                            <i class="bi ${icon}"></i>
+                                        </div>
+                                        <div>
+                                            <div class="small text-muted mb-1">${dataHora} • ${at.tipo}</div>
+                                            <div class="fw-semibold" style="font-size: 0.95rem;">${at.usuario} ${at.descricao}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+
+                    } catch (err) {
+                        console.error("Erro ao carregar atividades:", err);
+                        listEl.innerHTML = '<div class="alert alert-danger m-3">Erro ao carregar atividades.</div>';
+                    }
+                }
+
+                async function carregarAtividadesResumoHome() {
+                    const listEl = document.getElementById('home-activities-list');
+                    if (!listEl) return;
+
+                    const userRole = localStorage.getItem('sop_role') || 'guest';
+                    const userName = localStorage.getItem('sop_user_name') || '';
+
+                    try {
+                        let query = sbClient.from('app_atividades')
+                            .select('*')
+                            .limit(4)
+                            .order('created_at', { ascending: false });
+
+                        if (userRole.toLowerCase() === 'fiscal' && userName) {
+                            query = query.or(`tipo.neq.PROCESSO,fiscal.eq.${userName}`);
+                        }
+
+                        const { data, error } = await query;
+                        if (error) throw error;
+
+                        if (data.length === 0) {
+                            listEl.innerHTML = '<div class="text-center py-3 w-100 text-muted">Sem atividades recentes.</div>';
+                            return;
+                        }
+
+                        listEl.innerHTML = data.map(at => {
+                            const dt = new Date(at.created_at);
+                            const hora = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
+                            const dataHoje = new Date().toLocaleDateString();
+                            const timeLabel = (dt.toLocaleDateString() === dataHoje) ? hora : 'Ontem';
+
+                            return `
+                                <div class="activity-item">
+                                    <span class="activity-time">${timeLabel}</span>
+                                    <span class="activity-desc">${at.usuario} ${at.descricao}</span>
+                                </div>
+                            `;
+                        }).join('');
+
+                    } catch (err) {
+                        console.error("Erro no resumo de atividades:", err);
+                        listEl.innerHTML = '<div class="text-muted small">Erro ao carregar resumo.</div>';
+                    }
+                }
+
+                function getAtividadeIcon(tipo) {
+                    switch (tipo) {
+                        case 'PROCESSO': return 'bi-file-earmark-text text-primary';
+                        case 'ORCAMENTO': return 'bi-folder-check text-success';
+                        case 'COMPOSICAO': return 'bi-journal-text text-warning';
+                        case 'TABELA': return 'bi-search text-info';
+                        default: return 'bi-clock-history';
+                    }
+                }
+
                 async function carregarDadosSupabase() {
                     const loader = document.getElementById("load-error");
                     if (loader) loader.style.display = "none";
@@ -3637,6 +4251,11 @@
                     clearGerencial();
                     clearPrazos();
                     updateFinanceiro();
+
+                    // Atualiza resumo de atividades na Home
+                    if (typeof carregarAtividadesResumoHome === 'function') {
+                        carregarAtividadesResumoHome();
+                    }
                 }
 
                 // --- 4. CORE: SALVAR NOVO PROCESSO (CREATE) ---
@@ -3739,6 +4358,9 @@
                         msg.style.display = 'block';
                         msg.className = 'alert alert-success mt-3';
                         msg.innerHTML = '✅ Salvo com sucesso no Banco de Dados!';
+
+                        // Log de Atividade
+                        registrarAtividade('PROCESSO', `cadastrou o processo Nº ${numProcesso}`, numProcesso, formData.get("DESCRIÇÃO"), formData.get("FISCAL"));
 
                         setTimeout(() => {
                             const modal = bootstrap.Modal.getInstance(document.getElementById('modalCadastro'));
@@ -3913,6 +4535,11 @@
                                 msg.style.display = 'none';
                                 bootstrap.Modal.getInstance(document.getElementById('modalDetalhes')).hide();
                                 carregarDadosSupabase();
+
+                                // Log de Atividade (Apenas se status mudou, ou log geral)
+                                if (updates.status && updates.status !== registroOriginal.status) {
+                                    registrarAtividade('PROCESSO', `atualizou o status do processo Nº ${processoNome} para ${updates.status}`, processoNome, registroOriginal.descricao, registroOriginal.fiscal);
+                                }
                             }, 1000);
                         }
                     }
@@ -3930,7 +4557,117 @@
                     }
                 }
 
+                function updateHome() {
+                    const elHome = document.getElementById('pane-home');
+                    if (!elHome) return;
+
+                    // 1. Update Welcome Message
+                    const userName = localStorage.getItem('sop_user_name') || 'Usuário';
+                    const elName = document.getElementById('home-user-name');
+                    if (elName) elName.textContent = userName;
+
+                    // 1b. Update Recent Activities Summary
+                    carregarAtividadesResumoHome();
+
+                    // 2. Update Date
+                    const elDate = document.getElementById('home-current-date');
+                    if (elDate) {
+                        const agora = new Date();
+                        const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+                        const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                        elDate.textContent = `${diasSemana[agora.getDay()]}, ${agora.getDate()} de ${meses[agora.getMonth()]} de ${agora.getFullYear()}`;
+                    }
+
+                    // 3. Update Statistics
+                    const rows = allData || [];
+
+                    // Em Andamento (não aprovado, não cancelado, etc)
+                    const emAndamento = rows.filter(d => {
+                        const s = (d.status || "").toUpperCase();
+                        return !s.includes("APROVADO") && !s.includes("EXCLUÍDO") && !s.includes("EXCLUIDO") && !s.includes("CANCELADO") && !s.includes("ARQUIVADO");
+                    }).length;
+                    const elAndamento = document.getElementById('stat-proc-andamento');
+                    if (elAndamento) elAndamento.textContent = emAndamento;
+
+                    // Processos Em Análise (Apenas 'Em Análise' ou 'Em Reanálise')
+                    const emAnalise = rows.filter(d => {
+                        const s = (d.status || "").toUpperCase();
+                        const isAnalise = s.includes("EM ANÁLISE") || s.includes("EM ANALISE");
+                        const isReanalise = s.includes("EM REANÁLISE") || s.includes("EM REANALISE");
+                        const isAguardando = s.includes("AGUARD");
+                        return (isAnalise || isReanalise) && !isAguardando;
+                    }).length;
+                    const elAnalise = document.getElementById('stat-proc-analise');
+                    if (elAnalise) elAnalise.textContent = emAnalise;
+
+                    // Aditivos Aprovados no Mês
+                    const agora = new Date();
+                    const mesCorrente = agora.getMonth();
+                    const anoCorrente = agora.getFullYear();
+                    const aprovadosMes = rows.filter(d => {
+                        const s = (d.status || "").toUpperCase();
+                        const dt = d.dataAprovacao;
+                        return s.includes("APROVADO") && dt instanceof Date && dt.getMonth() === mesCorrente && dt.getFullYear() === anoCorrente;
+                    }).length;
+                    const elAprovMes = document.getElementById('stat-proc-aprovados');
+                    if (elAprovMes) elAprovMes.textContent = aprovadosMes;
+                }
+
+                function showPane(paneId) {
+                    const tabBtn = document.querySelector(`#dashboardTabs [data-bs-target="#${paneId}"]`);
+                    if (tabBtn) {
+                        tabBtn.click();
+                        // Scroll suave para o topo para dar feedback visual de mudança de tela
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+
+                    const backBtn = document.getElementById('nav-back-container');
+                    if (backBtn) {
+                        backBtn.style.display = (paneId === 'pane-home') ? 'none' : 'block';
+                    }
+
+                    // Se for Atividades, carrega ao abrir
+                    if (paneId === 'pane-atividades') {
+                        carregarAtividades();
+                    }
+
+                    // Atualiza o título do subheader
+                    const titles = {
+                        'pane-home': 'Painel Gerencial – Aditivos de Obras',
+                        'pane-financeiro': 'Painel Financeiro',
+                        'pane-gerencial': 'Painel Gerencial - Estatísticas',
+                        'pane-prazos': 'Prazos e Produtividade',
+                        'pane-reuniao': 'Processos',
+                        'pane-orcamentos': 'Orçamentos',
+                        'pane-composicoes': 'Composições',
+                        'pane-tabelas': 'Tabelas',
+                        'pane-admin': 'Administração',
+                        'pane-atividades': 'Atividades Recentes'
+                    };
+                    const titleEl = document.getElementById('main-subheader-title');
+                    if (titleEl && titles[paneId]) {
+                        titleEl.textContent = titles[paneId];
+                    }
+
+                    // Lógica específica para alguns painéis
+                    if (paneId === 'pane-admin') {
+                        if (typeof loadAllUsers === 'function') loadAllUsers();
+                    }
+                    if (paneId === 'pane-home') updateHome();
+
+                    // Se for painel gerencial ou financeiro, redimensionar gráficos
+                    setTimeout(() => {
+                        const activePane = document.getElementById(paneId);
+                        if (activePane) {
+                            activePane.querySelectorAll('.chart-placeholder').forEach(c => {
+                                if (window.Plotly) Plotly.Plots.resize(c);
+                            });
+                        }
+                    }, 300);
+                }
+
                 function updateDashboard() {
+                    if (typeof updateHome === 'function') updateHome();
                     if (typeof updateReuniao === 'function') updateReuniao();
                     if (typeof updateFinanceiro === 'function') updateFinanceiro();
                     if (typeof updateGerencial === 'function') updateGerencial();
@@ -4776,15 +5513,29 @@
                     document.body.classList.add(`role-${role}`);
                     if (role === 'admin') document.body.classList.add('is-admin');
 
-                    // Desativar todas as abas ao entrar/aplicar role (conforme solicitado pelo usuário)
+                    // 1. Reset tabs and panes
                     document.querySelectorAll('#dashboardTabs .nav-link').forEach(btn => btn.classList.remove('active'));
                     document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
 
-                    // 1. Visibilidade de Abas por Atributo data-roles
+                    // 2. Activate Home Tab by Default
+                    const homeTab = document.querySelector('[data-bs-target="#pane-home"]');
+                    const homePane = document.getElementById('pane-home');
+                    if (homeTab && homePane) {
+                        homeTab.classList.add('active');
+                        homePane.classList.add('show', 'active');
+                        updateHome();
+                    }
+
+                    // 1. Visibilidade de Abas e Tiles por Atributo data-roles
                     document.querySelectorAll('[data-roles]').forEach(el => {
                         const allowed = el.getAttribute('data-roles').split(',');
                         if (allowed.includes(role)) {
-                            el.style.setProperty('display', 'block', 'important');
+                            // Se for um card, usa flex, senão usa block (ou o default)
+                            if (el.classList.contains('home-action-card')) {
+                                el.style.setProperty('display', 'flex', 'important');
+                            } else {
+                                el.style.setProperty('display', 'block', 'important');
+                            }
                         } else {
                             el.style.setProperty('display', 'none', 'important');
                         }
@@ -4794,7 +5545,7 @@
                     const activeTab = document.querySelector('.nav-link.active');
                     if (activeTab && activeTab.closest('li').style.display === 'none') {
                         const firstVisible = document.querySelector('#dashboardTabs li[style*="display: block"] .nav-link');
-                        if (firstVisible) firstVisible.click();
+                        if (firstVisible) showPane(firstVisible.getAttribute('data-bs-target').replace('#', ''));
                     }
 
                     // Se for Pending, bloqueia acesso e volta para landing
@@ -5300,7 +6051,7 @@
 
                 /* --------------------------------------------------------------
                    MODAL: SELEÇÃO DE MÓDULOS (PÓS LOGIN)
-                ---------------------------------------------------------------- */
+                -------------------------------------------------------------- */
 
                 const modules = [
                     { id: '#pane-financeiro', name: 'Painel Financeiro' },
@@ -5464,6 +6215,9 @@
                         if (dbError) throw dbError;
 
                         alert("✅ Orçamento cadastrado com sucesso!");
+
+                        // Log de Atividade
+                        registrarAtividade('ORCAMENTO', `cadastrou o orçamento da obra ${obra}`, '', obra);
 
                         // Limpar e Fechar
                         form.reset();
@@ -5814,6 +6568,9 @@
                             await salvarComentarioNoBanco(id, 'Sistema (Versão)', `Gerada versão ${newVersionLabel}: ${descricao}`);
                         }
 
+                        // Log de Atividade
+                        registrarAtividade('ORCAMENTO', `atualizou a versão (${newVersionLabel}) do orçamento: ${currentData?.nome_obra || 'N/A'}`, '', currentData?.nome_obra);
+
                         alert(`Versão ${newVersionLabel} enviada! Status alterado para ATUALIZADO.`);
                         bootstrap.Modal.getInstance(document.getElementById('modalNovaVersao')).hide();
                         carregarOrcamentos();
@@ -5877,7 +6634,7 @@
                     }
 
                     // Buscar histórico atual
-                    const { data: curr } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao').eq('id', id).single();
+                    const { data: curr } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao, nome_obra').eq('id', id).single();
                     const novoArr = curr.comentarios_revisao || [];
 
                     novoArr.unshift({
@@ -5896,6 +6653,9 @@
 
                     if (updateError) throw updateError;
 
+                    // Log de Atividade
+                    registrarAtividade('ORCAMENTO', `adicionou um comentário no orçamento: ${curr?.nome_obra || 'N/A'}`, '', curr?.nome_obra);
+
                     alert("Solicitação enviada!");
                     bootstrap.Modal.getInstance(document.getElementById('modalComentarioOrcamento')).hide();
                     carregarOrcamentos();
@@ -5907,6 +6667,10 @@
                     const novoArr = curr.comentarios_revisao || [];
                     novoArr.unshift({ autor, mensagem, data: new Date().toISOString() });
                     await sbClient.from('orcamentos_biblioteca').update({ comentarios_revisao: novoArr }).eq('id', id);
+
+                    // Log de Atividade
+                    const { data: bData } = await sbClient.from('orcamentos_biblioteca').select('descricao').eq('id', id).single();
+                    registrarAtividade('ORCAMENTO', `registrou um comentário no orçamento: ${bData?.descricao || 'N/A'}`, '', bData?.descricao);
                 }
 
                 /* --- MOTORES GENÉRICOS (OTIMIZAÇÃO) --- */
@@ -6120,6 +6884,9 @@
                         const { error: dbError } = await sbClient.from('composicoes_biblioteca').insert([payload]);
                         if (dbError) throw dbError;
 
+                        // Log de Atividade
+                        registrarAtividade('COMPOSICAO', `cadastrou a composição: ${obra}`, '', obra);
+
                         alert("✅ Composição cadastrada com sucesso!");
                         form.reset();
                         bootstrap.Modal.getInstance(document.getElementById('modalCadastrarComposicao')).hide();
@@ -6190,6 +6957,10 @@
                         }
 
                         alert(`Versão ${newVersionLabel} de Composição enviada!`);
+
+                        // Log de Atividade
+                        registrarAtividade('COMPOSICAO', `atualizou a versão (${newVersionLabel}) da composição: ${currentData?.descricao || 'N/A'}`, '', currentData?.descricao);
+
                         bootstrap.Modal.getInstance(document.getElementById('modalNovaVersaoComposicao')).hide();
                         carregarComposicoes();
                     } catch (err) { alert("Erro: " + err.message); } finally { btn.disabled = false; btn.innerText = txtOrig; }
@@ -6265,6 +7036,10 @@
                         if (updateError) throw updateError;
 
                         alert("Solicitação enviada!");
+
+                        // Log de Atividade
+                        registrarAtividade('COMPOSICAO', `adicionou um comentário na composição: ${curr?.descricao || 'N/A'}`, '', curr?.descricao);
+
                         bootstrap.Modal.getInstance(document.getElementById('modalComentarioComposicao')).hide();
                         carregarComposicoes();
                     } catch (err) {
@@ -7249,25 +8024,18 @@
                         const formData = new FormData(form);
                         const nomeObra = (formData.get('descricao') || 'SEM DESCRIÇÃO').toUpperCase();
 
-                        // --- LÓGICA DE AUTO-CATEGORIZAÇÃO PARA USUÁRIO ---
                         let userEmail = localStorage.getItem('sop_user') || 'SISTEMA';
                         let userName = localStorage.getItem('sop_user_name');
 
-                        // Ajuste se o email for apenas a matricula (sem @)
                         if (userEmail !== 'SISTEMA' && !userEmail.includes('@')) {
-                            // Remove espaços da matrícula para gerar um email válido (evita erro de formato no DB)
-                            const matriculaLimpa = userEmail.replace(/\s+/g, '');
-                            userEmail = `${matriculaLimpa}@gecope.app`;
+                            userEmail = `${userEmail.replace(/\s+/g, '')}@gecope.app`;
                         }
 
-                        // Se o nome no storage for nulo ou parece uma matrícula (só números), tenta buscar no banco AGORA e AGUARDA
                         if (!userName || /^\d+$/.test(userName)) {
-                            console.log('[DEBUG] Nome ausente ou matricula detectada. Buscando dados completos...');
-                            // Tenta buscar pelo email exato ou pela matrícula (se o email foi construído)
                             const { data: userData } = await sbClient.from('app_users')
                                 .select('full_name, nome, sobrenome')
                                 .eq('email', userEmail)
-                                .maybeSingle(); // Usa maybeSingle para não lançar erro se não achar
+                                .maybeSingle();
 
                             if (userData) {
                                 if (userData.full_name && !/^\d+$/.test(userData.full_name)) {
@@ -7275,14 +8043,11 @@
                                 } else if (userData.nome) {
                                     userName = (userData.nome + (userData.sobrenome ? ' ' + userData.sobrenome : '')).toUpperCase();
                                 }
-
                                 if (userName) localStorage.setItem('sop_user_name', userName);
                             }
                         }
 
-                        // Fallback final: Deriva do email ou do login original
                         if ((!userName || /^\d+$/.test(userName)) && userEmail !== 'SISTEMA') {
-                            // Tenta usar o login original (que pode ser o nome "GECOPE DIFOR") ou parte do email
                             const loginOriginal = localStorage.getItem('sop_user');
                             if (loginOriginal && !loginOriginal.includes('@') && !/^\d+$/.test(loginOriginal)) {
                                 userName = loginOriginal.toUpperCase();
@@ -7292,15 +8057,11 @@
                             }
                         }
 
-                        // Se chegar aqui e ainda for só número, tenta prefixar algo para não ficar estranho
-                        if (/^\d+$/.test(userName)) {
-                            userName = "USUÁRIO " + userName;
-                        }
+                        if (/^\d+$/.test(userName)) userName = "USUÁRIO " + userName;
 
                         const categoriaFinal = (userName || 'OUTROS').toUpperCase();
                         const subcategoriaFinal = 'COMPOSIÇÕES PRÓPRIAS';
 
-                        // Salva no Banco - payload completo para suporte analítico
                         const payload = {
                             descricao: nomeObra,
                             usuario: categoriaFinal,
@@ -7311,7 +8072,7 @@
                             data_base: formData.get('data_base') || '',
                             bdi: formData.get('bdi') || '0,00',
                             desconto: formData.get('desconto') || '0,00',
-                            itens: currentCompositionItems, // JSONB com os itens
+                            itens: currentCompositionItems,
                             status: 'Em Revisão'
                         };
 
@@ -7319,7 +8080,6 @@
                         let res;
 
                         if (idEdicao) {
-                            // MODO EDIÇÃO: Busca histórico atual para anexar nova alteração
                             const { data: current } = await sbClient.from('composicoes_biblioteca').select('historico_versoes').eq('id', idEdicao).single();
                             const hist = current ? (current.historico_versoes || []) : [];
                             hist.push({
@@ -7329,10 +8089,8 @@
                                 autor: userName || userEmail
                             });
                             payload.historico_versoes = hist;
-
                             res = await sbClient.from('composicoes_biblioteca').update(payload).eq('id', idEdicao);
                         } else {
-                            // MODO CRIAÇÃO
                             payload.versao_atual = 'V1';
                             payload.historico_versoes = [{
                                 versao: 'V1',
@@ -7345,10 +8103,14 @@
 
                         if (res.error) throw new Error(res.error.message);
 
-                        alert("Composição salva com sucesso!");
-                        bootstrap.Modal.getInstance(document.getElementById('modalCriarComposicaoAnalitica')).hide();
+                        // Log de Atividade
+                        registrarAtividade('COMPOSICAO', `${idEdicao ? 'editou' : 'criou manualmente'} a composição analítica: ${nomeObra}`, '', nomeObra);
 
-                        // Atualiza a lista
+                        alert("✅ Composição salva com sucesso!");
+                        bootstrap.Modal.getInstance(document.getElementById('modalCriarComposicaoAnalitica')).hide();
+                        form.reset();
+                        currentCompositionItems = [];
+                        if (typeof renderItemsTable === 'function') renderItemsTable();
                         carregarComposicoes();
 
                     } catch (error) {
