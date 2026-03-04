@@ -3442,7 +3442,43 @@
                                                 <input type="number" class="form-control form-control-sm"
                                                     id="mercado-coef" value="1.00" min="0" step="0.0001">
                                             </div>
-                                            <div class="col-md-5">
+                                            <div class="col-md-12 mt-2">
+                                                <div class="card border-0 bg-white shadow-sm">
+                                                    <div
+                                                        class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+                                                        <span class="small fw-bold text-secondary"><i
+                                                                class="bi bi-shop me-1"></i> Fornecedores (Cotações
+                                                            Coletadas)</span>
+                                                        <button type="button" class="btn btn-xs btn-primary py-0"
+                                                            onclick="adicionarLinhaFornecedor()"
+                                                            style="font-size: 0.7rem;">
+                                                            <i class="bi bi-plus-lg"></i> Adicionar Fornecedor
+                                                        </button>
+                                                    </div>
+                                                    <div class="card-body p-2">
+                                                        <div id="container-fornecedores" class="mb-2">
+                                                            <!-- Linhas de fornecedores adicionadas dinamicamente -->
+                                                        </div>
+                                                        <div class="d-flex align-items-center gap-3 border-top pt-2">
+                                                            <div class="small fw-bold text-muted">Adoção do Preço:</div>
+                                                            <div class="form-check form-check-inline mb-0">
+                                                                <input class="form-check-input" type="radio"
+                                                                    name="mercado-metodo-preco" id="metodo-menor"
+                                                                    value="MENOR" checked
+                                                                    onchange="calcularPrecoAdotado()">
+                                                                <label class="form-check-label small"
+                                                                    for="metodo-menor">Menor Preço</label>
+                                                            </div>
+                                                            <div class="form-check form-check-inline mb-0">
+                                                                <input class="form-check-input" type="radio"
+                                                                    name="mercado-metodo-preco" id="metodo-media"
+                                                                    value="MEDIA" onchange="calcularPrecoAdotado()">
+                                                                <label class="form-check-label small"
+                                                                    for="metodo-media">Média Aritmética</label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div class="col-md-12">
@@ -3452,19 +3488,29 @@
                                                             class="col-md-12 mb-1 d-flex justify-content-between align-items-center">
                                                             <span class="badge bg-secondary">Cálculo Retroativo
                                                                 (Opcional)</span>
-                                                            <a href="https://sindusconce.com.br/indices-economicos/"
-                                                                target="_blank"
-                                                                class="btn btn-sm btn-outline-primary py-0"
-                                                                style="font-size: 0.8rem;">
-                                                                <i class="bi bi-box-arrow-up-right me-1"></i> Pesquisar
-                                                                Índices
-                                                            </a>
+                                                            <div>
+                                                                <button type="button"
+                                                                    class="btn btn-sm btn-success py-0 me-1"
+                                                                    style="font-size: 0.8rem;" id="btn-buscar-incc"
+                                                                    onclick="buscarIndicesAutomatico()">
+                                                                    <i class="bi bi-cloud-download me-1"></i> Buscar
+                                                                    INCC-DI
+                                                                </button>
+                                                                <a href="https://sindusconce.com.br/indices-economicos/"
+                                                                    target="_blank"
+                                                                    class="btn btn-sm btn-outline-primary py-0"
+                                                                    style="font-size: 0.8rem;"
+                                                                    title="Consultar Manualmente">
+                                                                    <i class="bi bi-box-arrow-up-right"></i> Manual
+                                                                </a>
+                                                            </div>
                                                         </div>
                                                         <div class="col-md-2">
                                                             <label class="form-label small fw-bold mb-0">Data
                                                                 Cotação</label>
                                                             <input type="text" class="form-control form-control-sm"
-                                                                id="mercado-data-ini" placeholder="MM/AAAA">
+                                                                id="mercado-data-ini" placeholder="MM/AAAA"
+                                                                maxlength="7" oninput="formatMonthYearInput(this)">
                                                         </div>
                                                         <div class="col-md-2">
                                                             <label class="form-label small fw-bold mb-0">Ind.
@@ -3477,7 +3523,8 @@
                                                             <label class="form-label small fw-bold mb-0">Data-Base
                                                                 Orç.</label>
                                                             <input type="text" class="form-control form-control-sm"
-                                                                id="mercado-data-fin" placeholder="MM/AAAA">
+                                                                id="mercado-data-fin" placeholder="MM/AAAA"
+                                                                maxlength="7" oninput="formatMonthYearInput(this)">
                                                         </div>
                                                         <div class="col-md-2">
                                                             <label class="form-label small fw-bold mb-0">Ind.
@@ -5168,7 +5215,7 @@
                     document.getElementById("card_proc_dias").textContent = maxDias;
 
                     const columns = [
-                        { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prioritário", width: "80px", key: null, align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
+                        { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prioritário", width: "80px", key: "prioritario", align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
                         { title: "Status", width: "146px", key: "status", align: "start" }, { title: "Analista", width: "100px", key: "analista", align: "center" }, { title: "Abertura", width: "100px", key: "abertura", align: "center" },
                         { title: "Dias", width: "100px", key: "dias", align: "center" }, { title: "Contratante", width: "100px", key: "contratante", align: "start" }, { title: "Contratada", width: "100px", key: "contratada", align: "start" }, { title: "Descrição", width: "auto", key: "descricao", align: "start" }
                     ];
@@ -5191,6 +5238,7 @@
                         }
                         let valA, valB;
                         switch (currentSort.col) {
+                            case 'prioritario': valA = isPrioritario(a) ? 1 : 0; valB = isPrioritario(b) ? 1 : 0; break;
                             case 'processo': valA = a.processo || ""; valB = b.processo || ""; break;
                             case 'meta': const mA = getMetaDate(a); const mB = getMetaDate(b); valA = mA ? mA.getTime() : 0; valB = mB ? mB.getTime() : 0; break;
                             case 'status': valA = (a.status || "").toLowerCase(); valB = (b.status || "").toLowerCase(); break;
@@ -7271,7 +7319,7 @@
                                             </div>
                                         </div>
                                         <div class="orcamento-actions">
-                                            <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Baixar Composição"><i class="bi bi-download"></i> Baixar</button>
+                                            <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Imprimir Composição"><i class="bi bi-printer"></i> Imprimir</button>
                                             <button class="btn btn-action-icon ms-1" onclick="visualizarComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Visualizar Documento"><i class="bi bi-eye-fill text-primary"></i></button>
                                             ${(isOwner || isAdmin) ? `
                                                 ${isAnalytical ?
@@ -7499,6 +7547,53 @@
                     calcularPrecoRetroativo();
                 }
 
+                window.adicionarLinhaFornecedor = function () {
+                    const container = document.getElementById('container-fornecedores');
+                    const div = document.createElement('div');
+                    div.className = 'row g-1 mb-1 align-items-center linha-fornecedor';
+                    div.innerHTML = `
+                        <div class="col-7">
+                            <input type="text" class="form-control form-control-sm input-fornecedor-nome" placeholder="Nome do Fornecedor...">
+                        </div>
+                        <div class="col-4">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">R$</span>
+                                <input type="text" class="form-control input-fornecedor-valor" oninput="formatMoneyInput(this); calcularPrecoAdotado()" placeholder="0,00">
+                            </div>
+                        </div>
+                        <div class="col-1 text-end">
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerLinhaFornecedor(this)"><i class="bi bi-dash-circle"></i></button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                }
+
+                window.removerLinhaFornecedor = function (btn) {
+                    btn.closest('.linha-fornecedor').remove();
+                    calcularPrecoAdotado();
+                }
+
+                window.calcularPrecoAdotado = function () {
+                    const valores = Array.from(document.querySelectorAll('.input-fornecedor-valor'))
+                        .map(input => parseFloat(input.value.replace(/\./g, '').replace(',', '.')) || 0)
+                        .filter(v => v > 0);
+
+                    if (valores.length === 0) return;
+
+                    const metodo = document.querySelector('input[name="mercado-metodo-preco"]:checked').value;
+                    let resultado = 0;
+
+                    if (metodo === 'MENOR') {
+                        resultado = Math.min(...valores);
+                    } else {
+                        resultado = valores.reduce((a, b) => a + b, 0) / valores.length;
+                    }
+
+                    const inputPreco = document.getElementById('mercado-preco');
+                    inputPreco.value = resultado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    calcularPrecoRetroativo();
+                }
+
                 // Listeners removed (handled by oninput)
 
                 window.adicionarItemMercadoManual = function () {
@@ -7523,6 +7618,13 @@
                     const dataFin = document.getElementById('mercado-data-fin').value;
                     const indFin = document.getElementById('mercado-ind-fin').value;
 
+                    // Fields for Multiple Suppliers
+                    const fornecedores = Array.from(document.querySelectorAll('.linha-fornecedor')).map(div => ({
+                        nome: div.querySelector('.input-fornecedor-nome').value.trim(),
+                        valor: parseFloat(div.querySelector('.input-fornecedor-valor').value.replace(/\./g, '').replace(',', '.')) || 0
+                    })).filter(f => f.nome && f.valor > 0);
+                    const metodoPreco = document.querySelector('input[name="mercado-metodo-preco"]:checked').value;
+
                     if (!desc) { alert("Informe a descrição."); return; }
                     if (!unid) { alert("Informe a unidade."); return; }
                     if (isNaN(preco) || preco <= 0) { alert("Preço inválido."); return; }
@@ -7546,7 +7648,7 @@
                         grupo: 'MATERIAL',
                         coeficiente: coef,
                         anexos: [],
-                        retroativo: calcPrice ? { dataIni, indIni, dataFin, indFin, base: rawPreco } : null
+                        retroativo: { dataIni, indIni, dataFin, indFin, base: rawPreco, fornecedores, metodoPreco }
                     });
 
                     // Reset Form
@@ -7561,6 +7663,10 @@
                     document.getElementById('mercado-ind-fin').value = '';
                     document.getElementById('mercado-preco-calc').textContent = 'R$ 0,00';
                     delete document.getElementById('mercado-preco-calc').dataset.value;
+
+                    // Reset Fornecedores
+                    document.getElementById('container-fornecedores').innerHTML = '';
+                    document.getElementById('metodo-menor').checked = true;
 
                     bootstrap.Modal.getInstance(document.getElementById('modalBuscarItemComposicao')).hide();
                 }
@@ -7795,7 +7901,13 @@
                 // 2.3 ADICIONAR E GERENCIAR ITENS
                 function adicionarItemComposicao(item) {
                     // Verifica duplicação
-                    const existe = currentCompositionItems.find(i => i.codigo === item.codigo && i.fonte === item.fonte);
+                    const existe = currentCompositionItems.find(i => {
+                        // Se for cotação de mercado, permite múltiplos itens se as descrições forem diferentes
+                        if (item.fonte === 'MERCADO') {
+                            return i.fonte === item.fonte && i.descricao === item.descricao;
+                        }
+                        return i.codigo === item.codigo && i.fonte === item.fonte;
+                    });
                     if (existe) {
                         alert("Este item já está na lista.");
                         return;
@@ -8152,7 +8264,7 @@
                     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-success"></div><div class="mt-2 text-muted small">Buscando na base de dados...</div></td></tr>';
 
                     try {
-                        let query = sbClient.from(nomeTabela).select('*, composicao');
+                        let query = sbClient.from(nomeTabela).select('*');
                         if (fonte === 'SEINFRA') query = query.eq('referencia', versaoBase);
                         else query = query.eq('referencia', dataFormatada);
 
@@ -8165,9 +8277,10 @@
                             } else {
                                 query = query.ilike('tipo_encargo', 'desonerada');
                             }
-                        } else {
+                        } else if (fonte === 'SINAPI') {
                             query = query.eq('tipo_encargo', tipoRef);
                         }
+                        // Para ORSE, ignoramos o filtro de tipo_encargo pois a tabela não possui essa coluna
 
                         // Busca por Código OU Descrição e limite estendido conforme solicitado (1000 itens)
                         query = query.or(`codigo.ilike.%${termo}%,descricao.ilike.%${termo}%`)
@@ -8243,11 +8356,13 @@
                         const stylePreco = (bdiVal > 0 || descVal > 0) ? 'color: #d63384 !important;' : 'color: var(--sop-gray-dark);';
 
                         let btnAction = '';
+                        const btnImprimir = `<button class="btn btn-sm btn-outline-success border me-1" onclick="imprimirLinhaTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Imprimir Composição"><i class="bi bi-printer"></i></button>`;
+
                         if (fonte === 'ORSE') {
                             const link = gerarLinkOrse(item.codigo, item.referencia);
-                            btnAction = `<a href="${link}" target="_blank" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a>`;
+                            btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<a href="${link}" target="_blank" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a></div>`;
                         } else {
-                            btnAction = `<button class="btn btn-sm btn-light border" onclick="abrirDetalheTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Ver Detalhes"><i class="bi bi-chevron-right"></i></button>`;
+                            btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<button class="btn btn-sm btn-light border" onclick="abrirDetalheTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Ver Detalhes"><i class="bi bi-chevron-right"></i></button></div>`;
                         }
 
                         return `<tr>
@@ -8607,7 +8722,7 @@
                             if (versao.length === 6) dataFormatada = `${versao.substring(2)}-${versao.substring(0, 2)}-01`;
                         }
 
-                        let query = sbClient.from(nomeTabela).select('*, composicao');
+                        let query = sbClient.from(nomeTabela).select('*');
 
                         if (fonte === 'SEINFRA') {
                             query = query.eq('referencia', dataFormatada);
@@ -8621,6 +8736,8 @@
                         }
 
                         const { data: dadosPai, error } = await query.eq('codigo', codigo).single();
+
+                        if (dadosPai) currentCompositionData = dadosPai;
 
                         if (error || !dadosPai) {
                             modalBody.innerHTML = '<div class="alert alert-warning m-4 fw-bold text-center">Composição não encontrada no banco de dados.</div>';
@@ -8725,6 +8842,59 @@
                         `;
                     } catch (e) {
                         modalBody.innerHTML = `<div class="alert alert-danger">Erro ao carregar: ${e.message}</div>`;
+                    }
+                }
+
+                // Nova função para imprimir diretamente da lista de tabelas
+                async function imprimirLinhaTabela(codigo, fonte, versao, tipoRef) {
+                    try {
+                        let nomeTabela = 'seinfra_itens';
+                        let dataFormatada = versao;
+                        if (fonte === 'SINAPI') {
+                            nomeTabela = 'sinapi_itens';
+                            if (versao.length === 6) dataFormatada = `${versao.substring(2)}-${versao.substring(0, 2)}-01`;
+                        }
+
+                        let query = sbClient.from(nomeTabela).select('*');
+                        if (fonte === 'SEINFRA') {
+                            query = query.eq('referencia', dataFormatada);
+                            if (tipoRef === 'onerada') {
+                                query = query.or('tipo_encargo.ilike.onerada,tipo_encargo.ilike.%não desonerada%');
+                            } else {
+                                query = query.ilike('tipo_encargo', 'desonerada');
+                            }
+                        } else {
+                            query = query.eq('referencia', dataFormatada).eq('tipo_encargo', tipoRef);
+                        }
+
+                        const { data: dadosPai, error } = await query.eq('codigo', codigo).single();
+                        if (error || !dadosPai) {
+                            alert("Dados não encontrados para impressão.");
+                            return;
+                        }
+
+                        currentCompositionData = dadosPai;
+                        const tempDiv = document.createElement('div');
+
+                        if (fonte === 'SINAPI' && dadosPai.composicao && Array.isArray(dadosPai.composicao)) {
+                            renderizarComposicaoSINAPI(dadosPai, tempDiv);
+                        } else if (fonte === 'SEINFRA') {
+                            renderizarComposicaoSEINFRA(dadosPai, tempDiv, tipoRef);
+                        } else {
+                            tempDiv.innerHTML = `
+                                <div class="p-4 report-print-area" style="font-family: 'Montserrat', sans-serif;">
+                                    <h4 class="fw-bold">${dadosPai.codigo} - ${dadosPai.descricao}</h4>
+                                    <p class="text-muted">Unidade: ${dadosPai.unidade}</p>
+                                    <p class="fw-bold">Valor Unitário: ${parseFloat(dadosPai.preco_unitario || dadosPai.valor_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                </div>
+                            `;
+                        }
+
+                        imprimirRelatorioSOP(dadosPai, tempDiv.innerHTML);
+
+                    } catch (e) {
+                        console.error(e);
+                        alert("Erro ao preparar impressão: " + e.message);
                     }
                 }
 
@@ -8884,7 +9054,7 @@
                                 totais: meta.totais,
                                 versao_atual: meta.versao || ''
                             };
-                            gerarPDF_Profissional(dados);
+                            imprimirRelatorioSOP(dados);
                         } else {
                             alert("Esta composição não possui arquivo nem dados analíticos.");
                         }
@@ -9006,7 +9176,33 @@
                 };
 
                 // --------------------------------------------------------------
-                // FUNÇÃO GERAR PDF (Clone Visual 1:1) - Utilizando html2pdf.js
+                // NOVA FUNÇÃO DE IMPRESSÃO HTML (Substitui o PDF direto)
+                // --------------------------------------------------------------
+                function imprimirRelatorioSOP(dados, htmlOpcional = null) {
+                    if (!dados) return;
+
+                    let htmlParaImprimir = htmlOpcional || "";
+                    const modalBody = document.getElementById('modal-report-body');
+
+                    if (!htmlParaImprimir) {
+                        if (modalBody && modalBody.querySelector('.report-print-area') && typeof currentCompositionData !== 'undefined' && currentCompositionData && (currentCompositionData.id === dados.id || currentCompositionData.codigo === dados.codigo)) {
+                            htmlParaImprimir = modalBody.innerHTML;
+                        } else {
+                            const tempDiv = document.createElement('div');
+                            renderizarRelatorioSOP_HTML(dados, tempDiv);
+                            htmlParaImprimir = tempDiv.innerHTML;
+                        }
+                    }
+
+                    const printWindow = window.open('', '_blank');
+                    const tagsHead = '<meta charset="UTF-8"><title>Impressão - ' + (dados.codigo || 'SOP') + '<\/title><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet"><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"><style>body { font-family: "Montserrat", sans-serif; background-color: white !important; } .report-print-area { padding: 0 !important; margin: 0 !important; box-shadow: none !important; border: none !important; } @media print { .d-print-none, .btn, .modal-footer, .btn-close { display: none !important; } @page { margin: 1cm; size: auto; } body { padding: 0; } } * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }</style><script src="https://cdn.tailwindcss.com"><\/script>';
+
+                    printWindow.document.write('<!DOCTYPE html><html lang="pt-BR"><head>' + tagsHead + '<\/head><body><div class="container-fluid p-4">' + htmlParaImprimir + '<\/div><script>window.onload = () => { setTimeout(() => { window.print(); }, 1000); };<\/script><\/body><\/html>');
+                    printWindow.document.close();
+                }
+
+                // --------------------------------------------------------------
+                // FUNÇÃO GERAR PDF (MANTIDA COMO FALLBACK SE NECESSÁRIO)
                 // --------------------------------------------------------------
                 async function gerarPDF_Profissional(rawInput) {
                     if (!rawInput) return;
@@ -9189,22 +9385,45 @@
 
                             let currentY = 35;
                             retroativos.forEach(r => {
-                                if (currentY > 240) { doc.addPage(); currentY = 20; }
+                                if (currentY > 220) { doc.addPage(); currentY = 20; }
                                 doc.setTextColor(0); doc.setFontSize(9); doc.setFont("helvetica", "bold");
                                 doc.text(`Item: ${r.codInsumo} - ${r.descInsumo}`, 14, currentY);
                                 currentY += 5;
 
                                 const ret = r.retroativo;
+
+                                // Tabela de Fornecedores (se houver)
+                                if (ret.fornecedores && ret.fornecedores.length > 0) {
+                                    doc.setFontSize(7.5); doc.setTextColor(80);
+                                    doc.text(`Detalhamento das Coletas (${ret.metodoPreco === 'MEDIA' ? 'Média Aritmética' : 'Menor Preço Adotado'}):`, 14, currentY);
+                                    currentY += 2;
+
+                                    doc.autoTable({
+                                        startY: currentY,
+                                        head: [['Fornecedor', 'Valor Cotado']],
+                                        body: ret.fornecedores.map(f => [f.nome, `R$ ${fCur(f.valor)}`]),
+                                        theme: 'grid',
+                                        styles: { fontSize: 7, cellPadding: 1.5 },
+                                        headStyles: { fillColor: cinzaHeader, textColor: 0 },
+                                        margin: { left: 14, right: 100 }
+                                    });
+                                    currentY = doc.lastAutoTable.finalY + 6;
+                                }
+
+                                doc.setFontSize(7.5); doc.setTextColor(80);
+                                doc.text(`Compatibilidade Temporal (Retroação):`, 14, currentY);
+                                currentY += 2;
+
                                 const fator = (Number(ret.indFin) / Number(ret.indIni)) || 1;
                                 doc.autoTable({
                                     startY: currentY,
                                     head: [['Parâmetro', 'Descrição / Valor']],
                                     body: [
-                                        ['Valor Cotado (A)', `R$ ${fCur(ret.base)}`],
+                                        ['Valor de Mercado / Base (A)', `R$ ${fCur(ret.base)}`],
                                         ['Data Cotação / Índice (C)', `${ret.dataIni?.split('-').reverse().join('/') || '-'} | ${fNum4(ret.indIni)}`],
                                         ['Data-Base / Índice (E)', `${ret.dataFin?.split('-').reverse().join('/') || '-'} | ${fNum4(ret.indFin)}`],
                                         ['Fator (E/C)', fator.toFixed(4)],
-                                        ['Preço Adotado (A x Fator)', { content: `R$ ${fCur(Number(ret.base) * fator)}`, styles: { fontStyle: 'bold', textColor: verdeSOP } }]
+                                        ['Preço Adotado Final (A x Fator)', { content: `R$ ${fCur(Number(ret.base) * fator)}`, styles: { fontStyle: 'bold', textColor: verdeSOP } }]
                                     ],
                                     theme: 'grid',
                                     styles: { fontSize: 8, cellPadding: 2 },
@@ -9439,17 +9658,17 @@
                             <div class="print-page-break p-4">
                                 <h6 class="fw-bold text-success mb-3" style="font-size: 0.9rem;">Metodologia de Cálculo de Insumo Não Tabelado (Cotação de Mercado)</h6>
                                 <p class="text-muted" style="font-size: 0.75rem; text-align: justify; line-height: 1.4;">
-                                    O presente custo unitário foi obtido através de cotação de mercado, visto que o insumo não consta nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do valor cotado.
+                                    O(s) presente(s) custo(s) unitário(s) foi(ram) obtido(s) através de cotação de mercado, visto que o(s) insumo(s) não consta(m) nas tabelas de referência oficiais (SINAPI/SICRO/ORSE). Para garantir a integridade e a homogeneidade financeira do orçamento, foi realizado o processo de retroação (deflacionamento) do(s) valor(es) cotado(s).
                                 </p>
                                 <p class="text-muted" style="font-size: 0.75rem; text-align: justify; line-height: 1.4;">
-                                    O objetivo é compatibilizar o preço de mercado atual (data da cotação) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.
+                                    O objetivo é compatibilizar o(s) preço(s) de mercado atual(is) com a Data-Base da Licitação/Orçamento, expurgando a inflação acumulada no período. Desta forma, todos os custos do orçamento permanecem referenciados no mesmo marco temporal, permitindo a correta aplicação de reajustes contratuais futuros.
                                 </p>
 
                                 <h6 class="fw-bold mt-4 mb-2" style="font-size: 0.85rem;">Memória de Cálculo e Compatibilização de Preços</h6>
                                 <p class="text-muted mb-4" style="font-size: 0.75rem; text-align: justify;">
-                                    Considerando a defasagem temporal entre a data desta cotação de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores. O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na tabela abaixo:
+                                    Considerando a defasagem temporal entre a data da(s) cotação(ões) de mercado e a data-base original deste orçamento, aplicou-se a retroação financeira dos valores. O cálculo consiste na divisão do valor cotado pelo índice inflacionário acumulado no período (ou pela razão entre os índices das datas final e inicial), utilizando o indexador informado na(s) tabela(s) a seguir:
                                 </p>
-                                ${retroativos.map(r => {
+                                 ${retroativos.map(r => {
                             const ret = r.retroativo;
                             const base = parseLocalNum(ret.base);
                             const iIni = parseLocalNum(ret.indIni);
@@ -9457,19 +9676,36 @@
                             const fator = (iFin / iIni) || 1;
                             const dCot = ret.dataIni ? ret.dataIni.split('-').reverse().join('/') : '-';
                             const dBase = ret.dataFin ? ret.dataFin.split('-').reverse().join('/') : '-';
+
+                            const fornecedoresHTML = (ret.fornecedores && ret.fornecedores.length > 0) ? `
+                                <div class="mb-3">
+                                    <div class="fw-bold text-dark mb-1" style="font-size: 0.75rem;">Detalhamento das Coletas (${ret.metodoPreco === 'MEDIA' ? 'Média Aritmética' : 'Menor Preço Adotado'}):</div>
+                                    <table class="table table-sm table-bordered mb-2" style="font-size: 0.7rem; max-width: 500px;">
+                                        <thead class="bg-light"><tr><th>Fornecedor</th><th class="text-end" style="width: 120px;">Valor Cotado</th></tr></thead>
+                                        <tbody>
+                                            ${ret.fornecedores.map(f => `<tr><td>${f.nome}</td><td class="text-end">R$ ${safeLoc(f.valor)}</td></tr>`).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ` : '';
+
                             return `
-                                        <div class="mb-4 border-bottom pb-3">
-                                            <div class="fw-bold text-dark mb-2" style="font-size: 0.8rem;">Item: ${r.codInsumo} - ${r.descInsumo}</div>
+                                        <div class="mb-5 border-bottom pb-3">
+                                            <div class="fw-bold text-dark mb-2" style="font-size: 0.85rem;">Item: ${r.codInsumo} - ${r.descInsumo}</div>
+                                            
+                                            ${fornecedoresHTML}
+
+                                            <div class="fw-bold text-dark mb-1" style="font-size: 0.75rem;">Compatibilidade Temporal (Retroação):</div>
                                             <table class="table table-bordered table-sm" style="font-size: 0.75rem; max-width: 600px;">
                                                 <thead style="background-color: #f5f5f5;">
                                                     <tr><th style="width: 70%">Parâmetro</th><th class="text-center">Valor / Descrição</th></tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr><td>Valor Cotado (A)</td><td class="text-center fw-bold">R$ ${safeLoc(base)}</td></tr>
+                                                    <tr><td>Valor de Mercado / Base (A)</td><td class="text-center fw-bold">R$ ${safeLoc(base)}</td></tr>
                                                     <tr><td>Data Cotação / Índice (C)</td><td class="text-center">${dCot} | ${safeLoc(iIni, 3)}</td></tr>
                                                     <tr><td>Data-Base / Índice (E)</td><td class="text-center">${dBase} | ${safeLoc(iFin, 3)}</td></tr>
                                                     <tr><td>Fator de Retroação (E / C)</td><td class="text-center fw-bold">${fator.toFixed(4)}</td></tr>
-                                                    <tr><td>Preço Adotado (A x Fator)</td><td class="text-center fw-bold text-success">R$ ${safeLoc(base * fator)}</td></tr>
+                                                    <tr><td>Preço Adotado Final (A x Fator)</td><td class="text-center fw-bold text-success">R$ ${safeLoc(base * fator)}</td></tr>
                                                 </tbody>
                                             </table>
                                         </div>
@@ -10365,8 +10601,8 @@
                         <div class="modal-footer py-2 bg-light d-print-none">
                             <div id="footer-extra-actions" class="me-2"></div>
                             <button type="button" class="btn btn-outline-success btn-sm"
-                                onclick="gerarPDF_Profissional(currentCompositionData)">
-                                <i class="bi bi-download me-1"></i> Baixar
+                                onclick="imprimirRelatorioSOP(currentCompositionData)">
+                                <i class="bi bi-printer me-1"></i> Imprimir
                             </button>
                             <button type="button" class="btn btn-secondary btn-sm ms-auto"
                                 data-bs-dismiss="modal">Fechar</button>
@@ -10376,6 +10612,91 @@
                 </div>
             </div>
 
+            <script>
+                function formatMonthYearInput(input) {
+                    let v = input.value.replace(/\D/g, ''); // Remove tudo que não for número
+                    if (v.length > 6) v = v.slice(0, 6); // Limite de 6 dígitos no máximo (MMYYYY)
+                    if (v.length >= 3) {
+                        input.value = v.slice(0, 2) + '/' + v.slice(2);
+                    } else {
+                        input.value = v;
+                    }
+                }
+
+                async function buscarIndicesAutomatico() {
+                    const dataIni = document.getElementById('mercado-data-ini').value.trim();
+                    const dataFin = document.getElementById('mercado-data-fin').value.trim();
+
+                    if (!dataIni || !dataFin) {
+                        alert("Por favor, preencha as datas 'Data Cotação' e 'Data-Base Orç.' (formato MM/AAAA) antes de buscar os índices.");
+                        return;
+                    }
+
+                    const parseMesAnoStr = (str) => {
+                        const parts = str.split('/');
+                        // Lida com DD/MM/AAAA ou MM/AAAA
+                        if (parts.length === 3) {
+                            return { mes: parseInt(parts[1], 10), ano: parseInt(parts[2], 10) };
+                        } else if (parts.length === 2) {
+                            return { mes: parseInt(parts[0], 10), ano: parseInt(parts[1], 10) };
+                        }
+                        return null;
+                    };
+
+                    const dIni = parseMesAnoStr(dataIni);
+                    const dFin = parseMesAnoStr(dataFin);
+
+                    if (!dIni || !dFin || isNaN(dIni.mes) || isNaN(dIni.ano)) {
+                        alert("Formato de data inválido. Utilize o formato MM/AAAA.");
+                        return;
+                    }
+
+                    const btn = document.getElementById('btn-buscar-incc');
+                    const oldHtml = btn.innerHTML;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Buscando...';
+                    btn.disabled = true;
+
+                    try {
+                        const fetchIndexFromEdge = async (mes, ano) => {
+                            const reqBody = { mes, ano };
+                            // Utilizando a sbClient globalmente instanciada na aplicação
+                            const { data, error } = await sbClient.functions.invoke('get-economic-indices', {
+                                body: reqBody
+                            });
+                            if (error) throw error;
+                            if (data.status === 'error') throw new Error(data.message);
+                            return data.valor_indice;
+                        };
+
+                        const [indiceIni, indiceFin] = await Promise.all([
+                            fetchIndexFromEdge(dIni.mes, dIni.ano),
+                            fetchIndexFromEdge(dFin.mes, dFin.ano)
+                        ]);
+
+                        document.getElementById('mercado-ind-ini').value = parseFloat(indiceIni).toFixed(4).replace('.', ',');
+                        document.getElementById('mercado-ind-fin').value = parseFloat(indiceFin).toFixed(4).replace('.', ',');
+
+                        // Dispara re-cálculos visuais nativos já existentes, se houver
+                        if (typeof window.formatIndexInput === 'function') {
+                            window.formatIndexInput(document.getElementById('mercado-ind-ini'));
+                            window.formatIndexInput(document.getElementById('mercado-ind-fin'));
+                        }
+
+                        if (typeof window.calcularPrecoAdotado === 'function') {
+                            window.calcularPrecoAdotado();
+                        }
+
+                        alert("Índices INCC-DI (FGV/Ipeadata) obtidos e aplicados com sucesso!");
+
+                    } catch (err) {
+                        console.error("[Erro ao automatizar INCC]", err);
+                        alert("Não foi possível automatizar. Motivo: " + (err.message || 'Erro de conexão/API.'));
+                    } finally {
+                        btn.innerHTML = oldHtml;
+                        btn.disabled = false;
+                    }
+                }
+            </script>
 </body>
 
 </html>
