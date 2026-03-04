@@ -1296,12 +1296,19 @@
             accent-color: var(--sop-green);
         }
 
-        .checkbox-prioritario:hover {
+        .checkbox-prioritario:hover:not(:disabled) {
             opacity: 0.8;
         }
 
-        .checkbox-prioritario:checked {
+        .checkbox-prioritario:checked:not(:disabled) {
             box-shadow: 0 0 4px rgba(13, 110, 253, 0.5);
+        }
+
+        /* Efeito visual "marca d'água" para checkbox como "readonly" (não-admin) */
+        .checkbox-prioritario.readonly-checkbox {
+            opacity: 0.6;
+            cursor: not-allowed;
+            /* Diferente do atributo "disabled" do HTML, isso não mata a accent-color principal */
         }
 
         /* CSS MULTI-SELECT */
@@ -5288,7 +5295,7 @@
                         return `
         <tr style="vertical-align: middle;">
             <td class="text-center">${uRole !== 'fiscal' ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : ''}</td>
-            <td class="text-center"><input type="checkbox" class="checkbox-prioritario" data-proc="${escapeHTML(d.processo)}" ${isPrioritario(d) ? 'checked' : ''} title="Marcar como prioritário" ${uRole !== 'admin' ? 'disabled' : ''} /></td>
+            <td class="text-center"><input type="checkbox" class="checkbox-prioritario ${uRole !== 'admin' ? 'readonly-checkbox' : ''}" data-proc="${escapeHTML(d.processo)}" ${isPrioritario(d) ? 'checked' : ''} title="${uRole === 'admin' ? 'Marcar como prioritário' : 'Processo Prioritário'}" ${uRole !== 'admin' ? 'onclick="return false;" tabindex="-1"' : ''} /></td>
             <td><div style="font-weight: 700; font-size: 0.95rem; color: #000; white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1 text-muted" style="font-size: 0.75rem; font-weight: 500;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
             <td><div class="mb-1"><span class="badge rounded-pill ${mCls}" style="font-size: 0.75rem;">${mSt}</span></div><input type="date" class="form-control form-control-sm" style="font-size: 0.75rem; padding: 2px 4px; height: auto;" data-proc="${escapeHTML(d.processo)}" value="${mIso}" title="Alterar Meta" ${uRole !== 'admin' ? 'disabled' : ''} /></td>
             <td><span class="badge rounded-pill ${stCls} badge-custom-size">${d.status}</span></td>
