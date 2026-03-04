@@ -2499,9 +2499,10 @@
                         </div>
                     </div>
 
-                    <div class="flex-grow-1 border rounded bg-white"
+                    <div class="table-responsive flex-grow-1 border rounded bg-white"
                         style="box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);">
-                        <table class="table table-hover table-striped align-middle mb-0" style="font-size: 0.9rem;">
+                        <table class="table table-hover table-striped align-middle mb-0"
+                            style="font-size: 0.9rem; min-width: 1100px;">
                             <thead class="table-light"
                                 style="position: sticky; top: 0; z-index: 1020; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-top: 1px solid #dee2e6;">
                             </thead>
@@ -4274,6 +4275,7 @@
                             acrescGecope: Number(r.acresc_gecope) || 0,
                             supressGecope: Number(r.supress_gecope) || 0,
                             repercGecope: Number(r.reperc_gecope) || 0,
+                            prioritario: r.prioritario || false,
 
                             // Audit Data Mapping
                             criador: r.criador,
@@ -5104,17 +5106,29 @@
                     return 99;
                 }
 
-                // Funções para gerenciar processos prioritários (marcador simples)
+                // Funções para gerenciar processos prioritários
                 function isPrioritario(row) {
-                    const key = `prioritario:${row.processo}`;
-                    return localStorage.getItem(key) === 'true';
+                    return row.prioritario === true;
                 }
-                function setPrioritario(processo, isPriority) {
-                    const key = `prioritario:${processo}`;
-                    if (isPriority) {
-                        localStorage.setItem(key, 'true');
-                    } else {
-                        localStorage.removeItem(key);
+
+                async function setPrioritario(processo, isPriority) {
+                    // 1. Atualizar imediatamente em memória (feedback visual instantâneo)
+                    const row = allData.find(d => d.processo === processo);
+                    if (row) row.prioritario = isPriority;
+
+                    // 2. Realizar comunicação com o Supabase nos bastidores (Background Sync)
+                    try {
+                        const { error } = await sbClient
+                            .from('processos')
+                            .update({ prioritario: isPriority })
+                            .eq('processo', processo);
+
+                        if (error) {
+                            console.error('[ERRO] Falha ao marcar processo prioritário: ', error.message);
+                            alert("Aviso: Falha de conexão ao salvar status prioritário nas nuvens.");
+                        }
+                    } catch (e) {
+                        console.error("Erro interno no setPrioritario:", e);
                     }
                 }
 
