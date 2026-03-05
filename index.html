@@ -10906,15 +10906,43 @@
                     btn.disabled = true;
 
                     try {
+                        // For some clients the built-in `functions.invoke` was generating requests
+                        // against the main project URL and receiving 401 before the function even ran.
+                        // To be sure we hit the correct endpoint with proper headers we do a manual fetch
+                        // against the dedicated .functions subdomain and send the anon key explicitly.
                         const fetchIndexFromEdge = async (mes, ano) => {
                             const reqBody = { mes, ano };
-                            // Utilizando a sbClient globalmente instanciada na aplicação
-                            const { data, error } = await sbClient.functions.invoke('get-economic-indices', {
-                                body: reqBody
+                            const resp = await fetch('https://qexdnxqmiaarzwwwrcor.functions.supabase.co/get-economic-indices', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    apikey: SUPABASE_KEY,
+                                    Authorization: `Bearer ${SUPABASE_KEY}`
+                                },
+                                body: JSON.stringify(reqBody)
                             });
-                            if (error) throw error;
-                            if (data.status === 'error') throw new Error(data.message);
-                            return data.valor_indice;
+                            if (!resp.ok) {
+                                // 401/403 will surface here
+                                throw new Error(`Edge function HTTP error: ${resp.status}`);
+                            }
+                            const data = await resp.json();
+                            if (!data) {
+                                throw new Error('Resposta vazia da função de índices.');
+                            }
+                            if (data.status === 'error') {
+                                let msg = data.message || 'erro desconhecido';
+                                if (data.details) msg += ` (${data.details})`;
+                                throw new Error(msg);
+                            }
+                            // the API sometimes returns values with a comma decimal and
+                            // dot thousands separator (e.g. "12.370,360"). normalize to
+                            // a JS-friendly number string first.
+                            let raw = data.valor_indice;
+                            if (typeof raw === 'string') {
+                                // remove dots (thousand separators) and replace comma by dot
+                                raw = raw.replace(/\./g, '').replace(',', '.')
+                            }
+                            return raw;
                         };
 
                         const [indiceIni, indiceFin] = await Promise.all([
@@ -10922,13 +10950,22 @@
                             fetchIndexFromEdge(dFin.mes, dFin.ano)
                         ]);
 
-                        document.getElementById('mercado-ind-ini').value = parseFloat(indiceIni).toFixed(4).replace('.', ',');
-                        document.getElementById('mercado-ind-fin').value = parseFloat(indiceFin).toFixed(4).replace('.', ',');
+                        const formatarIndiceBR = (valor) => {
+                            const num = parseFloat(valor);
+                            const formatted = num.toFixed(3);
+                            const [inteiro, decimais] = formatted.split('.');
+                            const inteiroFormatado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                            return `${inteiroFormatado},${decimais}`;
+                        };
+                        const valIni = formatarIndiceBR(indiceIni);
+                        const valFin = formatarIndiceBR(indiceFin);
+                        document.getElementById('mercado-ind-ini').value = valIni;
+                        document.getElementById('mercado-ind-fin').value = valFin;
+                        console.log('[INCC] Valores normalizados e atribuídos:', { valIni, valFin });
 
-                        // Dispara re-cálculos visuais nativos já existentes, se houver
-                        if (typeof window.formatIndexInput === 'function') {
-                            window.formatIndexInput(document.getElementById('mercado-ind-ini'));
-                            window.formatIndexInput(document.getElementById('mercado-ind-fin'));
+                        // Dispara recálculo do preço retroativo diretamente
+                        if (typeof window.calcularPrecoRetroativo === 'function') {
+                            window.calcularPrecoRetroativo();
                         }
 
                         if (typeof window.calcularPrecoAdotado === 'function') {
