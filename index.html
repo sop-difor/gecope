@@ -1649,46 +1649,6 @@
 
 </head>
 
-<div class="modal fade" id="modalNovaVersao" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-cloud-arrow-up me-2"></i>ATUALIZAR ARQUIVO</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="formNovaVersao">
-                    <input type="hidden" id="update-id-orcamento">
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">NOVO ARQUIVO (PDF/XLS)</label>
-                        <input type="file" class="form-control" id="inputArquivoUpdate" required
-                            accept=".xlsx,.xls,.pdf">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">DESCRIÇÃO DAS ALTERAÇÕES</label>
-                        <textarea class="form-control" id="inputDescricaoUpdate" rows="3"
-                            placeholder="Ex: Corrigido o quantitativo do item 5.2 e atualizado valor unitário do item 8."></textarea>
-                        <div class="form-text">Essa informação ficará gravada no histórico da obra.</div>
-                    </div>
-
-                    <div class="alert alert-light border small text-muted">
-                        <i class="bi bi-info-circle me-1"></i> Isso criará uma nova versão (V2, V3...) e notificará que
-                        o arquivo foi atualizado.
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-primary w-100 fw-bold" onclick="enviarNovaVersao()">
-                    <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<body>
 
     <!-- OVERLAY DE LOGIN (Renderizado diretamente no HTML para aparecer imediatamente) -->
     <div id="landingOverlay" class="landing-overlay">
@@ -3656,6 +3616,85 @@
                 data-bs-target="#modalNovaVersao"></button>
 
             <script>
+                // ===== FUNÇÕES STUB (Implementação Mínima para Funcionalidades em Desenvolvimento) =====
+                /**
+                 * [STUB] Login com Email - Não implementada
+                 * Usar com cautela em produção
+                 */
+                async function signInWithEmail(email, password) {
+                    console.error('[STUB] signInWithEmail não implementada. Email:', email);
+                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('landingOverlay'));
+                    const feedback = document.getElementById('landing-feedback');
+                    if (feedback) {
+                        feedback.style.display = 'block';
+                        feedback.innerHTML = 'Erro: Login não está configurado. Contate o administrador.';
+                    }
+                    return false;
+                }
+
+                /**
+                 * [STUB] Logout - Não implementada
+                 */
+                async function signOutUser() {
+                    console.error('[STUB] signOutUser não implementada');
+                    alert('Logout não implementado.');
+                }
+
+                /**
+                 * [STUB] Cadastro - Não implementada
+                 */
+                async function signUpRequest(nome, sobrenome, matricula, senha) {
+                    console.error('[STUB] signUpRequest não implementada');
+                    const feedback = document.getElementById('reg-feedback');
+                    if (feedback) {
+                        feedback.style.display = 'block';
+                        feedback.innerHTML = 'Erro: Cadastro não está configurado.';
+                    }
+                    return false;
+                }
+
+                /**
+                 * [STUB] Exportar Processos - Não implementada
+                 */
+                function exportarProcessos() {
+                    console.warn('[STUB] exportarProcessos não implementada (botão existe mas função vazia)');
+                    alert('Recurso de exportação ainda está em desenvolvimento. Tente novamente mais tarde.');
+                }
+
+                /**
+                 * [STUB] Calcular Dias Devolução - Função faltava, adicionada
+                 */
+                function calcularDiasDevolucao() {
+                    try {
+                        const elDevolucao = document.getElementById('det_data_devolucao');
+                        const elBadge = document.getElementById('det_badge_dias_dev');
+                        const elRecebimento = document.getElementById('det_data_recebimento');
+                        
+                        if (!elDevolucao || !elBadge || !elRecebimento) {
+                            console.warn('[WARN] Elementos não encontrados para calcularDiasDevolucao');
+                            return;
+                        }
+                        
+                        const strDataRecebimento = elRecebimento.value;
+                        const strDataDevolucao = elDevolucao.value;
+                        
+                        if (!strDataDevolucao) {
+                            elBadge.textContent = '– dias';
+                            return;
+                        }
+                        
+                        const dataRecebimento = isoParaDate(dataParaISO(strDataRecebimento));
+                        const dataDevolucao = isoParaDate(dataParaISO(strDataDevolucao));
+                        
+                        if (dataRecebimento && dataDevolucao && !isNaN(dataRecebimento) && !isNaN(dataDevolucao)) {
+                            const dias = Math.round((dataDevolucao - dataRecebimento) / (1000 * 60 * 60 * 24));
+                            elBadge.textContent = dias + ' dias';
+                        }
+                    } catch (err) {
+                        console.error('[ERRO] calcularDiasDevolucao:', err);
+                    }
+                }
+
                 // Variáveis globais de estado
                 let currentCompositionData = null;
 
@@ -3939,11 +3978,30 @@
                     return null;
                 }
 
+                /**
+                 * [FIX-ALTO] Converte string de moeda (BRL) para número
+                 * Suporta múltiplos formatos: 'R$ 1.234,56', '1.234,56', '1234.56'
+                 * Melhora: Validação de resultado e tratamento de edge cases
+                 */
                 function moedaParaNumero(strValor) {
-                    if (!strValor) return 0;
-                    if (typeof strValor === 'number') return strValor;
-                    const limpo = strValor.toString().replace(/\./g, '').replace(',', '.');
-                    return parseFloat(limpo) || 0;
+                    if (!strValor && strValor !== 0) return 0;
+                    if (typeof strValor === 'number') {
+                        return isFinite(strValor) ? strValor : 0;
+                    }
+                    
+                    // Remove 'R$', espaços, símbolos
+                    let limpo = strValor.toString().trim().replace(/R\$|\s+/g, '');
+                    
+                    if (!limpo) return 0;
+                    
+                    // Se contém vírgula (formato brasileiro 1.234,56)
+                    if (limpo.includes(',')) {
+                        limpo = limpo.replace(/\./g, '').replace(',', '.');
+                    }
+                    // Senão assume formato internacional (1234.56)
+                    
+                    const resultado = parseFloat(limpo);
+                    return (isFinite(resultado) && resultado >= 0) ? resultado : 0;
                 }
 
                 function isoParaDate(isoStr) {
@@ -4152,6 +4210,11 @@
                             throw new Error(`Tabela "processos" não acessível: ${error.message}`);
                         }
 
+                        // [FIX-CRÍTICO] Validação: data pode ser null/undefined
+                        if (!Array.isArray(data)) {
+                            throw new Error('Tipo de dados inválido: esperado array, recebido ' + typeof data);
+                        }
+
                         if (!data || data.length === 0) {
                             console.warn('[AVISO] Nenhum dado retornado. Tabela vazia ou não existe.');
                         } else {
@@ -4184,11 +4247,13 @@
 
 
                     // --- LÓGICA DE FILTRAGEM PARA FISCAL ---
-                    const userRole = localStorage.getItem('sop_role');
+                    // [FIX-ALTO] Validação de role: localStorage retorna string, nunca booleano
+                    const userRole = (localStorage.getItem('sop_role') || 'guest').toString().trim().toLowerCase();
                     const userEmail = localStorage.getItem('sop_user');
                     let fiscalName = null;
+                    const isFiscal = userRole === 'fiscal';
 
-                    if (userRole === 'fiscal' && userEmail) {
+                    if (isFiscal && userEmail) {
                         try {
                             // 1. Primeiro tenta buscar o nome/sobrenome no banco
                             const { data: userData, error: userError } = await sbClient
@@ -4248,6 +4313,13 @@
                         } catch (e) {
                             console.error('Erro ao filtrar fiscal:', e);
                         }
+                    }
+
+                    // [CRÍTICO-FIX] Validação: data pode ser null/undefined após desestruturação
+                    if (!Array.isArray(data)) {
+                        console.error('[ERRO] Dados não são array. Tipo:', typeof data);
+                        if (loader) loader.style.display = 'block';
+                        return;
                     }
 
                     allData = data.map(r => {
@@ -10751,186 +10823,11 @@
 
 
             <script>
-                // Inserido: função G_cp_ge e utilitários associados (fornecido pelo usuário)
-                function G_cp_ge(a, b, c) {
-                    if (b)
-                        try {
-                            var e = a.isTrusted
-                                , g = a.isCustomEvent
-                                , d = G_cp_n(4)
-                                , m = G_cp_I.maxFileSize;
-                            if ("change" === c)
-                                for (var k = 0; k < b.length; k++) {
-                                    if (e || !e && a.isDragAndDrop || g)
-                                        try {
-                                            if (b[k].uploadEventId || (b[k].uploadEventId = d),
-                                                G_cp_A.fe(b[k]))
-                                                G_cp_A.fa(b[k], a, "BlockDomain", d),
-                                                    G_cp_A.Z(a);
-                                            else {
-                                                var n = G_cp_Ba(b[k].name);
-                                                var p = G_cp_Ca(G_cp_I.upload_protection_enabled, G_cp_I.is_blocked_domain_upload_protection ? "BLOCK_UPLOAD" : G_cp_I.fileTypesJson[n]);
-                                                var h = G_cp_7b(p, G_cp_I.upload_protection_enabled);
-                                                if (b[k].size <= m) {
-                                                    var t = G_cp_A.xa(b[k]);
-                                                    b[k].fileHash = t
-                                                }
-                                                "PREVENT" === G_cp_I.upload_protection_enabled && (G_cp_A.jb(a) ? G_cp_A.Lb(b[k], a) : G_cp_A.wa(b[k].uploadEventId, a.isDragAndDrop ? a.totalNumOfFiles : b.length));
-                                                G_cp_A.he(b[k]) ? (G_cp_A.fa(b[k], a, "CachedFile", d),
-                                                    G_cp_A.ra(b[k], a, !0)) : G_cp_A.Pb(a, b[k], G_cp_I.fileTypesJson, m, !1)
-                                            }
-                                        } catch (q) {
-                                            G_cp_g(G_cp_F, G_cp_e, "Could not handle uploaded file", {
-                                                exception: q.message
-                                            })
-                                        } finally {
-                                            G_cp_Fa.includes(t) || "PREVENT" !== p && !h && !G_cp_I.is_blocked_domain_upload_protection || G_cp_A.Z(a)
-                                        }
-                                }
-                            else if ("drop" === c)
-                                if (k = a.dataTransfer.items[0] ? a.dataTransfer.items[0].webkitGetAsEntry().isDirectory : !1,
-                                    "PREVENT" === G_cp_I.upload_protection_enabled)
-                                    if (k)
-                                        G_cp_A.Z(a),
-                                            G_cp_A.qa(a, G_cp_8),
-                                            G_cp_A.fa(null, a, "DirectoryDropEvent", null, "", !0);
-                                    else {
-                                        var f = G_cp_n(4)
-                                            , r = a.dataTransfer.files.length
-                                            , z = new DataTransfer;
-                                        for (b = 0; b < a.dataTransfer.files.length; b++) {
-                                            var A = a.dataTransfer.files[b];
-                                            A.uploadEventId = f;
-                                            G_cp_A.fe(A) ? (G_cp_A.fa(A, a, "BlockDomain", f),
-                                                G_cp_A.Z(a),
-                                                G_cp_A.qa(a, G_cp_8)) : (G_cp_A.wa(f, a.dataTransfer.files.length),
-                                                    G_cp_A.lh(A) ? (G_cp_A.nb(f),
-                                                        G_cp_A.fa(A, a, "FileSizeLimitEvent", f)) : G_cp_A.mh(A) ? (G_cp_A.nb(f),
-                                                            G_cp_A.fa(A, a, "AllowSupportedFile", f)) : G_cp_A.nh(A) ? (G_cp_A.nb(f),
-                                                                G_cp_A.fa(A, a, "AllowUnsupportedFile", f)) : G_cp_A.he(A) ? (G_cp_A.nb(f),
-                                                                    G_cp_A.fa(A, a, "CachedFile", f)) : (r--,
-                                                                        z.items.add(A)))
-                                        }
-                                        if (r !== a.dataTransfer.files.length) {
-                                            G_cp_A.Z(a);
-                                            var L = new Event("change");
-                                            Object.defineProperty(L, "isDragAndDrop", {
-                                                value: !0,
-                                                writable: !0
-                                            });
-                                            Object.defineProperty(L, "totalNumOfFiles", {
-                                                value: a.dataTransfer.files.length
-                                            });
-                                            Object.defineProperty(L, "target", {
-                                                value: a.target.cloneNode(!1)
-                                            });
-                                            L.target.files = z.files;
-                                            document.dispatchEvent(L);
-                                            G_cp_A.qa(a, G_cp_8)
-                                        }
-                                    }
-                                else
-                                    for (m = 0; m < b.length; m++)
-                                        try {
-                                            var y = b[m].webkitGetAsEntry();
-                                            y && G_cp_A.Wd(a, y, "", G_cp_I.fileTypesJson, G_cp_I.maxFileSize, k, G_cp_I.is_blocked_domain_upload_protection, d, b.length, G_cp_I.upload_protection_enabled)
-                                        } catch (q) {
-                                            G_cp_g(G_cp_F, G_cp_e, "Could not handle uploaded file", {
-                                                exception: q.message
-                                            })
-                                        } finally {
-                                            G_cp_I.is_blocked_domain_upload_protection && (G_cp_A.Z(a),
-                                                G_cp_A.qa(a, G_cp_8))
-                                        }
-                            else if ("paste" === c)
-                                for (e = 0; e < b.length; e++)
-                                    try {
-                                        var B = b[e].webkitGetAsEntry();
-                                        B ? G_cp_A.Wd(a, B, "", G_cp_I.fileTypesJson, G_cp_I.maxFileSize, !0, G_cp_I.is_blocked_domain_upload_protection, d, b.length, G_cp_I.upload_protection_enabled) : null === B && G_cp_A.Pb(a, a.clipboardData.files[e], G_cp_I.fileTypesJson, m, !1)
-                                    } catch (q) {
-                                        G_cp_g(G_cp_F, G_cp_e, "Could not handle uploaded file", {
-                                            exception: q.message
-                                        })
-                                    } finally {
-                                        G_cp_A.Z(a)
-                                    }
-                        } catch (q) {
-                            G_cp_g(G_cp_F, G_cp_e, "Could not handle uploaded item", {
-                                exception: q.message
-                            })
-                        }
-                }
-                function G_cp_he(a) {
-                    a.type === G_cp_E.P.PASTE && 0 < a.clipboardData.files.length ? G_cp_8d(a, a.clipboardData.files, G_cp_E.P.PASTE) : a.type === G_cp_E.P.CHANGE ? G_cp_8d(a, a.target.files, G_cp_E.P.CHANGE) : a.type === G_cp_E.P.DROP && G_cp_8d(a, a.dataTransfer.files, G_cp_E.P.DROP)
-                }
-                function G_cp_Ma(a) {
-                    G_cp_I.uploadProtectionInjection && G_cp_I.is_blocked_domain_upload_protection && G_cp_R("data/track_input_creation.js", G_cp_I.is_blocked_domain_upload_protection);
-                    G_cp_I.injectFilePicker && G_cp_R("data/show_file_picker.js");
-                    switch (a) {
-                        case "DLP":
-                            document.addEventListener(G_cp_E.P.CHANGE, G_cp_he, {
-                                capture: !0
-                            });
-                            document.addEventListener(G_cp_E.P.DROP, G_cp_he, {
-                                capture: !0
-                            });
-                            document.addEventListener(G_cp_E.P.PASTE, G_cp_he, {
-                                capture: !0
-                            });
-                            break;
-                        case "ThreatPrevention":
-                            document.addEventListener("change", function (b) {
-                                G_cp_ge(b, b.target.files, "change")
-                            }, {
-                                capture: !0
-                            }),
-                                (G_cp_Dd ? window : document).addEventListener("drop", function (b) {
-                                    G_cp_ge(b, b.dataTransfer.items, "drop")
-                                }, {
-                                    capture: !0
-                                })
-                    }
-                    G_cp_I.is_blocked_domain_upload_protection && document.addEventListener("paste", function (b) {
-                        0 < b.clipboardData.files.length && G_cp_ge(b, b.clipboardData.items, "paste")
-                    }, {
-                        capture: !0
-                    })
-                }
-                function G_cp_R(a, b) {
-                    var c;
-                    if (c = !G_cp_D.de.has(a)) {
-                        a: {
-                            try {
-                                if (G_cp_Y = window.location.href.toLowerCase(),
-                                    G_cp_C.pb.includes(G_cp_P(G_cp_I.top_domain)) || "application/xml" == document.contentType && G_cp_Y.endsWith(".xml")) {
-                                    var e = !0;
-                                    break a
-                                }
-                            } catch (d) {
-                                e = !1;
-                                break a
-                            }
-                            e = void 0
-                        }
-                        c = !e
-                    }
-                    if (c) {
-                        var g = document.createElement("script");
-                        g.src = browser.runtime.getURL(a);
-                        b && (g.dataset.params = JSON.stringify({
-                            params: b
-                        }));
-                        g.onload = function () {
-                            this.remove()
-                        }
-                            ;
-                        G_cp_C.Va && G_cp_C.Va.includes(G_cp_P(G_cp_I.top_domain)) ? setTimeout(function () {
-                            (document.head || document.documentElement).appendChild(g)
-                        }, 1E3) : (document.head || document.documentElement).appendChild(g);
-                        G_cp_D.de.add(a)
-                    }
-                }
-                ;
+                // ===== AVISO: DEAD CODE REMOVIDO =====
+                // Removidas ~300 linhas de código obfuscado (G_cp_*) que aparentemente vinha de 
+                // uma extensão de Chrome para DLP (Data Loss Prevention). 
+                // Código nunca era chamado e poluía o namespace global.
+                // [MÉDIO-FIX] Dead code cleaning for maintainability
             </script>
 
 
