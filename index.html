@@ -5139,15 +5139,27 @@
                     }
                 }
 
-                let currentSort = { col: null, dir: 'asc' };
+                let currentSort = []; // Array of { col, dir }
                 function changeSort(columnKey) {
-                    if (currentSort.col === columnKey) { currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc'; }
-                    else { currentSort.col = columnKey; currentSort.dir = 'asc'; }
+                    const index = currentSort.findIndex(s => s.col === columnKey);
+                    if (index !== -1) {
+                        if (currentSort[index].dir === 'asc') {
+                            currentSort[index].dir = 'desc';
+                        } else {
+                            currentSort.splice(index, 1);
+                        }
+                    } else {
+                        currentSort.push({ col: columnKey, dir: 'asc' });
+                    }
                     updateReuniao();
                 }
                 function getSortIcon(columnKey) {
-                    if (currentSort.col !== columnKey) { return '<i class="bi bi-arrow-down-up text-secondary ms-1" style="font-size: 1rem; opacity: 0.4;"></i>'; }
-                    return currentSort.dir === 'asc' ? '<i class="bi bi-sort-down-alt text-success ms-1" style="font-size: 1.1rem;"></i>' : '<i class="bi bi-sort-up text-success ms-1" style="font-size: 1.1rem;"></i>';
+                    const sort = currentSort.find(s => s.col === columnKey);
+                    const sortIndex = currentSort.findIndex(s => s.col === columnKey);
+                    const indexBadge = currentSort.length > 1 && sortIndex !== -1 ? `<span class="badge bg-success ms-1" style="font-size: 0.6rem; padding: 2px 4px;">${sortIndex + 1}</span>` : '';
+
+                    if (!sort) { return '<i class="bi bi-arrow-down-up text-secondary ms-1" style="font-size: 1rem; opacity: 0.4;"></i>'; }
+                    return (sort.dir === 'asc' ? '<i class="bi bi-sort-down-alt text-success ms-1" style="font-size: 1.1rem;"></i>' : '<i class="bi bi-sort-up text-success ms-1" style="font-size: 1.1rem;"></i>') + indexBadge;
                 }
                 function updateReuniaoFilters(rows) { mtBase = rows; updateReuniao(); }
 
@@ -5250,28 +5262,33 @@
                     thead.innerHTML = headerHTML;
 
                     rows.sort((a, b) => {
-                        if (!currentSort.col) {
+                        if (currentSort.length === 0) {
                             const pA = statusPriority(a.status), pB = statusPriority(b.status);
                             if (pA !== pB) return pA - pB;
                             const dA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 8640000000000000;
                             const dB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 8640000000000000;
                             return dA - dB;
                         }
-                        let valA, valB;
-                        switch (currentSort.col) {
-                            case 'prioritario': valA = isPrioritario(a) ? 1 : 0; valB = isPrioritario(b) ? 1 : 0; break;
-                            case 'processo': valA = a.processo || ""; valB = b.processo || ""; break;
-                            case 'meta': const mA = getMetaDate(a); const mB = getMetaDate(b); valA = mA ? mA.getTime() : 0; valB = mB ? mB.getTime() : 0; break;
-                            case 'status': valA = (a.status || "").toLowerCase(); valB = (b.status || "").toLowerCase(); break;
-                            case 'analista': valA = (a.analista || "").toString(); valB = (b.analista || "").toString(); break;
-                            case 'abertura': valA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 0; valB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 0; break;
-                            case 'dias': valA = a.dataAbertura instanceof Date ? (new Date() - a.dataAbertura) : -1; valB = b.dataAbertura instanceof Date ? (new Date() - b.dataAbertura) : -1; break;
-                            case 'contratante': valA = (a.contratante || "").toLowerCase(); valB = (b.contratante || "").toLowerCase(); break;
-                            case 'contratada': valA = (a.contratada || "").toLowerCase(); valB = (b.contratada || "").toLowerCase(); break;
-                            case 'descricao': valA = (a.descricao || "").toLowerCase(); valB = (b.descricao || "").toLowerCase(); break;
-                            default: return 0;
+
+                        for (let sort of currentSort) {
+                            let valA, valB;
+                            switch (sort.col) {
+                                case 'prioritario': valA = isPrioritario(a) ? 1 : 0; valB = isPrioritario(b) ? 1 : 0; break;
+                                case 'processo': valA = a.processo || ""; valB = b.processo || ""; break;
+                                case 'meta': const mA = getMetaDate(a); const mB = getMetaDate(b); valA = mA ? mA.getTime() : 0; valB = mB ? mB.getTime() : 0; break;
+                                case 'status': valA = (a.status || "").toLowerCase(); valB = (b.status || "").toLowerCase(); break;
+                                case 'analista': valA = (a.analista || "").toString(); valB = (b.analista || "").toString(); break;
+                                case 'abertura': valA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 0; valB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 0; break;
+                                case 'dias': valA = a.dataAbertura instanceof Date ? (new Date() - a.dataAbertura) : -1; valB = b.dataAbertura instanceof Date ? (new Date() - b.dataAbertura) : -1; break;
+                                case 'contratante': valA = (a.contratante || "").toLowerCase(); valB = (b.contratante || "").toLowerCase(); break;
+                                case 'contratada': valA = (a.contratada || "").toLowerCase(); valB = (b.contratada || "").toLowerCase(); break;
+                                case 'descricao': valA = (a.descricao || "").toLowerCase(); valB = (b.descricao || "").toLowerCase(); break;
+                                default: continue;
+                            }
+                            if (valA < valB) return sort.dir === 'asc' ? -1 : 1;
+                            if (valA > valB) return sort.dir === 'asc' ? 1 : -1;
                         }
-                        if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1; if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1; return 0;
+                        return 0;
                     });
 
                     mt.body.innerHTML = rows.map(d => {
@@ -5346,7 +5363,7 @@
                     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
                         e.preventDefault(); mt.search.value = "";
                         [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => { Array.from(el.options).forEach(o => o.selected = false); renderMultiSelectUI(el); });
-                        currentSort = { col: null, dir: 'asc' }; updateReuniao();
+                        currentSort = []; updateReuniao();
                     });
 
                     // Listeners de Orçamentos com Debounce
