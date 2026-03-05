@@ -24,6 +24,7 @@
     <script src="https://unpkg.com/docx@7.1.0/build/index.js" defer></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" defer></script>
 
 
     <style>
@@ -2498,10 +2499,17 @@
                             <div class="col-auto">
                                 <label class="form-label small text-muted fw-bold text-uppercase mb-1"
                                     style="visibility:hidden;">.</label>
-                                <button class="btn btn-sm btn-grid-clear w-100" id="btn-reuniao-clear"
-                                    style="height: 30px; line-height: 1;">
-                                    Limpar
-                                </button>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-success fw-bold" id="btn-reuniao-export"
+                                        style="height: 30px; line-height: 1; display: flex; align-items: center; gap: 4px;"
+                                        onclick="exportarProcessos()" title="Exportar resultado filtrado para Excel">
+                                        <i class="bi bi-file-earmark-excel"></i> Exportar
+                                    </button>
+                                    <button class="btn btn-sm btn-grid-clear" id="btn-reuniao-clear"
+                                        style="height: 30px; line-height: 1;">
+                                        Limpar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -5247,6 +5255,13 @@
                     const maxDias = rows.length > 0 ? Math.max(...rows.map(d => { if (d.dataAbertura instanceof Date) return Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)); return 0; })) : 0;
                     document.getElementById("card_proc_dias").textContent = maxDias;
 
+                    const btnExport = document.getElementById("btn-reuniao-export");
+                    if (btnExport) {
+                        btnExport.disabled = rows.length === 0;
+                        btnExport.title = rows.length === 0 ? "Nada para exportar" : "Exportar tudo do resultado filtrado para Excel";
+                    }
+                    window.currentVisibleRows = rows; // Armazena globalmente para exportação
+
                     const columns = [
                         { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prioritário", width: "80px", key: "prioritario", align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
                         { title: "Status", width: "146px", key: "status", align: "start" }, { title: "Analista", width: "100px", key: "analista", align: "center" }, { title: "Abertura", width: "100px", key: "abertura", align: "center" },
@@ -5341,6 +5356,305 @@
                         updateReuniao();
                     }));
                 }
+
+                async function exportarProcessos() {
+                    const rows = window.currentVisibleRows || [];
+                    if (rows.length === 0) {
+                        alert("Nenhum dado visível para exportar.");
+                        return;
+                    }
+
+                    // Verificar se ExcelJS está disponível
+                    if (typeof ExcelJS === 'undefined') {
+                        alert("❌ Biblioteca ExcelJS não carregada ainda. Aguarde e tente novamente.");
+                        return;
+                    }
+
+                    const btn = document.getElementById('btn-reuniao-export');
+                    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Gerando...'; }
+
+                    try {
+                        const now = new Date();
+                        const dateExport = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
+                        const userName = localStorage.getItem('sop_user_name') || 'Não identificado';
+
+                        // Coletar filtros ativos
+                        const filtrosAtivos = [];
+                        const metaVal = document.getElementById('meetingMetaSelect')?.value;
+                        const priorVal = document.getElementById('meetingPrioritarioSelect')?.value;
+                        const searchVal = document.getElementById('meetingSearch')?.value?.trim();
+                        if (metaVal) filtrosAtivos.push(`Meta: ${metaVal}`);
+                        if (priorVal) filtrosAtivos.push(`Prioritário: ${priorVal}`);
+                        if (searchVal) filtrosAtivos.push(`Busca: "${searchVal}"`);
+                        // Multi-selects de status e fiscal
+                        const statusSel = Array.from(document.getElementById('meetingStatusSelect')?.selectedOptions || []).map(o => o.text).filter(t => t !== 'Todos');
+                        const fiscalSel = Array.from(document.getElementById('meetingFiscalSelect')?.selectedOptions || []).map(o => o.text).filter(t => t !== 'Todos');
+                        if (statusSel.length > 0) filtrosAtivos.push(`Status: ${statusSel.join(', ')}`);
+                        if (fiscalSel.length > 0) filtrosAtivos.push(`Fiscal: ${fiscalSel.join(', ')}`);
+                        const filtrosStr = filtrosAtivos.length > 0 ? filtrosAtivos.join(' | ') : 'Sem filtros aplicados';
+
+                        // ── Criar workbook ExcelJS ──
+                        const workbook = new ExcelJS.Workbook();
+                        workbook.creator = 'GECOPE / SOP-CE';
+                        workbook.created = now;
+                        const ws = workbook.addWorksheet('Processos GECOPE', {
+                            pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+                        });
+
+                        // ── PALETA DE CORES SOP ──
+                        const COR_VERDE = '008F3D';   // Verde SOP principal
+                        const COR_VERDE_DARK = '007233';
+                        const COR_VERDE_CLARO = 'E8F5E9';   // fundo bloco logo
+                        const COR_CINZA_CLARO = 'F5F5F5';   // fundo linhas zebra
+                        const COR_HEADER_BG = '1B5E20';   // Verde escuro para cabeçalho da tabela
+                        const COR_META_BG = 'EEF8F1';   // Fundo linha de metadados
+
+                        // ── DEFINIÇÃO DAS COLUNAS (LARGURAS FIXAS CONFORME SOLICITADO) ──
+                        const colConfig = [
+                            { key: 'prioritario', header: 'Prioritário', width: 11 },
+                            { key: 'processo', header: 'Processo', width: 23 },
+                            { key: 'metaStatus', header: 'Meta (Status)', width: 16 },
+                            { key: 'dataMeta', header: 'Data Meta', width: 16 },
+                            { key: 'status', header: 'Status', width: 32 },
+                            { key: 'analista', header: 'Analista', width: 12 },
+                            { key: 'dataAbertura', header: 'Data Abertura', width: 16 },
+                            { key: 'dias', header: 'Dias', width: 9 },
+                            { key: 'contratante', header: 'Contratante', width: 14 },
+                            { key: 'contratada', header: 'Contratada', width: 35 },
+                            { key: 'descricao', header: 'Descrição', width: 75 },
+                        ];
+                        const totalCols = colConfig.length; // 11
+                        const ROW_MIN_H = 20;
+
+                        // Aplicar larguras fixas e chaves
+                        colConfig.forEach((c, i) => {
+                            ws.getColumn(i + 1).width = c.width;
+                            ws.getColumn(i + 1).key = c.key;
+                        });
+
+                        // ─────────────────────────────────────────
+                        // LINHA 1 – BLOCO LOGO (SOP-CE simulado)
+                        // ─────────────────────────────────────────
+                        ws.mergeCells(1, 1, 2, 2);
+                        const logoCell = ws.getCell('A1');
+                        logoCell.value = 'SOP-CE';
+                        logoCell.font = { name: 'Montserrat', bold: true, size: 22, color: { argb: 'FF' + COR_VERDE } };
+                        logoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_VERDE_CLARO } };
+                        logoCell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        logoCell.border = {
+                            top: { style: 'medium', color: { argb: 'FF' + COR_VERDE } },
+                            left: { style: 'medium', color: { argb: 'FF' + COR_VERDE } },
+                            bottom: { style: 'medium', color: { argb: 'FF' + COR_VERDE } },
+                            right: { style: 'thin', color: { argb: 'FF' + COR_VERDE } },
+                        };
+
+                        // Células C1 e C2 – Texto institucional
+                        ws.mergeCells(1, 3, 1, 6);
+                        const instCell1 = ws.getCell('C1');
+                        instCell1.value = 'ESTADO DO CEARÁ';
+                        instCell1.font = { name: 'Montserrat', bold: true, size: 12, color: { argb: 'FF333333' } };
+                        instCell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_VERDE_CLARO } };
+                        instCell1.alignment = { vertical: 'middle', horizontal: 'left' };
+
+                        ws.mergeCells(2, 3, 2, 6);
+                        const instCell2 = ws.getCell('C2');
+                        instCell2.value = 'SUPERINTENDÊNCIA DE OBRAS PÚBLICAS';
+                        instCell2.font = { name: 'Montserrat', bold: true, size: 11, color: { argb: 'FF' + COR_VERDE_DARK } };
+                        instCell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_VERDE_CLARO } };
+                        instCell2.alignment = { vertical: 'middle', horizontal: 'left' };
+
+                        // Células G1-K2 – Título do relatório
+                        ws.mergeCells(1, 7, 2, totalCols);
+                        const tituloCell = ws.getCell('G1');
+                        tituloCell.value = 'RELATÓRIO DE PROCESSOS – GECOPE';
+                        tituloCell.font = { name: 'Montserrat', bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+                        tituloCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_VERDE } };
+                        tituloCell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        tituloCell.border = {
+                            top: { style: 'medium', color: { argb: 'FF' + COR_VERDE_DARK } },
+                            right: { style: 'medium', color: { argb: 'FF' + COR_VERDE_DARK } },
+                            bottom: { style: 'medium', color: { argb: 'FF' + COR_VERDE_DARK } },
+                        };
+
+                        // Alturas do bloco de cabeçalho institucional (Título com altura de 22 conforme pedido)
+                        ws.getRow(1).height = 22;
+                        ws.getRow(2).height = 22;
+
+                        // ─────────────────────────────────────────
+                        // LINHA 3 – METADADOS
+                        // ─────────────────────────────────────────
+                        ws.mergeCells(3, 1, 3, 4);
+                        const metaDataCell = ws.getCell('A3');
+                        metaDataCell.value = `Exportado em: ${dateExport}`;
+                        metaDataCell.font = { name: 'Montserrat', italic: true, size: 9, color: { argb: 'FF555555' } };
+                        metaDataCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_META_BG } };
+                        metaDataCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+                        ws.mergeCells(3, 5, 3, 7);
+                        const metaUserCell = ws.getCell('E3');
+                        metaUserCell.value = `Usuário: ${userName}`;
+                        metaUserCell.font = { name: 'Montserrat', italic: true, size: 9, color: { argb: 'FF555555' } };
+                        metaUserCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_META_BG } };
+                        metaUserCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+                        ws.mergeCells(3, 8, 3, totalCols);
+                        const metaFiltCell = ws.getCell('H3');
+                        metaFiltCell.value = `Filtros: ${filtrosStr}`;
+                        metaFiltCell.font = { name: 'Montserrat', italic: true, size: 9, color: { argb: 'FF555555' } };
+                        metaFiltCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_META_BG } };
+                        metaFiltCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+                        ws.getRow(3).height = Math.max(ROW_MIN_H, 16);
+
+                        // ─────────────────────────────────────────
+                        // LINHA 4 – CONTADOR DE REGISTROS
+                        // ─────────────────────────────────────────
+                        ws.mergeCells(4, 1, 4, totalCols);
+                        const countCell = ws.getCell('A4');
+                        countCell.value = `Total de registros exportados: ${rows.length}`;
+                        countCell.font = { name: 'Montserrat', bold: true, size: 10, color: { argb: 'FF' + COR_VERDE_DARK } };
+                        countCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FFF4' } };
+                        countCell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        ws.getRow(4).height = Math.max(ROW_MIN_H, 16);
+
+                        // ─────────────────────────────────────────
+                        // LINHA 5 – CABEÇALHO DA TABELA
+                        // ─────────────────────────────────────────
+                        const TABLE_HEADER_ROW = 5;
+                        const headerRow = ws.getRow(TABLE_HEADER_ROW);
+                        headerRow.height = Math.max(ROW_MIN_H, 22);
+
+                        colConfig.forEach((c, i) => {
+                            const cell = headerRow.getCell(i + 1);
+                            cell.value = c.header;
+                            cell.font = { name: 'Montserrat', bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_HEADER_BG } };
+                            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false };
+                            cell.border = {
+                                top: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+                                bottom: { style: 'medium', color: { argb: 'FFFFFFFF' } },
+                                left: { style: 'thin', color: { argb: 'FF2E7D32' } },
+                                right: { style: 'thin', color: { argb: 'FF2E7D32' } },
+                            };
+                        });
+
+                        // ─────────────────────────────────────────
+                        // LINHAS DE DADOS
+                        // ─────────────────────────────────────────
+                        rows.forEach((d, idx) => {
+                            const metaSt = getMetaSt(d);
+                            const metaDate = getMetaDate(d)?.toLocaleDateString('pt-BR') || '';
+                            const abert = dateParaInput(d.dataAbertura);
+                            const dias = (d.dataAbertura instanceof Date)
+                                ? Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24))
+                                : null;
+
+                            const rowNum = TABLE_HEADER_ROW + 1 + idx;
+                            const dataRow = ws.getRow(rowNum);
+
+                            // Ajuste Dinâmico de Altura para Legibilidade (Folga na Altura)
+                            const descText = d.descricao || '';
+                            const numLines = Math.max(1, Math.ceil(descText.length / 75), (descText.match(/\n/g) || []).length + 1);
+                            if (numLines > 1) {
+                                dataRow.height = (numLines * 15) + 12; // Folga proporcional
+                            } else {
+                                dataRow.height = 22; // Altura padrão com folga
+                            }
+
+                            const cellsData = [
+                                { v: isPrioritario(d) ? 'Sim' : 'Não', hz: 'center', bold: isPrioritario(d) },
+                                { v: String(d.processo || ''), hz: 'center', bold: true, font: 9.5 },
+                                { v: metaSt, hz: 'center' },
+                                { v: metaDate, hz: 'center' },
+                                { v: d.status || '', hz: 'left' },
+                                { v: d.analista || '', hz: 'center' },
+                                { v: abert, hz: 'center' },
+                                { v: dias, hz: 'center' },
+                                { v: d.contratante || '', hz: 'center' },
+                                { v: d.contratada || '', hz: 'left' },
+                                { v: d.descricao || '', hz: 'justify' },
+                            ];
+
+                            cellsData.forEach((cd, ci) => {
+                                const cell = dataRow.getCell(ci + 1);
+                                cell.value = (cd.v !== null && cd.v !== '') ? cd.v : '';
+                                cell.font = {
+                                    name: 'Montserrat',
+                                    size: cd.font || 9,
+                                    bold: cd.bold || false,
+                                    color: { argb: 'FF222222' }
+                                };
+                                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                                cell.alignment = {
+                                    vertical: 'middle',
+                                    horizontal: cd.hz || 'left',
+                                    wrapText: true  // Permitir ajuste na altura
+                                };
+                                cell.border = {
+                                    top: { style: 'hair', color: { argb: 'FFDDDDDD' } },
+                                    bottom: { style: 'hair', color: { argb: 'FFDDDDDD' } },
+                                    left: { style: 'hair', color: { argb: 'FFDDDDDD' } },
+                                    right: { style: 'hair', color: { argb: 'FFDDDDDD' } },
+                                };
+                                if (ci === 7 && typeof cd.v === 'number') { cell.numFmt = '0'; }
+                                if (ci === 1) { cell.value = String(cd.v); cell.numFmt = '@'; }
+                            });
+
+                            // Prioritário: apenas realça o texto da célula "Sim" em verde
+                            if (isPrioritario(d)) {
+                                dataRow.getCell(1).font = { name: 'Montserrat', bold: true, size: 9, color: { argb: 'FF008F3D' } };
+                            }
+                        });
+
+                        // ─────────────────────────────────────────
+                        // FREEZE PANES – congelar até linha 5 (cabeçalho)
+                        // ─────────────────────────────────────────
+                        ws.views = [{
+                            state: 'frozen',
+                            xSplit: 0,
+                            ySplit: TABLE_HEADER_ROW,
+                            topLeftCell: `A${TABLE_HEADER_ROW + 1}`,
+                            activeCell: 'A6'
+                        }];
+
+                        // ─────────────────────────────────────────
+                        // AUTOFILTER na linha do cabeçalho da tabela
+                        // ─────────────────────────────────────────
+                        ws.autoFilter = {
+                            from: { row: TABLE_HEADER_ROW, column: 1 },
+                            to: { row: TABLE_HEADER_ROW, column: totalCols }
+                        };
+
+                        // ─────────────────────────────────────────
+                        // GERAR E BAIXAR ARQUIVO
+                        // ─────────────────────────────────────────
+                        const dateStr = now.toISOString().split('T')[0];
+                        const hh = String(now.getHours()).padStart(2, '0');
+                        const mm = String(now.getMinutes()).padStart(2, '0');
+                        const fileName = `Processos_GECOPE_${dateStr}_${hh}${mm}.xlsx`;
+
+                        const buffer = await workbook.xlsx.writeBuffer();
+                        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Exportar'; }
+                        // Feedback discreto (sem alert que interrompe)
+                        btn && (btn.innerHTML = '<i class="bi bi-check-lg text-success"></i> Exportado!');
+                        setTimeout(() => { if (btn) btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Exportar'; }, 3000);
+
+                    } catch (err) {
+                        console.error("Erro na exportação ExcelJS:", err);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Exportar'; }
+                        alert("❌ Ocorreu um erro ao gerar a planilha. Verifique o console para detalhes.");
+                    }
+                }
+
                 function populateAllTabFilters() {
                     populateFinanceiroFilters();
                     fillSelect(ger.status, allData.map(d => d.status)); fillSelect(pr.status, allData.map(d => d.status)); fillSelect(mt.status, allData.map(d => d.status));
