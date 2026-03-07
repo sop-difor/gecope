@@ -57,16 +57,15 @@
             display: none !important;
         }
 
+        /* apenas administradores veem elementos marcados como admin-only */
         body.is-admin .admin-only,
-        body.role-admin .admin-only,
-        body.role-gerente .admin-only {
+        body.role-admin .admin-only {
             display: inline-block !important;
         }
 
         /* Correção para cards flexíveis que são admin-only */
         body.is-admin .home-action-card.admin-only,
-        body.role-admin .home-action-card.admin-only,
-        body.role-gerente .home-action-card.admin-only {
+        body.role-admin .home-action-card.admin-only {
             display: flex !important;
         }
 
@@ -1771,11 +1770,11 @@
                     data-bs-target="#pane-home" data-bs-toggle="tab">Início</button></li>
             <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
                     data-bs-target="#pane-financeiro" data-bs-toggle="tab">Financeiro</button></li>
-            <li class="nav-item" data-roles="admin,gerente"><button class="nav-link" data-bs-target="#pane-gerencial"
+            <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link" data-bs-target="#pane-gerencial"
                     data-bs-toggle="tab">Gerencial</button></li>
-            <li class="nav-item" data-roles="admin,gerente"><button class="nav-link" data-bs-target="#pane-prazos"
+            <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link" data-bs-target="#pane-prazos"
                     data-bs-toggle="tab">Prazos</button></li>
-            <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
+            <li class="nav-item" data-roles="admin,gerente,fiscal,externo"><button class="nav-link"
                     data-bs-target="#pane-reuniao" data-bs-toggle="tab">Processos</button></li>
             <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
                     data-bs-target="#pane-orcamentos" data-bs-toggle="tab">Orçamentos</button></li>
@@ -1840,7 +1839,7 @@
                 <!-- Hub de Navegação (Tiles) -->
                 <div class="home-quick-actions-grid">
                     <!-- 1. Administração -->
-                    <div class="home-action-card admin-only" data-pane="pane-admin" onclick="showPane('pane-admin')">
+                    <div class="home-action-card" data-pane="pane-admin" onclick="showPane('pane-admin')">
                         <div class="home-action-icon" style="color: #666;"><i class="bi bi-shield-lock"></i></div>
                         <div class="home-action-text">
                             <h3>Administração</h3>
@@ -1873,7 +1872,7 @@
                         </div>
                     </div>
                     <!-- 5. Painel Gerencial -->
-                    <div class="home-action-card" data-pane="pane-gerencial" data-roles="admin,gerente"
+                    <div class="home-action-card" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
                         onclick="showPane('pane-gerencial')">
                         <div class="home-action-icon"><i class="bi bi-pie-chart"></i></div>
                         <div class="home-action-text">
@@ -1882,7 +1881,7 @@
                         </div>
                     </div>
                     <!-- 6. Prazos -->
-                    <div class="home-action-card" data-pane="pane-prazos" data-roles="admin,gerente"
+                    <div class="home-action-card" data-pane="pane-prazos" data-roles="admin,gerente,fiscal"
                         onclick="showPane('pane-prazos')">
                         <div class="home-action-icon"><i class="bi bi-clock-history"></i></div>
                         <div class="home-action-text">
@@ -2807,7 +2806,7 @@
     </div>
 
     <div class="modal fade" id="modalComentarioOrcamento" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header bg-warning-subtle">
                     <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>SOLICITAR REVISÃO /
@@ -2829,7 +2828,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label small fw-bold">MENSAGEM / SOLICITAÇÃO</label>
-                            <textarea class="form-control" name="MENSAGEM" rows="4" required
+                            <textarea class="form-control" name="MENSAGEM" rows="30" style="min-height: 200px;" required
                                 placeholder="Descreva o motivo da revisão ou seu comentário..."></textarea>
                         </div>
                         <div class="mb-3">
@@ -3848,6 +3847,62 @@
                     return val;
                 }
 
+                // --- SANITIZAR NOME DE ARQUIVO ---
+                function sanitizarNomeArquivo(nomeArquivo) {
+                    // Remove caracteres especiais, acentuação e espaços
+                    let nome = nomeArquivo.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    // Substitui espaços por underscore
+                    nome = nome.replace(/\s+/g, '_');
+                    // Remove caracteres especiais perigosos
+                    nome = nome.replace(/[^a-zA-Z0-9._-]/g, '');
+                    return nome;
+                }
+
+                // --- EXTRAIR PATH DO STORAGE DA URL ---
+                function extrairPathDoStorage(url) {
+                    if (!url) return null;
+                    try {
+                        const urlObj = new URL(url);
+                        // Remove o domínio e o path base, ficando apenas o caminho relativo
+                        const path = urlObj.pathname.replace('/storage/v1/object/public/', '');
+                        return path;
+                    } catch (e) {
+                        console.error('Erro ao extrair path:', e);
+                        return null;
+                    }
+                }
+
+                // --- LIMPAR ARQUIVOS DE COMENTÁRIOS RESOLVIDOS ---
+                async function limparArquivosComentariosResolvidos(table, storageBucket, comentarios) {
+                    if (!comentarios || !Array.isArray(comentarios)) return;
+
+                    const arquivosParaDeletar = [];
+
+                    for (const comentario of comentarios) {
+                        // Só deleta arquivos de comentários que foram resolvidos (atendidos ou recusados)
+                        if (comentario.arquivo && (comentario.decisao === 'atendido' || comentario.decisao === 'recusado')) {
+                            const path = extrairPathDoStorage(comentario.arquivo);
+                            if (path) {
+                                arquivosParaDeletar.push(path);
+                            }
+                        }
+                    }
+
+                    if (arquivosParaDeletar.length > 0) {
+                        try {
+                            console.log(`Deletando ${arquivosParaDeletar.length} arquivos de comentários resolvidos...`);
+                            const { error } = await sbClient.storage.from(storageBucket).remove(arquivosParaDeletar);
+                            if (error) {
+                                console.error('Erro ao deletar arquivos:', error);
+                            } else {
+                                console.log('Arquivos deletados com sucesso');
+                            }
+                        } catch (err) {
+                            console.error('Erro ao limpar arquivos:', err);
+                        }
+                    }
+                }
+
                 function calcRepercussao(acrescId, supressId, repercId) {
                     const elA = document.getElementById(acrescId);
                     const elS = document.getElementById(supressId);
@@ -4752,6 +4807,12 @@
                 function showPane(paneId) {
                     const tabBtn = document.querySelector(`#dashboardTabs [data-bs-target="#${paneId}"]`);
                     if (tabBtn) {
+                        // não tenta abrir abas que foram escondidas por permissões
+                        const container = tabBtn.closest('li');
+                        if (container && container.style.display === 'none') {
+                            console.warn(`Acesso negado ao painel ${paneId}`);
+                            return;
+                        }
                         tabBtn.click();
                         // Scroll suave para o topo para dar feedback visual de mudança de tela
                         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -4852,9 +4913,50 @@
                     });
 
                     wireEvents();
+                    applyRBACToPainels();
                     verificarAdminSalvo();
                     carregarOrcamentos();
                 });
+
+                // --- FUNÇÃO PARA APLICAR RBAC NOS PAINÉIS ---
+                function applyRBACToPainels() {
+                    const role = getCurrentUserRole();
+                    
+                    if (role === 'fiscal') {
+                        // Ocultar filtro de Fiscal para Fiscal (Painel Financeiro)
+                        if (fin.fiscal && fin.fiscal.parentElement) {
+                            fin.fiscal.parentElement.parentElement.style.display = 'none';
+                        }
+                        
+                        // Ocultar filtro de Fiscal para Fiscal (Painel Gerencial)
+                        if (ger.fiscal && ger.fiscal.parentElement) {
+                            ger.fiscal.parentElement.parentElement.style.display = 'none';
+                        }
+                        
+                        // Ocultar filtro de Fiscal para Fiscal (Painel Prazos)
+                        if (pr.fiscal && pr.fiscal.parentElement) {
+                            pr.fiscal.parentElement.parentElement.style.display = 'none';
+                        }
+                        
+                        // Desabilitar botão Limpar para Fiscal (Painel Financeiro)
+                        if (fin.clear) {
+                            fin.clear.disabled = true;
+                            fin.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
+                        }
+                        
+                        // Desabilitar botão Limpar para Fiscal (Painel Gerencial)
+                        if (ger.clear) {
+                            ger.clear.disabled = true;
+                            ger.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
+                        }
+                        
+                        // Desabilitar botão Limpar para Fiscal (Painel Prazos)
+                        if (pr.clear) {
+                            pr.clear.disabled = true;
+                            pr.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
+                        }
+                    }
+                }
 
                 function parseMoneyInput(val) { if (!val) return 0; return parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0; }
                 function formatMoneyInput(val) { return val.toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
@@ -5035,7 +5137,22 @@
                 function getFinanceiroData() {
                     const sts = getSelectedValues(fin.status); const tps = getSelectedValues(fin.tipo); const fis = getSelectedValues(fin.fiscal);
                     const cts = getSelectedValues(fin.contratada); const crs = getSelectedValues(fin.contratante); const ans = getSelectedValues(fin.ano);
+                    
+                    // Filtragem automática para Fiscal
+                    const role = getCurrentUserRole();
+                    const userFiscal = role === 'fiscal' ? localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || '' : '';
+                    
                     return allData.filter(d => {
+                        // Filtro automático para Fiscal
+                        if (role === 'fiscal' && userFiscal) {
+                            const dFiscal = (d.fiscal || "").toUpperCase().trim();
+                            const userFiscalUpper = userFiscal.toUpperCase().trim();
+                            // Normalização: remove pontos e hífens
+                            const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
+                            const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
+                            if (dFiscalNorm !== userFiscalNorm) return false;
+                        }
+                        
                         if (sts.length > 0 && !sts.includes(d.status)) return false;
                         if (tps.length > 0 && !tps.includes(d.tipo)) return false;
                         if (fis.length > 0 && !fis.includes(d.fiscal)) return false;
@@ -5135,7 +5252,28 @@
                 const ger = { fiscal: document.getElementById("gerencial-filter-fiscal"), status: document.getElementById("gerencial-filter-status"), clear: document.getElementById("btn-gerencial-clear") };
                 let gerBase = [];
                 function updateGerencialFilters(rows) { gerBase = rows; fillSelect(ger.fiscal, gerBase.map(d => d.fiscal)); fillSelect(ger.status, gerBase.map(d => d.status)); updateGerencial(); }
-                function getGerencialData() { const f = getSelectedValues(ger.fiscal); const s = getSelectedValues(ger.status); return gerBase.filter(d => (f.length === 0 || f.includes(d.fiscal)) && (s.length === 0 || s.includes(d.status))); }
+                function getGerencialData() { 
+                    const f = getSelectedValues(ger.fiscal); 
+                    const s = getSelectedValues(ger.status); 
+                    
+                    // Filtragem automática para Fiscal
+                    const role = getCurrentUserRole();
+                    const userFiscal = role === 'fiscal' ? localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || '' : '';
+                    
+                    return gerBase.filter(d => {
+                        // Filtro automático para Fiscal
+                        if (role === 'fiscal' && userFiscal) {
+                            const dFiscal = (d.fiscal || "").toUpperCase().trim();
+                            const userFiscalUpper = userFiscal.toUpperCase().trim();
+                            // Normalização: remove pontos e hífens
+                            const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
+                            const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
+                            if (dFiscalNorm !== userFiscalNorm) return false;
+                        }
+                        
+                        return (f.length === 0 || f.includes(d.fiscal)) && (s.length === 0 || s.includes(d.status));
+                    });
+                }
                 function updateGerencial() {
                     const rows = getGerencialData();
                     document.getElementById("gerencial-count-badge").textContent = `${rows.length} processos`;
@@ -5148,7 +5286,28 @@
                 const pr = { fiscal: document.getElementById("prazos-filter-fiscal"), status: document.getElementById("prazos-filter-status"), clear: document.getElementById("btn-prazos-clear") };
                 let przBase = [];
                 function updatePrazosFilters(rows) { przBase = rows; fillSelect(pr.fiscal, przBase.map(d => d.fiscal)); fillSelect(pr.status, przBase.map(d => d.status)); updatePrazos(); }
-                function getPrazosData() { const f = getSelectedValues(pr.fiscal); const s = getSelectedValues(pr.status); return przBase.filter(d => (f.length === 0 || f.includes(d.fiscal)) && (s.length === 0 || s.includes(d.status))); }
+                function getPrazosData() { 
+                    const f = getSelectedValues(pr.fiscal); 
+                    const s = getSelectedValues(pr.status); 
+                    
+                    // Filtragem automática para Fiscal
+                    const role = getCurrentUserRole();
+                    const userFiscal = role === 'fiscal' ? localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || '' : '';
+                    
+                    return przBase.filter(d => {
+                        // Filtro automático para Fiscal
+                        if (role === 'fiscal' && userFiscal) {
+                            const dFiscal = (d.fiscal || "").toUpperCase().trim();
+                            const userFiscalUpper = userFiscal.toUpperCase().trim();
+                            // Normalização: remove pontos e hífens
+                            const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
+                            const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
+                            if (dFiscalNorm !== userFiscalNorm) return false;
+                        }
+                        
+                        return (f.length === 0 || f.includes(d.fiscal)) && (s.length === 0 || s.includes(d.status));
+                    });
+                }
                 function updatePrazos() {
                     const rows = getPrazosData();
                     const aprov = rows.filter(d => String(d.status).toUpperCase().includes("APROVADO") && isFinite(d.prazoDias));
@@ -5166,7 +5325,17 @@
                 let mtBase = [];
                 function getMetaDate(row, setD) {
                     const key = `meta:${row.processo}`;
-                    if (setD !== undefined) { if (!setD) localStorage.removeItem(key); else localStorage.setItem(key, setD.toISOString().substring(0, 10)); row.dataCompromissoFiscal = setD; return setD; }
+                    if (setD !== undefined) {
+                        // RBAC: apenas admins podem definir/excluir metas
+                        if (!canMarkDateAsMeta()) {
+                            console.warn(`[RBAC] usuário não pode alterar meta do processo ${row.processo}`);
+                            return null;
+                        }
+                        if (!setD) localStorage.removeItem(key);
+                        else localStorage.setItem(key, setD.toISOString().substring(0, 10));
+                        row.dataCompromissoFiscal = setD;
+                        return setD;
+                    }
                     if (row.dataCompromissoFiscal instanceof Date) return row.dataCompromissoFiscal;
                     const ls = localStorage.getItem(key); if (ls) { const d = isoParaDate(ls); if (d) { row.dataCompromissoFiscal = d; return d; } }
                     return null;
@@ -5199,6 +5368,14 @@
                 }
 
                 async function setPrioritario(processo, isPriority) {
+                    // RBAC guard - apenas administradores podem alterar prioridade
+                    if (!canMarkProcessAsPriority()) {
+                        const role = getCurrentUserRole();
+                        console.warn(`[RBAC] Usuário (${role}) não tem permissão para marcar como prioritário`);
+                        alert('Você não tem permissão para marcar processos como prioritário.');
+                        return;
+                    }
+
                     // 1. Atualizar imediatamente em memória (feedback visual instantâneo)
                     const row = allData.find(d => d.processo === processo);
                     if (row) row.prioritario = isPriority;
@@ -5398,8 +5575,8 @@
                         const fiscalNome = (d.fiscal || "").toUpperCase();
                         return `
         <tr style="vertical-align: middle;">
-            <td class="text-center">${uRole !== 'fiscal' ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : ''}</td>
-            <td class="text-center"><input type="checkbox" class="checkbox-prioritario ${uRole !== 'admin' ? 'readonly-checkbox' : ''}" data-proc="${escapeHTML(d.processo)}" ${isPrioritario(d) ? 'checked' : ''} title="${uRole === 'admin' ? 'Marcar como prioritário' : 'Processo Prioritário'}" ${uRole !== 'admin' ? 'onclick="return false;" tabindex="-1"' : ''} /></td>
+            <td class="text-center">${['admin', 'gerente'].includes(uRole) ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : ''}</td>
+            <td class="text-center"><input type="checkbox" class="checkbox-prioritario ${uRole !== 'admin' ? 'readonly-checkbox' : ''}" data-proc="${escapeHTML(d.processo)}" ${isPrioritario(d) ? 'checked' : ''} title="${uRole === 'admin' ? 'Marcar como prioritário' : 'Você não tem permissão'}" ${uRole !== 'admin' ? 'onclick=\"return false;\" tabindex=\"-1\"' : ''} /></td>
             <td><div style="font-weight: 700; font-size: 0.95rem; color: #000; white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1 text-muted" style="font-size: 0.75rem; font-weight: 500;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
             <td><div class="mb-1"><span class="badge rounded-pill ${mCls}" style="font-size: 0.75rem;">${mSt}</span></div><input type="date" class="form-control form-control-sm" style="font-size: 0.75rem; padding: 2px 4px; height: auto;" data-proc="${escapeHTML(d.processo)}" value="${mIso}" title="Alterar Meta" ${uRole !== 'admin' ? 'disabled' : ''} /></td>
             <td><span class="badge rounded-pill ${stCls} badge-custom-size">${d.status}</span></td>
@@ -5999,15 +6176,17 @@
                     }
 
                     // 1. Visibilidade de Abas e Tiles por Atributo data-roles
+                    // -> cards iniciais devem permanecer visíveis para todos os papéis;
+                    //    a lógica de restrição de acesso é tratada no showPane() e em cada função.
                     document.querySelectorAll('[data-roles]').forEach(el => {
+                        if (el.classList.contains('home-action-card')) {
+                            // sempre mostra o tile
+                            el.style.setProperty('display', 'flex', 'important');
+                            return;
+                        }
                         const allowed = el.getAttribute('data-roles').split(',');
                         if (allowed.includes(role)) {
-                            // Se for um card, usa flex, senão usa block (ou o default)
-                            if (el.classList.contains('home-action-card')) {
-                                el.style.setProperty('display', 'flex', 'important');
-                            } else {
-                                el.style.setProperty('display', 'block', 'important');
-                            }
+                            el.style.setProperty('display', 'block', 'important');
                         } else {
                             el.style.setProperty('display', 'none', 'important');
                         }
@@ -6030,14 +6209,16 @@
                     // 2. Elementos .admin-only
                     document.querySelectorAll('.admin-only').forEach(el => {
                         if (el.id !== 'btn-nova-comp-analitica') {
-                            el.style.display = (role === 'admin' || role === 'gerente') ? '' : 'none';
+                            el.style.display = (role === 'admin') ? '' : 'none';
                         }
                     });
 
                     // 3. Botões Específicos
                     const btnNovaComp = document.getElementById('btn-nova-comp-analitica');
                     if (btnNovaComp) {
-                        btnNovaComp.style.display = (role === 'admin' || role === 'fiscal') ? 'inline-block' : 'none';
+                        // now all authenticated roles can see the "nova composição analítica" link
+                        // guests and pending users will still have it hidden via their role string
+                        btnNovaComp.style.display = (role && role !== 'guest' && role !== 'pending') ? 'inline-block' : 'none';
                     }
 
                     // 4. Elementos Hide Fiscal
@@ -6067,6 +6248,141 @@
                             if (roleEl) roleEl.textContent = role;
                         }
                     }
+
+                    // Aplicar regras de RBAC nos painéis
+                    if (typeof applyRBACToPainels === 'function') {
+                        applyRBACToPainels();
+                    }
+                }
+
+                // --- FUNÇÕES DE CONTROLE DE RBAC (ROLE-BASED ACCESS CONTROL) ---
+                /**
+                 * Retorna o papel atual do usuário logado
+                 */
+                function getCurrentUserRole() {
+                    return (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                }
+
+                /**
+                 * Retorna o email do usuário logado
+                 */
+                function getCurrentUserEmail() {
+                    return localStorage.getItem('sop_user') || '';
+                }
+
+                /**
+                 * Verifica se o usuario é proprietário de uma composição/orçamento
+                 * @param {Object} item - O item (composição ou orçamento)
+                 * @returns {boolean} - True se o usuário é o dono
+                 */
+                function isItemOwner(item) {
+                    const userEmail = getCurrentUserEmail();
+                    const currentUserName = (localStorage.getItem('sop_user_name') || '').toUpperCase();
+                    const currentFiscalName = (localStorage.getItem('sop_fiscal_name') || '').toUpperCase();
+
+                    // Para composições, verifica criador
+                    const criador = item.criador_email || item.criado_por || item.created_by || '';
+                    const autorV1 = item.historico_versoes?.[0]?.autor || criador || item.criador_nome || item.autor || '';
+
+                    if (userEmail && autorV1.toUpperCase().includes(userEmail.toUpperCase())) return true;
+                    if (currentUserName && autorV1.toUpperCase().includes(currentUserName)) return true;
+                    if (currentFiscalName && autorV1.toUpperCase().includes(currentFiscalName)) return true;
+                    return false;
+                }
+
+                /**
+                 * Verifica se o usuário pode editar uma composição
+                 * Regra: Admin pode editar todas. Gerente/Fiscal/Externo podem editar apenas suas próprias
+                 */
+                function canEditComposition(item) {
+                    const role = getCurrentUserRole();
+                    if (role === 'admin') return true;
+                    if (['gerente', 'fiscal', 'externo'].includes(role)) {
+                        return isItemOwner(item);
+                    }
+                    return false;
+                }
+
+                /**
+                 * Verifica se o usuário pode deletar uma composição
+                 * Regra: Admin pode deletar todas. Gerente/Fiscal/Externo podem deletar apenas suas próprias
+                 */
+                function canDeleteComposition(item) {
+                    const role = getCurrentUserRole();
+                    if (role === 'admin') return true;
+                    if (['gerente', 'fiscal', 'externo'].includes(role)) {
+                        return isItemOwner(item);
+                    }
+                    return false;
+                }
+
+                /**
+                 * Verifica se o usuário pode fazer upload de composição
+                 * Regra: Apenas Admin
+                 */
+                function canUploadComposition() {
+                    return getCurrentUserRole() === 'admin';
+                }
+
+                /**
+                 * Verifica se o usuário pode criar novo orçamento
+                 * Regra: Apenas Admin
+                 */
+                function canCreateBudget() {
+                    return getCurrentUserRole() === 'admin';
+                }
+
+                /**
+                 * Verifica se o usuário pode criar nova versão de orçamento
+                 * Regra: Apenas Admin
+                 */
+                function canCreateBudgetVersion() {
+                    return getCurrentUserRole() === 'admin';
+                }
+
+                /**
+                 * Verifica se o usuário pode deletar um orçamento
+                 * Regra: Apenas Admin
+                 */
+                function canDeleteBudget() {
+                    return getCurrentUserRole() === 'admin';
+                }
+
+                /**
+                 * Verifica se o usuário pode visualizar abas de Painel Financeiro/Gerencial/Prazos
+                 * e se os dados devem ser filtrados por fiscal responsável
+                 */
+                function shouldFilterDataByFiscal() {
+                    return getCurrentUserRole() === 'fiscal';
+                }
+
+                /**
+                 * Verifica se o usuário pode ver ações em processos (botões de ação)
+                 * Regra: Apenas Admin e Gerente. Fiscal e Externo não podem ver
+                 */
+                function canSeeProcessActions() {
+                    const role = getCurrentUserRole();
+                    return ['admin', 'gerente'].includes(role);
+                }
+
+                /**
+                 * Verifica se o usuário pode marcar processo como prioritário
+                 * Regra: Apenas Admin e Gerente. Fiscal e Externo não podem
+                 */
+                function canMarkProcessAsPriority() {
+                    const role = getCurrentUserRole();
+                    // apenas administrador pode alterar prioridades
+                    return role === 'admin';
+                }
+
+                /**
+                 * Verifica se o usuário pode marcar data como meta
+                 * Regra: apenas Admin pode (
+                 */
+                function canMarkDateAsMeta() {
+                    const role = getCurrentUserRole();
+                    // gerentes não têm essa permissão
+                    return role === 'admin';
                 }
 
                 // --- ADMIN DASHBOARD LOGIC ---
@@ -6995,11 +7311,16 @@
                         // 1. Pegar dados atuais
                         const { data: currentData } = await sbClient.from('orcamentos_biblioteca').select('*').eq('id', id).single();
 
-                        // 2. Calcular nova versão
+                        // 2. LIMPAR ARQUIVOS DE COMENTÁRIOS RESOLVIDOS
+                        if (currentData.comentarios_revisao && currentData.comentarios_revisao.length > 0) {
+                            await limparArquivosComentariosResolvidos('orcamentos_biblioteca', 'orcamentos', currentData.comentarios_revisao);
+                        }
+
+                        // 3. Calcular nova versão
                         const currentV = parseInt(currentData.versao_atual.replace(/[^0-9]/g, '')) || 1;
                         const newVersionLabel = `V${currentV + 1}`;
 
-                        // 3. Upload Novo Arquivo
+                        // 4. Upload Novo Arquivo
                         const nomeLimpo = arquivo.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9.-]/g, "_");
                         const pathParts = currentData.arquivo_path.split('/');
                         if (pathParts.length > 1) pathParts.pop();
@@ -7011,7 +7332,7 @@
 
                         const { data: publicUrlData } = sbClient.storage.from('orcamentos').getPublicUrl(newStoragePath);
 
-                        // 4. Atualizar Histórico de Versões
+                        // 5. Atualizar Histórico de Versões
                         const oldHistory = currentData.historico_versoes || [];
                         oldHistory.push({
                             versao: currentData.versao_atual,
@@ -7020,7 +7341,7 @@
                             motivo: 'Versão arquivada'
                         });
 
-                        // 5. Update na Tabela -> AQUI MUDA O STATUS PARA "ATUALIZADO"
+                        // 6. Update na Tabela -> AQUI MUDA O STATUS PARA "ATUALIZADO"
                         const { error: updateError } = await sbClient
                             .from('orcamentos_biblioteca')
                             .update({
@@ -7043,7 +7364,7 @@
                         // Log de Atividade
                         registrarAtividade('ORCAMENTO', `atualizou a versão (${newVersionLabel}) do orçamento: ${currentData?.nome_obra || 'N/A'}`, '', currentData?.nome_obra);
 
-                        alert(`Versão ${newVersionLabel} enviada! Status alterado para ATUALIZADO.`);
+                        alert(`Versão ${newVersionLabel} enviada! Status alterado para ATUALIZADO. Arquivos de comentários resolvidos foram limpos.`);
                         bootstrap.Modal.getInstance(document.getElementById('modalNovaVersao')).hide();
                         carregarOrcamentos();
 
@@ -7097,40 +7418,46 @@
 
                     if (!autor || !msg) { alert("Preencha autor e mensagem."); return; }
 
-                    let anexoUrl = null;
-                    if (arquivoAnexo) {
-                        const path = `anexos_comentarios/${id}_${Date.now()}_${arquivoAnexo.name}`;
-                        await sbClient.storage.from('orcamentos').upload(path, arquivoAnexo);
-                        const { data } = sbClient.storage.from('orcamentos').getPublicUrl(path);
-                        anexoUrl = data.publicUrl;
+                    try {
+                        let anexoUrl = null;
+                        if (arquivoAnexo) {
+                            const nomeLinpo = sanitizarNomeArquivo(arquivoAnexo.name);
+                            const path = `anexos_comentarios/${id}_${Date.now()}_${nomeLinpo}`;
+                            const { error: uploadError } = await sbClient.storage.from('orcamentos').upload(path, arquivoAnexo);
+                            if (uploadError) throw uploadError;
+                            const { data } = sbClient.storage.from('orcamentos').getPublicUrl(path);
+                            anexoUrl = data.publicUrl;
+                        }
+
+                        // Buscar histórico atual
+                        const { data: curr } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao, nome_obra').eq('id', id).single();
+                        const novoArr = curr.comentarios_revisao || [];
+
+                        novoArr.unshift({
+                            autor: autor,
+                            mensagem: msg,
+                            data: new Date().toISOString(),
+                            arquivo: anexoUrl,
+                            decisao: 'pendente' // Novo comentário nasce pendente
+                        });
+
+                        // Atualiza status para "Em Revisão"
+                        const { error: updateError } = await sbClient.from('orcamentos_biblioteca').update({
+                            comentarios_revisao: novoArr,
+                            status: 'Em Revisão'  // <--- FORÇA O STATUS DE REVISÃO
+                        }).eq('id', id);
+
+                        if (updateError) throw updateError;
+
+                        // Log de Atividade
+                        registrarAtividade('ORCAMENTO', `adicionou um comentário no orçamento: ${curr?.nome_obra || 'N/A'}`, '', curr?.nome_obra);
+
+                        alert("Solicitação enviada!");
+                        bootstrap.Modal.getInstance(document.getElementById('modalComentarioOrcamento')).hide();
+                        carregarOrcamentos();
+                    } catch (err) {
+                        alert("Erro ao enviar: " + err.message);
                     }
-
-                    // Buscar histórico atual
-                    const { data: curr } = await sbClient.from('orcamentos_biblioteca').select('comentarios_revisao, nome_obra').eq('id', id).single();
-                    const novoArr = curr.comentarios_revisao || [];
-
-                    novoArr.unshift({
-                        autor: autor,
-                        mensagem: msg,
-                        data: new Date().toISOString(),
-                        arquivo: anexoUrl,
-                        decisao: 'pendente' // Novo comentário nasce pendente
-                    });
-
-                    // Atualiza status para "Em Revisão"
-                    const { error: updateError } = await sbClient.from('orcamentos_biblioteca').update({
-                        comentarios_revisao: novoArr,
-                        status: 'Em Revisão'  // <--- FORÇA O STATUS DE REVISÃO
-                    }).eq('id', id);
-
-                    if (updateError) throw updateError;
-
-                    // Log de Atividade
-                    registrarAtividade('ORCAMENTO', `adicionou um comentário no orçamento: ${curr?.nome_obra || 'N/A'}`, '', curr?.nome_obra);
-
-                    alert("Solicitação enviada!");
-                    bootstrap.Modal.getInstance(document.getElementById('modalComentarioOrcamento')).hide();
-                    carregarOrcamentos();
                 }
 
                 // Função auxiliar usada internamente
@@ -7160,6 +7487,14 @@
                     try {
                         const { data } = await sbClient.from(table).select('comentarios_revisao, status, versao_atual').eq('id', id).single();
                         const hist = data.comentarios_revisao || [];
+
+                        // Verificar se o comentário tem arquivo anexado antes de resolver
+                        const comentarioAtual = hist[index];
+                        let arquivoParaDeletar = null;
+                        if (comentarioAtual && comentarioAtual.arquivo) {
+                            arquivoParaDeletar = comentarioAtual.arquivo;
+                        }
+
                         if (hist[index]) {
                             hist[index].decisao = decision;
                             hist[index].resp_admin = respText || (decision === 'atendido' ? "Solicitação atendida." : "Solicitação não acatada.");
@@ -7184,6 +7519,25 @@
                             status: novoStatus
                         }).eq('id', id);
                         if (error) throw error;
+
+                        // --- LIMPAR ARQUIVO ANEXADO APÓS RESOLVER O COMENTÁRIO ---
+                        if (arquivoParaDeletar) {
+                            const storageBucket = table === 'orcamentos_biblioteca' ? 'orcamentos' : 'composicoes_biblioteca';
+                            const path = extrairPathDoStorage(arquivoParaDeletar);
+                            if (path) {
+                                try {
+                                    console.log(`Deletando arquivo anexado do comentário resolvido: ${path}`);
+                                    const { error: deleteError } = await sbClient.storage.from(storageBucket).remove([path]);
+                                    if (deleteError) {
+                                        console.error('Erro ao deletar arquivo:', deleteError);
+                                    } else {
+                                        console.log('Arquivo deletado com sucesso');
+                                    }
+                                } catch (err) {
+                                    console.error('Erro ao limpar arquivo:', err);
+                                }
+                            }
+                        }
 
                         alert("Ação realizada com sucesso!");
                         bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
@@ -7392,6 +7746,12 @@
 
                     try {
                         const { data: currentData } = await sbClient.from('composicoes_biblioteca').select('*').eq('id', id).single();
+
+                        // LIMPAR ARQUIVOS DE COMENTÁRIOS RESOLVIDOS
+                        if (currentData.comentarios_revisao && currentData.comentarios_revisao.length > 0) {
+                            await limparArquivosComentariosResolvidos('composicoes_biblioteca', 'composicoes_biblioteca', currentData.comentarios_revisao);
+                        }
+
                         const currentV = parseInt(currentData.versao_atual.replace(/[^0-9]/g, '')) || 1;
                         const newVersionLabel = `V${currentV + 1}`;
 
@@ -7428,7 +7788,7 @@
                             await sbClient.from('composicoes_biblioteca').update({ comentarios_revisao: novoArr }).eq('id', id);
                         }
 
-                        alert(`Versão ${newVersionLabel} de Composição enviada!`);
+                        alert(`Versão ${newVersionLabel} de Composição enviada! Arquivos de comentários resolvidos foram limpos.`);
 
                         // Log de Atividade
                         registrarAtividade('COMPOSICAO', `atualizou a versão (${newVersionLabel}) da composição: ${currentData?.descricao || 'N/A'}`, '', currentData?.descricao);
@@ -7492,7 +7852,8 @@
                     try {
                         let anexoUrl = null;
                         if (anexo) {
-                            const path = `anexos_comentarios/${id}_${Date.now()}_${anexo.name}`;
+                            const nomeLinpo = sanitizarNomeArquivo(anexo.name);
+                            const path = `anexos_comentarios/${id}_${Date.now()}_${nomeLinpo}`;
                             const { error: uploadError } = await sbClient.storage.from('composicoes_biblioteca').upload(path, anexo);
                             if (uploadError) throw uploadError;
                             anexoUrl = sbClient.storage.from('composicoes_biblioteca').getPublicUrl(path).data.publicUrl;
@@ -7745,14 +8106,14 @@
                                         <div class="orcamento-actions">
                                             <button class="btn btn-action-baixar" onclick="prepararExportacaoComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Imprimir Composição"><i class="bi bi-printer"></i> Imprimir</button>
                                             <button class="btn btn-action-icon ms-1" onclick="visualizarComposicao(${obra.id}, '${obra.arquivo_url || ''}')" title="Visualizar Documento"><i class="bi bi-eye-fill text-primary"></i></button>
-                                            ${(isOwner || isAdmin) ? `
+                                            ${canEditComposition(obra) ? `
                                                 ${isAnalytical ?
                                             `<button class="btn btn-action-icon" onclick="editarComposicaoAnalitica(${obra.id})" title="Alterar Composição"><i class="bi bi-pencil-square text-primary"></i></button>` :
                                             `<button class="btn btn-action-icon" onclick="prepararNovaVersaoComposicao(${obra.id})" title="Alterar Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>`
                                         }
                                             ` : ''}
                                             <button class="btn btn-action-icon" onclick="prepararComentarioComposicao(${obra.id})" title="Adicionar Comentário"><i class="bi bi-chat-left-text-fill text-warning"></i></button>
-                                            ${(isOwner || isAdmin) ? `
+                                            ${canDeleteComposition(obra) ? `
                                                 <button class="btn btn-action-icon" onclick="deletarComposicao(${obra.id}, '${obra.arquivo_path}')" title="Excluir Composição"><i class="bi bi-trash-fill icon-trash"></i></button>
                                             ` : ''}
                                         </div>
@@ -10622,7 +10983,7 @@
 
             <!-- 2. COMENTAR / SOLICITAR REVISÃO (COMPOSIÇÕES) -->
             <div class="modal fade" id="modalComentarioComposicao" tabindex="-1">
-                <div class="modal-dialog">
+                <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header bg-warning-subtle">
                             <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>SOLICITAR
@@ -10645,7 +11006,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-bold">MENSAGEM / SOLICITAÇÃO</label>
-                                    <textarea class="form-control" name="MENSAGEM" rows="4" required
+                                    <textarea class="form-control" name="MENSAGEM" rows="30" style="min-height: 200px;" required
                                         placeholder="Descreva o motivo da revisão ou seu comentário..."></textarea>
                                 </div>
                                 <div class="mb-3">
