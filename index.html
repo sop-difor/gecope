@@ -4056,7 +4056,7 @@
                     // Senão assume formato internacional (1234.56)
                     
                     const resultado = parseFloat(limpo);
-                    return (isFinite(resultado) && resultado >= 0) ? resultado : 0;
+                    return isFinite(resultado) ? resultado : 0;
                 }
 
                 function isoParaDate(isoStr) {
@@ -5990,7 +5990,9 @@
                         if (confirm("Deseja sair do modo Administrador?")) {
                             document.body.classList.remove('is-admin');
                             localStorage.removeItem('is_admin_gecope');
-                            localStorage.removeItem('sop_user');
+                            // Ao sair do modo admin forçado, colocamos o role para 'guest' e reaplicamos a UI
+                            localStorage.setItem('sop_role', 'guest');
+                            applyRoleToUI('guest');
                             atualizarIconesCadeado(true);
                             alert("Modo de visualização ativado.");
                             if (document.querySelector('.modal.show')) location.reload();
@@ -6025,6 +6027,9 @@
                         document.body.classList.add('is-admin');
                         localStorage.setItem('is_admin_gecope', 'true');
                         localStorage.setItem('sop_user', user);
+                        // Garantir consistência: marca o role como 'admin' e reaplica as regras de UI
+                        localStorage.setItem('sop_role', 'admin');
+                        applyRoleToUI('admin');
                         atualizarIconesCadeado(false);
                         const modal = bootstrap.Modal.getInstance(document.getElementById('modalLogin'));
                         if (modal) modal.hide();
