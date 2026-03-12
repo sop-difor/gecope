@@ -4572,7 +4572,9 @@
                 }
 
                 // --- 5. CORE: DETALHES, ATUALIZAR E EXCLUIR ---
-                function abrirDetalhes(processoStr) {
+                async function abrirDetalhes(processoStr) {
+                    // garante que a role local esteja atualizada com o servidor
+                    await refreshUserRole();
                     const row = allData.find(d => d.processo === processoStr);
                     if (!row) { alert("Erro: Dados não encontrados na memória."); return; }
 
@@ -4613,7 +4615,8 @@
                     const elNota = document.getElementById('det_notas_locais');
                     if (elNota) elNota.value = notaSalva || "";
 
-                    const isAdmin = document.body.classList.contains('is-admin');
+                    // Determina se o usuário atual é admin a partir da role mais recente
+                    const isAdmin = (getCurrentUserRole() === 'admin');
                     const inputs = document.querySelectorAll('#formDetalhes input, #formDetalhes select, #formDetalhes textarea');
                     inputs.forEach(el => { el.disabled = !isAdmin; });
 
@@ -6279,6 +6282,31 @@
                  */
                 function getCurrentUserEmail() {
                     return localStorage.getItem('sop_user') || '';
+                }
+
+                /**
+                 * Busca a role atual do usuário no servidor (tabela app_users)
+                 * e atualiza localStorage + UI se houver alteração.
+                 */
+                async function refreshUserRole() {
+                    try {
+                        const email = getCurrentUserEmail();
+                        if (!email) return;
+                        const { data, error } = await sbClient.from('app_users').select('role').eq('email', email).single();
+                        if (error) {
+                            console.warn('[WARN] refreshUserRole: erro ao buscar role', error.message || error);
+                            return;
+                        }
+                        const newRole = (data?.role || 'guest').toLowerCase();
+                        const curRole = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                        if (newRole !== curRole) {
+                            localStorage.setItem('sop_role', newRole);
+                            console.log('[INFO] Role atualizada de', curRole, 'para', newRole);
+                            applyRoleToUI(newRole);
+                        }
+                    } catch (err) {
+                        console.error('[ERRO] refreshUserRole:', err);
+                    }
                 }
 
                 /**
