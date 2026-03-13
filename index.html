@@ -5399,6 +5399,19 @@
                         if (error) {
                             console.error('[ERRO] Falha ao marcar processo prioritário: ', error.message);
                             alert("Aviso: Falha de conexão ao salvar status prioritário nas nuvens.");
+                        } else {
+                            // Registrar atividade: Admin marcou/desmarcou prioridade
+                            try {
+                                const acao = isPriority ? 'marcou como prioritário' : 'desmarcou como prioritário';
+                                await registrarAtividade('PROCESSO', `${acao} o processo Nº ${processo}`, processo, (row && row.descricao) || '', (row && row.fiscal) || '');
+                            } catch (regErr) {
+                                console.error('Erro ao registrar atividade de prioridade:', regErr);
+                            }
+
+                            // Atualiza o resumo de atividades na Home, se disponível
+                            if (typeof carregarAtividadesResumoHome === 'function') {
+                                try { carregarAtividadesResumoHome(); } catch (e) { /* noop */ }
+                            }
                         }
                     } catch (e) {
                         console.error("Erro interno no setPrioritario:", e);
