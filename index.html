@@ -6003,7 +6003,7 @@
                 // Abre o modal de login em vez do prompt
                 const modalEl = document.getElementById('modalLogin');
                 if (modalEl) {
-                    const modal = new bootstrap.Modal(modalEl);
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                     modal.show();
                 } else {
                     // Fallback: prompt com senha mestre
@@ -6032,7 +6032,7 @@
                     localStorage.setItem('sop_role', 'admin');
                     applyRoleToUI('admin');
                     atualizarIconesCadeado(false);
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalLogin'));
+                    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalLogin'));
                     if (modal) modal.hide();
                     alert("🔓 Modo Administrador Ativado!");
                 } else {
@@ -6638,7 +6638,7 @@
                     sel.appendChild(opt);
                 });
 
-                new bootstrap.Modal(document.getElementById('modalVincularFiscal')).show();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modalVincularFiscal')).show();
             }
 
             async function aprovarUsuario(email, role = 'externo', skipConfirm = false) {
@@ -6916,7 +6916,7 @@
             function openModuleSelector() {
                 // Se ainda não existe, cria
                 if (!document.getElementById('modalModuleSelector')) buildModuleSelector();
-                const modal = new bootstrap.Modal(document.getElementById('modalModuleSelector'));
+                const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalModuleSelector'));
                 modal.show();
             }
 
@@ -7041,7 +7041,7 @@
                     // Limpar e Fechar
                     form.reset();
                     const modalEl = document.getElementById('modalNovoOrcamento');
-                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                     modal.hide();
 
                     carregarOrcamentos();
@@ -7306,9 +7306,9 @@
 
 
             // Hook para buscar ao digitar (debounce simples)
-            document.getElementById('orcamento-search').addEventListener('input', () => {
+            document.getElementById('orcamento-search')?.addEventListener('input', debounce(() => {
                 carregarOrcamentos();
-            });
+            }, 500));
 
             // Clear Listener Orçamentos
             document.getElementById('btn-orc-clear')?.addEventListener('click', () => {
@@ -7323,7 +7323,7 @@
             function prepararNovaVersao(id) {
                 document.getElementById('update-id-orcamento').value = id;
                 document.getElementById('formNovaVersao').reset();
-                new bootstrap.Modal(document.getElementById('modalNovaVersao')).show();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovaVersao')).show();
             }
 
             /* --- ENVIO DE NOVA VERSÃO (MUDA STATUS PARA ATUALIZADO) --- */
@@ -7396,7 +7396,7 @@
                     registrarAtividade('ORCAMENTO', `atualizou a versão (${newVersionLabel}) do orçamento: ${currentData?.nome_obra || 'N/A'}`, '', currentData?.nome_obra);
 
                     alert(`Versão ${newVersionLabel} enviada! Status alterado para ATUALIZADO. Arquivos de comentários resolvidos foram limpos.`);
-                    bootstrap.Modal.getInstance(document.getElementById('modalNovaVersao')).hide();
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovaVersao')).hide();
                     carregarOrcamentos();
 
                 } catch (err) {
@@ -7761,7 +7761,7 @@
             function prepararNovaVersaoComposicao(id) {
                 document.getElementById('update-id-composicao').value = id;
                 document.getElementById('formNovaVersaoComposicao').reset();
-                new bootstrap.Modal(document.getElementById('modalNovaVersaoComposicao')).show();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovaVersaoComposicao')).show();
             }
 
             async function enviarNovaVersaoComposicao() {
@@ -8197,7 +8197,8 @@
                 const modaisParaMover = [
                     'modalCadastrarComposicao', 'modalNovaVersaoComposicao', 'modalAtenderComposicao',
                     'modalRecusarComposicao', 'modalCriarComposicaoAnalitica', 'modalBuscarItemComposicao',
-                    'modalComentarioOrcamento', 'modalComentarioComposicao', 'modalExportarComposicao'
+                    'modalComentarioOrcamento', 'modalComentarioComposicao', 'modalExportarComposicao',
+                    'modalNovaVersao', 'modalNovoOrcamento', 'modalLogin', 'modalVincularFiscal'
                 ];
                 modaisParaMover.forEach(id => {
                     const el = document.getElementById(id);
@@ -8292,7 +8293,7 @@
 
                 await atualizarVersoesBusca(); // Load initial versions
 
-                new bootstrap.Modal(document.getElementById('modalBuscarItemComposicao')).show();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modalBuscarItemComposicao')).show();
             }
 
             window.toggleBuscaItemMode = function () {
@@ -9035,7 +9036,7 @@
                     registrarAtividade('COMPOSICAO', `${idEdicao ? 'editou' : 'criou manualmente'} a composição analítica: ${nomeObra}`, '', nomeObra);
 
                     alert("✅ Composição salva com sucesso!");
-                    bootstrap.Modal.getInstance(document.getElementById('modalCriarComposicaoAnalitica')).hide();
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalCriarComposicaoAnalitica')).hide();
                     form.reset();
                     currentCompositionItems = [];
                     if (typeof renderItemsTable === 'function') renderItemsTable();
