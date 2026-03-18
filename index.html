@@ -4453,7 +4453,9 @@
                 }
 
                 // 2. Verificação Local (Feedback Instantâneo)
-                const existeLocal = allData.some(d => d.processo === numProcesso);
+                // Usando .trim() para evitar que falhas passadas (espaços no banco) mascarem duplicidade
+                const numProcessoLimpo = numProcesso.replace(/\s+/g, "");
+                const existeLocal = allData.some(d => (d.processo || "").replace(/\s+/g, "") === numProcessoLimpo);
                 if (existeLocal) {
                     alert("Este número de processo já consta na lista local.");
                     return;
@@ -4469,7 +4471,8 @@
                     const { data: dbCheck, error: checkError } = await sbClient
                         .from('processos')
                         .select('id')
-                        .eq('processo', numProcesso)
+                        .like('processo', `${numProcesso}%`)
+                        .limit(1)
                         .maybeSingle();
 
                     if (checkError) {
@@ -5478,22 +5481,41 @@
                 const s = getSelectedValues(mt.status).filter(v => v !== "");
                 const m = getSelectedValues(mt.meta).filter(v => v !== "");
                 const priorFilt = getSelectedValues(mt.prioritario).filter(v => v !== "");
-                const q = mt.search.value.toLowerCase();
+                const qRaw = mt.search.value.trim();
 
                 if (uRole !== 'fiscal' && f.length > 0) rows = rows.filter(d => f.includes(d.fiscal));
                 if (s.length > 0) rows = rows.filter(d => s.includes(d.status));
                 if (m.length > 0) rows = rows.filter(d => m.includes(getMetaSt(d)));
                 if (priorFilt.length > 0) rows = rows.filter(d => priorFilt.includes(isPrioritario(d) ? "Sim" : "Não"));
-                if (q) {
+                if (qRaw) {
+                    const normalizeText = (text) => (text || "").normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                    const qNormalized = normalizeText(qRaw);
+                    const terms = qNormalized.split(/\s+/).filter(t => t.length > 0);
+                    const escapeRE = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
                     rows = rows.filter(d => {
                         const proc = (d.processo || "").toLowerCase();
-                        const contrat = (d.contratante || "").toLowerCase();
-                        const desc = (d.descricao || "").toLowerCase();
-                        const analistaNome = (d.nomeAnalista || "").toLowerCase();
-                        const fiscal = (d.fiscal || "").toLowerCase();
-                        const status = (d.status || "").toLowerCase();
-                        const contratada = (d.contratada || "").toLowerCase();
-                        return proc.includes(q) || contrat.includes(q) || contratada.includes(q) || desc.includes(q) || analistaNome.includes(q) || fiscal.includes(q) || status.includes(q);
+                        const contrat = normalizeText(d.contratante);
+                        const desc = normalizeText(d.descricao);
+                        const analistaNome = normalizeText(d.nomeAnalista);
+                        const fiscal = normalizeText(d.fiscal);
+                        const status = normalizeText(d.status);
+                        const contratada = normalizeText(d.contratada);
+
+                        return terms.every(term => {
+                            const termEq = escapeRE(term);
+                            // Usando \b garantimos que "pio" só encontre palavras que comecem com "pio" 
+                            // (não achará dentro de "município")
+                            const regex = new RegExp(`\\b${termEq}`, 'i');
+
+                            return proc.includes(term) ||
+                                regex.test(contratada) ||
+                                regex.test(contrat) ||
+                                regex.test(desc) ||
+                                regex.test(analistaNome) ||
+                                regex.test(fiscal) ||
+                                regex.test(status);
+                        });
                     });
                 }
                 document.getElementById("meetingFooterNote").textContent = `Exibindo ${rows.length} processos`;
