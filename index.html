@@ -3806,7 +3806,7 @@
 
             // LISTA DE FISCAIS (FIXA - SOLICITAÇÃO USUÁRIO)
             const FISCAIS_LIST = [
-                'ÁGABE SOUSA','ALEXANDRE HORTÊNCIO','ANTÔNIO EDSON','ANTÔNIO ELDER','ANTÔNIO ROLIM','ARTHUR EDÍSIO','CARLOS RIOS',
+                'ÁGABE SOUSA', 'ALEXANDRE HORTÊNCIO', 'ANTÔNIO EDSON', 'ANTÔNIO ELDER', 'ANTÔNIO ROLIM', 'ARTHUR EDÍSIO', 'CARLOS RIOS',
                 'CLOVIS FONTENELE',
                 'CRISTIANA PALÁCIO',
                 'CRISTIANO GUILHERME',
@@ -3865,7 +3865,7 @@
                 'WEBER TEIXEIRA',
                 'WESLEY PEDROSA',
                 'WILSON MACHADO'
-                ];
+            ];
 
             function carregarListaFiscais() {
                 console.log('Lista de Usuários carregada (Estática):', FISCAIS_LIST.length);
@@ -5371,9 +5371,29 @@
                         console.warn(`[RBAC] usuário não pode alterar meta do processo ${row.processo}`);
                         return null;
                     }
+
+                    const valSupabase = setD ? setD.toISOString().substring(0, 10) : null;
+
                     if (!setD) localStorage.removeItem(key);
-                    else localStorage.setItem(key, setD.toISOString().substring(0, 10));
+                    else localStorage.setItem(key, valSupabase);
+
                     row.dataCompromissoFiscal = setD;
+
+                    // Sincroniza ativamente com o Supabase quando alterado pelo Painel (Tabela)
+                    sbClient.from('processos')
+                        .update({ data_compromisso_fiscal: valSupabase })
+                        .eq('processo', row.processo)
+                        .then(({ error }) => {
+                            if (error) {
+                                console.error('[ERRO] Falha ao sincronizar meta na base de dados: ', error.message);
+                            } else {
+                                try {
+                                    const acao = valSupabase ? `definiu a meta para ${valSupabase.split('-').reverse().join('/')}` : 'removeu a meta';
+                                    registrarAtividade('PROCESSO', `Usuário ${acao} no processo Nº ${row.processo}`, row.processo, (row && row.descricao) || '', (row && row.fiscal) || '');
+                                } catch (e) { }
+                            }
+                        });
+
                     return setD;
                 }
                 if (row.dataCompromissoFiscal instanceof Date) return row.dataCompromissoFiscal;
@@ -5386,6 +5406,7 @@
                 if (!md) return "Sem meta";
                 return md.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0) ? "Atrasado" : "No prazo";
             }
+            // Ordem ORIGINAL (para preservar a ordem de carregamento padrão da tela inicial)
             function statusPriority(status) {
                 const raw = (status || "").toString().toUpperCase().trim();
                 const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -5399,6 +5420,35 @@
                 if (s.includes("CONTRATANTE")) return 8;
                 if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
                 if (s.includes("ARQUIVADO")) return 10;
+                return 99;
+            }
+
+            // Ordem REVISADA (aplicada apenas ao "filtro"/setinha da coluna Status quando clicada)
+            function statusFilterPriority(status) {
+                const raw = (status || "").toString().toUpperCase().trim();
+                const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+                // 1. Em Reanálise
+                if (s.includes("EM REAN") || (s.startsWith("EM") && s.includes("REAN"))) return 1;
+                // 2. Em Análise
+                if ((s.includes("EM ANALIS") || s === "ANALISE") && !s.includes("FISCAL") && !s.includes("REAN")) return 2;
+                // 3. Aguard. Reanálise
+                if (s.includes("AGUAR") && s.includes("REAN")) return 3;
+                // 4. Aguard. Análise
+                if (s.includes("AGUAR") && s.includes("ANALIS") && !s.includes("FISCAL") && !s.includes("REAN")) return 4;
+                // 5. Devolvido p/ Reanálise Fiscal
+                if (s.includes("DEVOLVIDO")) return 5;
+                // 6. Análise Fiscal
+                if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO")) return 6;
+                // 7. Aguard. Aprovação
+                if (s.includes("AGUAR") && s.includes("APROVA")) return 7;
+                // 8. Contratante
+                if (s.includes("CONTRATANTE")) return 8;
+                // 9. Aprovado
+                if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
+                // 10. Arquivado
+                if (s.includes("ARQUIVADO")) return 10;
+
                 return 99;
             }
 
@@ -5613,10 +5663,10 @@
                             case 'prioritario': valA = isPrioritario(a) ? 1 : 0; valB = isPrioritario(b) ? 1 : 0; break;
                             case 'processo': valA = a.processo || ""; valB = b.processo || ""; break;
                             case 'meta': const mA = getMetaDate(a); const mB = getMetaDate(b); valA = mA ? mA.getTime() : 0; valB = mB ? mB.getTime() : 0; break;
-                            case 'status': valA = (a.status || "").toLowerCase(); valB = (b.status || "").toLowerCase(); break;
+                            case 'status': valA = statusFilterPriority(a.status); valB = statusFilterPriority(b.status); break;
                             case 'analista': valA = (a.analista || "").toString(); valB = (b.analista || "").toString(); break;
                             case 'abertura': valA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 0; valB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 0; break;
-                            case 'dias': valA = a.dataAbertura instanceof Date ? (new Date() - a.dataAbertura) : -1; valB = b.dataAbertura instanceof Date ? (new Date() - b.dataAbertura) : -1; break;
+                            case 'dias': valA = a.dataAbertura instanceof Date ? -(new Date() - a.dataAbertura) : 1; valB = b.dataAbertura instanceof Date ? -(new Date() - b.dataAbertura) : 1; break;
                             case 'contratante': valA = (a.contratante || "").toLowerCase(); valB = (b.contratante || "").toLowerCase(); break;
                             case 'contratada': valA = (a.contratada || "").toLowerCase(); valB = (b.contratada || "").toLowerCase(); break;
                             case 'descricao': valA = (a.descricao || "").toLowerCase(); valB = (b.descricao || "").toLowerCase(); break;
@@ -10407,6 +10457,12 @@
                                 if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
                                 const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
+                                // Inicializa os inputs de BDI e Desconto no cabeçalho do Modal
+                                const inputBdi = document.getElementById('modal-report-bdi');
+                                const inputDesc = document.getElementById('modal-report-desc');
+                                if (inputBdi) inputBdi.value = (docData.bdi || 0).toString().replace(',', '.');
+                                if (inputDesc) inputDesc.value = (docData.desconto || 0).toString().replace(',', '.');
+
                                 // Mostra loader
                                 modalBody.innerHTML = `<div class="p-5 text-center text-muted"><div class="spinner-border text-success mb-3"></div><p>Carregando Relatório GECOPE...</p></div>`;
                                 modal.show();
@@ -10437,6 +10493,24 @@
                 }
             }
 
+            // NOVA FUNÇÃO: Recalcula o relatório com base nos inputs de BDI e DESC do Modal
+            function recalcularRelatorioSOP() {
+                if (!currentCompositionData) return;
+                const modalBdi = document.getElementById('modal-report-bdi');
+                const modalDesc = document.getElementById('modal-report-desc');
+                
+                // Converte string para número com fallback para 0, tratando vírgula
+                const parseVal = (str) => parseFloat((str || "0").toString().replace(',', '.')) || 0;
+                
+                currentCompositionData.bdi = modalBdi ? parseVal(modalBdi.value) : 0;
+                currentCompositionData.desconto = modalDesc ? parseVal(modalDesc.value) : 0;
+                
+                const modalBody = document.getElementById('modal-report-body');
+                if(modalBody) {
+                    renderizarRelatorioSOP_HTML(currentCompositionData, modalBody);
+                }
+            }
+
             function renderizarRelatorioSOP_HTML(dados, container) {
                 const parseLocalNum = (v) => {
                     if (v === undefined || v === null || v === '') return 0;
@@ -10456,8 +10530,8 @@
                 const codigo = dados.codigo || 'N/A';
                 const descricao = (dados.descricao || 'SEM DESCRIÇÃO').toUpperCase();
                 const unidade = dados.unidade || 'N/A';
-                const bdiText = (dados.bdi !== null && dados.bdi !== undefined) ? (dados.bdi + '%') : '0,00%';
-                const descText = (dados.desconto !== null && dados.desconto !== undefined) ? (dados.desconto + '%') : '0,00%';
+                const bdiText = (dados.bdi !== null && dados.bdi !== undefined) ? (safeLoc(dados.bdi, 2) + '%') : '0,00%';
+                const descText = (dados.desconto !== null && dados.desconto !== undefined) ? (safeLoc(dados.desconto, 2) + '%') : '0,00%';
 
                 // Lógica de Diferenciação: SOP Oficial (GEROA) vs Usuário (GECOPE)
                 const isOficial = (dados.usuario || '').toUpperCase() === 'SOP';
@@ -11292,10 +11366,23 @@
         <div class="modal fade" id="modalDetalheComposicao" tabindex="-1">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content border-0 shadow-lg">
-                    <div class="modal-header bg-dark text-white py-2">
-                        <h6 class="modal-title fw-bold"><i class="bi bi-file-text me-2"></i>RELATÓRIO DE COMPOSIÇÃO
+                    <div class="modal-header bg-dark text-white py-2 align-items-center">
+                        <h6 class="modal-title fw-bold mb-0"><i class="bi bi-file-text me-2"></i>RELATÓRIO DE COMPOSIÇÃO
                             ANALÍTICA</h6>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        
+                        <!-- NOVOS BOTÕES PARA INFORMAR BDI E DESC DENTRO DO RELATÓRIO -->
+                        <div class="ms-auto d-flex align-items-center me-3" style="gap: 10px;">
+                            <div class="input-group input-group-sm" style="width: 140px;" title="Informe o Desconto (%)">
+                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold" style="font-size: 0.75rem;">DESC %</span>
+                                <input type="number" class="form-control text-end" id="modal-report-desc" step="0.01" min="0" max="100" placeholder="0.00" onchange="recalcularRelatorioSOP()">
+                            </div>
+                            <div class="input-group input-group-sm" style="width: 140px;" title="Informe o BDI (%)">
+                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold" style="font-size: 0.75rem;">BDI %</span>
+                                <input type="number" class="form-control text-end" id="modal-report-bdi" step="0.01" min="0" max="100" placeholder="0.00" onchange="recalcularRelatorioSOP()">
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-close btn-close-white m-0" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body p-0 bg-white" id="modal-report-body">
                         <!-- O conteúdo do relatório será injetado aqui pelo JS -->
