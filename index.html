@@ -7240,15 +7240,38 @@
                 const role = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
                 const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
 
-                const { data, error } = await sbClient
-                    .from('orcamentos_biblioteca')
-                    .select('*')
-                    .order('categoria', { ascending: true })
-                    .order('subcategoria', { ascending: true })
-                    // O banco ordena alfabeticamente (10 antes de 6), corrigiremos no JS abaixo
-                    .order('nome_obra', { ascending: true });
+                let data = [];
+                let hasMore = true;
+                let blockStart = 0;
+                const blockSize = 1000;
+                let queryError = null;
 
-                if (error) { container.innerHTML = `Erro: ${error.message}`; return; }
+                while (hasMore) {
+                    const { data: bData, error } = await sbClient
+                        .from('orcamentos_biblioteca')
+                        .select('*')
+                        .order('categoria', { ascending: true })
+                        .order('subcategoria', { ascending: true })
+                        .order('nome_obra', { ascending: true })
+                        .range(blockStart, blockStart + blockSize - 1);
+
+                    if (error) {
+                        queryError = error;
+                        break;
+                    }
+
+                    if (bData && bData.length > 0) {
+                        data = data.concat(bData);
+                        blockStart += blockSize;
+                        if (bData.length < blockSize) {
+                            hasMore = false;
+                        }
+                    } else {
+                        hasMore = false;
+                    }
+                }
+
+                if (queryError) { container.innerHTML = `Erro: ${queryError.message}`; return; }
                 if (data.length === 0) { container.innerHTML = `<div class="text-center mt-5 text-muted">Nenhum orçamento encontrado.</div>`; return; }
 
                 const arvore = {};
@@ -8116,16 +8139,40 @@
                 container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success"></div><div class="mt-2 text-secondary fw-bold">Carregando composições...</div></div>';
 
                 try {
-                    const { data, error } = await sbClient
-                        .from('composicoes_biblioteca')
-                        .select('*')
-                        .order('usuario', { ascending: true })
-                        .order('subcategoria', { ascending: true })
-                        .order('descricao', { ascending: true });
+                    let data = [];
+                    let hasMore = true;
+                    let blockStart = 0;
+                    const blockSize = 1000;
+                    let queryError = null;
 
-                    if (error) {
-                        console.error('[ERRO Composições]', error);
-                        container.innerHTML = `<div class="alert alert-danger">Erro ao carregar banco: ${error.message}</div>`;
+                    while (hasMore) {
+                        const { data: bData, error } = await sbClient
+                            .from('composicoes_biblioteca')
+                            .select('*')
+                            .order('usuario', { ascending: true })
+                            .order('subcategoria', { ascending: true })
+                            .order('descricao', { ascending: true })
+                            .range(blockStart, blockStart + blockSize - 1);
+
+                        if (error) {
+                            queryError = error;
+                            break;
+                        }
+
+                        if (bData && bData.length > 0) {
+                            data = data.concat(bData);
+                            blockStart += blockSize;
+                            if (bData.length < blockSize) {
+                                hasMore = false;
+                            }
+                        } else {
+                            hasMore = false;
+                        }
+                    }
+
+                    if (queryError) {
+                        console.error('[ERRO Composições]', queryError);
+                        container.innerHTML = `<div class="alert alert-danger">Erro ao carregar banco: ${queryError.message}</div>`;
                         return;
                     }
 
@@ -10498,15 +10545,15 @@
                 if (!currentCompositionData) return;
                 const modalBdi = document.getElementById('modal-report-bdi');
                 const modalDesc = document.getElementById('modal-report-desc');
-                
+
                 // Converte string para número com fallback para 0, tratando vírgula
                 const parseVal = (str) => parseFloat((str || "0").toString().replace(',', '.')) || 0;
-                
+
                 currentCompositionData.bdi = modalBdi ? parseVal(modalBdi.value) : 0;
                 currentCompositionData.desconto = modalDesc ? parseVal(modalDesc.value) : 0;
-                
+
                 const modalBody = document.getElementById('modal-report-body');
-                if(modalBody) {
+                if (modalBody) {
                     renderizarRelatorioSOP_HTML(currentCompositionData, modalBody);
                 }
             }
@@ -11369,16 +11416,21 @@
                     <div class="modal-header bg-dark text-white py-2 align-items-center">
                         <h6 class="modal-title fw-bold mb-0"><i class="bi bi-file-text me-2"></i>RELATÓRIO DE COMPOSIÇÃO
                             ANALÍTICA</h6>
-                        
+
                         <!-- NOVOS BOTÕES PARA INFORMAR BDI E DESC DENTRO DO RELATÓRIO -->
                         <div class="ms-auto d-flex align-items-center me-3" style="gap: 10px;">
-                            <div class="input-group input-group-sm" style="width: 140px;" title="Informe o Desconto (%)">
-                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold" style="font-size: 0.75rem;">DESC %</span>
-                                <input type="number" class="form-control text-end" id="modal-report-desc" step="0.01" min="0" max="100" placeholder="0.00" onchange="recalcularRelatorioSOP()">
+                            <div class="input-group input-group-sm" style="width: 140px;"
+                                title="Informe o Desconto (%)">
+                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold"
+                                    style="font-size: 0.75rem;">DESC %</span>
+                                <input type="number" class="form-control text-end" id="modal-report-desc" step="0.01"
+                                    min="0" max="100" placeholder="0.00" onchange="recalcularRelatorioSOP()">
                             </div>
                             <div class="input-group input-group-sm" style="width: 140px;" title="Informe o BDI (%)">
-                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold" style="font-size: 0.75rem;">BDI %</span>
-                                <input type="number" class="form-control text-end" id="modal-report-bdi" step="0.01" min="0" max="100" placeholder="0.00" onchange="recalcularRelatorioSOP()">
+                                <span class="input-group-text bg-secondary text-white border-secondary fw-bold"
+                                    style="font-size: 0.75rem;">BDI %</span>
+                                <input type="number" class="form-control text-end" id="modal-report-bdi" step="0.01"
+                                    min="0" max="100" placeholder="0.00" onchange="recalcularRelatorioSOP()">
                             </div>
                         </div>
 
