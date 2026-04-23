@@ -1698,6 +1698,12 @@
                         required /></div>
                 <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha" class="form-control"
                         required /></div>
+                <div class="mb-3">
+                    <input id="reg-telefone" type="tel" placeholder="WhatsApp (DDD+Núm)" class="form-control"
+                        maxlength="15" />
+                    <div class="form-text mt-1 text-white-50" style="font-size: 0.70rem; line-height: 1;">Apenas
+                        números. Opcional.</div>
+                </div>
                 <div id="reg-feedback" class="alert alert-danger py-2 px-3 small" style="display: none;"></div>
                 <button class="btn btn-primary w-100 fw-bold py-2" type="submit">Solicitar Cadastro</button>
                 <div class="text-center mt-3">
@@ -1987,14 +1993,17 @@
 
                 <!-- User Management -->
                 <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
-                    <div class="card-header bg-white py-3 border-0">
-                        <div class="row align-items-center g-3">
-                            <div class="col-md-6 text-center text-md-start">
-                                <h5 class="fw-bold text-dark mb-0"><i class="bi bi-people-fill me-2"></i>Gestão de
-                                    Usuários Ativos</h5>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="d-flex gap-2 justify-content-md-end">
+                    <div class="card-header bg-success text-white py-3 border-0 d-flex justify-content-between align-items-center"
+                        role="button" data-bs-toggle="collapse" data-bs-target="#collapseUserMgmt"
+                        aria-expanded="false">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-people-fill me-2"></i>Gestão de Usuários Ativos</h5>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                    <div id="collapseUserMgmt" class="collapse">
+                        <div class="card-body bg-light p-0">
+                            <!-- Search & Refresh Control Bar -->
+                            <div class="d-flex justify-content-end p-3 border-bottom bg-white">
+                                <div class="d-flex gap-2">
                                     <div class="input-group input-group-sm" style="max-width: 300px;">
                                         <span class="input-group-text bg-light border-end-0"><i
                                                 class="bi bi-search text-muted"></i></span>
@@ -2008,26 +2017,506 @@
                                     </button>
                                 </div>
                             </div>
+
+                            <div class="table-responsive" style="max-height: 60vh;">
+                                <table class="table table-hover align-middle mb-0 bg-white">
+                                    <thead class="bg-light sticky-top shadow-sm">
+                                        <tr>
+                                            <th class="ps-4">Nome / Usuário</th>
+                                            <th>E-mail</th>
+                                            <th>WhatsApp</th>
+                                            <th>Matrícula</th>
+                                            <th>Função / Perfil</th>
+                                            <th class="text-end pe-4">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-users-table-body">
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4 text-muted small">Carregando
+                                                usuários...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                    <div class="table-responsive" style="max-height: 60vh;">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light sticky-top">
-                                <tr>
-                                    <th class="ps-4">Nome / Usuário</th>
-                                    <th>E-mail</th>
-                                    <th>Matrícula</th>
-                                    <th>Função / Perfil</th>
-                                    <th class="text-end pe-4">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-users-table-body">
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted small">Carregando usuários...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                </div>
+
+                <!-- PAINEL DE GESTÃO DO WHATSAPP -->
+                <div class="card border-0 shadow-sm overflow-hidden mt-4" style="border-radius: 12px;">
+                    <div class="card-header bg-success text-white py-3 border-0 d-flex justify-content-between align-items-center"
+                        role="button" data-bs-toggle="collapse" data-bs-target="#collapseWhatsAppConfig"
+                        aria-expanded="false" onclick="WhatsAppConfigManager.loadAll()">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-whatsapp me-2"></i>Configurações de Notificações</h5>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                    <div id="collapseWhatsAppConfig" class="collapse">
+                        <div class="card-body bg-light" style="max-height: 60vh; overflow-y: auto;">
+                            <div class="accordion" id="accordionWhatsAppConfig">
+                                <!-- STATUS DA CONEXÃO -->
+                                <div class="card border-0 shadow-sm mb-3 bg-light">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-0 fw-bold">Status da API WhatsApp</h6>
+                                                <small id="ws-status-text" class="text-secondary">Verificando
+                                                    conexão...</small>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                    onclick="verificarStatusEvolution()">
+                                                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                                                </button>
+                                                <a href="https://evolution-api-production-1522.up.railway.app/manager"
+                                                    target="_blank" class="btn btn-sm btn-success">
+                                                    <i class="bi bi-qr-code-scan"></i> Conectar WhatsApp
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- NOVA ABA: LOGS DE DISPAROS PENDENTES/FALHAS -->
+                                <div class="accordion-item shadow-sm border-0 mb-3">
+                                    <h2 class="accordion-header" id="headingLogs">
+                                        <button class="accordion-button collapsed bg-white text-dark fw-bold"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#collapseLogs">
+                                            <i class="bi bi-list-check me-2 text-info"></i> Histórico de Envios e Falhas
+                                        </button>
+                                    </h2>
+                                    <div id="collapseLogs" class="accordion-collapse collapse"
+                                        data-bs-parent="#accordionWhatsAppConfig">
+                                        <div class="accordion-body bg-white p-0">
+                                            <div
+                                                class="d-flex justify-content-between align-items-center p-3 bg-light border-bottom">
+                                                <span class="small text-muted">Últimos disparos registrados no
+                                                    sistema</span>
+                                                <button class="btn btn-xs btn-primary p-1 px-2"
+                                                    style="font-size: 0.70rem;" onclick="carregarLogsWhatsApp()">
+                                                    <i class="bi bi-arrow-clockwise"></i> Atualizar Logs
+                                                </button>
+                                            </div>
+                                            <div class="table-responsive" style="max-height: 350px;">
+                                                <table class="table table-sm table-hover small mb-0">
+                                                    <thead class="bg-light sticky-top">
+                                                        <tr>
+                                                            <th>Data/Hora</th>
+                                                            <th>Evento</th>
+                                                            <th>Destinatário</th>
+                                                            <th>Número</th>
+                                                            <th>Status</th>
+                                                            <th class="text-center">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="ws-logs-table-body">
+                                                        <tr>
+                                                            <td colspan="5" class="text-center py-3">Carregando
+                                                                histórico...</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ABA PROCESSOS -->
+                                <div class="accordion-item shadow-sm border-0 mb-3">
+                                    <h2 class="accordion-header" id="headingProc">
+                                        <button class="accordion-button collapsed bg-white text-dark fw-bold"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#collapseProc">
+                                            <i class="bi bi-file-earmark-text me-2 text-primary"></i> Notificações de
+                                            Processos
+                                        </button>
+                                    </h2>
+                                    <div id="collapseProc" class="accordion-collapse collapse"
+                                        data-bs-parent="#accordionWhatsAppConfig">
+                                        <div class="accordion-body bg-white">
+                                            <!-- Novo Processo -->
+                                            <form id="formConfigProcNovo" class="border-bottom pb-3 mb-3"
+                                                data-gatilho="novo_processo">
+                                                <h6 class="fw-bold text-primary">1. Cadastro de Novo Processo</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch" checked>
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto"
+                                                        rows="10"
+                                                        style="resize: vertical; min-height: 150px;">Olá, Fiscal [NOME_FISCAL]! Foi cadastrado na GECOPE o processo NUP [NUP_PROCESSO] - [NOME_OBRA]. Este processo foi encaminhado para a Fiscalização analisar.</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('novo_processo')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                    <div class="form-text text-muted small">Variáveis:
+                                                        <code>[NOME_FISCAL]</code>, <code>[NUP_PROCESSO]</code>,
+                                                        <code>[NOME_OBRA]</code>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label
+                                                        class="form-label d-block small fw-bold">Destinatários</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input config-dest-indiv"
+                                                            type="checkbox" checked>
+                                                        <label class="form-check-label small">Disparo Individual (Fiscal
+                                                            do Processo)</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input config-dest-geral"
+                                                            type="checkbox">
+                                                        <label class="form-check-label small">Disparo Geral</label>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="WhatsAppConfigManager.save('novo_processo', this.form)">
+                                                    <i class="bi bi-save me-1"></i> Salvar Novo Processo
+                                                </button>
+                                            </form>
+
+                                            <!-- Alteração de Status -->
+                                            <form id="formConfigProcStatus" class="border-bottom pb-3 mb-3"
+                                                data-gatilho="mudanca_status_processo">
+                                                <h6 class="fw-bold text-primary">2. Alteração de Status</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch">
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">Olá, Fiscal [NOME_FISCAL]! O processo NUP [NUP_PROCESSO] teve uma mudança de status para: [NOVO_STATUS]. Por favor, verifique no sistema GECOPE para prosseguir com a análise.</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('mudanca_status_processo')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                </div>
+                                                <div class="mb-3 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="WhatsAppConfigManager.save('mudanca_status_processo', this.form)">
+                                                    <i class="bi bi-save me-1"></i> Salvar Alteração de Status
+                                                </button>
+                                            </form>
+
+                                            <!-- Metas e Atrasos -->
+                                            <form id="formConfigProcMetas" class="border-bottom pb-3 mb-3"
+                                                data-gatilho="novas_metas_processo">
+                                                <h6 class="fw-bold text-primary">3. Metas e Alertas de Atraso</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch">
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">Atenção Fiscal [NOME_FISCAL]: A meta estabelecida para o processo NUP [NUP_PROCESSO] não foi cumprida e encontra-se com análise em ATRASO. 
+
+OBSERVAÇÃO: Caso você já tenha despachado o processo no SUITE, por favor desconsidere esta mensagem automática.</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('novas_metas_processo')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                </div>
+                                                <div class="mb-3 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="WhatsAppConfigManager.save('novas_metas_processo', this.form)">
+                                                    <i class="bi bi-save me-1"></i> Salvar Configuração de Metas
+                                                </button>
+                                            </form>
+
+                                            <!-- Designação de Analista -->
+                                            <form id="formConfigProcAnalista" data-gatilho="analista_designado">
+                                                <h6 class="fw-bold text-primary">4. Designação de Analista (Gecope)</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch" checked>
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">Olá, [ANALISTA]! Você foi designado como analista responsável para o processo NUP [NUP_PROCESSO] - [NOME_OBRA]. Por favor, verifique os detalhes no sistema GECOPE.</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('analista_designado')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                    <div class="form-text text-muted small">Variáveis:
+                                                        <code>[ANALISTA]</code>, <code>[NUP_PROCESSO]</code>,
+                                                        <code>[NOME_OBRA]</code>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label class="form-check-label small">Individual
+                                                            (Analista)</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="WhatsAppConfigManager.save('analista_designado', this.form)">
+                                                    <i class="bi bi-save me-1"></i> Salvar Designação de Analista
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ABA ORÇAMENTOS -->
+                                <div class="accordion-item shadow-sm border-0 mb-3">
+                                    <h2 class="accordion-header" id="headingOrc">
+                                        <button class="accordion-button collapsed bg-white text-dark fw-bold"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#collapseOrc">
+                                            <i class="bi bi-folder-check me-2 text-warning"></i> Notificações de
+                                            Orçamentos
+                                        </button>
+                                    </h2>
+                                    <div id="collapseOrc" class="accordion-collapse collapse"
+                                        data-bs-parent="#accordionWhatsAppConfig">
+                                        <div class="accordion-body bg-white">
+                                            <!-- Atualização -->
+                                            <form id="formConfigOrcAtualizacao" class="border-bottom pb-3 mb-3">
+                                                <h6 class="fw-bold text-warning">1. Atualização / Novo Cadastro</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch">
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">Um orçamento foi atualizado no GECOPE. Orçamento Ref: [REF_ORCAMENTO].</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('atualizacao_orcamento')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                </div>
+                                                <div class="mb-2 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral" type="checkbox"
+                                                            checked><label class="form-check-label small">Geral
+                                                            (Todos)</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="salvarConfigWhatsApp('atualizacao_orcamento', 'formConfigOrcAtualizacao')">
+                                                    <i class="bi bi-save me-1"></i> Salvar Atualização Orçamento
+                                                </button>
+                                            </form>
+
+                                            <!-- Comentários -->
+                                            <form id="formConfigOrcComentario">
+                                                <h6 class="fw-bold text-warning">2. Novo Comentário</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch">
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">Novo comentário de [NOME_USUARIO] no Orçamento [REF_ORCAMENTO].</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('novo_comentario_orcamento')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                </div>
+                                                <div class="mb-2 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral" type="checkbox"
+                                                            checked><label class="form-check-label small">Geral
+                                                            (Todos)</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="salvarConfigWhatsApp('novo_comentario_orcamento', 'formConfigOrcComentario')">
+                                                    <i class="bi bi-save me-1"></i> Salvar Comentário Orçamento
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ABA COMPOSIÇÕES E TABELAS -->
+                                <div class="accordion-item shadow-sm border-0 mb-2">
+                                    <h2 class="accordion-header" id="headingCompTab">
+                                        <button class="accordion-button collapsed bg-white text-dark fw-bold"
+                                            type="button" data-bs-toggle="collapse" data-bs-target="#collapseCompTab">
+                                            <i class="bi bi-journal-text me-2 text-danger"></i> Notificações de
+                                            Composições e Tabelas
+                                        </button>
+                                    </h2>
+                                    <div id="collapseCompTab" class="accordion-collapse collapse"
+                                        data-bs-parent="#accordionWhatsAppConfig">
+                                        <div class="accordion-body bg-white">
+                                            <!-- Composições -->
+                                            <form id="formConfigCompAtualizacao" class="border-bottom pb-3 mb-3">
+                                                <h6 class="fw-bold text-danger">1. Atualização / Nova Composição</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch">
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">GECOPE Informa: A composição [CODIGO_COMPOSICAO] foi criada/atualizada.</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('atualizacao_composicao')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                </div>
+                                                <div class="mb-2 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral" type="checkbox"
+                                                            checked><label class="form-check-label small">Geral
+                                                            (Todos)</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="salvarConfigWhatsApp('atualizacao_composicao', 'formConfigCompAtualizacao')">
+                                                    <i class="bi bi-save me-1"></i> Salvar Atualização Composição
+                                                </button>
+                                            </form>
+
+                                            <!-- Tabelas/INCC -->
+                                            <form id="formConfigINCC">
+                                                <h6 class="fw-bold text-danger">2. Atualização INCC / Tabelas</h6>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input config-ativo" type="checkbox"
+                                                        role="switch">
+                                                    <label class="form-check-label fw-bold">Disparo Ativado</label>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <label class="form-label small fw-bold mb-0">Template Base /
+                                                            Contexto</label>
+                                                        <span class="badge bg-info-subtle text-info"
+                                                            style="font-size: 0.6rem;"><i class="bi bi-robot me-1"></i>
+                                                            REDAÇÃO DINÂMICA ATIVADA</span>
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm config-texto" rows="3"
+                                                        style="resize: vertical; min-height: 80px;">GECOPE Informa: As Tabelas Base e o índice INCC foram atualizados.
+Tabela: [TABELA_NOME]
+Versão: [VERSAO]
+Mês Ref: [MES_REFERENCIA]</textarea>
+                                                    <button type="button"
+                                                        class="btn btn-link btn-sm p-0 mt-1 text-decoration-none"
+                                                        style="font-size: 0.7rem;"
+                                                        onclick="testarPreviaMensagem('atualizacao_tabelas')">
+                                                        <i class="bi bi-eye me-1"></i> Visualizar variação do Assistente
+                                                    </button>
+                                                </div>
+                                                <div class="mb-2 d-flex gap-3">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral" type="checkbox"
+                                                            checked><label class="form-check-label small">Geral
+                                                            (Todos)</label></div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-success fw-bold px-3"
+                                                    onclick="salvarConfigWhatsApp('atualizacao_tabelas', 'formConfigINCC')">
+                                                    <i class="bi bi-save me-1"></i> Salvar Atu. Tabelas/INCC
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2588,7 +3077,16 @@
             <div class="page-wrapper pt-0">
 
                 <div class="mb-3 text-center" style="margin-top: -15px;">
-                    <h4 class="fw-bold" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE REFERÊNCIA</h4>
+                    <div class="d-flex justify-content-center align-items-center gap-3">
+                        <h4 class="fw-bold mb-0" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE REFERÊNCIA
+                        </h4>
+                        <!-- Botão de Notificação de Tabelas (Apenas Admin) -->
+                        <button id="btn-notificar-tabelas" class="btn btn-xs btn-outline-danger shadow-sm admin-only"
+                            style="display:none; font-size: 0.7rem; border-radius: 20px;"
+                            onclick="notificarAtualizacaoTabelas()">
+                            <i class="bi bi-megaphone-fill me-1"></i> Notificar Atualização
+                        </button>
+                    </div>
                     <p class="text-muted small">Consulte bases oficiais (SEINFRA, SINAPI, ORSE) atualizadas.</p>
                 </div>
 
@@ -3734,8 +4232,10 @@
                     const sobrenome = document.getElementById('reg-sobrenome').value.trim();
                     const matricula = document.getElementById('reg-matricula').value.trim();
                     const senha = document.getElementById('reg-senha').value;
+                    const elTel = document.getElementById('reg-telefone');
+                    const telefone = (elTel && elTel.value) ? elTel.value.replace(/\D/g, '') : null;
 
-                    await signUpRequest(nome, sobrenome, matricula, senha);
+                    await signUpRequest(nome, sobrenome, matricula, senha, telefone);
 
                     // Retorna ao login
                     containerReg.style.display = 'none';
@@ -3805,9 +4305,20 @@
             // CORREÇÃO: Usamos 'sbClient' para não conflitar com a biblioteca 'supabase' global
             const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+            // --- 1.1 CONFIGURAÇÕES EVOLUTION API (WhatsApp Local) ---
+            const EVO_API_URL = 'https://evolution-api-production-1522.up.railway.app';
+            const EVO_API_KEY = 'SopCeara2024!';
+            const EVO_INSTANCE = 'SOP';
+
             // LISTA DE FISCAIS (FIXA - SOLICITAÇÃO USUÁRIO)
             const FISCAIS_LIST = [
-                'ÁGABE SOUSA', 'ALEXANDRE HORTÊNCIO', 'ANTÔNIO EDSON', 'ANTÔNIO ELDER', 'ANTÔNIO ROLIM', 'ARTHUR EDÍSIO', 'CARLOS RIOS',
+                'ÁGABE SOUSA',
+                'ALEXANDRE HORTÊNCIO',
+                'ANTÔNIO EDSON',
+                'ANTÔNIO ELDER',
+                'ANTÔNIO ROLIM',
+                'ARTHUR EDÍSIO',
+                'CARLOS RIOS',
                 'CLOVIS FONTENELE',
                 'CRISTIANA PALÁCIO',
                 'CRISTIANO GUILHERME',
@@ -3865,7 +4376,9 @@
                 'VIRNA DE PAULA',
                 'WEBER TEIXEIRA',
                 'WESLEY PEDROSA',
-                'WILSON MACHADO'
+                'WILSON MACHADO',
+                'NILDENO ARAGÃO',
+                'CAIO TIMBÓ',
             ];
 
             function carregarListaFiscais() {
@@ -4591,9 +5104,38 @@
                     // Log de Atividade
                     registrarAtividade('PROCESSO', `cadastrou o processo Nº ${numProcesso}`, numProcesso, formData.get("DESCRIÇÃO"), formData.get("FISCAL"));
 
+                    // Notificação WhatsApp (Apenas se entrar em Análise Fiscal)
+                    const statusInicial = formData.get("STATUS");
+                    if (statusInicial === 'ANÁLISE FISCAL') {
+                        processarNotificacao('novo_processo', {
+                            NOME_FISCAL: formData.get("FISCAL") || 'Fiscal',
+                            NUP_PROCESSO: numProcesso,
+                            NOME_OBRA: formData.get("DESCRIÇÃO") || 'Obra não informada'
+                        });
+                    }
+
+                    // Notificação para Analistas Específicos
+                    const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO'];
+                    const analistaNome = (formData.get("ANALISTA") || "").toUpperCase();
+                    const usuarioAtual = (localStorage.getItem('sop_user_name') || "").toUpperCase();
+
+                    // Dispara se for um dos alvos e não for auto-atribuição
+                    if (analistasAlvo.some(alvo => analistaNome.includes(alvo))) {
+                        const ehAutoAtribuicao = usuarioAtual && (analistaNome.includes(usuarioAtual) || usuarioAtual.includes(analistaNome));
+
+                        if (!ehAutoAtribuicao) {
+                            processarNotificacao('analista_designado', {
+                                ANALISTA: analistaNome,
+                                NUP_PROCESSO: numProcesso,
+                                NOME_OBRA: formData.get("DESCRIÇÃO") || 'Obra não informada',
+                                NOVO_STATUS: 'Em Análise'
+                            });
+                        }
+                    }
+
                     setTimeout(() => {
                         const modal = bootstrap.Modal.getInstance(document.getElementById('modalCadastro'));
-                        modal.hide();
+                        if (modal) modal.hide();
                         form.reset();
                         msg.style.display = 'none';
                         btn.disabled = false;
@@ -4770,6 +5312,36 @@
                         msg.style.display = 'block';
                         msg.className = 'alert alert-success';
                         msg.innerHTML = '✅ Dados atualizados!';
+
+                        // Notificação WhatsApp (Apenas para Devolução para Reanálise)
+                        const statusAlvo = ['DEVOLVIDO P/ REANÁLISE FISCAL'];
+                        if (updates.status && updates.status !== registroOriginal.status && statusAlvo.includes(updates.status)) {
+                            processarNotificacao('mudanca_status_processo', {
+                                NUP_PROCESSO: processoNome,
+                                NOME_OBRA: registroOriginal.descricao,
+                                NOVO_STATUS: updates.status,
+                                NOME_FISCAL: registroOriginal.fiscal || 'Fiscal'
+                            });
+                        }
+
+                        // Notificação para Analistas Específicos (Se mudou o analista ou se foi marcado agora)
+                        const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO'];
+                        const analistaAtual = (updates.analista || "").toUpperCase();
+                        const analistaAnterior = (registroOriginal.analista || "").toUpperCase();
+                        const usuarioAtual = (localStorage.getItem('sop_user_name') || "").toUpperCase();
+
+                        if (analistaAtual && analistaAtual !== analistaAnterior && analistasAlvo.some(alvo => analistaAtual.includes(alvo))) {
+                            const ehAutoAtribuicao = usuarioAtual && (analistaAtual.includes(usuarioAtual) || usuarioAtual.includes(analistaAtual));
+
+                            if (!ehAutoAtribuicao) {
+                                processarNotificacao('analista_designado', {
+                                    ANALISTA: analistaAtual,
+                                    NUP_PROCESSO: processoNome,
+                                    NOME_OBRA: registroOriginal.descricao,
+                                    NOVO_STATUS: 'Em Análise'
+                                });
+                            }
+                        }
                         setTimeout(() => {
                             msg.style.display = 'none';
                             bootstrap.Modal.getInstance(document.getElementById('modalDetalhes')).hide();
@@ -6093,6 +6665,11 @@
                 fillSelect(ger.status, allData.map(d => d.status)); fillSelect(pr.status, allData.map(d => d.status)); fillSelect(mt.status, allData.map(d => d.status));
                 renderMultiSelectUI(mt.meta);
                 updateGerencialFilters(allData); updatePrazosFilters(allData); updateReuniaoFilters(allData);
+
+                // Verifica notificações de atraso (apenas admins ou autorizados)
+                if (getCurrentUserRole() === 'admin') {
+                    verificarNotificacoesAtraso();
+                }
             }
             function wireEvents() {
                 fin.status.addEventListener("change", updateFinanceiro); fin.tipo.addEventListener("change", updateFinanceiro); fin.fiscal.addEventListener("change", updateFinanceiro);
@@ -6231,7 +6808,7 @@
             -------------------------------------------------------------- */
 
             // Cadastro reformulado: NOME, SOBRENOME, MATRICULA, SENHA
-            async function signUpRequest(nome, sobrenome, matricula, senha) {
+            async function signUpRequest(nome, sobrenome, matricula, senha, telefone) {
                 try {
                     const email = `${matricula}@gecope.app`;
 
@@ -6256,6 +6833,7 @@
                         matricula: matricula,
                         nome: nome,
                         sobrenome: sobrenome,
+                        telefone_whatsapp: telefone,
                         role: 'pending',
                         created_at: new Date().toISOString()
                     }]);
@@ -6616,7 +7194,7 @@
 
                 if (!tbodyActive || !tbodyPending) return;
 
-                tbodyActive.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Carregando usuários...</td></tr>';
+                tbodyActive.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Carregando usuários...</td></tr>';
 
                 try {
                     const { data, error } = await sbClient.from('app_users').select('*').order('created_at', { ascending: false });
@@ -6690,7 +7268,7 @@
                     // Renderizar Ativos
                     tbodyActive.innerHTML = '';
                     if (actives.length === 0) {
-                        tbodyActive.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Nenhum usuário ativo.</td></tr>';
+                        tbodyActive.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nenhum usuário ativo.</td></tr>';
                     }
 
                     actives.forEach(u => {
@@ -6724,6 +7302,7 @@
                                     <div class="fw-bold text-dark">${fullNome}</div>
                                 </td>
                                 <td><div class="small text-muted">${u.email}</div></td>
+                                <td><div class="small fw-bold text-secondary">${u.telefone_whatsapp || '-'}</div></td>
                                 <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
                                 <td>
                                     <span class="badge ${roleColor} rounded-pill px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span>
@@ -7593,6 +8172,11 @@
 
                     if (updateError) throw updateError;
 
+                    // Notificação WhatsApp
+                    processarNotificacao('atualizacao_orcamento', {
+                        REF_ORCAMENTO: currentData?.obra || currentData?.processo || 'N/A'
+                    });
+
                     // Se houver descrição, salva como comentário de sistema
                     if (descricao) {
                         await salvarComentarioNoBanco(id, 'Sistema (Versão)', `Gerada versão ${newVersionLabel}: ${descricao}`);
@@ -7685,6 +8269,12 @@
                     }).eq('id', id);
 
                     if (updateError) throw updateError;
+
+                    // Notificação WhatsApp
+                    processarNotificacao('novo_comentario_orcamento', {
+                        NOME_USUARIO: autor,
+                        REF_ORCAMENTO: curr?.nome_obra || 'N/A'
+                    });
 
                     // Log de Atividade
                     registrarAtividade('ORCAMENTO', `adicionou um comentário no orçamento: ${curr?.nome_obra || 'N/A'}`, '', curr?.nome_obra);
@@ -7947,6 +8537,12 @@
                     const { error: dbError } = await sbClient.from('composicoes_biblioteca').insert([payload]);
                     if (dbError) throw dbError;
 
+                    // Notificação WhatsApp
+                    processarNotificacao('atualizacao_composicao', {
+                        CODIGO_COMPOSICAO: payload.usuario || 'N/A',
+                        DESCRICAO: payload.descricao || 'N/A'
+                    });
+
                     // Log de Atividade
                     registrarAtividade('COMPOSICAO', `cadastrou a composição: ${obra}`, '', obra);
 
@@ -8027,6 +8623,12 @@
 
                     alert(`Versão ${newVersionLabel} de Composição enviada! Arquivos de comentários resolvidos foram limpos.`);
 
+                    // Notificação WhatsApp
+                    processarNotificacao('atualizacao_composicao', {
+                        CODIGO_COMPOSICAO: currentData?.codigo || 'N/A',
+                        DESCRICAO: currentData?.descricao || 'N/A'
+                    });
+
                     // Log de Atividade
                     registrarAtividade('COMPOSICAO', `atualizou a versão (${newVersionLabel}) da composição: ${currentData?.descricao || 'N/A'}`, '', currentData?.descricao);
 
@@ -8106,6 +8708,13 @@
                     if (updateError) throw updateError;
 
                     alert("Solicitação enviada!");
+
+                    // Notificação WhatsApp
+                    processarNotificacao('novo_comentario_composicao', {
+                        AUTOR: autor,
+                        CODIGO_COMPOSICAO: curr?.codigo || 'N/A',
+                        DESCRICAO: curr?.descricao || 'N/A'
+                    });
 
                     // Log de Atividade
                     registrarAtividade('COMPOSICAO', `adicionou um comentário na composição: ${curr?.descricao || 'N/A'}`, '', curr?.descricao);
@@ -11639,6 +12248,772 @@
                     btn.disabled = false;
                 }
             }
+
+            async function notificarAtualizacaoTabelas() {
+                const fonte = document.getElementById('busca-fonte').value;
+                const versao = document.getElementById('busca-versao').value;
+                const ref = document.getElementById('busca-ref').value;
+
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Notificar Todos?',
+                    text: `Deseja enviar um comunicado via WhatsApp para TODOS os usuários informando que a tabela ${fonte} (${versao}) foi atualizada?`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sim, disparar!',
+                    cancelButtonText: 'Cancelar'
+                });
+
+                if (isConfirmed) {
+                    processarNotificacao('atualizacao_tabelas', {
+                        TABELA_NOME: fonte,
+                        VERSAO: versao,
+                        MES_REFERENCIA: ref.toUpperCase()
+                    });
+                    Swal.fire('Disparo Iniciado', 'As mensagens estão sendo enviadas em segundo plano (com delay de segurança).', 'success');
+                }
+            }
+
+            async function verificarNotificacoesAtraso() {
+                try {
+                    // Segurança: Verifica se a notificação de atraso está ativa no banco ANTES de qualquer processamento
+                    const { data: config, error: configError } = await sbClient
+                        .from('config_whatsapp')
+                        .select('is_ativo')
+                        .eq('evento_gatilho', 'novas_metas_processo')
+                        .single();
+
+                    if (configError || !config || !config.is_ativo) {
+                        console.log("[WhatsApp] Notificações de Meta/Atraso estão desativadas globalmente.");
+                        return;
+                    }
+
+                    // Filtra processos "Atrasados" que possuem fiscal e não foram notificados hoje
+                    const hoje = new Date().toISOString().split('T')[0];
+                    const atrasados = allData.filter(d => {
+                        const st = (d.status || '').toUpperCase();
+                        if (['CONCLUÍDO', 'EXCLUÍDO', 'APROVADO'].includes(st)) return false;
+
+                        const mSt = getMetaSt(d);
+                        if (mSt !== 'Atrasado') return false;
+
+                        const key = `notif_atraso_${d.id}`;
+                        return !localStorage.getItem(key);
+                    });
+
+                    if (atrasados.length === 0) return;
+
+                    console.log(`[WhatsApp] Detectados ${atrasados.length} processos atrasados para notificar.`);
+
+                    for (const d of atrasados) {
+                        await processarNotificacao('novas_metas_processo', {
+                            NOME_FISCAL: d.fiscal || 'Fiscal',
+                            NUP_PROCESSO: d.processo,
+                            NOME_OBRA: d.descricao || d.processo
+                        });
+                        const key = `notif_atraso_${d.id}`;
+                        localStorage.setItem(key, 'true');
+
+                        // Espera um pouco entre verificações para não congestionar
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                } catch (err) {
+                    console.error("[WhatsApp] Erro ao verificar atrasos:", err);
+                }
+            }
+
+            // ============================================
+            // MOTOR DE NOTIFICAÇÕES WHATSAPP (REFATORADO)
+            // ============================================
+            const WhatsAppConfigManager = {
+                async loadAll() {
+                    try {
+                        const { data: configs, error } = await sbClient.from('config_whatsapp').select('*');
+                        if (error) throw error;
+                        if (!configs) return;
+
+                        configs.forEach(conf => {
+                            const form = document.querySelector(`form[data-gatilho="${conf.evento_gatilho}"]`);
+                            if (form) {
+                                if (form.querySelector('.config-ativo')) form.querySelector('.config-ativo').checked = conf.is_ativo;
+                                if (form.querySelector('.config-texto')) form.querySelector('.config-texto').value = conf.texto_mensagem;
+
+                                const dests = conf.destinatarios || [];
+                                if (form.querySelector('.config-dest-geral')) form.querySelector('.config-dest-geral').checked = dests.includes('geral');
+                                if (form.querySelector('.config-dest-indiv')) form.querySelector('.config-dest-indiv').checked = dests.includes('individual');
+                            }
+                        });
+                        console.log("[WhatsApp] Configurações carregadas com sucesso.");
+                    } catch (err) { console.error("[WhatsApp] Erro ao carregar:", err); }
+                },
+
+                async save(eventoGatilho, formElement) {
+                    if (!formElement) return;
+                    const btn = formElement.querySelector('button');
+                    const textoOriginal = btn.innerHTML;
+
+                    try {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                        const isAtivo = formElement.querySelector('.config-ativo').checked;
+                        const textoMensagem = formElement.querySelector('.config-texto').value;
+                        let destinatarios = [];
+
+                        if (formElement.querySelector('.config-dest-geral')?.checked) destinatarios.push('geral');
+                        if (formElement.querySelector('.config-dest-indiv')?.checked) destinatarios.push('individual');
+
+                        const { error } = await sbClient.from('config_whatsapp').upsert({
+                            evento_gatilho: eventoGatilho,
+                            is_ativo: isAtivo,
+                            texto_mensagem: textoMensagem,
+                            destinatarios: destinatarios
+                        }, { onConflict: 'evento_gatilho' });
+
+                        if (error) throw error;
+                        showToast("Configuração salva com sucesso!");
+                    } catch (err) {
+                        console.error("Erro ao salvar WS:", err);
+                        alert("Erro ao salvar a configuração.");
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = textoOriginal;
+                    }
+                }
+            };
+
+            // ============================================
+            // MOTOR DE REDAÇÃO DINÂMICA (PADRÃO CARD GECOPE)
+            // ============================================
+            const NOTIFICATION_MAP = {
+                'novo_processo': { titulo: '📋 *Novo Processo*', sub: '📌 Cadastro Inicial' },
+                'mudanca_status_processo': { titulo: '🔄 *Mudança de Status*', sub: '📌 Reanálise Solicitada' },
+                'novas_metas_processo': { titulo: '⚠️ *Alerta de Atraso*', sub: '📌 Prazo Excedido' },
+                'atualizacao_composicao': { titulo: '📚 *Nova Composição*', sub: '📌 Cadastro de Referência' },
+                'atualizacao_orcamento': { titulo: '💰 *Atualização de Orçamento*', sub: '📌 Revisão de Dados' },
+                'novo_comentario_orcamento': { titulo: '💬 *Novo Comentário*', sub: '📌 Revisão Técnica' },
+                'atualizacao_tabelas': { titulo: '📊 *Atualização de Tabelas*', sub: '📌 Tabelas de Referência' },
+                'analista_designado': { titulo: '👤 *Analista Designado*', sub: '📌 Replanilhamento' }
+            };
+
+            function gerarMensagemAmigavel(evento, dados) {
+                const conf = NOTIFICATION_MAP[evento] || { titulo: "📋 Notificação", sub: "📌 Processamento" };
+
+                // Variantes de Saudação (Mais diversificadas)
+                const saudacoes = [
+                    "Olá", "Oi", "Tudo bem?", "Bom dia", "Boa tarde", "Boa noite",
+                    "Passando para avisar", "Aviso rápido", "Notificação importante",
+                    "Olá, colega", "Oi, tudo certo?", "Como vai?"
+                ];
+
+                // Frases de conexão aleatórias para quebrar o padrão
+                let conectores = [
+                    "Houve uma atualização no sistema:",
+                    "Temos novidades sobre este processo:",
+                    "Veja os detalhes da movimentação abaixo:",
+                    "Informações atualizadas agora há pouco:",
+                    "O status foi alterado no GECOPE:",
+                    "Acompanhe esta atualização:"
+                ];
+
+                // Personalização específica para Processos (conforme solicitado pelo usuário)
+                if (evento === 'novo_processo') {
+                    conectores = [
+                        "Foi registrado um novo processo no sistema:",
+                        "Um processo foi cadastrado na plataforma:",
+                        "Há um novo processo aguardando análise:",
+                        "Um novo registro de processo foi realizado:"
+                    ];
+                } else if (evento === 'mudanca_status_processo') {
+                    conectores = [
+                        "O processo foi devolvido para reanálise:",
+                        "O replanilhamento foi devolvido para ajustes:",
+                        "O aditivo está novamente com a Fiscalização para reanálise:",
+                        "Atenção: Processo devolvido para novos ajustes técnicos:"
+                    ];
+                } else if (evento === 'novas_metas_processo') {
+                    conectores = [
+                        "Atenção: A meta deste processo não foi cumprida:",
+                        "Alerta de Atraso: O prazo estabelecido foi excedido:",
+                        "Notificação de Meta: O processo encontra-se em atraso:"
+                    ];
+                } else if (evento === 'analista_designado') {
+                    conectores = [
+                        "Você foi designado como analista para o seguinte processo:",
+                        "Há um novo processo sob sua responsabilidade técnica:",
+                        "Informamos que você é o analista responsável por este processo:",
+                        "Processo encaminhado para sua análise técnica:",
+                        "Atenção: Novo processo atribuído à sua fila de análise:",
+                        "Você foi escalado para analisar o seguinte processo:",
+                        "Um processo acaba de entrar na sua lista de análise:"
+                    ];
+                }
+
+                const saudar = `${saudacoes[Math.floor(Math.random() * saudacoes.length)]}, *${dados.ANALISTA || dados.NOME_FISCAL || dados.NOME_USUARIO || dados.FISCAL || 'Colega'}*.`;
+                const conector = conectores[Math.floor(Math.random() * conectores.length)];
+
+
+                const agora = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const enviadoPor = (localStorage.getItem('sop_user_name') || 'Assistente').toUpperCase();
+
+                // Variantes de rodapé
+                const rodapes = [
+                    `_Enviado por ${enviadoPor} via GECOPE às ${agora.split(' ')[1]}_`,
+                    `_Sistema GECOPE | ${enviadoPor} | ${agora.split(' ')[1]}_`,
+                    `_Notificação automática | Resp: ${enviadoPor} | Hora: ${agora.split(' ')[1]}_`
+                ];
+                const footer = `\n\n${rodapes[Math.floor(Math.random() * rodapes.length)]}`;
+
+                const objetoTexto = dados.NOME_OBRA || dados.DESCRICAO || dados.REF_ORCAMENTO || dados.TABELA_NOME;
+
+                // Escolha aleatória de subtítulo para Processos (Replanilhamento vs Aditivo)
+                let subtituloDinamico = conf.sub;
+                if (['novo_processo', 'mudanca_status_processo', 'novas_metas_processo', 'analista_designado'].includes(evento)) {
+                    const subs = (evento === 'analista_designado') ? ['📌 Replanilhamento'] : ['📌 Replanilhamento', '📌 Aditivo de Serviços'];
+                    subtituloDinamico = subs[Math.floor(Math.random() * subs.length)];
+                }
+
+                let linhas = [
+                    `📌 *OBJETO:* ${objetoTexto || dados.NUP_PROCESSO || 'N/A'}`,
+                    subtituloDinamico
+                ];
+
+                if (dados.NUP_PROCESSO && objetoTexto) {
+                    linhas.push(`📝 *NUP:* ${dados.NUP_PROCESSO}`);
+                }
+
+                if (dados.NOVO_STATUS) {
+                    const label = (evento === 'novo_processo') ? 'Status' : 'Novo Status';
+                    const valorStatus = (evento === 'analista_designado') ? 'Em Análise' : dados.NOVO_STATUS;
+                    linhas.push(`📊 *${label}:* ${valorStatus}`);
+                }
+
+                if (evento === 'novas_metas_processo') linhas.push(`🔴 *Prazo Final:* EXCEDIDO`);
+                if (dados.CODIGO_COMPOSICAO) linhas.push(`📝 *Código:* ${dados.CODIGO_COMPOSICAO}`);
+
+                if (dados.VERSAO && evento === 'atualizacao_tabelas') {
+                    linhas.push(`📝 *Versão:* ${dados.VERSAO}`);
+                }
+
+                const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAÇÃO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";
+
+                return `${conf.titulo}\n\n${saudar}\n${conector}\n\n${linhas.join('\n')}${avisoSuite}${footer}`;
+            }
+
+            async function processarNotificacao(eventoGatilho, dadosDinamicos) {
+                try {
+                    console.log(`[WhatsApp] Iniciando verificação para: ${eventoGatilho}`);
+                    const { data: config, error: configError } = await sbClient
+                        .from('config_whatsapp')
+                        .select('*')
+                        .eq('evento_gatilho', eventoGatilho)
+                        .single();
+
+                    if (configError || !config || !config.is_ativo) return;
+
+                    // GERA MENSAGEM PELO MOTOR DINÂMICO (IA)
+                    // A mensagem agora é gerada dentro do loop de envio para permitir variações por destinatário
+
+
+                    let telefonesAlvo = [];
+
+                    // Disparo Geral (Para todos os Fiscais Ativos com Telefone)
+                    if (config.destinatarios.includes('geral')) {
+                        const { data: usuarios } = await sbClient
+                            .from('app_users')
+                            .select('telefone_whatsapp')
+                            .not('telefone_whatsapp', 'is', null);
+
+                        if (usuarios) {
+                            telefonesAlvo.push(...usuarios.map(u => u.telefone_whatsapp));
+                        }
+                    }
+
+                    // Disparo Individual (Fiscal Responsável ou Definido nos Dados)
+                    if (config.destinatarios.includes('individual')) {
+                        if (dadosDinamicos.MATRICULA_FISCAL) {
+                            // Tenta resgatar pelo BD caso passe a matrícula do fiscal alvo
+                            const { data: user } = await sbClient
+                                .from('app_users')
+                                .select('telefone_whatsapp')
+                                .eq('matricula', dadosDinamicos.MATRICULA_FISCAL)
+                                .single();
+
+                            if (user && user.telefone_whatsapp) {
+                                telefonesAlvo.push(user.telefone_whatsapp);
+                            }
+                        }
+
+                        // Fallback: Tenta resgatar pelo Nome caso não tenha matrícula ou não tenha encontrado
+                        let nomeBusca = dadosDinamicos.ANALISTA || dadosDinamicos.NOME_FISCAL || dadosDinamicos.FISCAL || dadosDinamicos.NOME_USUARIO || dadosDinamicos.AUTOR;
+
+                        // Se não encontrou por nome explicito, mas tem uma "matrícula" que não é número, assume que é o nome
+                        if (!nomeBusca && dadosDinamicos.MATRICULA_FISCAL && isNaN(dadosDinamicos.MATRICULA_FISCAL)) {
+                            nomeBusca = dadosDinamicos.MATRICULA_FISCAL;
+                        }
+
+                        if (telefonesAlvo.length === 0 && nomeBusca) {
+                            const { data: users } = await sbClient
+                                .from('app_users')
+                                .select('nome, sobrenome, full_name, telefone_whatsapp')
+                                .not('telefone_whatsapp', 'is', null);
+
+                            if (users && users.length > 0) {
+                                const search = nomeBusca.toUpperCase().trim();
+                                const found = users.find(u => {
+                                    const dbName = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '').toUpperCase();
+                                    return dbName.includes(search) || search.includes(dbName);
+                                });
+
+                                if (found && found.telefone_whatsapp) {
+                                    telefonesAlvo.push(found.telefone_whatsapp);
+                                }
+                            }
+                        }
+
+                        if (telefonesAlvo.length === 0 && dadosDinamicos.TELEFONE_ALVO) {
+                            telefonesAlvo.push(dadosDinamicos.TELEFONE_ALVO);
+                        }
+                    }
+
+                    if (telefonesAlvo.length > 0) {
+                        console.log(`[WhatsApp] Preparando disparo para ${telefonesAlvo.length} destinatário(s).`);
+
+                        // Mapear para objetos {nome, fone} para o log ficar completo
+                        let alvosCompletos = [];
+
+                        // Busca o nome do Fiscal se for disparo individual
+                        let nomeDestinatarioPadrao = "Fiscal / Responsável";
+                        if (dadosDinamicos.ANALISTA || dadosDinamicos.NOME_FISCAL || dadosDinamicos.FISCAL) {
+                            nomeDestinatarioPadrao = dadosDinamicos.ANALISTA || dadosDinamicos.NOME_FISCAL || dadosDinamicos.FISCAL;
+                        }
+
+                        telefonesAlvo.forEach(t => {
+                            let clean = typeof t === 'string' ? t.replace(/\D/g, '') : '';
+                            if (clean.length === 10 || clean.length === 11) clean = '55' + clean;
+                            // Correção para DDDs do Ceará (85/88) que costumam dar erro com o 9 extra no envio via API
+                            if (clean.length === 13 && (clean.startsWith('55889') || clean.startsWith('55859'))) {
+                                const cleanSemNove = clean.substring(0, 4) + clean.substring(5);
+                                console.log("[WhatsApp] Detectado DDD do Ceará. Preparando envio alternativo (sem 9):", cleanSemNove);
+                                clean = cleanSemNove; // Prioriza o formato de 12 dígitos para maior compatibilidade
+                            }
+                            if (clean.length >= 12) {
+                                alvosCompletos.push({
+                                    nome: nomeDestinatarioPadrao,
+                                    fone: clean
+                                });
+                            }
+                        });
+
+                        // Função auxiliar para pausa
+                        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+                        // Loop de envio sequencial com delay anti-bloqueio
+                        for (let i = 0; i < alvosCompletos.length; i++) {
+                            const alvo = alvosCompletos[i];
+                            const mensagemUnica = gerarMensagemAmigavel(eventoGatilho, dadosDinamicos);
+                            await sleep(Math.floor(Math.random() * 5000) + 3000);
+
+
+                            if (i > 0) {
+                                const delayExtra = Math.floor(Math.random() * 5000) + 5000;
+                                await sleep(delayExtra);
+                            }
+
+                            try {
+                                const response = await fetch(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
+                                    body: JSON.stringify({
+                                        number: alvo.fone,
+                                        text: mensagemUnica,
+                                        delay: 1200,
+                                        linkPreview: false
+                                    })
+                                });
+
+                                const resData = await response.json();
+                                const statusEnvio = response.ok ? 'sucesso' : 'falha';
+                                let detalheErro = null;
+
+                                if (response.ok) {
+                                    const msgId = resData.key?.id || resData.id || null;
+                                    if (msgId) detalheErro = `ID:${msgId}`;
+                                } else {
+                                    detalheErro = `Erro: ${response.status} - ${resData.response?.message || resData.error || 'Desconhecido'}`;
+                                }
+
+                                await sbClient.from('whatsapp_logs').insert({
+                                    evento: eventoGatilho,
+                                    destinatario: alvo.fone,
+                                    destinatario_nome: alvo.nome,
+                                    mensagem: mensagemFinal,
+                                    status: statusEnvio,
+                                    erro_detalhe: detalheErro
+                                });
+
+                                console.log(`[WhatsApp] RESPOSTA TÉCNICA PARA ${alvo.fone}:`, JSON.stringify(resData, null, 2));
+                                if (resData && (resData.error || resData.status === 'ERROR')) {
+                                    console.error("⚠️ A API RETORNOU ERRO INTERNO:", resData.message || resData.error);
+                                }
+                                if (resData.response && typeof resData.response === 'string' && resData.response.includes('not connected')) {
+                                    console.warn("⚠️ ALERTA: A instância SOP parece estar desconectada no servidor, apesar do painel mostrar verde.");
+                                } else if (resData.response && resData.response.message && Array.isArray(resData.response.message) && resData.response.message.join(' ').includes('not connected')) {
+                                    console.warn("⚠️ ALERTA: A instância SOP parece estar desconectada no servidor, apesar do painel mostrar verde.");
+                                }
+                            } catch (itemErr) {
+                                console.error("[WhatsApp] Erro no item:", itemErr);
+                                await sbClient.from('whatsapp_logs').insert({
+                                    evento: eventoGatilho,
+                                    destinatario: alvo.fone,
+                                    destinatario_nome: alvo.nome,
+                                    mensagem: mensagemFinal,
+                                    status: 'falha',
+                                    erro_detalhe: `Erro Local: ${itemErr.message}`
+                                });
+                            }
+                        }
+                    } else {
+                        console.log(`[WhatsApp] Nenhum destinatário apto encontrado para o evento.`);
+                    }
+                } catch (err) {
+                    console.error(`[WhatsApp] Erro geral:`, err);
+                }
+            }
+
+            function testarPreviaMensagem(evento) {
+                const dadosTeste = {
+                    NOME_FISCAL: "Engenheiro Exemplo",
+                    NUP_PROCESSO: "2024/98765-4",
+                    NOME_OBRA: "Centro Esportivo",
+                    NOVO_STATUS: "ANÁLISE FISCAL",
+                    REF_ORCAMENTO: "ORC-2024-001",
+                    TABELA_NOME: "SEINFRA",
+                    VERSAO: "028.1",
+                    MES_REFERENCIA: "AGOSTO/2024",
+                    DESCRICAO: "Muro de Arrimo (Protótipo)"
+                };
+
+                const msg = gerarMensagemAmigavel(evento, dadosTeste);
+
+                Swal.fire({
+                    title: '<i class="bi bi-robot text-primary me-2"></i>Redação Dinâmica',
+                    html: `<div class="text-start p-3 border rounded bg-light shadow-sm" style="white-space: pre-wrap; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 0.9rem; line-height: 1.4; border-left: 4px solid #0d6efd !important;">${msg}</div>`,
+                    footer: '<div class="text-center w-100"><small class="text-muted"><i class="bi bi-info-circle me-1"></i>Esta é apenas uma prévia. No envio real, o Assistente sorteará novas variações.</small></div>',
+                    confirmButtonText: 'Ver outra variação',
+                    showCancelButton: true,
+                    cancelButtonText: 'Fechar',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        testarPreviaMensagem(evento);
+                    }
+                });
+            }
+
+            async function carregarLogsWhatsApp() {
+                const tbody = document.getElementById('ws-logs-table-body');
+                if (!tbody) return;
+
+                try {
+                    const { data, error } = await sbClient
+                        .from('whatsapp_logs')
+                        .select('*')
+                        .order('created_at', { ascending: false })
+                        .limit(50);
+
+                    if (error) throw error;
+
+                    if (!data || data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3">Nenhum disparo registrado ainda.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = data.map(log => {
+                        const statusColor = log.status === 'sucesso' ? 'bg-success' : 'bg-danger';
+                        const erroFormatado = formatarErroWhatsApp(log.erro_detalhe);
+
+                        return `
+                        <tr>
+                            <td class="small text-muted">${new Date(log.created_at).toLocaleString('pt-BR')}</td>
+                            <td><span class="badge bg-light text-dark" style="font-size:0.6rem">${log.evento}</span></td>
+                            <td class="fw-bold small text-truncate" style="max-width: 120px;">${log.destinatario_nome || '-'}</td>
+                            <td class="small">${log.destinatario}</td>
+                            <td>
+                                <span class="badge ${statusColor}" style="font-size:0.65rem">
+                                    ${log.status.toUpperCase()}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    ${log.status === 'falha' ? `
+                                        <button class="btn btn-xs btn-outline-danger p-0 px-1" title="Ver Detalhes do Erro"
+                                            onclick="Swal.fire({title:'Dificuldade no Envio', html:'<div class=&quot;text-start small&quot;><b>Motivo provável:</b><br>${erroFormatado}<br><br><hr><i class=&quot;text-muted&quot;>Erro técnico: ${log.erro_detalhe || 'sem detalhes'}</i></div>', icon:'error'})">
+                                            <i class="bi bi-info-circle"></i>
+                                        </button>
+                                        <button class="btn btn-xs btn-primary p-0 px-1" title="Tentar Reenviar"
+                                            onclick="reenviarMensagemWhatsApp('${log.id}')">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                        <button class="btn btn-xs btn-danger p-0 px-1" title="Excluir Log"
+                                            onclick="excluirLogWhatsApp('${log.id}')">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    ` : (log.erro_detalhe && log.erro_detalhe.startsWith('ID:')) ? `
+                                        <button class="btn btn-xs btn-outline-info p-0 px-1" title="Verificar Status Real"
+                                            onclick="consultarStatusWhatsApp('${log.erro_detalhe.split('ID:')[1]}', '${log.id}', '${log.destinatario}')">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                     ` : '-'}
+                                </div>
+                            </td>
+                        </tr>
+                        `;
+                    }).join('');
+                } catch (err) {
+                    console.error("Erro ao carregar logs:", err);
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Erro ao carregar logs.</td></tr>';
+                }
+            }
+
+            async function reenviarMensagemWhatsApp(logId) {
+                try {
+                    // 1. Busca os dados do log original
+                    const { data: log, error } = await sbClient
+                        .from('whatsapp_logs')
+                        .select('*')
+                        .eq('id', logId)
+                        .single();
+
+                    if (error || !log) throw new Error("Log não encontrado.");
+
+                    Swal.fire({
+                        title: 'Reenviando...',
+                        text: `Tentando novamente para ${log.destinatario_nome || log.destinatario}`,
+                        allowOutsideClick: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
+                    // 2. Tenta o envio via API
+                    const response = await fetch(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
+                        body: JSON.stringify({
+                            number: log.destinatario,
+                            text: log.mensagem,
+                            delay: 500,
+                            linkPreview: false
+                        })
+                    });
+
+                    if (response.ok) {
+                        // 3. Se deu certo, atualiza o status do log original (ou cria um novo, mas vamos atualizar para limpar o histórico)
+                        await sbClient.from('whatsapp_logs').update({
+                            status: 'sucesso',
+                            erro_detalhe: 'Reenviado com sucesso em ' + new Date().toLocaleString(),
+                            created_at: new Date()
+                        }).eq('id', logId);
+
+                        Swal.fire('Sucesso!', 'Mensagem reenviada.', 'success');
+                    } else {
+                        const errData = await response.json();
+                        const rawErr = `Erro: ${response.status} - ${errData.response?.message || errData.error || 'Erro na API'}`;
+                        throw new Error(formatarErroWhatsApp(rawErr));
+                    }
+
+                    carregarLogsWhatsApp(); // Recarrega a tabela
+                } catch (err) {
+                    Swal.fire('Falha no Reenvio', err.message, 'error');
+                }
+            }
+
+            async function consultarStatusWhatsApp(messageId, logId, destinatario) {
+                try {
+                    Swal.fire({ title: 'Consultando Status...', text: 'Aguarde...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+                    const jid = destinatario.includes('@') ? destinatario : (destinatario + '@s.whatsapp.net');
+
+                    // Endpoint v2 Universal para buscar uma mensagem específica
+                    const url = `${EVO_API_URL}/chat/findMessages/${EVO_INSTANCE}`;
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
+                        body: JSON.stringify({ where: { id: messageId }, remoteJid: jid })
+                    });
+
+                    let msg = null;
+                    if (response.ok) {
+                        const data = await response.json();
+                        const messages = data.messages || (Array.isArray(data) ? data : []);
+                        msg = messages.find(m => m.key?.id === messageId || m.id === messageId);
+                    }
+
+                    if (!msg) {
+                        Swal.fire({
+                            title: 'Status: Enviado',
+                            html: 'A mensagem foi despachada para o WhatsApp. Se você ainda não recebeu, verifique a conexão do celular que faz os disparos.<br><br><small class="text-muted">ID: ' + messageId + '</small>',
+                            icon: 'success'
+                        });
+                        return;
+                    }
+
+                    const statusMap = {
+                        'PENDING': { t: 'Pendente (Aguardando Internet)', i: 'warning' },
+                        'SENT': { t: 'Enviado ao Servidor (Um tique)', i: 'success' },
+                        'DELIVERED': { t: 'Entregue ao Aparelho (Dois tiques)', i: 'success' },
+                        'READ': { t: 'Lido pelo Destinatário (Azul)', i: 'info' }
+                    };
+
+                    const rawStatus = (msg.status || '').toUpperCase();
+                    const info = statusMap[rawStatus] || { t: 'Enviado com Sucesso', i: 'success' };
+
+                    Swal.fire({
+                        title: 'Status da Mensagem',
+                        html: `<b>Situação Atual:</b><br>${info.t}<br><br><small class="text-muted">Rastreador: ${messageId}</small>`,
+                        icon: info.i
+                    });
+                } catch (err) {
+                    console.error("Erro no status:", err);
+                    Swal.fire('Erro na Consulta', 'Não foi possível conectar ao rastreio.', 'error');
+                }
+            }
+
+            async function excluirLogWhatsApp(logId) {
+                const { isConfirmed } = await Swal.fire({
+                    title: 'Excluir Log?',
+                    text: "Esta ação removerá este registro de falha permanentemente.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'Sim, excluir!',
+                    cancelButtonText: 'Cancelar'
+                });
+
+                if (isConfirmed) {
+                    try {
+                        const { error } = await sbClient
+                            .from('whatsapp_logs')
+                            .delete()
+                            .eq('id', logId);
+
+                        if (error) throw error;
+
+                        showToast("Log excluído com sucesso.");
+                        carregarLogsWhatsApp();
+                    } catch (err) {
+                        console.error("Erro ao excluir log:", err);
+                        Swal.fire('Erro', 'Não foi possível excluir o log.', 'error');
+                    }
+                }
+            }
+
+            function formatarErroWhatsApp(erroBruto) {
+                if (!erroBruto) return "Erro desconhecido ou não detalhado.";
+
+                const erro = String(erroBruto).toUpperCase();
+
+                if (erro.includes("500") || erro.includes("CONNECTION CLOSED")) {
+                    return "O servidor do WhatsApp está temporariamente fora de área ou a conexão caiu. Tente novamente em alguns minutos.";
+                }
+                if (erro.includes("401") || erro.includes("UNAUTHORIZED")) {
+                    return "Falha na autenticação do sistema. Por favor, avise o administrador para verificar a chave de acesso (API Key).";
+                }
+                if (erro.includes("404") || erro.includes("NOT FOUND")) {
+                    return "A instância de envio não foi encontrada. A conexão com o celular pode ter sido deslogada.";
+                }
+                if (erro.includes("NUMBER NOT EXISTS") || erro.includes("INVALID NUMBER")) {
+                    return "O número do destinatário parece estar incorreto ou não possui uma conta de WhatsApp ativa.";
+                }
+                if (erro.includes("403") || erro.includes("FORBIDDEN")) {
+                    return "Acesso negado. O servidor bloqueou o disparo por motivo de segurança ou limites da conta.";
+                }
+                if (erro.includes("ECONNREFUSED") || erro.includes("FETCH ERROR")) {
+                    return "Não foi possível conectar ao servidor de disparos. Verifique se o servidor da Evolution API está ligado.";
+                }
+                if (erro.includes("TIMEDOUT") || erro.includes("TIMEOUT")) {
+                    return "O tempo de espera para o envio esgotou. O servidor pode estar lento ou o destinatário está inacessível.";
+                }
+
+                return "Ocorreu um erro técnico durante o processamento. Tente reenviar ou verifique o log detalhado.";
+            }
+
+            // Utilitário para exibir notificações rápidas (Toast)
+            function showToast(mensagem, icon = 'success') {
+                Swal.fire({
+                    text: mensagem,
+                    icon: icon,
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true
+                });
+            }
+
+            async function verificarStatusEvolution() {
+                const statusText = document.getElementById('ws-status-text');
+                if (!statusText) return;
+
+                try {
+                    statusText.innerText = "Consultando instância...";
+                    const response = await fetch(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+                        headers: { 'apikey': EVO_API_KEY }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const state = data.instance?.state || 'unknown';
+
+                        if (state === 'open') {
+                            statusText.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Conectado (SOP)</span>';
+                        } else if (state === 'connecting' || state === 'close') {
+                            statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-qr-code"></i> Instância: ${state} (Escaneie o QR)</span>`;
+                        } else {
+                            statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> Instância: ${state}</span>`;
+                        }
+                    } else if (response.status === 404) {
+                        // Se a instância não existir, tenta criar
+                        statusText.innerText = "Instância não encontrada. Tentando criar...";
+                        await criarInstanciaEvolution();
+                    } else {
+                        statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Erro na API</span>';
+                    }
+                } catch (err) {
+                    statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> API Offline</span>';
+                    console.error("[WhatsApp] Erro ao verificar status:", err);
+                }
+            }
+
+            async function criarInstanciaEvolution() {
+                try {
+                    const response = await fetch(`${EVO_API_URL}/instance/create`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': EVO_API_KEY
+                        },
+                        body: JSON.stringify({
+                            instanceName: EVO_INSTANCE,
+                            token: EVO_API_KEY,
+                            integration: "WHATSAPP-BAILEYS",
+                            qrcode: true
+                        })
+                    });
+                    if (response.ok) {
+                        document.getElementById('ws-status-text').innerText = "Instância 'SOP' criada. Conecte-se agora.";
+                        // Recarrega status após criar
+                        setTimeout(verificarStatusEvolution, 2000);
+                    }
+                } catch (e) {
+                    console.error("Erro ao criar instância:", e);
+                }
+            }
+
+            // Inicia verificação ao carregar se estiver na aba de config
+            document.addEventListener('DOMContentLoaded', () => {
+                // Pequeno delay para garantir que o DOM está pronto e estilos aplicados
+                setTimeout(verificarStatusEvolution, 2000);
+            });
         </script>
         </body>
 
