@@ -2104,13 +2104,15 @@
                                                             <th>Evento</th>
                                                             <th>Destinatário</th>
                                                             <th>Número</th>
+                                                            <th>NUP</th>
+                                                            <th>Descrição</th>
                                                             <th>Status</th>
                                                             <th class="text-center">Ações</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="ws-logs-table-body">
                                                         <tr>
-                                                            <td colspan="5" class="text-center py-3">Carregando
+                                                            <td colspan="8" class="text-center py-3">Carregando
                                                                 histórico...</td>
                                                         </tr>
                                                     </tbody>
@@ -12453,11 +12455,11 @@ Mês Ref: [MES_REFERENCIA]</textarea>
 
 
                 const agora = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const enviadoPor = (localStorage.getItem('sop_user_name') || 'Assistente').toUpperCase();
+                const enviadoPor = "GECOPE";
 
                 // Variantes de rodapé
                 const rodapes = [
-                    `_Enviado por ${enviadoPor} via GECOPE às ${agora.split(' ')[1]}_`,
+                    `_Enviado via GECOPE às ${agora.split(' ')[1]}_`,
                     `_Sistema GECOPE | ${enviadoPor} | ${agora.split(' ')[1]}_`,
                     `_Notificação automática | Resp: ${enviadoPor} | Hora: ${agora.split(' ')[1]}_`
                 ];
@@ -12499,8 +12501,22 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                 return `${conf.titulo}\n\n${saudar}\n${conector}\n\n${linhas.join('\n')}${avisoSuite}${footer}`;
             }
 
+            // Cache para evitar disparos duplicados (debounce)
+            const lastNotificationCache = new Map();
+
             async function processarNotificacao(eventoGatilho, dadosDinamicos) {
                 try {
+                    // Previne disparos duplicados em um curto intervalo (ex: duplo clique ou loop)
+                    const identificador = dadosDinamicos.NUP_PROCESSO || dadosDinamicos.ID || dadosDinamicos.CODIGO_COMPOSICAO || JSON.stringify(dadosDinamicos);
+                    const cacheKey = `${eventoGatilho}_${identificador}`;
+                    const agoraMs = Date.now();
+
+                    if (lastNotificationCache.has(cacheKey) && (agoraMs - lastNotificationCache.get(cacheKey) < 8000)) {
+                        console.warn(`[WhatsApp] Bloqueio de duplicidade: O evento "${eventoGatilho}" para "${identificador}" já foi processado recentemente.`);
+                        return;
+                    }
+                    lastNotificationCache.set(cacheKey, agoraMs);
+
                     console.log(`[WhatsApp] Iniciando verificação para: ${eventoGatilho}`);
                     const { data: config, error: configError } = await sbClient
                         .from('config_whatsapp')
@@ -12576,10 +12592,11 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                     }
 
                     if (telefonesAlvo.length > 0) {
-                        console.log(`[WhatsApp] Preparando disparo para ${telefonesAlvo.length} destinatário(s).`);
+                        console.log(`[WhatsApp] Analisando ${telefonesAlvo.length} possíveis destinatários.`);
 
-                        // Mapear para objetos {nome, fone} para o log ficar completo
+                        // Mapear para objetos {nome, fone} com DEDUPLICAÇÃO RIGOROSA
                         let alvosCompletos = [];
+                        const fonesProcessados = new Set();
 
                         // Busca o nome do Fiscal se for disparo individual
                         let nomeDestinatarioPadrao = "Fiscal / Responsável";
@@ -12590,13 +12607,15 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                         telefonesAlvo.forEach(t => {
                             let clean = typeof t === 'string' ? t.replace(/\D/g, '') : '';
                             if (clean.length === 10 || clean.length === 11) clean = '55' + clean;
-                            // Correção para DDDs do Ceará (85/88) que costumam dar erro com o 9 extra no envio via API
+
+                            // Normalização para DDDs do Ceará (85/88) que costumam dar erro com o 9 extra
                             if (clean.length === 13 && (clean.startsWith('55889') || clean.startsWith('55859'))) {
-                                const cleanSemNove = clean.substring(0, 4) + clean.substring(5);
-                                console.log("[WhatsApp] Detectado DDD do Ceará. Preparando envio alternativo (sem 9):", cleanSemNove);
-                                clean = cleanSemNove; // Prioriza o formato de 12 dígitos para maior compatibilidade
+                                clean = clean.substring(0, 4) + clean.substring(5);
                             }
-                            if (clean.length >= 12) {
+
+                            // Só adiciona se o telefone for válido e ainda não estiver na lista deste disparo
+                            if (clean.length >= 12 && !fonesProcessados.has(clean)) {
+                                fonesProcessados.add(clean);
                                 alvosCompletos.push({
                                     nome: nomeDestinatarioPadrao,
                                     fone: clean
@@ -12612,7 +12631,6 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                             const alvo = alvosCompletos[i];
                             const mensagemUnica = gerarMensagemAmigavel(eventoGatilho, dadosDinamicos);
                             await sleep(Math.floor(Math.random() * 5000) + 3000);
-
 
                             if (i > 0) {
                                 const delayExtra = Math.floor(Math.random() * 5000) + 5000;
@@ -12633,81 +12651,35 @@ Mês Ref: [MES_REFERENCIA]</textarea>
 
                                 const resData = await response.json();
                                 const statusEnvio = response.ok ? 'sucesso' : 'falha';
-                                let detalheErro = null;
-
-                                if (response.ok) {
-                                    const msgId = resData.key?.id || resData.id || null;
-                                    if (msgId) detalheErro = `ID:${msgId}`;
-                                } else {
-                                    detalheErro = `Erro: ${response.status} - ${resData.response?.message || resData.error || 'Desconhecido'}`;
-                                }
+                                let detalheErro = response.ok ? `ID:${resData.key?.id || resData.id || ''}` : `Erro: ${response.status} - ${resData.response?.message || resData.error || 'Desconhecido'}`;
 
                                 await sbClient.from('whatsapp_logs').insert({
                                     evento: eventoGatilho,
                                     destinatario: alvo.fone,
                                     destinatario_nome: alvo.nome,
-                                    mensagem: mensagemFinal,
+                                    mensagem: mensagemUnica,
                                     status: statusEnvio,
-                                    erro_detalhe: detalheErro
+                                    erro_detalhe: detalheErro,
+                                    nup: dadosDinamicos.NUP_PROCESSO || null,
+                                    objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
                                 });
-
-                                console.log(`[WhatsApp] RESPOSTA TÉCNICA PARA ${alvo.fone}:`, JSON.stringify(resData, null, 2));
-                                if (resData && (resData.error || resData.status === 'ERROR')) {
-                                    console.error("⚠️ A API RETORNOU ERRO INTERNO:", resData.message || resData.error);
-                                }
-                                if (resData.response && typeof resData.response === 'string' && resData.response.includes('not connected')) {
-                                    console.warn("⚠️ ALERTA: A instância SOP parece estar desconectada no servidor, apesar do painel mostrar verde.");
-                                } else if (resData.response && resData.response.message && Array.isArray(resData.response.message) && resData.response.message.join(' ').includes('not connected')) {
-                                    console.warn("⚠️ ALERTA: A instância SOP parece estar desconectada no servidor, apesar do painel mostrar verde.");
-                                }
                             } catch (itemErr) {
-                                console.error("[WhatsApp] Erro no item:", itemErr);
                                 await sbClient.from('whatsapp_logs').insert({
                                     evento: eventoGatilho,
                                     destinatario: alvo.fone,
                                     destinatario_nome: alvo.nome,
-                                    mensagem: mensagemFinal,
+                                    mensagem: mensagemUnica,
                                     status: 'falha',
-                                    erro_detalhe: `Erro Local: ${itemErr.message}`
+                                    erro_detalhe: `Erro Local: ${itemErr.message}`,
+                                    nup: dadosDinamicos.NUP_PROCESSO || null,
+                                    objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
                                 });
                             }
                         }
-                    } else {
-                        console.log(`[WhatsApp] Nenhum destinatário apto encontrado para o evento.`);
                     }
                 } catch (err) {
                     console.error(`[WhatsApp] Erro geral:`, err);
                 }
-            }
-
-            function testarPreviaMensagem(evento) {
-                const dadosTeste = {
-                    NOME_FISCAL: "Engenheiro Exemplo",
-                    NUP_PROCESSO: "2024/98765-4",
-                    NOME_OBRA: "Centro Esportivo",
-                    NOVO_STATUS: "ANÁLISE FISCAL",
-                    REF_ORCAMENTO: "ORC-2024-001",
-                    TABELA_NOME: "SEINFRA",
-                    VERSAO: "028.1",
-                    MES_REFERENCIA: "AGOSTO/2024",
-                    DESCRICAO: "Muro de Arrimo (Protótipo)"
-                };
-
-                const msg = gerarMensagemAmigavel(evento, dadosTeste);
-
-                Swal.fire({
-                    title: '<i class="bi bi-robot text-primary me-2"></i>Redação Dinâmica',
-                    html: `<div class="text-start p-3 border rounded bg-light shadow-sm" style="white-space: pre-wrap; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 0.9rem; line-height: 1.4; border-left: 4px solid #0d6efd !important;">${msg}</div>`,
-                    footer: '<div class="text-center w-100"><small class="text-muted"><i class="bi bi-info-circle me-1"></i>Esta é apenas uma prévia. No envio real, o Assistente sorteará novas variações.</small></div>',
-                    confirmButtonText: 'Ver outra variação',
-                    showCancelButton: true,
-                    cancelButtonText: 'Fechar',
-                    reverseButtons: true
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        testarPreviaMensagem(evento);
-                    }
-                });
             }
 
             async function carregarLogsWhatsApp() {
@@ -12718,13 +12690,14 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                     const { data, error } = await sbClient
                         .from('whatsapp_logs')
                         .select('*')
+                        .eq('status', 'falha')
                         .order('created_at', { ascending: false })
                         .limit(50);
 
                     if (error) throw error;
 
                     if (!data || data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3">Nenhum disparo registrado ainda.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="bi bi-check-circle me-2"></i>Nenhuma falha de envio registrada no momento.</td></tr>';
                         return;
                     }
 
@@ -12732,12 +12705,17 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                         const statusColor = log.status === 'sucesso' ? 'bg-success' : 'bg-danger';
                         const erroFormatado = formatarErroWhatsApp(log.erro_detalhe);
 
+                        const nupExibicao = log.nup || (log.mensagem ? log.mensagem.match(/NUP:\* ([\d\/\-]+)/)?.[1] : '-');
+                        const objetoExibicao = log.objeto || (log.mensagem ? log.mensagem.match(/OBJETO:\* ([^\n]+)/)?.[1] : '-');
+
                         return `
                         <tr>
                             <td class="small text-muted">${new Date(log.created_at).toLocaleString('pt-BR')}</td>
                             <td><span class="badge bg-light text-dark" style="font-size:0.6rem">${log.evento}</span></td>
                             <td class="fw-bold small text-truncate" style="max-width: 120px;">${log.destinatario_nome || '-'}</td>
                             <td class="small">${log.destinatario}</td>
+                            <td class="small text-muted">${nupExibicao}</td>
+                            <td class="small text-truncate" style="max-width: 150px;" title="${objetoExibicao}">${objetoExibicao}</td>
                             <td>
                                 <span class="badge ${statusColor}" style="font-size:0.65rem">
                                     ${log.status.toUpperCase()}
@@ -12745,82 +12723,55 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                             </td>
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center">
-                                    ${log.status === 'falha' ? `
-                                        <button class="btn btn-xs btn-outline-danger p-0 px-1" title="Ver Detalhes do Erro"
-                                            onclick="Swal.fire({title:'Dificuldade no Envio', html:'<div class=&quot;text-start small&quot;><b>Motivo provável:</b><br>${erroFormatado}<br><br><hr><i class=&quot;text-muted&quot;>Erro técnico: ${log.erro_detalhe || 'sem detalhes'}</i></div>', icon:'error'})">
-                                            <i class="bi bi-info-circle"></i>
-                                        </button>
-                                        <button class="btn btn-xs btn-primary p-0 px-1" title="Tentar Reenviar"
-                                            onclick="reenviarMensagemWhatsApp('${log.id}')">
-                                            <i class="bi bi-arrow-repeat"></i>
-                                        </button>
-                                        <button class="btn btn-xs btn-danger p-0 px-1" title="Excluir Log"
-                                            onclick="excluirLogWhatsApp('${log.id}')">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
-                                    ` : (log.erro_detalhe && log.erro_detalhe.startsWith('ID:')) ? `
-                                        <button class="btn btn-xs btn-outline-info p-0 px-1" title="Verificar Status Real"
-                                            onclick="consultarStatusWhatsApp('${log.erro_detalhe.split('ID:')[1]}', '${log.id}', '${log.destinatario}')">
-                                            <i class="bi bi-search"></i>
-                                        </button>
-                                     ` : '-'}
-                                </div>
-                            </td>
-                        </tr>
+                                    <button class="btn btn-xs btn-outline-danger p-0 px-1" title="Ver Detalhes do Erro"
+                                        onclick="Swal.fire({
+                                            title: 'Dificuldade no Envio', 
+                                            html: '<div class=\'text-start small\'><b>O que ocorreu?</b><br><span class=\'text-danger\'>${erroFormatado}</span><br><br><b>Destinatário:</b> ${log.destinatario_nome || \'Não identificado\'}<br><b>Telefone:</b> ${log.destinatario}<br><hr><i class=\'text-muted\'>Erro técnico: ${log.erro_detalhe || \'sem detalhes\'}</i></div>',
+                            icon: 'error',
+                                confirmButtonText: 'Entendido'
+                    })">
+                        < i class="bi bi-search" ></i >
+                                    </button >
+                                    <button class="btn btn-xs btn-primary p-0 px-1" title="Tentar Reenviar Agora"
+                                        onclick="reenviarMensagemWhatsApp(\'${log.id}\')">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button class="btn btn-xs btn-outline-secondary p-0 px-1" title="Excluir Log"
+                                        onclick="excluirLogWhatsApp(\'${log.id}\')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div >
+                            </td >
+                        </tr >
                         `;
                     }).join('');
                 } catch (err) {
                     console.error("Erro ao carregar logs:", err);
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Erro ao carregar logs.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-3">Erro ao carregar logs.</td></tr>';
                 }
             }
 
             async function reenviarMensagemWhatsApp(logId) {
                 try {
-                    // 1. Busca os dados do log original
-                    const { data: log, error } = await sbClient
-                        .from('whatsapp_logs')
-                        .select('*')
-                        .eq('id', logId)
-                        .single();
-
+                    const { data: log, error } = await sbClient.from('whatsapp_logs').select('*').eq('id', logId).single();
                     if (error || !log) throw new Error("Log não encontrado.");
 
-                    Swal.fire({
-                        title: 'Reenviando...',
-                        text: `Tentando novamente para ${log.destinatario_nome || log.destinatario}`,
-                        allowOutsideClick: false,
-                        didOpen: () => { Swal.showLoading(); }
-                    });
+                    Swal.fire({ title: 'Reenviando...', text: `Tentando para ${ log.destinatario_nome || log.destinatario } `, allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
-                    // 2. Tenta o envio via API
-                    const response = await fetch(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
+                    const response = await fetch(`${ EVO_API_URL } /message/sendText / ${ EVO_INSTANCE } `, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
-                        body: JSON.stringify({
-                            number: log.destinatario,
-                            text: log.mensagem,
-                            delay: 500,
-                            linkPreview: false
-                        })
+                        body: JSON.stringify({ number: log.destinatario, text: log.mensagem, delay: 500, linkPreview: false })
                     });
 
                     if (response.ok) {
-                        // 3. Se deu certo, atualiza o status do log original (ou cria um novo, mas vamos atualizar para limpar o histórico)
-                        await sbClient.from('whatsapp_logs').update({
-                            status: 'sucesso',
-                            erro_detalhe: 'Reenviado com sucesso em ' + new Date().toLocaleString(),
-                            created_at: new Date()
-                        }).eq('id', logId);
-
+                        await sbClient.from('whatsapp_logs').update({ status: 'sucesso', erro_detalhe: 'Reenviado em ' + new Date().toLocaleString() }).eq('id', logId);
                         Swal.fire('Sucesso!', 'Mensagem reenviada.', 'success');
                     } else {
                         const errData = await response.json();
-                        const rawErr = `Erro: ${response.status} - ${errData.response?.message || errData.error || 'Erro na API'}`;
-                        throw new Error(formatarErroWhatsApp(rawErr));
+                        throw new Error(formatarErroWhatsApp(`Erro: ${ response.status } - ${ errData.response?.message || errData.error || 'Erro' } `));
                     }
-
-                    carregarLogsWhatsApp(); // Recarrega a tabela
+                    carregarLogsWhatsApp();
                 } catch (err) {
                     Swal.fire('Falha no Reenvio', err.message, 'error');
                 }
@@ -12828,14 +12779,9 @@ Mês Ref: [MES_REFERENCIA]</textarea>
 
             async function consultarStatusWhatsApp(messageId, logId, destinatario) {
                 try {
-                    Swal.fire({ title: 'Consultando Status...', text: 'Aguarde...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-
+                    Swal.fire({ title: 'Consultando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
                     const jid = destinatario.includes('@') ? destinatario : (destinatario + '@s.whatsapp.net');
-
-                    // Endpoint v2 Universal para buscar uma mensagem específica
-                    const url = `${EVO_API_URL}/chat/findMessages/${EVO_INSTANCE}`;
-
-                    const response = await fetch(url, {
+                    const response = await fetch(`${ EVO_API_URL } /chat/findMessages / ${ EVO_INSTANCE } `, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
                         body: JSON.stringify({ where: { id: messageId }, remoteJid: jid })
@@ -12869,98 +12815,98 @@ Mês Ref: [MES_REFERENCIA]</textarea>
 
                     Swal.fire({
                         title: 'Status da Mensagem',
-                        html: `<b>Situação Atual:</b><br>${info.t}<br><br><small class="text-muted">Rastreador: ${messageId}</small>`,
+                        html: `< b > Situação Atual:</b > <br>${info.t}<br><br><small class="text-muted">Rastreador: ${messageId}</small>`,
                         icon: info.i
                     });
                 } catch (err) {
-                    console.error("Erro no status:", err);
-                    Swal.fire('Erro na Consulta', 'Não foi possível conectar ao rastreio.', 'error');
+                            console.error("Erro no status:", err);
+                        Swal.fire('Erro na Consulta', 'Não foi possível conectar ao rastreio.', 'error');
                 }
             }
 
-            async function excluirLogWhatsApp(logId) {
-                const { isConfirmed } = await Swal.fire({
-                    title: 'Excluir Log?',
-                    text: "Esta ação removerá este registro de falha permanentemente.",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    confirmButtonText: 'Sim, excluir!',
-                    cancelButtonText: 'Cancelar'
+                        async function excluirLogWhatsApp(logId) {
+                const {isConfirmed} = await Swal.fire({
+                            title: 'Excluir Log?',
+                        text: "Esta ação removerá este registro de falha permanentemente.",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d33',
+                        confirmButtonText: 'Sim, excluir!',
+                        cancelButtonText: 'Cancelar'
                 });
 
-                if (isConfirmed) {
+                        if (isConfirmed) {
                     try {
-                        const { error } = await sbClient
-                            .from('whatsapp_logs')
-                            .delete()
-                            .eq('id', logId);
+                        const {error} = await sbClient
+                        .from('whatsapp_logs')
+                        .delete()
+                        .eq('id', logId);
 
                         if (error) throw error;
 
                         showToast("Log excluído com sucesso.");
                         carregarLogsWhatsApp();
                     } catch (err) {
-                        console.error("Erro ao excluir log:", err);
+                            console.error("Erro ao excluir log:", err);
                         Swal.fire('Erro', 'Não foi possível excluir o log.', 'error');
                     }
                 }
             }
 
-            function formatarErroWhatsApp(erroBruto) {
+                        function formatarErroWhatsApp(erroBruto) {
                 if (!erroBruto) return "Erro desconhecido ou não detalhado.";
 
-                const erro = String(erroBruto).toUpperCase();
+                        const erro = String(erroBruto).toUpperCase();
 
-                if (erro.includes("500") || erro.includes("CONNECTION CLOSED")) {
+                        if (erro.includes("500") || erro.includes("CONNECTION CLOSED")) {
                     return "O servidor do WhatsApp está temporariamente fora de área ou a conexão caiu. Tente novamente em alguns minutos.";
                 }
-                if (erro.includes("401") || erro.includes("UNAUTHORIZED")) {
+                        if (erro.includes("401") || erro.includes("UNAUTHORIZED")) {
                     return "Falha na autenticação do sistema. Por favor, avise o administrador para verificar a chave de acesso (API Key).";
                 }
-                if (erro.includes("404") || erro.includes("NOT FOUND")) {
+                        if (erro.includes("404") || erro.includes("NOT FOUND")) {
                     return "A instância de envio não foi encontrada. A conexão com o celular pode ter sido deslogada.";
                 }
-                if (erro.includes("NUMBER NOT EXISTS") || erro.includes("INVALID NUMBER")) {
+                        if (erro.includes("NUMBER NOT EXISTS") || erro.includes("INVALID NUMBER")) {
                     return "O número do destinatário parece estar incorreto ou não possui uma conta de WhatsApp ativa.";
                 }
-                if (erro.includes("403") || erro.includes("FORBIDDEN")) {
+                        if (erro.includes("403") || erro.includes("FORBIDDEN")) {
                     return "Acesso negado. O servidor bloqueou o disparo por motivo de segurança ou limites da conta.";
                 }
-                if (erro.includes("ECONNREFUSED") || erro.includes("FETCH ERROR")) {
+                        if (erro.includes("ECONNREFUSED") || erro.includes("FETCH ERROR")) {
                     return "Não foi possível conectar ao servidor de disparos. Verifique se o servidor da Evolution API está ligado.";
                 }
-                if (erro.includes("TIMEDOUT") || erro.includes("TIMEOUT")) {
+                        if (erro.includes("TIMEDOUT") || erro.includes("TIMEOUT")) {
                     return "O tempo de espera para o envio esgotou. O servidor pode estar lento ou o destinatário está inacessível.";
                 }
 
-                return "Ocorreu um erro técnico durante o processamento. Tente reenviar ou verifique o log detalhado.";
+                        return "Ocorreu um erro técnico durante o processamento. Tente reenviar ou verifique o log detalhado.";
             }
 
-            // Utilitário para exibir notificações rápidas (Toast)
-            function showToast(mensagem, icon = 'success') {
-                Swal.fire({
-                    text: mensagem,
-                    icon: icon,
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true
-                });
+                        // Utilitário para exibir notificações rápidas (Toast)
+                        function showToast(mensagem, icon = 'success') {
+                            Swal.fire({
+                                text: mensagem,
+                                icon: icon,
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 3000,
+                                timerProgressBar: true
+                            });
             }
 
-            async function verificarStatusEvolution() {
+                        async function verificarStatusEvolution() {
                 const statusText = document.getElementById('ws-status-text');
-                if (!statusText) return;
+                        if (!statusText) return;
 
-                try {
-                    statusText.innerText = "Consultando instância...";
-                    const response = await fetch(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
-                        headers: { 'apikey': EVO_API_KEY }
+                        try {
+                            statusText.innerText = "Consultando instância...";
+                        const response = await fetch(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+                            headers: {'apikey': EVO_API_KEY }
                     });
 
-                    if (response.ok) {
+                        if (response.ok) {
                         const data = await response.json();
                         const state = data.instance?.state || 'unknown';
 
@@ -12972,47 +12918,47 @@ Mês Ref: [MES_REFERENCIA]</textarea>
                             statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> Instância: ${state}</span>`;
                         }
                     } else if (response.status === 404) {
-                        // Se a instância não existir, tenta criar
-                        statusText.innerText = "Instância não encontrada. Tentando criar...";
+                            // Se a instância não existir, tenta criar
+                            statusText.innerText = "Instância não encontrada. Tentando criar...";
                         await criarInstanciaEvolution();
                     } else {
-                        statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Erro na API</span>';
+                            statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Erro na API</span>';
                     }
                 } catch (err) {
-                    statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> API Offline</span>';
-                    console.error("[WhatsApp] Erro ao verificar status:", err);
+                            statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> API Offline</span>';
+                        console.error("[WhatsApp] Erro ao verificar status:", err);
                 }
             }
 
-            async function criarInstanciaEvolution() {
+                        async function criarInstanciaEvolution() {
                 try {
                     const response = await fetch(`${EVO_API_URL}/instance/create`, {
-                        method: 'POST',
+                            method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'apikey': EVO_API_KEY
+                        'apikey': EVO_API_KEY
                         },
                         body: JSON.stringify({
                             instanceName: EVO_INSTANCE,
-                            token: EVO_API_KEY,
-                            integration: "WHATSAPP-BAILEYS",
-                            qrcode: true
+                        token: EVO_API_KEY,
+                        integration: "WHATSAPP-BAILEYS",
+                        qrcode: true
                         })
                     });
-                    if (response.ok) {
-                        document.getElementById('ws-status-text').innerText = "Instância 'SOP' criada. Conecte-se agora.";
+                        if (response.ok) {
+                            document.getElementById('ws-status-text').innerText = "Instância 'SOP' criada. Conecte-se agora.";
                         // Recarrega status após criar
                         setTimeout(verificarStatusEvolution, 2000);
                     }
                 } catch (e) {
-                    console.error("Erro ao criar instância:", e);
+                            console.error("Erro ao criar instância:", e);
                 }
             }
 
             // Inicia verificação ao carregar se estiver na aba de config
             document.addEventListener('DOMContentLoaded', () => {
-                // Pequeno delay para garantir que o DOM está pronto e estilos aplicados
-                setTimeout(verificarStatusEvolution, 2000);
+                            // Pequeno delay para garantir que o DOM está pronto e estilos aplicados
+                            setTimeout(verificarStatusEvolution, 2000);
             });
         </script>
         </body>
