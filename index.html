@@ -12223,17 +12223,18 @@
                         .from('whatsapp_logs')
                         .select('nup, created_at')
                         .eq('evento', 'novas_metas_processo')
-                        .eq('status', 'sucesso')
+                        .in('status', ['sucesso', 'processando'])
                         .order('created_at', { ascending: false })
-                        .limit(2000);
+                        .limit(10000);
 
                     const ultimoAlertaPorNup = new Map();
                     if (!logsError && logs) {
                         logs.forEach(log => {
                             if (!log.nup) return;
+                            const cleanNup = log.nup.trim().toUpperCase();
                             // Armazena o mais recente por ser order desc
-                            if (!ultimoAlertaPorNup.has(log.nup)) {
-                                ultimoAlertaPorNup.set(log.nup, new Date(log.created_at).getTime());
+                            if (!ultimoAlertaPorNup.has(cleanNup)) {
+                                ultimoAlertaPorNup.set(cleanNup, new Date(log.created_at).getTime());
                             }
                         });
                     }
@@ -12252,8 +12253,9 @@
                         const metaTime = metaDate.getTime();
 
                         // 1. Verifica banco de dados (Global): se já houve disparo DEPOIS da data da meta, já foi cobrado!
-                        const ultimoAlertaTime = ultimoAlertaPorNup.get(d.processo);
-                        if (ultimoAlertaTime && ultimoAlertaTime > metaTime) return false;
+                        const cleanProcesso = (d.processo || '').trim().toUpperCase();
+                        const ultimoAlertaTime = ultimoAlertaPorNup.get(cleanProcesso);
+                        if (ultimoAlertaTime && ultimoAlertaTime >= metaTime) return false;
 
                         // 2. Verifica cache local (Secundário): atrelado ao timestamp da meta atual
                         const key = `notif_atraso_meta_${d.id}_${metaTime}`;
@@ -12617,6 +12619,26 @@
                         for (let i = 0; i < alvosCompletos.length; i++) {
                             const alvo = alvosCompletos[i];
                             const mensagemUnica = gerarMensagemAmigavel(eventoGatilho, dadosDinamicos);
+
+                            // Insere LOG PENDENTE imediato para bloquear duplicidades concorrentes (corrida entre administradores)
+                            let logId = null;
+                            try {
+                                const { data: logRow } = await sbClient.from('whatsapp_logs').insert({
+                                    evento: eventoGatilho,
+                                    destinatario: alvo.fone,
+                                    destinatario_nome: alvo.nome,
+                                    mensagem: mensagemUnica,
+                                    status: 'processando',
+                                    erro_detalhe: 'Iniciando envio...',
+                                    nup: dadosDinamicos.NUP_PROCESSO || null,
+                                    objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
+                                }).select('id').single();
+
+                                if (logRow) logId = logRow.id;
+                            } catch (e) {
+                                console.error('[WhatsApp] Erro ao criar log pendente:', e);
+                            }
+
                             await sleep(Math.floor(Math.random() * 5000) + 3000);
 
                             if (i > 0) {
@@ -12640,27 +12662,41 @@
                                 const statusEnvio = response.ok ? 'sucesso' : 'falha';
                                 let detalheErro = response.ok ? `ID:${resData.key?.id || resData.id || ''}` : `Erro: ${response.status} - ${resData.response?.message || resData.error || 'Desconhecido'}`;
 
-                                await sbClient.from('whatsapp_logs').insert({
-                                    evento: eventoGatilho,
-                                    destinatario: alvo.fone,
-                                    destinatario_nome: alvo.nome,
-                                    mensagem: mensagemUnica,
-                                    status: statusEnvio,
-                                    erro_detalhe: detalheErro,
-                                    nup: dadosDinamicos.NUP_PROCESSO || null,
-                                    objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
-                                });
+                                if (logId) {
+                                    await sbClient.from('whatsapp_logs').update({
+                                        status: statusEnvio,
+                                        erro_detalhe: detalheErro
+                                    }).eq('id', logId);
+                                } else {
+                                    await sbClient.from('whatsapp_logs').insert({
+                                        evento: eventoGatilho,
+                                        destinatario: alvo.fone,
+                                        destinatario_nome: alvo.nome,
+                                        mensagem: mensagemUnica,
+                                        status: statusEnvio,
+                                        erro_detalhe: detalheErro,
+                                        nup: dadosDinamicos.NUP_PROCESSO || null,
+                                        objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
+                                    });
+                                }
                             } catch (itemErr) {
-                                await sbClient.from('whatsapp_logs').insert({
-                                    evento: eventoGatilho,
-                                    destinatario: alvo.fone,
-                                    destinatario_nome: alvo.nome,
-                                    mensagem: mensagemUnica,
-                                    status: 'falha',
-                                    erro_detalhe: `Erro Local: ${itemErr.message}`,
-                                    nup: dadosDinamicos.NUP_PROCESSO || null,
-                                    objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
-                                });
+                                if (logId) {
+                                    await sbClient.from('whatsapp_logs').update({
+                                        status: 'falha',
+                                        erro_detalhe: `Erro Local: ${itemErr.message}`
+                                    }).eq('id', logId);
+                                } else {
+                                    await sbClient.from('whatsapp_logs').insert({
+                                        evento: eventoGatilho,
+                                        destinatario: alvo.fone,
+                                        destinatario_nome: alvo.nome,
+                                        mensagem: mensagemUnica,
+                                        status: 'falha',
+                                        erro_detalhe: `Erro Local: ${itemErr.message}`,
+                                        nup: dadosDinamicos.NUP_PROCESSO || null,
+                                        objeto: dadosDinamicos.NOME_OBRA || dadosDinamicos.DESCRICAO || dadosDinamicos.REF_ORCAMENTO || dadosDinamicos.TABELA_NOME || null
+                                    });
+                                }
                             }
                         }
                     }
