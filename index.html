@@ -12206,6 +12206,10 @@
 
             async function verificarNotificacoesAtraso() {
                 try {
+                    // JITTER ANTI-CORRIDA: Espera aleatória para evitar que múltiplos administradores
+                    // disparem o loop simultaneamente ao carregar a página ou receber atualizações Realtime.
+                    await new Promise(r => setTimeout(r, Math.random() * 8000));
+
                     // Segurança: Verifica se a notificação de atraso está ativa no banco ANTES de qualquer processamento
                     const { data: config, error: configError } = await sbClient
                         .from('config_whatsapp')
@@ -12218,23 +12222,24 @@
                         return;
                     }
 
-                    // Busca os últimos disparos de metas no banco para verificar qual foi o último aviso por processo
+                    // Busca os últimos disparos de metas no banco para verificar qual foi o último aviso por processo/fiscal
                     const { data: logs, error: logsError } = await sbClient
                         .from('whatsapp_logs')
-                        .select('nup, created_at')
+                        .select('nup, destinatario_nome, objeto, created_at')
                         .eq('evento', 'novas_metas_processo')
-                        .in('status', ['sucesso', 'processando'])
                         .order('created_at', { ascending: false })
                         .limit(10000);
 
-                    const ultimoAlertaPorNup = new Map();
+                    const ultimoAlertaPorChave = new Map();
+                    const cleanStr = str => (str || '').replace(/[^A-Z0-9]/ig, '').toUpperCase();
+
                     if (!logsError && logs) {
                         logs.forEach(log => {
                             if (!log.nup) return;
-                            const cleanNup = log.nup.trim().toUpperCase();
-                            // Armazena o mais recente por ser order desc
-                            if (!ultimoAlertaPorNup.has(cleanNup)) {
-                                ultimoAlertaPorNup.set(cleanNup, new Date(log.created_at).getTime());
+                            // Chave composta: NUP + FISCAL + OBJETO (limpos)
+                            const chave = `${cleanStr(log.nup)}|${cleanStr(log.destinatario_nome)}|${cleanStr(log.objeto)}`;
+                            if (!ultimoAlertaPorChave.has(chave)) {
+                                ultimoAlertaPorChave.set(chave, new Date(log.created_at).getTime());
                             }
                         });
                     }
@@ -12252,9 +12257,12 @@
 
                         const metaTime = metaDate.getTime();
 
-                        // 1. Verifica banco de dados (Global): se já houve disparo DEPOIS da data da meta, já foi cobrado!
-                        const cleanProcesso = (d.processo || '').trim().toUpperCase();
-                        const ultimoAlertaTime = ultimoAlertaPorNup.get(cleanProcesso);
+                        // 1. Verifica banco de dados (Global): se já houve disparo para este NUP+FISCAL+OBJETO DEPOIS da data da meta
+                        const fiscalAlvo = d.fiscal || 'Fiscal';
+                        const objetoAlvo = d.descricao || d.processo;
+                        const chaveProcesso = `${cleanStr(d.processo)}|${cleanStr(fiscalAlvo)}|${cleanStr(objetoAlvo)}`;
+                        const ultimoAlertaTime = ultimoAlertaPorChave.get(chaveProcesso);
+
                         if (ultimoAlertaTime && ultimoAlertaTime >= metaTime) return false;
 
                         // 2. Verifica cache local (Secundário): atrelado ao timestamp da meta atual
