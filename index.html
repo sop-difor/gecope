@@ -12300,7 +12300,7 @@
                         // 2. SOMENTE SE o update funcionou e afetou uma linha, fazemos o disparo
                         if (!updateError && updatedData && updatedData.length > 0) {
                             console.log(`[WhatsApp] Flag atualizada para o processo ${d.processo}. Disparando aviso...`);
-                            
+
                             await processarNotificacao('novas_metas_processo', {
                                 NOME_FISCAL: d.fiscal || 'Fiscal',
                                 NUP_PROCESSO: d.processo,
