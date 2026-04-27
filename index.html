@@ -4583,8 +4583,8 @@
 
             async function registrarAtividade(tipo, descricao, contexto = '', obra = '', fiscal = '') {
                 try {
-                    const userName = localStorage.getItem('sop_user_name') || 'Sistema';
-                    const userRole = localStorage.getItem('sop_role') || 'guest';
+                    const userName = sessionStorage.getItem('sop_user_name') || 'Sistema';
+                    const userRole = sessionStorage.getItem('sop_role') || 'guest';
 
                     const payload = {
                         usuario: userName,
@@ -4607,8 +4607,8 @@
                 const countEl = document.getElementById('count-atividades-24h');
                 if (!listEl) return;
 
-                const userRole = localStorage.getItem('sop_role') || 'guest';
-                const userName = localStorage.getItem('sop_user_name') || '';
+                const userRole = sessionStorage.getItem('sop_role') || 'guest';
+                const userName = sessionStorage.getItem('sop_user_name') || '';
 
                 // Filtro de 24h
                 const periodo = new Date();
@@ -4673,8 +4673,8 @@
                 const listEl = document.getElementById('home-activities-list');
                 if (!listEl) return;
 
-                const userRole = localStorage.getItem('sop_role') || 'guest';
-                const userName = localStorage.getItem('sop_user_name') || '';
+                const userRole = sessionStorage.getItem('sop_role') || 'guest';
+                const userName = sessionStorage.getItem('sop_user_name') || '';
 
                 try {
                     let query = sbClient.from('app_atividades')
@@ -4731,7 +4731,7 @@
                 try {
                     console.log('[DEBUG] Iniciando carregarDadosSupabase...');
                     console.log('[DEBUG] sbClient:', sbClient ? 'OK' : 'FALHA - não inicializado');
-                    console.log('[DEBUG] Usuário logado:', localStorage.getItem('sop_user') || 'Não');
+                    console.log('[DEBUG] Usuário logado:', sessionStorage.getItem('sop_user') || 'Não');
 
                     // Busca dados usando o cliente corrigido 'sbClient'
                     console.log('[DEBUG] Executando query na tabela "processos"...');
@@ -4784,9 +4784,9 @@
 
 
                 // --- LÓGICA DE FILTRAGEM PARA FISCAL ---
-                // [FIX-ALTO] Validação de role: localStorage retorna string, nunca booleano
-                const userRole = (localStorage.getItem('sop_role') || 'guest').toString().trim().toLowerCase();
-                const userEmail = localStorage.getItem('sop_user');
+                // [FIX-ALTO] Validação de role: sessionStorage retorna string, nunca booleano
+                const userRole = (sessionStorage.getItem('sop_role') || 'guest').toString().trim().toLowerCase();
+                const userEmail = sessionStorage.getItem('sop_user');
                 let fiscalName = null;
                 const isFiscal = userRole === 'fiscal';
 
@@ -4812,7 +4812,7 @@
                             console.log('[DEBUG] Fiscal Name Derivado do Email:', fiscalName);
                         }
 
-                        localStorage.setItem('sop_fiscal_name', fiscalName);
+                        sessionStorage.setItem('sop_fiscal_name', fiscalName);
                         console.log('[DEBUG] Email do usuário:', userEmail);
 
                         if (data && data.length > 0) {
@@ -5017,7 +5017,7 @@
                     reperc_gecope: moedaParaNumero(formData.get("REPERCUSSÃO GECOPE")),
 
                     // Audit: Criação
-                    criador: localStorage.getItem('sop_user_name') || 'Sistema',
+                    criador: sessionStorage.getItem('sop_user_name') || 'Sistema',
 
 
                 };
@@ -5060,7 +5060,7 @@
                     else if (analistaExtenso === "H") analistaExtenso = "Helder";
 
                     const analistaNome = analistaExtenso.toUpperCase();
-                    const usuarioAtual = (localStorage.getItem('sop_user_name') || "").toUpperCase();
+                    const usuarioAtual = (sessionStorage.getItem('sop_user_name') || "").toUpperCase();
 
                     // Dispara se for um dos alvos e não for auto-atribuição
                     if (analistasAlvo.some(alvo => analistaNome.includes(alvo))) {
@@ -5177,7 +5177,7 @@
                     btn.disabled = true;
 
                     // Soft Delete com Auditoria
-                    const userName = localStorage.getItem('sop_user_name') || 'Usuário Desconhecido';
+                    const userName = sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido';
                     const updates = {
                         status: 'EXCLUÍDO',
                         excluido_por: userName,
@@ -5225,7 +5225,7 @@
                         reperc_gecope: moedaParaNumero(formData.get("REPERCUSSÃO GECOPE")),
 
                         // Audit: Atualização
-                        atualizado_por: localStorage.getItem('sop_user_name') || 'Usuário Desconhecido',
+                        atualizado_por: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido',
                         ultima_atualizacao: new Date().toISOString()
                     };
 
@@ -5286,7 +5286,7 @@
                         else if (aAnteriorExtenso === "H") aAnteriorExtenso = "Helder";
                         const analistaAnterior = aAnteriorExtenso.toUpperCase();
 
-                        const usuarioAtual = (localStorage.getItem('sop_user_name') || "").toUpperCase();
+                        const usuarioAtual = (sessionStorage.getItem('sop_user_name') || "").toUpperCase();
 
                         if (analistaAtual && analistaAtual !== analistaAnterior && analistasAlvo.some(alvo => analistaAtual.includes(alvo))) {
                             const ehAutoAtribuicao = usuarioAtual && (analistaAtual.includes(usuarioAtual) || usuarioAtual.includes(analistaAtual));
@@ -5331,7 +5331,7 @@
                 if (!elHome) return;
 
                 // 1. Update Welcome Message
-                const userName = localStorage.getItem('sop_user_name') || 'Usuário';
+                const userName = sessionStorage.getItem('sop_user_name') || 'Usuário';
                 const elName = document.getElementById('home-user-name');
                 if (elName) elName.textContent = userName;
 
@@ -5452,8 +5452,8 @@
             // --- 6. EVENT LISTENERS E MÁSCARAS ---
             document.addEventListener('DOMContentLoaded', () => {
                 console.log('[DEBUG] === DOMContentLoaded iniciado ===');
-                console.log('[DEBUG] Usuário:', localStorage.getItem('sop_user') || 'nenhum');
-                console.log('[DEBUG] Role:', localStorage.getItem('sop_role') || 'nenhum');
+                console.log('[DEBUG] Usuário:', sessionStorage.getItem('sop_user') || 'nenhum');
+                console.log('[DEBUG] Role:', sessionStorage.getItem('sop_role') || 'nenhum');
                 const landing = document.getElementById('landingOverlay');
                 console.log('[DEBUG] Landing display:', landing ? landing.style.display || 'padrão' : 'não encontrado');
 
@@ -5718,7 +5718,7 @@
 
                 // Filtragem automática para Fiscal
                 const role = getCurrentUserRole();
-                const userFiscal = role === 'fiscal' ? localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || '' : '';
+                const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
 
                 return allData.filter(d => {
                     // Filtro automático para Fiscal
@@ -5784,7 +5784,7 @@
             }
             function renderTotaisFinanceiro(rows) {
                 const base = applyPeriodo(rows, fin.totAno.value, fin.totMes.value);
-                const isFiscal = localStorage.getItem('sop_role') === 'fiscal';
+                const isFiscal = sessionStorage.getItem('sop_role') === 'fiscal';
 
                 const render = (id, v1, v2, tit) => {
                     const labels = isFiscal ? ["Fiscalização"] : ["Fiscalização", "GECOPE"];
@@ -5836,7 +5836,7 @@
 
                 // Filtragem automática para Fiscal
                 const role = getCurrentUserRole();
-                const userFiscal = role === 'fiscal' ? localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || '' : '';
+                const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
 
                 return gerBase.filter(d => {
                     // Filtro automático para Fiscal
@@ -5870,7 +5870,7 @@
 
                 // Filtragem automática para Fiscal
                 const role = getCurrentUserRole();
-                const userFiscal = role === 'fiscal' ? localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || '' : '';
+                const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
 
                 return przBase.filter(d => {
                     // Filtro automático para Fiscal
@@ -6064,10 +6064,10 @@
 
             function updateReuniao() {
                 if (!mt.body) return;
-                const uRole = (localStorage.getItem('sop_role') || "").toLowerCase();
+                const uRole = (sessionStorage.getItem('sop_role') || "").toLowerCase();
 
                 // Prioriza sop_fiscal_name (derivado do email) sobre sop_user_name
-                let uName = (localStorage.getItem('sop_fiscal_name') || localStorage.getItem('sop_user_name') || "").toUpperCase().trim();
+                let uName = (sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || "").toUpperCase().trim();
 
                 const fs = Array.from(new Set(mtBase.map(d => d.fiscal).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
                 if (mt.fiscal.options.length <= 1) fillSelect(mt.fiscal, fs);
@@ -6339,7 +6339,7 @@
                 try {
                     const now = new Date();
                     const dateExport = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
-                    const userName = localStorage.getItem('sop_user_name') || 'Não identificado';
+                    const userName = sessionStorage.getItem('sop_user_name') || 'Não identificado';
 
                     // Coletar filtros ativos
                     const filtrosAtivos = [];
@@ -6695,7 +6695,7 @@
             }
 
             function verificarAdminSalvo() {
-                const isAdm = localStorage.getItem('is_admin_gecope');
+                const isAdm = sessionStorage.getItem('is_admin_gecope');
                 if (isAdm === 'true') {
                     document.body.classList.add('is-admin');
                     atualizarIconesCadeado(false);
@@ -6708,9 +6708,9 @@
                 if (document.body.classList.contains('is-admin')) {
                     if (confirm("Deseja sair do modo Administrador?")) {
                         document.body.classList.remove('is-admin');
-                        localStorage.removeItem('is_admin_gecope');
+                        sessionStorage.removeItem('is_admin_gecope');
                         // Ao sair do modo admin forçado, colocamos o role para 'guest' e reaplicamos a UI
-                        localStorage.setItem('sop_role', 'guest');
+                        sessionStorage.setItem('sop_role', 'guest');
                         applyRoleToUI('guest');
                         atualizarIconesCadeado(true);
                         alert("Modo de visualização ativado.");
@@ -6728,7 +6728,7 @@
                     const tentativa = prompt("🔒 Digite a senha de administrador:");
                     if (tentativa === SENHA_MESTRA) {
                         document.body.classList.add('is-admin');
-                        localStorage.setItem('is_admin_gecope', 'true');
+                        sessionStorage.setItem('is_admin_gecope', 'true');
                         atualizarIconesCadeado(false);
                         alert("🔓 Modo Administrador Ativado!");
                     } else if (tentativa !== null) { alert("❌ Senha incorreta."); }
@@ -6744,10 +6744,10 @@
                 const found = USERS.find(u => u.username === user && u.password === pass);
                 if (found) {
                     document.body.classList.add('is-admin');
-                    localStorage.setItem('is_admin_gecope', 'true');
-                    localStorage.setItem('sop_user', user);
+                    sessionStorage.setItem('is_admin_gecope', 'true');
+                    sessionStorage.setItem('sop_user', user);
                     // Garantir consistência: marca o role como 'admin' e reaplica as regras de UI
-                    localStorage.setItem('sop_role', 'admin');
+                    sessionStorage.setItem('sop_role', 'admin');
                     applyRoleToUI('admin');
                     atualizarIconesCadeado(false);
                     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalLogin'));
@@ -6826,9 +6826,9 @@
 
                     console.log('[DEBUG] Perfil encontrado:', { email, role });
 
-                    // Salva no localStorage
-                    localStorage.setItem('sop_user', email);
-                    localStorage.setItem('sop_role', role);
+                    // Salva no sessionStorage
+                    sessionStorage.setItem('sop_user', email);
+                    sessionStorage.setItem('sop_role', role);
 
                     // Busca nome completo de forma robusta
                     let finalName = '';
@@ -6841,9 +6841,9 @@
                     }
 
                     if (finalName) {
-                        localStorage.setItem('sop_user_name', finalName);
+                        sessionStorage.setItem('sop_user_name', finalName);
                     } else {
-                        localStorage.removeItem('sop_user_name');
+                        sessionStorage.removeItem('sop_user_name');
                     }
                     console.log('[DEBUG] Dados salvos em localStorage. Nome:', finalName);
 
@@ -6870,9 +6870,9 @@
 
             async function signOutUser() {
                 await sbClient.auth.signOut();
-                localStorage.removeItem('sop_user');
-                localStorage.removeItem('sop_role');
-                localStorage.removeItem('sop_user_name');
+                sessionStorage.removeItem('sop_user');
+                sessionStorage.removeItem('sop_role');
+                sessionStorage.removeItem('sop_user_name');
                 // Exibe landing novamente
                 const landing = document.getElementById('landingOverlay'); if (landing) landing.style.display = 'flex';
                 // Atualiza UI
@@ -6969,7 +6969,7 @@
                         userInfoHeader.style.setProperty('display', 'flex', 'important');
                         const nameEl = document.getElementById('header-user-name');
                         const roleEl = document.getElementById('header-user-role');
-                        if (nameEl) nameEl.textContent = (localStorage.getItem('sop_user_name') || 'Usuário').toUpperCase();
+                        if (nameEl) nameEl.textContent = (sessionStorage.getItem('sop_user_name') || 'Usuário').toUpperCase();
                         if (roleEl) roleEl.textContent = role;
                     }
                 }
@@ -6985,14 +6985,14 @@
              * Retorna o papel atual do usuário logado
              */
             function getCurrentUserRole() {
-                return (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                return (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
             }
 
             /**
              * Retorna o email do usuário logado
              */
             function getCurrentUserEmail() {
-                return localStorage.getItem('sop_user') || '';
+                return sessionStorage.getItem('sop_user') || '';
             }
 
             /**
@@ -7009,9 +7009,9 @@
                         return;
                     }
                     const newRole = (data?.role || 'guest').toLowerCase();
-                    const curRole = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                    const curRole = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
                     if (newRole !== curRole) {
-                        localStorage.setItem('sop_role', newRole);
+                        sessionStorage.setItem('sop_role', newRole);
                         console.log('[INFO] Role atualizada de', curRole, 'para', newRole);
                         applyRoleToUI(newRole);
                     }
@@ -7027,8 +7027,8 @@
              */
             function isItemOwner(item) {
                 const userEmail = getCurrentUserEmail();
-                const currentUserName = (localStorage.getItem('sop_user_name') || '').toUpperCase();
-                const currentFiscalName = (localStorage.getItem('sop_fiscal_name') || '').toUpperCase();
+                const currentUserName = (sessionStorage.getItem('sop_user_name') || '').toUpperCase();
+                const currentFiscalName = (sessionStorage.getItem('sop_fiscal_name') || '').toUpperCase();
 
                 // Para composições, verifica criador
                 const criador = item.criador_email || item.criado_por || item.created_by || '';
@@ -7504,11 +7504,11 @@
             }
             // Ao carregar, aplica role salvo (se houver)
             (function () {
-                const savedRole = localStorage.getItem('sop_role') || 'guest';
+                const savedRole = sessionStorage.getItem('sop_role') || 'guest';
                 console.log('[DEBUG] IIFE: Role salvo ao iniciar:', savedRole);
 
-                const savedEmail = localStorage.getItem('sop_user');
-                const savedUserName = localStorage.getItem('sop_user_name');
+                const savedEmail = sessionStorage.getItem('sop_user');
+                const savedUserName = sessionStorage.getItem('sop_user_name');
 
                 // Se não tem nome ou se o nome salvo é apenas números (matrícula), tenta buscar o nome real
                 if (savedEmail && (!savedUserName || /^\d+$/.test(savedUserName))) {
@@ -7522,7 +7522,7 @@
                             }
 
                             if (realName) {
-                                localStorage.setItem('sop_user_name', realName);
+                                sessionStorage.setItem('sop_user_name', realName);
                                 console.log('[DEBUG] Nome do usuário corrigido/carregado:', realName);
                             }
                         }
@@ -7568,9 +7568,9 @@
                         if (!upErr) {
                             console.log('[AUTO-ADMIN] Sucesso!');
                             // Update session if logged in
-                            const current = localStorage.getItem('sop_user');
+                            const current = sessionStorage.getItem('sop_user');
                             if (current === targetEmail) {
-                                localStorage.setItem('sop_role', 'admin');
+                                sessionStorage.setItem('sop_role', 'admin');
                                 applyRoleToUI('admin');
                                 alert('Sua conta foi promovida para Administrador com sucesso.');
                             }
@@ -7642,7 +7642,7 @@
 
             // Botão do cabeçalho agora abre seleção se estiver logado, ou landing se não
             document.getElementById('btn-admin-login')?.addEventListener('click', () => {
-                const user = localStorage.getItem('sop_user');
+                const user = sessionStorage.getItem('sop_user');
                 if (!user) {
                     const landing = document.getElementById('landingOverlay'); if (landing) landing.style.display = 'flex';
                     return;
@@ -7835,7 +7835,7 @@
             async function carregarOrcamentos() {
                 const container = document.getElementById('accordionOrcamentos');
                 const termoBusca = document.getElementById('orcamento-search').value.toLowerCase();
-                const role = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                const role = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
                 const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
 
                 let data = [];
@@ -8169,7 +8169,7 @@
 
                     const sel = document.getElementById('coment-fiscal');
                     // Preenche automaticamente com o usuário logado
-                    const currentUserName = localStorage.getItem('sop_user_name') || localStorage.getItem('sop_user') || 'Usuário';
+                    const currentUserName = sessionStorage.getItem('sop_user_name') || sessionStorage.getItem('sop_user') || 'Usuário';
                     sel.innerHTML = `<option value="${currentUserName}" selected>${currentUserName}</option>`;
                     // Visualmente "readonly"
                     sel.style.backgroundColor = '#e9ecef';
@@ -8480,15 +8480,15 @@
                         versao_atual: 'V1',
                         arquivo_url: publicUrlData.publicUrl,
                         arquivo_path: storagePath,
-                        criador_email: localStorage.getItem('sop_user') || 'sistema',
-                        criador_nome: localStorage.getItem('sop_user_name') || 'SISTEMA',
-                        criador_role: localStorage.getItem('sop_role') || 'fiscal',
+                        criador_email: sessionStorage.getItem('sop_user') || 'sistema',
+                        criador_nome: sessionStorage.getItem('sop_user_name') || 'SISTEMA',
+                        criador_role: sessionStorage.getItem('sop_role') || 'fiscal',
                         historico_versoes: [{
                             versao: 'V1',
                             data: new Date().toISOString(),
                             descricao: 'Upload Inicial',
                             url: publicUrlData.publicUrl,
-                            autor: localStorage.getItem('sop_user_name') || localStorage.getItem('sop_user') || 'Sistema'
+                            autor: sessionStorage.getItem('sop_user_name') || sessionStorage.getItem('sop_user') || 'Sistema'
                         }]
                     };
 
@@ -8610,7 +8610,7 @@
 
                     const sel = document.getElementById('coment-fiscal-comp');
                     // Preenche automaticamente com o usuário logado
-                    const currentUserNameComp = localStorage.getItem('sop_user_name') || localStorage.getItem('sop_user') || 'Usuário';
+                    const currentUserNameComp = sessionStorage.getItem('sop_user_name') || sessionStorage.getItem('sop_user') || 'Usuário';
                     sel.innerHTML = `<option value="${currentUserNameComp}" selected>${currentUserNameComp}</option>`;
                     // Visualmente "readonly"
                     sel.style.backgroundColor = '#e9ecef';
@@ -8757,11 +8757,11 @@
             async function carregarComposicoes() {
                 const container = document.getElementById('accordionComposicoes');
                 const termoBusca = document.getElementById('comp-search').value.toLowerCase();
-                const role = (localStorage.getItem('sop_role') || 'guest').toLowerCase();
+                const role = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
                 const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
-                const userEmail = localStorage.getItem('sop_user');
-                const currentUserName = (localStorage.getItem('sop_user_name') || '').toUpperCase();
-                const currentFiscalName = (localStorage.getItem('sop_fiscal_name') || '').toUpperCase();
+                const userEmail = sessionStorage.getItem('sop_user');
+                const currentUserName = (sessionStorage.getItem('sop_user_name') || '').toUpperCase();
+                const currentFiscalName = (sessionStorage.getItem('sop_fiscal_name') || '').toUpperCase();
 
                 if (!container) return;
                 container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success"></div><div class="mt-2 text-secondary fw-bold">Carregando composições...</div></div>';
@@ -9750,8 +9750,8 @@
                     const formData = new FormData(form);
                     const nomeObra = (formData.get('descricao') || 'SEM DESCRIÇÃO').toUpperCase();
 
-                    let userEmail = localStorage.getItem('sop_user') || 'SISTEMA';
-                    let userName = localStorage.getItem('sop_user_name');
+                    let userEmail = sessionStorage.getItem('sop_user') || 'SISTEMA';
+                    let userName = sessionStorage.getItem('sop_user_name');
 
                     if (userEmail !== 'SISTEMA' && !userEmail.includes('@')) {
                         userEmail = `${userEmail.replace(/\s+/g, '')}@gecope.app`;
@@ -9769,12 +9769,12 @@
                             } else if (userData.nome) {
                                 userName = (userData.nome + (userData.sobrenome ? ' ' + userData.sobrenome : '')).toUpperCase();
                             }
-                            if (userName) localStorage.setItem('sop_user_name', userName);
+                            if (userName) sessionStorage.setItem('sop_user_name', userName);
                         }
                     }
 
                     if ((!userName || /^\d+$/.test(userName)) && userEmail !== 'SISTEMA') {
-                        const loginOriginal = localStorage.getItem('sop_user');
+                        const loginOriginal = sessionStorage.getItem('sop_user');
                         if (loginOriginal && !loginOriginal.includes('@') && !/^\d+$/.test(loginOriginal)) {
                             userName = loginOriginal.toUpperCase();
                         } else {
