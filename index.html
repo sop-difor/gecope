@@ -4210,8 +4210,34 @@
             const SUPABASE_URL = 'https://qexdnxqmiaarzwwwrcor.supabase.co';
             const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFleGRueHFtaWFhcnp3d3dyY29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDYyNDUsImV4cCI6MjA4NTQyMjI0NX0.RJnLpsXMMzzhcq_YKHI7wObBqubKgdltauvBvGpz4dc';
 
-            // CORREÇÃO: Usamos 'sbClient' para não conflitar com a biblioteca 'supabase' global
-            const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            // CONFIGURAÇÃO DE STORAGE: Mantém logado entre abas, mas desloga ao fechar o navegador
+            // Técnica: Usa localStorage para persistência entre abas, mas valida através de um cookie de sessão (sem expiração)
+            const cookieGuardStorage = {
+                getItem: (key) => {
+                    const sessionActive = document.cookie.split(';').some((item) => item.trim().startsWith('gecope_session_active='));
+                    if (!sessionActive) {
+                        localStorage.removeItem(key);
+                        return null;
+                    }
+                    return localStorage.getItem(key);
+                },
+                setItem: (key, value) => {
+                    // Define um cookie sem 'expires', que o navegador descarta ao ser fechado completamente
+                    document.cookie = "gecope_session_active=true; path=/; SameSite=Lax";
+                    localStorage.setItem(key, value);
+                },
+                removeItem: (key) => {
+                    localStorage.removeItem(key);
+                }
+            };
+
+            const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: {
+                    storage: cookieGuardStorage,
+                    autoRefreshToken: true,
+                    persistSession: true
+                }
+            });
 
             // --- 1.1 CONFIGURAÇÕES EVOLUTION API (WhatsApp Local) ---
             const EVO_API_URL = 'https://evolution-api-production-1522.up.railway.app';
@@ -4874,6 +4900,7 @@
                         supressGecope: Number(r.supress_gecope) || 0,
                         repercGecope: Number(r.reperc_gecope) || 0,
                         prioritario: r.prioritario || false,
+                        avisoAtrasoEnviado: r.aviso_atraso_enviado || false,
 
                         // Audit Data Mapping
                         criador: r.criador,
@@ -11456,7 +11483,7 @@
                                         new Paragraph({
                                             children: [
                                                 new TextRun({ text: "SOP-CE", bold: true, color: "FFFFFF", size: 24, shading: { fill: "008F3D" } }),
-                                                new TextRun({ text: "  ESTADO DO CEARÁ", bold: true, color: "008F3D", size: 22 }),
+                                                new TextRun({ text: "ESTADO DO CEARÁ", bold: true, color: "008F3D", size: 22 }),
                                             ],
                                             spacing: { after: 100 }
                                         }),
@@ -12244,49 +12271,49 @@
                         });
                     }
 
-                    // Filtra processos "Atrasados" que possuem fiscal e ainda NÃO foram notificados para a META ATUAL
+                    // Filtra processos "Atrasados" que possuem fiscal e ainda NÃO tiveram aviso enviado (Flag de Banco)
                     const atrasados = allData.filter(d => {
                         const st = (d.status || '').toUpperCase();
                         if (['CONCLUÍDO', 'EXCLUÍDO', 'APROVADO'].includes(st)) return false;
 
                         const mSt = getMetaSt(d);
-                        if (mSt !== 'Atrasado') return false;
+                        const foiEnviado = d.avisoAtrasoEnviado === true;
 
-                        const metaDate = getMetaDate(d);
-                        if (!metaDate) return false;
-
-                        const metaTime = metaDate.getTime();
-
-                        // 1. Verifica banco de dados (Global): se já houve disparo para este NUP+FISCAL+OBJETO DEPOIS da data da meta
-                        const fiscalAlvo = d.fiscal || 'Fiscal';
-                        const objetoAlvo = d.descricao || d.processo;
-                        const chaveProcesso = `${cleanStr(d.processo)}|${cleanStr(fiscalAlvo)}|${cleanStr(objetoAlvo)}`;
-                        const ultimoAlertaTime = ultimoAlertaPorChave.get(chaveProcesso);
-
-                        if (ultimoAlertaTime && ultimoAlertaTime >= metaTime) return false;
-
-                        // 2. Verifica cache local (Secundário): atrelado ao timestamp da meta atual
-                        const key = `notif_atraso_meta_${d.id}_${metaTime}`;
-                        return !localStorage.getItem(key);
+                        // REGRA: Somente se estiver Atrasado e a flag for estritamente false
+                        return mSt === 'Atrasado' && !foiEnviado;
                     });
 
                     if (atrasados.length === 0) return;
 
-                    console.log(`[WhatsApp] Detectados ${atrasados.length} processos atrasados para notificar.`);
+                    console.log(`[WhatsApp] Detectados ${atrasados.length} processos atrasados para notificação única.`);
 
                     for (const d of atrasados) {
-                        await processarNotificacao('novas_metas_processo', {
-                            NOME_FISCAL: d.fiscal || 'Fiscal',
-                            NUP_PROCESSO: d.processo,
-                            NOME_OBRA: d.descricao || d.processo
-                        });
+                        // 1. Tenta marcar no Banco de Dados PRIMEIRO (Lock lógico)
+                        // Isso evita que múltiplos usuários disparando ao mesmo tempo gerem duplicatas
+                        const { data: updatedData, error: updateError } = await sbClient
+                            .from('processos')
+                            .update({ aviso_atraso_enviado: true })
+                            .eq('id', d.id)
+                            .eq('aviso_atraso_enviado', false) // Garantia extra de atomicidade
+                            .select();
 
-                        // Marca no localStorage com o timestamp da meta para não repetir neste mesmo browser
-                        const metaTime = getMetaDate(d).getTime();
-                        const key = `notif_atraso_meta_${d.id}_${metaTime}`;
-                        localStorage.setItem(key, 'true');
+                        // 2. SOMENTE SE o update funcionou e afetou uma linha, fazemos o disparo
+                        if (!updateError && updatedData && updatedData.length > 0) {
+                            console.log(`[WhatsApp] Flag atualizada para o processo ${d.processo}. Disparando aviso...`);
+                            
+                            await processarNotificacao('novas_metas_processo', {
+                                NOME_FISCAL: d.fiscal || 'Fiscal',
+                                NUP_PROCESSO: d.processo,
+                                NOME_OBRA: d.descricao || d.processo
+                            });
 
-                        // Espera um pouco entre verificações para não congestionar
+                            // Atualiza localmente para não tentar disparar de novo nesta mesma sessão de carga
+                            d.avisoAtrasoEnviado = true;
+                        } else {
+                            console.log(`[WhatsApp] Ignorando processo ${d.processo}: aviso já enviado ou falha no update.`);
+                        }
+
+                        // Espera um pouco entre disparos
                         await new Promise(r => setTimeout(r, 2000));
                     }
                 } catch (err) {
