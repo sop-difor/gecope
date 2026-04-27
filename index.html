@@ -4788,7 +4788,7 @@
                 const userRole = (sessionStorage.getItem('sop_role') || 'guest').toString().trim().toLowerCase();
                 const userEmail = sessionStorage.getItem('sop_user');
                 let fiscalName = null;
-                const isFiscal = userRole === 'fiscal';
+                const isFiscal = userRole === 'fiscal' && userRole !== 'admin'; // Safeguard admin
 
                 if (isFiscal && userEmail) {
                     try {
@@ -5655,6 +5655,58 @@
                 };
                 menu.appendChild(searchInput);
 
+                // Adiciona botões de Marcar/Desmarcar Todos
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'd-flex justify-content-between px-2 mb-1 border-bottom pb-1';
+                actionsDiv.style.marginTop = "2px";
+                actionsDiv.innerHTML = `
+                    <button type="button" class="btn btn-link btn-sm p-0 text-success fw-bold text-decoration-none" style="font-size: 0.75rem;">Marcar Todos</button>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-danger fw-bold text-decoration-none" style="font-size: 0.75rem;">Limpar</button>
+                `;
+                const [btnMarcar, btnLimpar] = actionsDiv.querySelectorAll('button');
+                btnMarcar.onclick = (e) => {
+                    e.stopPropagation();
+                    const term = searchInput.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    Array.from(selectEl.options).forEach(opt => {
+                        if (!opt.value) return;
+                        const text = opt.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        if (text.includes(term)) opt.selected = true;
+                    });
+                    menu.querySelectorAll('.multiselect-option').forEach(div => {
+                        const text = div.textContent.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        if (text.includes(term)) {
+                            const chk = div.querySelector('input');
+                            if (chk) chk.checked = true;
+                        }
+                    });
+                    updateLabel();
+                    selectEl.dispatchEvent(new Event('change'));
+                };
+                btnLimpar.onclick = (e) => {
+                    e.stopPropagation();
+                    const term = searchInput.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    if (!term) {
+                        Array.from(selectEl.options).forEach(opt => opt.selected = false);
+                        menu.querySelectorAll('.multiselect-option input').forEach(chk => chk.checked = false);
+                    } else {
+                        Array.from(selectEl.options).forEach(opt => {
+                            if (!opt.value) return;
+                            const text = opt.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            if (text.includes(term)) opt.selected = false;
+                        });
+                        menu.querySelectorAll('.multiselect-option').forEach(div => {
+                            const text = div.textContent.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                            if (text.includes(term)) {
+                                const chk = div.querySelector('input');
+                                if (chk) chk.checked = false;
+                            }
+                        });
+                    }
+                    updateLabel();
+                    selectEl.dispatchEvent(new Event('change'));
+                };
+                menu.appendChild(actionsDiv);
+
                 Array.from(selectEl.options).forEach(opt => {
                     if (!opt.value) return;
                     const div = document.createElement('div');
@@ -5683,9 +5735,12 @@
 
                 function updateLabel() {
                     const selecteds = Array.from(selectEl.options).filter(o => o.selected && o.value);
-                    const totalOpts = Array.from(selectEl.options).length - 1;
-                    if (selecteds.length === 0 || selecteds.length === totalOpts) {
+                    const totalOpts = Array.from(selectEl.options).filter(o => o.value).length;
+
+                    if (selecteds.length === totalOpts && totalOpts > 0) {
                         btnSpan.textContent = 'Todos'; btnSpan.style.color = '#777'; btnSpan.style.fontWeight = '400';
+                    } else if (selecteds.length === 0) {
+                        btnSpan.textContent = 'Nenhum'; btnSpan.style.color = '#dc3545'; btnSpan.style.fontWeight = '600';
                     } else if (selecteds.length === 1) {
                         btnSpan.textContent = selecteds[0].text; btnSpan.style.color = '#333'; btnSpan.style.fontWeight = '400';
                     } else {
@@ -5697,10 +5752,11 @@
 
             function fillSelect(selectEl, list) {
                 if (!selectEl) return;
+                selectEl.multiple = true;
                 const values = Array.from(new Set(list)).filter(v => v !== null && v !== undefined && String(v).trim() !== "");
                 values.sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
                 let options = '<option value="">Todos</option>';
-                options += values.map(v => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`).join("");
+                options += values.map(v => `<option value="${escapeHTML(v)}" selected>${escapeHTML(v)}</option>`).join("");
                 selectEl.innerHTML = options;
                 renderMultiSelectUI(selectEl);
             }
@@ -5741,13 +5797,13 @@
                 });
             }
             function clearFinanceiro() {
-                [fin.status, fin.tipo, fin.fiscal, fin.contratada, fin.contratante, fin.ano].forEach(el => { if (el) { Array.from(el.options).forEach(o => o.selected = false); renderMultiSelectUI(el); } });
+                [fin.status, fin.tipo, fin.fiscal, fin.contratada, fin.contratante, fin.ano].forEach(el => { if (el) { Array.from(el.options).forEach(o => o.selected = true); renderMultiSelectUI(el); } });
                 updateFinanceiro();
             }
             function clearGerencial() {
                 [ger.fiscal, ger.status].forEach(el => {
                     if (el) {
-                        Array.from(el.options).forEach(o => o.selected = false);
+                        Array.from(el.options).forEach(o => o.selected = true);
                         renderMultiSelectUI(el);
                     }
                 });
@@ -5756,7 +5812,7 @@
             function clearPrazos() {
                 [pr.fiscal, pr.status].forEach(el => {
                     if (el) {
-                        Array.from(el.options).forEach(o => o.selected = false);
+                        Array.from(el.options).forEach(o => o.selected = true);
                         renderMultiSelectUI(el);
                     }
                 });
@@ -6644,7 +6700,7 @@
 
                 document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
                     e.preventDefault(); mt.search.value = "";
-                    [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => { Array.from(el.options).forEach(o => o.selected = false); renderMultiSelectUI(el); });
+                    [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => { Array.from(el.options).forEach(o => o.selected = true); renderMultiSelectUI(el); });
                     currentSort = []; updateReuniao();
                 });
 
