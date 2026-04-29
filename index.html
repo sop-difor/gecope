@@ -21,7 +21,8 @@
     <!-- Deferred non-critical scripts for better performance -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"
+        defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
     <script src="https://unpkg.com/docx@7.1.0/build/index.js" defer></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer></script>
@@ -196,6 +197,13 @@
         .admin-stat-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08) !important;
+        }
+
+        /* Classe custom para altura dos cards do dashboard */
+        .h-150 {
+            min-height: 120px !important;
+            display: flex;
+            flex-direction: column;
         }
 
         .admin-stat-icon-wrapper {
@@ -2344,6 +2352,10 @@
                                                     <i class="bi bi-arrow-clockwise"></i> Atualizar
                                                 </button>
                                                 <a href="https://evolution-api-production-1522.up.railway.app/manager"
+                                                    target="_blank" class="btn btn-sm btn-info text-white">
+                                                    <i class="bi bi-chat-left-dots"></i> Ver Mensagens (API)
+                                                </a>
+                                                <a href="https://evolution-api-production-1522.up.railway.app/manager"
                                                     target="_blank" class="btn btn-sm btn-success">
                                                     <i class="bi bi-qr-code-scan"></i> Conectar
                                                 </a>
@@ -2521,7 +2533,8 @@
                                     <div id="collapseOrcUnified" class="collapse"
                                         data-bs-parent="#accordionWhatsAppUnified">
                                         <div class="card-body bg-white">
-                                            <form id="formConfigOrcAtualizacao" class="border-bottom pb-3 mb-3">
+                                            <form id="formConfigOrcAtualizacao" class="border-bottom pb-3 mb-3"
+                                                data-gatilho="atualizacao_orcamento">
                                                 <h6 class="fw-bold text-warning small">1. Atualização / Novo Cadastro
                                                 </h6>
                                                 <div class="form-check form-switch mb-2">
@@ -2529,18 +2542,38 @@
                                                         role="switch">
                                                     <label class="form-check-label fw-bold small">Ativado</label>
                                                 </div>
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
-                                                    onclick="salvarConfigWhatsApp('atualizacao_orcamento', 'formConfigOrcAtualizacao')">Salvar</button>
+                                                    onclick="WhatsAppConfigManager.save('atualizacao_orcamento', this.form)">Salvar</button>
                                             </form>
-                                            <form id="formConfigOrcComentario">
+                                            <form id="formConfigOrcComentario" data-gatilho="novo_comentario_orcamento">
                                                 <h6 class="fw-bold text-warning small">2. Novo Comentário</h6>
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input config-ativo" type="checkbox"
                                                         role="switch">
                                                     <label class="form-check-label fw-bold small">Ativado</label>
                                                 </div>
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
-                                                    onclick="salvarConfigWhatsApp('novo_comentario_orcamento', 'formConfigOrcComentario')">Salvar</button>
+                                                    onclick="WhatsAppConfigManager.save('novo_comentario_orcamento', this.form)">Salvar</button>
                                             </form>
                                         </div>
                                     </div>
@@ -2560,7 +2593,8 @@
                                     <div id="collapseTabUnified" class="collapse"
                                         data-bs-parent="#accordionWhatsAppUnified">
                                         <div class="card-body bg-white">
-                                            <form id="formConfigCompAtualizacao" class="border-bottom pb-3 mb-3">
+                                            <form id="formConfigCompAtualizacao" class="border-bottom pb-3 mb-3"
+                                                data-gatilho="atualizacao_composicao">
                                                 <h6 class="fw-bold text-danger small">1. Atualização / Nova Composição
                                                 </h6>
                                                 <div class="form-check form-switch mb-2">
@@ -2568,18 +2602,38 @@
                                                         role="switch">
                                                     <label class="form-check-label fw-bold small">Ativado</label>
                                                 </div>
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
-                                                    onclick="salvarConfigWhatsApp('atualizacao_composicao', 'formConfigCompAtualizacao')">Salvar</button>
+                                                    onclick="WhatsAppConfigManager.save('atualizacao_composicao', this.form)">Salvar</button>
                                             </form>
-                                            <form id="formConfigINCC">
+                                            <form id="formConfigINCC" data-gatilho="atualizacao_tabelas">
                                                 <h6 class="fw-bold text-danger small">2. Atualização INCC / Tabelas</h6>
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input config-ativo" type="checkbox"
                                                         role="switch">
                                                     <label class="form-check-label fw-bold small">Ativado</label>
                                                 </div>
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-indiv" type="checkbox"
+                                                            checked><label
+                                                            class="form-check-label small">Individual</label></div>
+                                                    <div class="form-check"><input
+                                                            class="form-check-input config-dest-geral"
+                                                            type="checkbox"><label
+                                                            class="form-check-label small">Geral</label></div>
+                                                </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
-                                                    onclick="salvarConfigWhatsApp('atualizacao_tabelas', 'formConfigINCC')">Salvar</button>
+                                                    onclick="WhatsAppConfigManager.save('atualizacao_tabelas', this.form)">Salvar</button>
                                             </form>
                                         </div>
                                     </div>
@@ -2913,9 +2967,9 @@
 
                 <div class="row g-2 mb-2">
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="card border-0 shadow-sm h-100"
+                        <div class="card border-0 shadow-sm h-150"
                             style="border-bottom: 4px solid var(--sop-green-light) !important;">
-                            <div class="card-body p-2">
+                            <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-pin-angle-fill me-2 text-muted"></i>
                                     <span class="small text-muted fw-bold text-uppercase">Processos (No Recorte)</span>
@@ -2926,9 +2980,9 @@
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="card border-0 shadow-sm h-100"
+                        <div class="card border-0 shadow-sm h-150"
                             style="border-bottom: 4px solid var(--sop-orange) !important;">
-                            <div class="card-body p-2">
+                            <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-hourglass-split me-2 text-muted"></i>
                                     <span class="small text-muted fw-bold text-uppercase">Não Aprovados</span>
@@ -2939,9 +2993,9 @@
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="card border-0 shadow-sm h-100"
+                        <div class="card border-0 shadow-sm h-150"
                             style="border-bottom: 4px solid var(--sop-green) !important;">
-                            <div class="card-body p-2">
+                            <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-check-square-fill me-2 text-muted"></i>
                                     <span class="small text-muted fw-bold text-uppercase">Aprovados</span>
@@ -2952,8 +3006,8 @@
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
-                        <div class="card border-0 shadow-sm h-100" style="border-bottom: 4px solid #6f42c1 !important;">
-                            <div class="card-body p-2">
+                        <div class="card border-0 shadow-sm h-150" style="border-bottom: 4px solid #6f42c1 !important;">
+                            <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-calendar-event me-2 text-muted"></i>
                                     <span class="small text-muted fw-bold text-uppercase">Mais Antigo (Dias)</span>
@@ -3023,8 +3077,7 @@
                     </div>
                 </section>
 
-                <table class="table table-hover table-striped align-middle mb-0 w-100"
-                    style="font-size: 0.9rem;">
+                <table class="table table-hover table-striped align-middle mb-0 w-100" style="font-size: 0.9rem;">
                     <thead class="table-light"></thead>
                     <tbody id="meetingTableBody" class="border-top-0"></tbody>
                 </table>
@@ -4265,11 +4318,11 @@
                         window.EVO_API_KEY = window.EVO_API_KEY || '';
                         window.EVO_INSTANCE = window.EVO_INSTANCE || '';
                         // Set `IS_PROD` to false during debugging to restore console output.
-                        (function(){
+                        (function () {
                             const IS_PROD = true;
                             if (IS_PROD && typeof window.console === 'object') {
-                                console.log = function(){};
-                                console.info = function(){};
+                                console.log = function () { };
+                                console.info = function () { };
                             }
                         })();
 
@@ -4359,7 +4412,7 @@
 
                         // --- 1.1 CONFIGURAÇÕES EVOLUTION API (WhatsApp Local) ---
                         window.EVO_API_URL = 'https://evolution-api-production-1522.up.railway.app';
-                        window.EVO_API_KEY = 'SopCeara2024!';
+                        window.EVO_API_KEY = 'sopgecope2026';
                         window.EVO_INSTANCE = 'SOP';
 
                         // LISTA DE FISCAIS (FIXA - SOLICITAO USUÁRIO)
@@ -12759,7 +12812,7 @@
                                                                         // Busca os últimos disparos de metas no banco para verificar qual foi o último aviso por processo/fiscal
                                                                         const { data: logs, error: logsError } = await sbClient
                                                                             .from('whatsapp_logs')
-                                                                            .select('nup, destinatario_nome, objeto, created_at')
+                                                                            .select('mensagem, destinatario_nome, created_at')
                                                                             .eq('evento', 'novas_metas_processo')
                                                                             .order('created_at', { ascending: false })
                                                                             .limit(10000);
@@ -12769,9 +12822,11 @@
 
                                                                         if (!logsError && logs) {
                                                                             logs.forEach(log => {
-                                                                                if (!log.nup) return;
+                                                                                const nupLog = (log.mensagem ? log.mensagem.match(/NUP:\* ([\d\/\-]+)/)?.[1] : null);
+                                                                                const objetoLog = (log.mensagem ? log.mensagem.match(/OBJETO:\* ([^\n]+)/)?.[1] : null);
+                                                                                if (!nupLog) return;
                                                                                 // Chave composta: NUP + FISCAL + OBJETO (limpos)
-                                                                                const chave = `${cleanStr(log.nup)}|${cleanStr(log.destinatario_nome)}|${cleanStr(log.objeto)}`;
+                                                                                const chave = `${cleanStr(nupLog)}|${cleanStr(log.destinatario_nome)}|${cleanStr(objetoLog)}`;
                                                                                 if (!ultimoAlertaPorChave.has(chave)) {
                                                                                     ultimoAlertaPorChave.set(chave, new Date(log.created_at).getTime());
                                                                                 }
