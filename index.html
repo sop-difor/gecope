@@ -630,51 +630,76 @@
         }
 
         .activities-list-container {
-            display: flex;
-            gap: 40px;
-            overflow-x: auto;
-            padding-bottom: 15px;
-            scrollbar-width: thin;
-            scrollbar-color: #ddd transparent;
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 15px;
+            width: 100%;
         }
 
-        .activities-list-container::-webkit-scrollbar {
-            height: 6px;
+        @media (min-width: 768px) {
+            .activities-list-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
-        .activities-list-container::-webkit-scrollbar-thumb {
-            background: #ddd;
-            border-radius: 3px;
+        @media (min-width: 1200px) {
+            .activities-list-container {
+                grid-template-columns: repeat(4, 1fr);
+            }
         }
 
         .activity-item {
-            min-width: 280px;
+            background: rgba(248, 249, 250, 0.5);
+            border-radius: 12px;
+            padding: 15px;
             display: flex;
-            gap: 15px;
-            align-items: center;
-            position: relative;
+            align-items: flex-start;
+            gap: 12px;
+            border: 1px solid var(--sop-slate-200);
+            transition: all 0.2s ease;
+            height: 100%;
         }
 
-        .activity-item:not(:last-child)::after {
-            content: "";
-            position: absolute;
-            right: -20px;
-            height: 35px;
-            width: 1px;
-            background-color: #eee;
+        .activity-item:hover {
+            background: #fff;
+            border-color: var(--sop-green-light);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transform: translateY(-2px);
+        }
+
+        .activity-icon-box {
+            width: 36px;
+            height: 36px;
+            background: #fff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            border: 1px solid #f0f0f0;
+        }
+
+        .activity-content {
+            flex: 1;
+            min-width: 0;
         }
 
         .activity-time {
-            font-weight: 800;
+            font-weight: 700;
             color: var(--sop-gray-dark);
-            font-size: 1rem;
-            white-space: nowrap;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 4px;
         }
 
         .activity-desc {
-            font-size: 0.9rem;
-            color: #555;
-            line-height: 1.4;
+            font-size: 0.82rem;
+            color: #444;
+            line-height: 1.5;
+            word-wrap: break-word;
         }
 
         * {
@@ -2335,6 +2360,7 @@
                         <div class="card-body bg-light p-4">
                             <div class="accordion d-flex flex-column gap-3" id="accordionWhatsAppUnified">
 
+
                                 <!-- 1. STATUS E CONEXÃO -->
                                 <div class="card border-0 shadow-sm" style="border-radius: 12px;">
                                     <div class="card-body p-3">
@@ -2481,6 +2507,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('novo_processo', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('novo_processo')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                             <form id="formConfigProcStatus" class="border-bottom pb-3 mb-3"
                                                 data-gatilho="mudanca_status_processo">
@@ -2492,6 +2522,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('mudanca_status_processo', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('mudanca_status_processo')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                             <form id="formConfigProcMetas" class="border-bottom pb-3 mb-3"
                                                 data-gatilho="novas_metas_processo">
@@ -2503,6 +2537,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('novas_metas_processo', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('novas_metas_processo')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                             <form id="formConfigProcAnalista" data-gatilho="analista_designado">
                                                 <h6 class="fw-bold text-primary small">4. Designação de Analista
@@ -2514,6 +2552,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('analista_designado', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('analista_designado')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                         </div>
                                     </div>
@@ -2554,6 +2596,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('atualizacao_orcamento', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('atualizacao_orcamento')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                             <form id="formConfigOrcComentario" data-gatilho="novo_comentario_orcamento">
                                                 <h6 class="fw-bold text-warning small">2. Novo Comentário</h6>
@@ -2574,6 +2620,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('novo_comentario_orcamento', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('novo_comentario_orcamento')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                         </div>
                                     </div>
@@ -2595,7 +2645,7 @@
                                         <div class="card-body bg-white">
                                             <form id="formConfigCompAtualizacao" class="border-bottom pb-3 mb-3"
                                                 data-gatilho="atualizacao_composicao">
-                                                <h6 class="fw-bold text-danger small">1. Atualização / Nova Composição
+                                                <h6 class="fw-bold text-danger small">1. Nova Composição
                                                 </h6>
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input config-ativo" type="checkbox"
@@ -2614,9 +2664,13 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('atualizacao_composicao', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('atualizacao_composicao')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                             <form id="formConfigINCC" data-gatilho="atualizacao_tabelas">
-                                                <h6 class="fw-bold text-danger small">2. Atualização INCC / Tabelas</h6>
+                                                <h6 class="fw-bold text-danger small">2. Atualização Tabelas</h6>
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input config-ativo" type="checkbox"
                                                         role="switch">
@@ -2634,6 +2688,10 @@
                                                 </div>
                                                 <button type="button" class="btn btn-xs btn-success fw-bold"
                                                     onclick="WhatsAppConfigManager.save('atualizacao_tabelas', this.form)">Salvar</button>
+                                                <button type="button"
+                                                    class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                    onclick="testarPreviaMensagem('atualizacao_tabelas')"><i
+                                                        class="bi bi-eye me-1"></i>Ver Prévia</button>
                                             </form>
                                         </div>
                                     </div>
@@ -2985,10 +3043,10 @@
                             <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-hourglass-split me-2 text-muted"></i>
-                                    <span class="small text-muted fw-bold text-uppercase">Não Aprovados</span>
+                                    <span class="small text-muted fw-bold text-uppercase">Aguardando Análise</span>
                                 </div>
                                 <h3 class="fw-bold mb-0" id="card_proc_andamento">0</h3>
-                                <small class="text-muted" style="font-size: 0.75rem;">Em andamento</small>
+                                <small class="text-muted" style="font-size: 0.75rem;">Status = AGUAR. ANÁLISE</small>
                             </div>
                         </div>
                     </div>
@@ -2998,10 +3056,10 @@
                             <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-check-square-fill me-2 text-muted"></i>
-                                    <span class="small text-muted fw-bold text-uppercase">Aprovados</span>
+                                    <span class="small text-muted fw-bold text-uppercase">Análise Fiscal</span>
                                 </div>
                                 <h3 class="fw-bold mb-0" id="card_proc_aprovados">0</h3>
-                                <small class="text-muted" style="font-size: 0.75rem;">Status = Aprovado</small>
+                                <small class="text-muted" style="font-size: 0.75rem;">Status = ANÁLISE FISCAL</small>
                             </div>
                         </div>
                     </div>
@@ -3010,10 +3068,10 @@
                             <div class="card-body p-3 d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center mb-1">
                                     <i class="bi bi-calendar-event me-2 text-muted"></i>
-                                    <span class="small text-muted fw-bold text-uppercase">Mais Antigo (Dias)</span>
+                                    <span class="small text-muted fw-bold text-uppercase">Reanálise Fiscal</span>
                                 </div>
                                 <h3 class="fw-bold mb-0" id="card_proc_dias">0</h3>
-                                <small class="text-muted" style="font-size: 0.75rem;">Pelo campo DIAS</small>
+                                <small class="text-muted" style="font-size: 0.75rem;">Status = REANÁLISE FISCAL</small>
                             </div>
                         </div>
                     </div>
@@ -3457,118 +3515,240 @@
     </div>
 
     <!-- Modal Novo Cadastro Processo -->
-    <div class="modal fade" id="modalCadastro" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade" id="modalCadastro" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header" style="background-color: var(--sop-green); color: white;">
-                    <h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2"></i>NOVO CADASTRO</h5><button
-                        type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2"></i>NOVO CADASTRO DE PROCESSO</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body p-4 bg-light-subtle">
                     <form id="formCadastro">
                         <input type="hidden" name="action" value="create">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <div
-                                    style="border-bottom: 2px solid var(--sop-gray-light); margin-bottom: 1rem; color: var(--sop-green); font-weight: 700;">
-                                    DADOS DO PROCESSO</div>
-                            </div>
-                            <div class="col-md-4"><label class="form-label">PROCESSO N.º *</label><input type="text"
-                                    class="form-control" name="PROCESSO N." id="cad-processo"
-                                    placeholder="00000.000000/0000-00" required></div>
-                            <div class="col-md-4"><label class="form-label">TIPO</label><input type="text"
-                                    class="form-control" name="TIPO"></div>
-                            <div class="col-md-4">
-                                <label class="form-label">STATUS</label>
-                                <select class="form-select" name="STATUS">
-                                    <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
-                                    <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
-                                    <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
-                                    <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
-                                    <option value="APROVADO">APROVADO</option>
-                                    <option value="ARQUIVADO">ARQUIVADO</option>
-                                    <option value="CONTRATANTE">CONTRATANTE</option>
-                                    <option value="DEVOLVIDO P/ REANÁLISE FISCAL">DEVOLVIDO P/ REANÁLISE FISCAL
-                                    </option>
-                                    <option value="EM ANÁLISE">EM ANÁLISE</option>
-                                    <option value="EM REANÁLISE">EM REANÁLISE</option>
-                                </select>
-                            </div>
-                            <div class="col-12"><label class="form-label">DESCRIÇÃO</label><textarea
-                                    class="form-control" name="DESCRIÇÃO" rows="2"></textarea></div>
+                        <div class="row g-4">
+                            <!-- Coluna Esquerda: Informações Principais e Financeiro -->
+                            <div class="col-lg-7">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES DO PROCESSO
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Número do Processo *</label>
+                                                <input type="text"
+                                                    class="form-control form-control-lg border-primary-subtle fw-bold text-primary"
+                                                    name="PROCESSO N." id="cad-processo"
+                                                    placeholder="00000.000000/0000-00" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Status Inicial *</label>
+                                                <select
+                                                    class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
+                                                    name="STATUS" id="cad-status" required>
+                                                    <option value="" selected disabled>Selecione o status...</option>
+                                                    <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
+                                                    <option value="EM ANÁLISE">EM ANÁLISE</option>
+                                                    <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
+                                                    <option value="EM REANÁLISE">EM REANÁLISE</option>
+                                                    <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE FISCAL
+                                                    </option>
+                                                    <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
+                                                    <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
+                                                    <option value="APROVADO">APROVADO</option>
+                                                    <option value="ARQUIVADO">ARQUIVADO</option>
+                                                    <option value="CONTRATANTE">CONTRATANTE</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Tipo de Processo *</label>
+                                                <input type="text" class="form-control" name="TIPO"
+                                                    placeholder="Ex: Escola" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Fiscal Responsável *</label>
+                                                <select class="form-select" name="FISCAL" id="cad-fiscal" required>
+                                                    <option value="">Selecione...</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Descrição do Objeto *</label>
+                                                <textarea class="form-control" name="DESCRIÇÃO" rows="6"
+                                                    placeholder="Descreva brevemente o objeto do aditivo..."
+                                                    style="font-size: 0.9rem; min-height: 120px; white-space: pre-wrap; word-wrap: break-word;"
+                                                    required></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                            <div class="col-12">
-                                <div
-                                    style="border-bottom: 2px solid var(--sop-gray-light); margin: 1rem 0; color: var(--sop-green); font-weight: 700;">
-                                    AGENTES E PRAZOS</div>
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-cash-stack me-2 text-success"></i>VALORES ESTIMADOS</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-4">
+                                            <!-- Fiscalização -->
+                                            <div class="col-md-6 border-end">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <span
+                                                        class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill"
+                                                        style="font-size: 0.65rem;">FISCALIZAÇÃO</span>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Acréscimo</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control mask-money calc-fiscal"
+                                                            name="ACRSCIMO FISCALIZAO" id="acresc_fisc"
+                                                            placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Supressão</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text"
+                                                            class="form-control mask-money text-danger calc-fiscal"
+                                                            name="SUPRESSO FISCALIZAO" id="supress_fisc"
+                                                            placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                                <div class="bg-light p-3 rounded-3 border">
+                                                    <label
+                                                        class="form-label small fw-bold text-muted mb-1 text-uppercase"
+                                                        style="font-size: 0.6rem;">REPERCUSSÃO</label>
+                                                    <input type="text"
+                                                        class="form-control form-control-lg fw-bold bg-transparent border-0 p-0 text-dark"
+                                                        id="reperc_fisc" name="REPERCUSSO FISCALIZAO" value="0,00"
+                                                        readonly style="font-size: 1.1rem;">
+                                                </div>
+                                            </div>
+                                            <!-- GECOPE -->
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <span
+                                                        class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill"
+                                                        style="font-size: 0.65rem;">GECOPE</span>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Acréscimo</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control mask-money calc-gecope"
+                                                            name="ACRSCIMO GECOPE" id="acresc_gec" placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Supressão</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text"
+                                                            class="form-control mask-money text-danger calc-gecope"
+                                                            name="SUPRESSO GECOPE" id="supress_gec" placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                                <div class="bg-light p-3 rounded-3 border border-success-subtle">
+                                                    <label
+                                                        class="form-label small fw-bold text-success mb-1 text-uppercase"
+                                                        style="font-size: 0.6rem;">REPERCUSSÃO</label>
+                                                    <input type="text"
+                                                        class="form-control form-control-lg fw-bold bg-transparent border-0 p-0 text-success"
+                                                        id="reperc_gec" name="REPERCUSSO GECOPE" value="0,00" readonly
+                                                        style="font-size: 1.1rem;">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-md-4"><label class="form-label">CONTRATANTE</label><input type="text"
-                                    class="form-control" name="CONTRATANTE"></div>
-                            <div class="col-md-4"><label class="form-label">CONTRATADA</label><input type="text"
-                                    class="form-control" name="CONTRATADA"></div>
-                            <div class="col-md-4"><label class="form-label">FISCAL *</label><select class="form-select"
-                                    id="cad-fiscal" name="FISCAL" required>
-                                    <option value="">Selecione...</option>
-                                </select></div>
 
-                            <div class="col-md-4"><label class="form-label">ABERTURA</label><input type="text"
-                                    class="form-control mask-date" name="DATA DE ABERTURA" placeholder="dd/mm/aaaa"
-                                    maxlength="10"></div>
-                            <div class="col-md-4"><label class="form-label">DATA RECEBIMENTO (Col E)</label><input
-                                    type="text" class="form-control mask-date" name="DATA RECEBIMENTO"
-                                    placeholder="dd/mm/aaaa" maxlength="10"></div>
+                            <!-- Coluna Direita: Agentes e Prazos -->
+                            <div class="col-lg-5">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-people me-2 text-info"></i>AGENTES DO CONTRATO</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-muted text-uppercase"
+                                                style="font-size: 0.7rem;">Contratante *</label>
+                                            <input type="text" class="form-control bg-light border-0" name="CONTRATANTE"
+                                                placeholder="Ex: SEDUC" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-muted text-uppercase"
+                                                style="font-size: 0.7rem;">Contratada *</label>
+                                            <input type="text" class="form-control bg-light border-0" name="CONTRATADA"
+                                                placeholder="Nome da Empresa" required>
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label small fw-bold text-muted text-uppercase"
+                                                style="font-size: 0.7rem;">Analista Designado</label>
+                                            <select class="form-select bg-light border-0" name="ANALISTA">
+                                                <option value="">Selecione...</option>
+                                                <option value="N">Nildeno</option>
+                                                <option value="W">Walace</option>
+                                                <option value="P">Pedro</option>
+                                                <option value="F">Felipe</option>
+                                                <option value="H">Helder</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label">ANALISTA (Col H)</label>
-                                <select class="form-select" name="ANALISTA">
-                                    <option value="">Selecione...</option>
-                                    <option value="N">Nildeno</option>
-                                    <option value="W">Walace</option>
-                                    <option value="P">Pedro</option>
-                                    <option value="F">Felipe</option>
-                                    <option value="H">Helder</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4"><label class="form-label">META</label><input type="text"
-                                    class="form-control mask-date" name="DATA COMPROMISSO FISCAL"
-                                    placeholder="dd/mm/aaaa" maxlength="10"></div>
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-calendar-event me-2 text-warning"></i>DATAS INICIAIS</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Abertura *</label>
+                                                <input type="text" class="form-control form-control-sm mask-date"
+                                                    name="DATA DE ABERTURA" placeholder="dd/mm/aaaa" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Recebimento</label>
+                                                <input type="text" class="form-control form-control-sm mask-date"
+                                                    name="DATA RECEBIMENTO" placeholder="dd/mm/aaaa">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Meta Fiscal</label>
+                                                <input type="text"
+                                                    class="form-control form-control-sm mask-date border-warning-subtle"
+                                                    name="DATA COMPROMISSO FISCAL" placeholder="dd/mm/aaaa">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                            <div class="col-12">
-                                <div
-                                    style="border-bottom: 2px solid var(--sop-gray-light); margin: 1rem 0; color: var(--sop-green); font-weight: 700;">
-                                    VALORES (F)</div>
+                                <div class="alert alert-info border-0 shadow-sm small">
+                                    <i class="bi bi-info-circle-fill me-2"></i>
+                                    Preencha os campos obrigatórios (*) para habilitar o salvamento do novo processo.
+                                </div>
                             </div>
-                            <div class="col-md-4"><label class="form-label">ACRSCIMO</label><input type="text"
-                                    class="form-control mask-money calc-fiscal" id="acresc_fisc"
-                                    name="ACRSCIMO FISCALIZAO"></div>
-                            <div class="col-md-4"><label class="form-label">SUPRESSO</label><input type="text"
-                                    class="form-control mask-money text-danger calc-fiscal" id="supres_fisc"
-                                    name="SUPRESSO FISCALIZAO"></div>
-                            <div class="col-md-4"><label class="form-label">REPERCUSSO</label><input type="text"
-                                    class="form-control fw-bold bg-light" id="reperc_fisc" name="REPERCUSSO FISCALIZAO"
-                                    readonly></div>
-
-                            <div class="col-12">
-                                <div
-                                    style="border-bottom: 2px solid var(--sop-gray-light); margin: 1rem 0; color: var(--sop-green); font-weight: 700;">
-                                    VALORES (G)</div>
-                            </div>
-                            <div class="col-md-4"><label class="form-label">ACRSCIMO</label><input type="text"
-                                    class="form-control mask-money calc-gecope" id="acresc_gec" name="ACRSCIMO GECOPE">
-                            </div>
-                            <div class="col-md-4"><label class="form-label">SUPRESSO</label><input type="text"
-                                    class="form-control mask-money text-danger calc-gecope" id="supres_gec"
-                                    name="SUPRESSO GECOPE"></div>
-                            <div class="col-md-4"><label class="form-label">REPERCUSSO</label><input type="text"
-                                    class="form-control fw-bold bg-light" id="reperc_gec" name="REPERCUSSO GECOPE"
-                                    readonly></div>
                         </div>
                     </form>
                     <div id="msg-feedback" class="mt-3" style="display:none"></div>
                 </div>
-                <div class="modal-footer"><button class="btn btn-secondary"
-                        data-bs-dismiss="modal">CANCELAR</button><button class="btn btn-success px-4" id="btn-salvar"
-                        onclick="enviarParaPlanilha()">SALVAR</button></div>
+                <div class="modal-footer justify-content-center bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm px-4 me-2"
+                        data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="button" class="btn btn-success px-5 fw-bold" id="btn-salvar"
+                        onclick="enviarParaPlanilha()">
+                        <i class="bi bi-check-circle me-2"></i>CADASTRAR PROCESSO
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -3580,143 +3760,258 @@
                     <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>GERENCIAR PROCESSO</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body p-4 bg-light-subtle">
 
                     <form id="formDetalhes">
                         <input type="hidden" name="action" id="detalheAction" value="update">
-                        <h6 class="text-primary fw-bold border-bottom pb-2 mb-3">DADOS PRINCIPAIS</h6>
-                        <div class="row g-3">
-                            <div class="col-md-3"><label class="form-label fw-bold">PROCESSO</label><input type="text"
-                                    class="form-control bg-light fw-bold" name="PROCESSO N." id="det_processo" readonly>
-                            </div>
-                            <div class="col-md-3"><label class="form-label">TIPO</label><input type="text"
-                                    class="form-control" name="TIPO" id="det_tipo"></div>
-                            <div class="col-md-3"><label class="form-label">STATUS</label><select
-                                    class="form-select fw-bold text-primary" name="STATUS" id="det_status">
-                                    <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
-                                    <option value="EM ANÁLISE">EM ANÁLISE</option>
-                                    <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
-                                    <option value="EM REANÁLISE">EM REANÁLISE</option>
-                                    <option value="DEVOLVIDO P/ REANÁLISE FISCAL">DEVOLVIDO P/ REANÁLISE FISCAL
-                                    </option>
-                                    <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
-                                    <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
-                                    <option value="APROVADO">APROVADO</option>
-                                    <option value="ARQUIVADO">ARQUIVADO</option>
-                                    <option value="CONTRATANTE">CONTRATANTE</option>
-                                </select></div>
-                            <div class="col-md-3"><label class="form-label">FISCAL</label><select class="form-select"
-                                    name="FISCAL" id="det_fiscal">
-                                    <option value="">Selecione...</option>
-                                </select></div>
-                            <div class="col-12"><label class="form-label">DESCRIÇÃO</label><textarea
-                                    class="form-control" name="DESCRIÇÃO" id="det_descricao" rows="2"></textarea>
-                            </div>
-                        </div>
 
-                        <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 mt-4">AGENTES E PRAZOS</h6>
-                        <div class="row g-3">
-                            <div class="col-md-6"><label class="form-label">CONTRATANTE</label><input type="text"
-                                    class="form-control" name="CONTRATANTE" id="det_contratante"></div>
-                            <div class="col-md-6"><label class="form-label">CONTRATADA</label><input type="text"
-                                    class="form-control" name="CONTRATADA" id="det_contratada"></div>
-
-                            <div class="col-md-4"><label class="form-label">ABERTURA</label><input type="text"
-                                    class="form-control mask-date" name="DATA DE ABERTURA" id="det_data_abertura"
-                                    placeholder="dd/mm/aaaa" maxlength="10"></div>
-                            <div class="col-md-4"><label class="form-label">RECEBIMENTO</label><input type="text"
-                                    class="form-control mask-date" name="DATA RECEBIMENTO" id="det_data_recebimento"
-                                    placeholder="dd/mm/aaaa" maxlength="10"></div>
-                            <div class="col-md-4">
-                                <label class="form-label">ANALISTA</label>
-                                <select class="form-select" name="ANALISTA" id="det_analista">
-                                    <option value="">Selecione...</option>
-                                    <option value="N">Nildeno</option>
-                                    <option value="W">Walace</option>
-                                    <option value="P">Pedro</option>
-                                    <option value="F">Felipe</option>
-                                    <option value="H">Helder</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-3"><label class="form-label">META</label><input type="text"
-                                    class="form-control mask-date" name="DATA COMPROMISSO FISCAL"
-                                    id="det_data_compromisso" placeholder="dd/mm/aaaa" maxlength="10"></div>
-                            <div class="col-md-3"><label class="form-label">APROVAÇÃO</label><input type="text"
-                                    class="form-control mask-date" name="DATA APROVAÇÃO GECOPE" id="det_data_aprovacao"
-                                    placeholder="dd/mm/aaaa" maxlength="10"></div>
-
-                            <div class="col-md-6">
-                                <label class="form-label">DEVOLUO CORREES (Col O)</label>
-                                <div class="position-relative">
-                                    <input type="text" class="form-control mask-date" name="DATA DEVOLUO CORREES"
-                                        id="det_data_devolucao" placeholder="dd/mm/aaaa" maxlength="10"
-                                        oninput="calcularDiasDevolucao()" style="padding-right: 90px;">
-                                    <span id="det_badge_dias_dev"
-                                        class="position-absolute top-50 end-0 translate-middle-y me-3 text-secondary fw-bold"
-                                        style="pointer-events: none; font-size: 0.85rem;">
-                                        - dias
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 mt-4">VALORES & ANOTAÇÕES</h6>
-                        <div class="row g-3">
-                            <div class="col-md-6 border-end">
-                                <label class="form-label text-muted">FISCALIZAO</label>
-                                <div class="mb-2"><label class="small">Acréscimo</label><input type="text"
-                                        class="form-control form-control-sm mask-money" name="ACRSCIMO FISCALIZAO"
-                                        id="det_acresc_f"></div>
-                                <div class="mb-2"><label class="small">Supressão</label><input type="text"
-                                        class="form-control form-control-sm mask-money text-danger"
-                                        name="SUPRESSO FISCALIZAO" id="det_supress_f"></div>
-                                <div><label class="small fw-bold">Repercussão</label><input type="text"
-                                        class="form-control form-control-sm fw-bold bg-light"
-                                        name="REPERCUSSO FISCALIZAO" id="det_reperc_f" readonly></div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label text-muted">GECOPE</label>
-                                <div class="mb-2"><label class="small">Acréscimo</label><input type="text"
-                                        class="form-control form-control-sm mask-money" name="ACRSCIMO GECOPE"
-                                        id="det_acresc_g"></div>
-                                <div class="mb-2"><label class="small">Supressão</label><input type="text"
-                                        class="form-control form-control-sm mask-money text-danger"
-                                        name="SUPRESSO GECOPE" id="det_supress_g"></div>
-                                <div><label class="small fw-bold">Repercussão</label><input type="text"
-                                        class="form-control form-control-sm fw-bold bg-light" name="REPERCUSSO GECOPE"
-                                        id="det_reperc_g" readonly></div>
-                            </div>
-
-                            <div class="col-12 mt-3">
-                                <label class="form-label text-muted"><i
-                                        class="bi bi-sticky-fill text-warning me-1"></i>ANOTAÇÕES ADICIONAIS</label>
-                                <textarea class="form-control" id="det_notas_locais"
-                                    style="background-color: #fffae6; border: 1px solid #f0e68c; font-size: 0.95rem; resize: vertical; min-height: 200px;"
-                                    placeholder="Digite aqui observações sobre este processo. Elas ficarão salvas apenas neste computador."></textarea>
-                            </div>
-
-                            <div class="col-12 mt-4 pt-2 border-top">
-                                <h6 class="text-secondary small fw-bold mb-3"><i
-                                        class="bi bi-clock-history me-1"></i>HISTÓRICO DE AÇÕES</h6>
-                                <div class="row g-2">
-                                    <div class="col-md-6">
-                                        <label class="form-label small text-muted" style="font-size: 0.75rem;">CRIADO
-                                            POR</label>
-                                        <input type="text" class="form-control form-control-sm bg-light text-secondary"
-                                            id="det_criador" readonly>
+                        <div class="row g-4">
+                            <!-- Coluna Esquerda: Informações Principais e Financeiro -->
+                            <div class="col-lg-7">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES GERAIS</h6>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small text-muted" style="font-size: 0.75rem;">LTIMA
-                                            ATUALIZAO</label>
-                                        <input type="text" class="form-control form-control-sm bg-light text-secondary"
-                                            id="det_atualizacao" readonly>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Número do Processo</label>
+                                                <input type="text"
+                                                    class="form-control form-control-lg bg-light border-0 fw-bold text-primary"
+                                                    name="PROCESSO N." id="det_processo" readonly>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Status Atual</label>
+                                                <select
+                                                    class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
+                                                    name="STATUS" id="det_status">
+                                                    <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
+                                                    <option value="EM ANÁLISE">EM ANÁLISE</option>
+                                                    <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
+                                                    <option value="EM REANÁLISE">EM REANÁLISE</option>
+                                                    <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE FISCAL
+                                                    </option>
+                                                    <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
+                                                    <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
+                                                    <option value="APROVADO">APROVADO</option>
+                                                    <option value="ARQUIVADO">ARQUIVADO</option>
+                                                    <option value="CONTRATANTE">CONTRATANTE</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Tipo de Processo</label>
+                                                <input type="text" class="form-control" name="TIPO" id="det_tipo">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Fiscal Responsável</label>
+                                                <select class="form-select" name="FISCAL" id="det_fiscal">
+                                                    <option value="">Selecione...</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Descrição do Objeto</label>
+                                                <textarea class="form-control" name="DESCRIÇÃO" id="det_descricao"
+                                                    rows="6"
+                                                    style="font-size: 0.9rem; min-height: 120px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-cash-stack me-2 text-success"></i>ANÁLISE FINANCEIRA</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-4">
+                                            <!-- Fiscalização -->
+                                            <div class="col-md-6 border-end">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <span
+                                                        class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill"
+                                                        style="font-size: 0.65rem;">FISCALIZAÇÃO</span>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Acréscimo</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control mask-money"
+                                                            name="ACRSCIMO FISCALIZAO" id="det_acresc_f">
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Supressão</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control mask-money text-danger"
+                                                            name="SUPRESSO FISCALIZAO" id="det_supress_f">
+                                                    </div>
+                                                </div>
+                                                <div class="bg-light p-3 rounded-3 border">
+                                                    <label
+                                                        class="form-label small fw-bold text-muted mb-1 text-uppercase"
+                                                        style="font-size: 0.6rem;">REPERCUSSÃO</label>
+                                                    <input type="text"
+                                                        class="form-control form-control-lg fw-bold bg-transparent border-0 p-0 text-dark"
+                                                        id="det_reperc_f" name="REPERCUSSO FISCALIZAO" readonly
+                                                        style="font-size: 1.1rem;">
+                                                </div>
+                                            </div>
+                                            <!-- GECOPE -->
+                                            <div class="col-md-6">
+                                                <div class="d-flex align-items-center mb-3">
+                                                    <span
+                                                        class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill"
+                                                        style="font-size: 0.65rem;">GECOPE</span>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Acréscimo</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control mask-money"
+                                                            name="ACRSCIMO GECOPE" id="det_acresc_g">
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted">Supressão</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control mask-money text-danger"
+                                                            name="SUPRESSO GECOPE" id="det_supress_g">
+                                                    </div>
+                                                </div>
+                                                <div class="bg-light p-3 rounded-3 border border-success-subtle">
+                                                    <label
+                                                        class="form-label small fw-bold text-success mb-1 text-uppercase"
+                                                        style="font-size: 0.6rem;">REPERCUSSÃO</label>
+                                                    <input type="text"
+                                                        class="form-control form-control-lg fw-bold bg-transparent border-0 p-0 text-success"
+                                                        id="det_reperc_g" name="REPERCUSSO GECOPE" readonly
+                                                        style="font-size: 1.1rem;">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
+                            <!-- Coluna Direita: Agentes e Prazos -->
+                            <div class="col-lg-5">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-people me-2 text-info"></i>AGENTES DO CONTRATO</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-muted text-uppercase"
+                                                style="font-size: 0.7rem;">Contratante</label>
+                                            <input type="text" class="form-control bg-light border-0" name="CONTRATANTE"
+                                                id="det_contratante" style="font-size: 0.9rem;">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-muted text-uppercase"
+                                                style="font-size: 0.7rem;">Contratada</label>
+                                            <input type="text" class="form-control bg-light border-0" name="CONTRATADA"
+                                                id="det_contratada" style="font-size: 0.9rem;">
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label small fw-bold text-muted text-uppercase"
+                                                style="font-size: 0.7rem;">Analista Designado</label>
+                                            <select class="form-select bg-light border-0" name="ANALISTA"
+                                                id="det_analista" style="font-size: 0.9rem;">
+                                                <option value="">Selecione...</option>
+                                                <option value="N">Nildeno</option>
+                                                <option value="W">Walace</option>
+                                                <option value="P">Pedro</option>
+                                                <option value="F">Felipe</option>
+                                                <option value="H">Helder</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
 
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-white py-3">
+                                        <h6 class="mb-0 fw-bold text-dark"><i
+                                                class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA E METAS
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Data Abertura</label>
+                                                <input type="text" class="form-control form-control-sm mask-date"
+                                                    name="DATA DE ABERTURA" id="det_data_abertura"
+                                                    placeholder="dd/mm/aaaa">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Recebimento</label>
+                                                <input type="text" class="form-control form-control-sm mask-date"
+                                                    name="DATA RECEBIMENTO" id="det_data_recebimento"
+                                                    placeholder="dd/mm/aaaa">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Meta Fiscal</label>
+                                                <input type="text"
+                                                    class="form-control form-control-sm mask-date border-warning-subtle"
+                                                    name="DATA COMPROMISSO FISCAL" id="det_data_compromisso"
+                                                    placeholder="dd/mm/aaaa">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Aprovação GECOPE</label>
+                                                <input type="text"
+                                                    class="form-control form-control-sm mask-date border-success-subtle"
+                                                    name="DATA APROVAÇÃO GECOPE" id="det_data_aprovacao"
+                                                    placeholder="dd/mm/aaaa">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small text-muted mb-1"
+                                                    style="font-size: 0.7rem;">Devolução p/ Correções</label>
+                                                <div class="position-relative">
+                                                    <input type="text" class="form-control form-control-sm mask-date"
+                                                        name="DATA DEVOLUO CORREES" id="det_data_devolucao"
+                                                        placeholder="dd/mm/aaaa" oninput="calcularDiasDevolucao()">
+                                                    <span id="det_badge_dias_dev"
+                                                        class="position-absolute top-50 end-0 translate-middle-y me-2 text-secondary fw-bold"
+                                                        style="font-size: 0.75rem; pointer-events: none;">- dias</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Histórico e Auditoria -->
+                                <div class="card border-0 bg-transparent">
+                                    <div class="card-body p-0 ps-2">
+                                        <h6 class="text-secondary small fw-bold mb-3 text-uppercase"
+                                            style="font-size: 0.65rem;"><i
+                                                class="bi bi-clock-history me-1"></i>Histórico do Registro</h6>
+                                        <div class="mb-2">
+                                            <label class="form-label x-small text-muted mb-0"
+                                                style="font-size: 0.6rem;">CRIADO POR</label>
+                                            <input type="text"
+                                                class="form-control form-control-sm bg-transparent border-0 text-secondary p-0"
+                                                id="det_criador" readonly style="font-size: 0.75rem; min-height: auto;">
+                                        </div>
+                                        <div class="mb-0">
+                                            <label class="form-label x-small text-muted mb-0"
+                                                style="font-size: 0.65rem;">ÚLTIMA ATUALIZAÇÃO</label>
+                                            <input type="text"
+                                                class="form-control form-control-sm bg-transparent border-0 text-secondary p-0"
+                                                id="det_atualizacao" readonly
+                                                style="font-size: 0.75rem; min-height: auto;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                     <div id="msg-detalhes" class="mt-3" style="display:none"></div>
@@ -4557,36 +4852,15 @@
                             }
                         }
 
-                        function calcRepercussao(acrescId, supressId, repercId) {
-                            const elA = document.getElementById(acrescId);
-                            const elS = document.getElementById(supressId);
-                            const elR = document.getElementById(repercId);
-
-                            if (!elA || !elS || !elR) return;
-
-                            const valA = moedaParaNumero(elA.value) || 0;
-                            const valS = moedaParaNumero(elS.value) || 0;
-                            const valR = valA + valS;
-
-                            elR.value = 'R$ ' + valR.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        }
-
                         document.addEventListener('input', (e) => {
                             if (e.target.id === 'cad-processo') e.target.value = mascaraProcesso(e.target.value);
 
-                            if (e.target.classList.contains('calc-fiscal')) calcRepercussao('acresc_fisc', 'supres_fisc', 'reperc_fisc');
-                            if (e.target.classList.contains('calc-gecope')) calcRepercussao('acresc_gec', 'supres_gec', 'reperc_gec');
-
-                            // Detalhes (Gerenciar Processo)
-                            const detailsMap = {
-                                'det_acresc_f': ['det_acresc_f', 'det_supress_f', 'det_reperc_f'],
-                                'det_supress_f': ['det_acresc_f', 'det_supress_f', 'det_reperc_f'],
-                                'det_acresc_g': ['det_acresc_g', 'det_supress_g', 'det_reperc_g'],
-                                'det_supress_g': ['det_acresc_g', 'det_supress_g', 'det_reperc_g']
-                            };
-                            if (detailsMap[e.target.id]) {
-                                const [a, s, r] = detailsMap[e.target.id];
-                                calcRepercussao(a, s, r);
+                            // Detalhes e Cadastro (Cálculo Automático de Repercussão)
+                            const id = e.target.id || "";
+                            if (id && (id.includes('acresc') || id.includes('supres'))) {
+                                const prefix = id.startsWith('det_') ? 'det' : 'cad';
+                                // Pequeno delay para garantir que a máscara de dinheiro já tenha atualizado o value
+                                setTimeout(() => calcularRepercussao(prefix), 10);
                             }
                         });
 
@@ -4691,32 +4965,116 @@
                         /**
                          * [FIX-ALTO] Converte string de moeda (BRL) para número
                          * Suporta múltiplos formatos: 'R$ 1.234,56', '1.234,56', '1234.56'
-                         * Melhora: Validação de resultado e tratamento de edge cases
                          */
                         function moedaParaNumero(strValor) {
                             if (!strValor && strValor !== 0) return 0;
                             if (typeof strValor === 'number') {
                                 return isFinite(strValor) ? strValor : 0;
                             }
-
-                            // Remove 'R$', espaços, símbolos
                             let limpo = strValor.toString().trim().replace(/R\$|\s+/g, '');
-
                             if (!limpo) return 0;
-
-                            // Se contém vírgula (formato brasileiro 1.234,56)
                             if (limpo.includes(',')) {
                                 limpo = limpo.replace(/\./g, '').replace(',', '.');
                             }
-                            // Senão assume formato internacional (1234.56)
-
                             const resultado = parseFloat(limpo);
                             return isFinite(resultado) ? resultado : 0;
                         }
 
                         function isoParaDate(isoStr) {
                             if (!isoStr) return null;
-                            return new Date(isoStr + "T00:00:00");
+                            // Força o horário local para evitar problemas de fuso horário (UTC vs Local)
+                            const d = isoStr.includes('T') ? new Date(isoStr) : new Date(isoStr + "T00:00:00");
+                            return isNaN(d.getTime()) ? null : d;
+                        }
+
+                        /**
+                         * Retorna lista de feriados nacionais (Pode ser expandido para consulta em DB)
+                         */
+                        function getFeriados(ano) {
+                            const feriados = [
+                                "01-01", // Confraternização Universal
+                                "04-21", // Tiradentes
+                                "05-01", // Dia do Trabalho
+                                "09-07", // Independência
+                                "10-12", // Padroeira do Brasil
+                                "11-02", // Finados
+                                "11-15", // Proclamação da República
+                                "11-20", // Consciência Negra
+                                "12-25", // Natal
+                                // Feriados Estaduais / Específicos (Ceará)
+                                "03-19", // São José
+                                "03-25", // Data Magna do Ceará
+                                "02-17", // Carnaval
+                                "02-18", // Carnaval
+                                "06-04", // Corpus Christi
+                                "10-28", // Servidor Público
+                            ];
+                            return feriados.map(f => `${ano}-${f}`);
+                        }
+
+                        /**
+                         * Retorna o próximo dia útil a partir de uma data (inclusive a própria data se for útil)
+                         */
+                        function obterProximoDiaUtil(data) {
+                            let d = new Date(data);
+                            let tentativa = 0;
+                            while (tentativa < 15) { // Segurança contra loop infinito
+                                const diaSemana = d.getDay(); // 0=Dom, 6=Sab
+                                const dataFormatada = d.toISOString().substring(5, 10);
+                                const feriados = getFeriados(d.getFullYear());
+                                const ehFeriado = feriados.some(f => f.endsWith(dataFormatada));
+
+                                if (diaSemana === 0 || diaSemana === 6 || ehFeriado) {
+                                    d.setDate(d.getDate() + 1);
+                                } else {
+                                    return d;
+                                }
+                                tentativa++;
+                            }
+                            return d;
+                        }
+
+                        /**
+                         * Soma dias úteis a uma data, pulando fins de semana e feriados
+                         */
+                        function somarDiasUteis(data, dias) {
+                            let d = new Date(data);
+                            let cont = 0;
+                            let seguranca = 0;
+                            while (cont < dias && seguranca < 100) {
+                                d.setDate(d.getDate() + 1);
+                                const diaSemana = d.getDay();
+                                const dataFormatada = d.toISOString().substring(5, 10);
+                                const feriados = getFeriados(d.getFullYear());
+                                const ehFeriado = feriados.some(f => f.endsWith(dataFormatada));
+
+                                if (diaSemana !== 0 && diaSemana !== 6 && !ehFeriado) {
+                                    cont++;
+                                }
+                                seguranca++;
+                            }
+                            return d;
+                        }
+
+                        /**
+                         * Calcula a Data Meta somando 20 dias CORRIDOS a partir do PRÓXIMO dia útil do registro.
+                         * Se a data final cair em final de semana ou feriado, será prorrogada para o próximo dia útil.
+                         */
+                        function calcularDataMeta(dataBase, diasParaSoma = 20) {
+                            if (!dataBase) return null;
+                            let data = (dataBase instanceof Date) ? new Date(dataBase) : new Date(dataBase);
+                            
+                            // 1. Encontra o ponto de partida (próximo dia útil APÓS o cadastro)
+                            let amanha = new Date(data);
+                            amanha.setDate(amanha.getDate() + 1);
+                            let dataInicioContagem = obterProximoDiaUtil(amanha);
+                            
+                            // 2. Adiciona os 20 dias corridos a partir desse ponto
+                            let dataFim = new Date(dataInicioContagem);
+                            dataFim.setDate(dataFim.getDate() + diasParaSoma);
+                            
+                            // 3. Se cair em fim de semana ou feriado, pula para o próximo dia útil
+                            return obterProximoDiaUtil(dataFim);
                         }
 
                         function dateParaInput(dateObj) {
@@ -4735,7 +5093,42 @@
                         }
 
                         function isFiniteNumber(v) { return typeof v === 'number' && isFinite(v); }
+                        
+                        function escapeHTML(str) { const s = String(str || ''); return s.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+                        
+                        /**
+                         * Calcula de forma inteligente quantos dias o processo está no status atual.
+                         * Considera heurística de transição para dados legados (anteriores a 30/04/2026).
+                         */
+                        function calcularDiasNoStatus(d) {
+                            if (!d) return 0;
+                            const getSafeDate = (val) => {
+                                if (val instanceof Date && !isNaN(val.getTime())) return val;
+                                if (!val) return null;
+                                const dateObj = new Date(val);
+                                return isNaN(dateObj.getTime()) ? null : dateObj;
+                            };
+
+                            let dStatus = getSafeDate(d.ultima_atualizacao) || getSafeDate(d.created_at) || new Date();
+                            const stNormalizado = (d.status || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                            const ehFluxoAnalise = stNormalizado.includes("ANALISE") || stNormalizado.includes("AGUAR") || stNormalizado.includes("EM REANALISE") || stNormalizado.includes("FISCAL");
+
+                            if (ehFluxoAnalise) {
+                                const dEntrada = d.dataRecebimento || d.dataAbertura;
+                                const dataCorte = new Date('2026-04-30T00:00:00');
+                                if (dStatus < dataCorte && dEntrada && dEntrada instanceof Date && dEntrada.getTime() < dStatus.getTime()) {
+                                    dStatus = dEntrada;
+                                }
+                            }
+                            return Math.floor((new Date() - dStatus) / (1000 * 60 * 60 * 24));
+                        }
+
                         function sum(rows, fn) { return rows.reduce((acc, it) => { const v = fn(it); return acc + (isFiniteNumber(v) ? v : 0); }, 0); }
+                        function formatStatusDisplay(status) {
+                            if (status === "DEVOLVIDO P/ REANÁLISE FISCAL") return "REANÁLISE FISCAL";
+                            return status;
+                        }
+
                         function escapeHTML(str) { const s = String(str || ''); return s.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
 
                         // --- FUNO DEBOUNCE (PERFORMANCE) ---
@@ -4870,11 +5263,17 @@
                                     const dt = new Date(at.created_at);
                                     const hora = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
                                     const timeLabel = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + hora;
+                                    const iconClass = getAtividadeIcon(at.tipo);
 
                                     return `
                                 <div class="activity-item">
-                                    <span class="activity-time">${timeLabel}</span>
-                                    <span class="activity-desc">${at.usuario} ${at.descricao}</span>
+                                    <div class="activity-icon-box">
+                                        <i class="bi ${iconClass} fs-5"></i>
+                                    </div>
+                                    <div class="activity-content">
+                                        <span class="activity-time">${timeLabel}</span>
+                                        <div class="activity-desc"><strong>${at.usuario}</strong> ${at.descricao}</div>
+                                    </div>
                                 </div>
                             `;
                                 }).join('');
@@ -5078,9 +5477,9 @@
 
                                     // Audit Data Mapping
                                     criador: r.criador,
-                                    created_at: r.created_at,
+                                    created_at: isoParaDate(r.created_at),
                                     atualizado_por: r.atualizado_por,
-                                    ultima_atualizacao: r.ultima_atualizacao, // timestamp
+                                    ultima_atualizacao: isoParaDate(r.ultima_atualizacao), // Date object
                                     excluido_por: r.excluido_por,
                                     data_exclusao: r.data_exclusao
                                 };
@@ -5195,18 +5594,23 @@
                                 data_recebimento: dataParaISO(formData.get("DATA RECEBIMENTO")),
                                 data_compromisso_fiscal: dataParaISO(formData.get("DATA COMPROMISSO FISCAL")),
 
-                                acresc_fiscal: moedaParaNumero(formData.get("ACRSCIMO FISCALIZAO")),
-                                supress_fiscal: moedaParaNumero(formData.get("SUPRESSO FISCALIZAO")),
-                                reperc_fiscal: moedaParaNumero(formData.get("REPERCUSSO FISCALIZAO")),
-                                acresc_gecope: moedaParaNumero(formData.get("ACRSCIMO GECOPE")),
-                                supress_gecope: moedaParaNumero(formData.get("SUPRESSO GECOPE")),
-                                reperc_gecope: moedaParaNumero(formData.get("REPERCUSSO GECOPE")),
+                                acresc_fiscal: parseMoneyInput(formData.get("ACRSCIMO FISCALIZAO")),
+                                supress_fiscal: parseMoneyInput(formData.get("SUPRESSO FISCALIZAO")),
+                                reperc_fiscal: parseMoneyInput(formData.get("REPERCUSSO FISCALIZAO")),
+                                acresc_gecope: parseMoneyInput(formData.get("ACRSCIMO GECOPE")),
+                                supress_gecope: parseMoneyInput(formData.get("SUPRESSO GECOPE")),
+                                reperc_gecope: parseMoneyInput(formData.get("REPERCUSSO GECOPE")),
 
                                 // Audit: Criação
                                 criador: sessionStorage.getItem('sop_user_name') || 'Sistema',
-
-
+                                ultima_atualizacao: new Date().toISOString()
                             };
+
+                            // Automação GECOPE: Data Meta (Análise Fiscal)
+                            if (formData.get("STATUS") === 'ANÁLISE FISCAL' && !payload.data_compromisso_fiscal) {
+                                const metaCalculada = calcularDataMeta(new Date());
+                                payload.data_compromisso_fiscal = metaCalculada.toISOString().substring(0, 10);
+                            }
 
                             const { data, error } = await sbClient.from('processos').insert([payload]);
 
@@ -5228,10 +5632,12 @@
                                 // Notificação WhatsApp (Apenas se entrar em Análise Fiscal)
                                 const statusInicial = formData.get("STATUS");
                                 if (statusInicial === 'ANÁLISE FISCAL') {
+                                    const metaFormatada = payload.data_compromisso_fiscal ? payload.data_compromisso_fiscal.split('-').reverse().join('/') : 'Não definida';
                                     processarNotificacao('novo_processo', {
                                         NOME_FISCAL: formData.get("FISCAL") || 'Fiscal',
                                         NUP_PROCESSO: numProcesso,
-                                        NOME_OBRA: formData.get("DESCRIÇÃO") || 'Obra não informada'
+                                        NOME_OBRA: formData.get("DESCRIÇÃO") || 'Obra não informada',
+                                        DATA_META: metaFormatada
                                     });
                                 }
 
@@ -5314,9 +5720,9 @@
                             document.getElementById('det_supress_g').value = toInputMoney(row.supressGecope);
                             document.getElementById('det_reperc_g').value = toInputMoney(row.repercGecope);
 
-                            const notaSalva = localStorage.getItem(`nota_proc_${row.processo}`);
-                            const elNota = document.getElementById('det_notas_locais');
-                            if (elNota) elNota.value = notaSalva || "";
+                            // Garante que o cálculo seja refletido visualmente logo ao abrir
+                            setTimeout(() => { calcularRepercussao('det'); }, 50);
+
 
                             // Determina se o usuário atual é admin a partir da role mais recente
                             const isAdmin = (getCurrentUserRole() === 'admin');
@@ -5385,8 +5791,6 @@
 
                             if (actionType === 'update') {
                                 const formData = new FormData(form);
-                                const textoNota = document.getElementById('det_notas_locais').value;
-                                localStorage.setItem(`nota_proc_${processoNome}`, textoNota);
 
                                 const updates = {
                                     tipo: formData.get("TIPO"),
@@ -5410,16 +5814,27 @@
                                     supress_gecope: moedaParaNumero(formData.get("SUPRESSO GECOPE")),
                                     reperc_gecope: moedaParaNumero(formData.get("REPERCUSSO GECOPE")),
 
-                                    // Audit: Atualização
-                                    atualizado_por: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido',
-                                    ultima_atualizacao: new Date().toISOString()
+                                    // Audit: Atualização (Mantém o registro de quem mexeu por último)
+                                    atualizado_por: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido'
+                                    // A data 'ultima_atualizacao' não é definida aqui para não resetar o contador de dias sem mudança de status
                                 };
 
-                                // NOVA LGICA: Se o status mudar, remover a meta automaticamente
-                                if (updates.status && updates.status !== registroOriginal.status) {
-                                    updates.data_compromisso_fiscal = null;
-                                    const key = `meta:${processoNome}`;
-                                    localStorage.removeItem(key);
+                                // NOVA LÓGICA: Se o status mudar, reiniciar o contador de dias e remover a meta
+                                const novoStatus = (updates.status || "").toString().trim().toUpperCase();
+                                const statusAntigo = (registroOriginal.status || "").toString().trim().toUpperCase();
+
+                                if (novoStatus && novoStatus !== statusAntigo) {
+                                    updates.ultima_atualizacao = new Date().toISOString(); // Reinicia o contador de dias
+
+                                    // Automação GECOPE: Se mudar para "ANÁLISE FISCAL", define meta automática de 20 dias
+                                    if (updates.status === 'ANÁLISE FISCAL') {
+                                        const metaAuto = calcularDataMeta(new Date());
+                                        updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
+                                    } else {
+                                        updates.data_compromisso_fiscal = null;
+                                        const key = `meta:${processoNome}`;
+                                        localStorage.removeItem(key);
+                                    }
                                 }
 
                                 const btn = document.getElementById('btn-atualizar');
@@ -5695,10 +6110,22 @@
                                         return;
                                     }
                                     v = (parseInt(v) / 100).toFixed(2).replace(".", ",").replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
-                                    if (e.target.id.toLowerCase().includes('supres') && v !== "0,00") { v = "-" + v; }
+                                    const lowId = e.target.id.toLowerCase();
+                                    if (lowId.includes('supres') && v !== "0,00") { v = "-" + v; }
                                     e.target.value = v;
                                     if (e.target.id.startsWith('det_')) calcularRepercussao('det'); else calcularRepercussao('cad');
                                 });
+                            });
+
+                            // Garantir que campos específicos chamem calcularRepercussao mesmo em casos extremos
+                            ['det_acresc_f', 'det_supress_f', 'det_acresc_g', 'det_supress_g', 'acresc_fisc', 'supress_fisc', 'acresc_gec', 'supress_gec'].forEach(id => {
+                                const el = document.getElementById(id);
+                                if (el) {
+                                    el.addEventListener('input', () => {
+                                        const prefix = id.startsWith('det_') ? 'det' : 'cad';
+                                        setTimeout(() => calcularRepercussao(prefix), 10);
+                                    });
+                                }
                             });
 
                             wireEvents();
@@ -5747,27 +6174,63 @@
                             }
                         }
 
-                        function parseMoneyInput(val) { if (!val) return 0; return parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0; }
+                        function parseMoneyInput(val) {
+                            if (val === null || val === undefined || val === '') return 0;
+                            let s = val.toString().trim();
+                            // Normaliza sinal de menos unicode para hífen ASCII
+                            s = s.replace(/\u2212/g, '-');
+                            // Se estiver entre parênteses, trata como negativo: (1.000,00) => -1.000,00
+                            if (/^\(.*\)$/.test(s)) { s = '-' + s.replace(/^\(|\)$/g, ''); }
+                            // Remove R$, espaços normais e NBSP
+                            s = s.replace(/R\$|\s|\u00A0/g, '');
+                            // Remove quaisquer caracteres que não sejam dígito, vírgula, ponto ou sinal de menos
+                            s = s.replace(/[^0-9\-,.]/g, '');
+                            if (!s) return 0;
+                            // Se formato brasileiro (com vírgula), converte para formato parseable
+                            if (s.includes(',')) {
+                                s = s.replace(/\./g, '').replace(',', '.');
+                            }
+                            const res = parseFloat(s);
+                            return isFinite(res) ? res : 0;
+                        }
                         function formatMoneyInput(val) { return val.toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
 
                         function calcularRepercussao(prefix) {
-                            const idA = prefix === 'cad' ? 'acresc' : 'det_acresc';
-                            const idS = prefix === 'cad' ? 'supres' : 'det_supress';
-                            const idR = prefix === 'cad' ? 'reperc' : 'det_reperc';
+                            try {
+                                const isDet = (prefix === 'det');
+                                const sets = isDet ? [
+                                    { a: 'det_acresc_f', s: 'det_supress_f', r: 'det_reperc_f' },
+                                    { a: 'det_acresc_g', s: 'det_supress_g', r: 'det_reperc_g' }
+                                ] : [
+                                    { a: 'acresc_fisc', s: 'supress_fisc', r: 'reperc_fisc' },
+                                    { a: 'acresc_gec', s: 'supress_gec', r: 'reperc_gec' }
+                                ];
 
-                            const elAf = document.getElementById(idA + '_fisc') || document.getElementById(idA + '_f');
-                            const elSf = document.getElementById(idS + '_fisc') || document.getElementById(idS + '_f');
-                            const elRf = document.getElementById(idR + '_fisc') || document.getElementById(idR + '_f');
-                            let af = elAf ? parseMoneyInput(elAf.value) : 0;
-                            let sf = elSf ? parseMoneyInput(elSf.value) : 0;
-                            if (elRf) elRf.value = formatMoneyInput(Math.abs(af) - Math.abs(sf));
+                                sets.forEach(set => {
+                                    const elA = document.getElementById(set.a);
+                                    const elS = document.getElementById(set.s);
+                                    const elR = document.getElementById(set.r);
 
-                            const elAg = document.getElementById(idA + '_gec') || document.getElementById(idA + '_g');
-                            const elSg = document.getElementById(idS + '_gec') || document.getElementById(idS + '_g');
-                            const elRg = document.getElementById(idR + '_gec') || document.getElementById(idR + '_g');
-                            let ag = elAg ? parseMoneyInput(elAg.value) : 0;
-                            let sg = elSg ? parseMoneyInput(elSg.value) : 0;
-                            if (elRg) elRg.value = formatMoneyInput(Math.abs(ag) - Math.abs(sg));
+                                    if (elR) {
+                                        const vA = parseMoneyInput(elA ? elA.value : '0');
+                                        const vS = parseMoneyInput(elS ? elS.value : '0');
+                                        const total = vA + vS;
+                                        elR.value = formatMoneyInput(total);
+
+                                        // Feedback visual de cor conforme o valor
+                                        elR.classList.remove('text-danger', 'text-success', 'text-dark');
+                                        if (total < 0) {
+                                            elR.classList.add('text-danger');
+                                        } else if (total > 0) {
+                                            elR.classList.add('text-success');
+                                        } else {
+                                            elR.classList.add('text-dark');
+                                        }
+                                    }
+                                });
+                            } catch (err) {
+                                console.error('Erro no cálculo de repercussão:', err);
+                            }
                         }
 
                         function calcularDiasDevolucao() {
@@ -5974,7 +6437,7 @@
 
                             let options = '';
                             // Removido o "Todos" como opção individual, pois o componente MultiSelect já gerencia o estado global
-                            options += values.map(v => `<option value="${escapeHTML(v)}" selected>${escapeHTML(v)}</option>`).join("");
+                            options += values.map(v => `<option value="${escapeHTML(v)}" selected>${escapeHTML(formatStatusDisplay(v))}</option>`).join("");
                             selectEl.innerHTML = options;
                             renderMultiSelectUI(selectEl);
                         }
@@ -6157,7 +6620,7 @@
                             document.getElementById("gerencial-count-badge").textContent = `${rows.length} processos`;
                             renderHBar("chart_proc_por_fiscal", topN(groupCount(rows, d => d.fiscal), 20), "Qtd");
                             const pieD = groupCount(rows, d => d.status).sort((a, b) => b.value - a.value);
-                            Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => d.key), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false });
+                            Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => formatStatusDisplay(d.key)), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false });
                             renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
                         }
 
@@ -6480,11 +6943,9 @@
                             }
                             document.getElementById("meetingFooterNote").textContent = `Exibindo ${rows.length} processos`;
                             document.getElementById("card_proc_total").textContent = rows.length;
-                            const aprovadosCount = rows.filter(d => (d.status || "").toUpperCase().includes("APROVADO")).length;
-                            document.getElementById("card_proc_aprovados").textContent = aprovadosCount;
-                            document.getElementById("card_proc_andamento").textContent = rows.length - aprovadosCount;
-                            const maxDias = rows.length > 0 ? Math.max(...rows.map(d => { if (d.dataAbertura instanceof Date) return Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)); return 0; })) : 0;
-                            document.getElementById("card_proc_dias").textContent = maxDias;
+                            document.getElementById("card_proc_andamento").textContent = rows.filter(d => (d.status || "").toUpperCase() === "AGUAR. ANÁLISE").length;
+                            document.getElementById("card_proc_aprovados").textContent = rows.filter(d => (d.status || "").toUpperCase() === "ANÁLISE FISCAL").length;
+                            document.getElementById("card_proc_dias").textContent = rows.filter(d => (d.status || "").toUpperCase() === "DEVOLVIDO P/ REANÁLISE FISCAL").length;
 
                             const btnExport = document.getElementById("btn-reuniao-export");
                             if (btnExport) {
@@ -6496,7 +6957,7 @@
                             const columns = [
                                 { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prioritário", width: "80px", key: "prioritario", align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
                                 { title: "Status", width: "146px", key: "status", align: "start" }, { title: "Analista", width: "100px", key: "analista", align: "center" }, { title: "Abertura", width: "100px", key: "abertura", align: "center" },
-                                { title: "Dias", width: "100px", key: "dias", align: "center" }, { title: "Contratante", width: "100px", key: "contratante", align: "start" }, { title: "Contratada", width: "100px", key: "contratada", align: "start" }, { title: "Descrição", width: "auto", key: "descricao", align: "start" }
+                                { title: "Contratante", width: "100px", key: "contratante", align: "start" }, { title: "Contratada", width: "100px", key: "contratada", align: "start" }, { title: "Descrição", width: "auto", key: "descricao", align: "start" }
                             ];
                             const thead = document.querySelector("#pane-reuniao table thead");
                             let headerHTML = "<tr>";
@@ -6512,6 +6973,12 @@
                                 if (currentSort.length === 0) {
                                     const pA = statusPriority(a.status), pB = statusPriority(b.status);
                                     if (pA !== pB) return pA - pB;
+                                    
+                                    // Ordenação dentro do bloco de status: Maior quantidade de dias para o menor
+                                    const diasA = calcularDiasNoStatus(a);
+                                    const diasB = calcularDiasNoStatus(b);
+                                    if (diasA !== diasB) return diasB - diasA;
+
                                     const dA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 8640000000000000;
                                     const dB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 8640000000000000;
                                     return dA - dB;
@@ -6539,16 +7006,23 @@
                             });
 
                             mt.body.innerHTML = rows.map(d => {
-                                const mIso = getMetaDate(d)?.toISOString().substring(0, 10) || ""; const mSt = getMetaSt(d);
+                                const mIso = getMetaDate(d)?.toISOString().substring(0, 10) || "";
+                                const mSt = getMetaSt(d);
                                 let mCls = "badge-meta-sem";
-                                if (mSt === "Cumprido") mCls = "badge-meta-cumprido"; else if (mSt === "No prazo") mCls = "badge-meta-prazo"; else if (mSt === "Atrasado") mCls = "badge-meta-atrasado";
+                                if (mSt === "Cumprido") mCls = "badge-meta-cumprido";
+                                else if (mSt === "No prazo") mCls = "badge-meta-prazo";
+                                else if (mSt === "Atrasado") mCls = "badge-meta-atrasado";
+
                                 const stTxt = (d.status || "").toString().toUpperCase().trim();
                                 let stCls = "text-bg-light";
                                 if (stTxt.includes("DEVOLVIDO")) { stCls = "badge-status-devolvido"; }
                                 else if (stTxt.includes("CONTRATANTE")) { stCls = "badge-status-contratante"; }
                                 else if (stTxt.includes("APROVAÇÃO")) { stCls = "badge-status-dark-blue"; }
                                 else if (stTxt.includes("FISCAL") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-fiscal"; }
-                                else if (stTxt.includes("AGUAR")) { if (stTxt.includes("REAN")) { stCls = "badge-status-aguar-reanalise"; } else { stCls = "badge-status-light-blue"; } }
+                                else if (stTxt.includes("AGUAR")) {
+                                    if (stTxt.includes("REAN")) { stCls = "badge-status-aguar-reanalise"; }
+                                    else { stCls = "badge-status-light-blue"; }
+                                }
                                 else if (stTxt.startsWith("EM") && stTxt.includes("REANÁLISE")) { stCls = "badge-status-em-reanalise"; }
                                 else if (stTxt.startsWith("EM") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-em-analise"; }
                                 else if (stTxt.includes("APROVADO") || stTxt === "SEDUC") { stCls = "badge-status-aprovado"; }
@@ -6556,6 +7030,10 @@
                                 const abert = dateParaInput(d.dataAbertura);
                                 const dias = (d.dataAbertura instanceof Date) ? Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)) : "";
                                 const fiscalNome = (d.fiscal || "").toUpperCase();
+
+                                const diasNoStatus = calcularDiasNoStatus(d);
+                                const labelDias = diasNoStatus <= 0 ? "Hoje" : (diasNoStatus === 1 ? "1 dia" : `${diasNoStatus} dias`);
+
                                 return `
         <tr style="vertical-align: middle;">
             <td class="text-center">${['admin', 'gerente'].includes(uRole) ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : ''}</td>
@@ -6567,10 +7045,15 @@
                     <i class="bi bi-calendar-event me-1"></i>${mIso ? mIso.split('-').reverse().join('/') : "Definir"}
                 </div>
             </td>
-            <td><span class="badge rounded-pill ${stCls} badge-custom-size">${d.status}</span></td>
+            <td>
+                <div><span class="badge rounded-pill ${stCls} badge-custom-size">${formatStatusDisplay(d.status)}</span></div>
+                <div class="mt-1 text-muted px-1" style="font-size: 0.7rem; font-weight: 500;"><i class="bi bi-clock-history me-1"></i>${labelDias}</div>
+            </td>
             <td class="text-center fw-bold text-secondary" style="font-size: 0.8rem;">${d.analista || "-"}</td>
-            <td class="text-center" style="font-size: 0.8rem; color: #555;">${abert}</td>
-            <td class="text-center fw-bold" style="font-size: 0.8rem;">${dias}</td>
+            <td class="text-center">
+                <div style="font-size: 0.8rem; color: #555;">${abert}</div>
+                <div class="mt-1 text-muted" style="font-size: 0.7rem; font-weight: 500;"><i class="bi bi-calendar3 me-1"></i>${dias} dias</div>
+            </td>
             <td style="font-size: 0.80rem; font-weight: 300;">${escapeHTML(d.contratante)}</td>
             <td style="font-size: 0.80rem; font-weight: 300;">${escapeHTML(d.contratada)}</td>
             <td style="font-size: 0.80rem; color: #333; line-height: 1.3; text-align: justify;">${escapeHTML(d.descricao)}</td>
@@ -6850,7 +7333,7 @@
                                         { v: String(d.processo || ''), hz: 'center', bold: true, font: 9.5 },
                                         { v: metaSt, hz: 'center' },
                                         { v: metaDate, hz: 'center' },
-                                        { v: d.status || '', hz: 'left' },
+                                        { v: formatStatusDisplay(d.status) || '', hz: 'left' },
                                         { v: d.analista || '', hz: 'center' },
                                         { v: abert, hz: 'center' },
                                         { v: dias, hz: 'center' },
@@ -6976,7 +7459,7 @@
                                     d.processo || '-',
                                     getMetaSt(d),
                                     getMetaDate(d)?.toLocaleDateString('pt-BR') || '-',
-                                    d.status || '-',
+                                    formatStatusDisplay(d.status) || '-',
                                     d.analista || '-',
                                     d.dataAbertura instanceof Date ? d.dataAbertura.toLocaleDateString('pt-BR') : '-',
                                     d.dataAbertura instanceof Date ? Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)) : '-',
@@ -7015,7 +7498,15 @@
                         function populateAllTabFilters() {
                             populateFinanceiroFilters();
                             fillSelect(ger.status, allData.map(d => d.status)); fillSelect(pr.status, allData.map(d => d.status)); fillSelect(mt.status, allData.map(d => d.status));
-                            renderMultiSelectUI(mt.meta);
+
+                            // Força os filtros estáticos da aba Reunião a iniciarem como "Todos"
+                            [mt.meta, mt.prioritario].forEach(el => {
+                                if (el) {
+                                    Array.from(el.options).forEach(o => o.selected = true);
+                                    renderMultiSelectUI(el);
+                                }
+                            });
+
                             updateGerencialFilters(allData); updatePrazosFilters(allData); updateReuniaoFilters(allData);
 
                             // Verifica notificações de atraso (apenas admins ou autorizados)
@@ -13125,105 +13616,93 @@
                                                                 function gerarMensagemAmigavel(evento, dados) {
                                                                     const conf = NOTIFICATION_MAP[evento] || { titulo: " Notificação", sub: " Processamento" };
 
-                                                                    // Variantes de Saudação (Mais diversificadas)
-                                                                    const saudacoes = [
-                                                                        "Olá", "Oi", "Tudo bem?", "Bom dia", "Boa tarde", "Boa noite",
-                                                                        "Passando para avisar", "Aviso rápido", "Notificação importante",
-                                                                        "Olá, colega", "Oi, tudo certo?", "Como vai?"
+                                                                    // MOTOR DE SPINNING: Variantes para evitar bloqueio por spam
+                                                                    const saudarPadrao = ["Olá", "Oi", "Como vai?", "Tudo bem?"];
+                                                                    const saudarAlerta = ["Atenção", "Notificação importante", "Alerta do sistema", "Aviso urgente"];
+
+                                                                    const conectorNovo = [
+                                                                        "Há um novo processo aguardando análise:",
+                                                                        "Um novo processo foi registrado e aguarda sua atenção:",
+                                                                        "Foi cadastrado um novo processo na plataforma para você:"
+                                                                    ];
+                                                                    const conectorMuda = [
+                                                                        "Informamos que houve uma movimentação no processo abaixo:",
+                                                                        "O seguinte processo teve uma atualização de status relevante:",
+                                                                        "Houve uma mudança de status no processo que segue abaixo:"
+                                                                    ];
+                                                                    const conectorDesigna = [
+                                                                        "Você foi designado como analista para o seguinte processo:",
+                                                                        "Informamos que você é o analista responsável pelo processo abaixo:",
+                                                                        "Há um novo processo sob sua responsabilidade técnica no GECOPE:"
+                                                                    ];
+                                                                    const conectorAtraso = [
+                                                                        "Notificação de Meta: O processo encontra-se em atraso:",
+                                                                        "Atenção: O prazo estabelecido para este processo foi excedido:",
+                                                                        "Alerta: A meta de análise expirou sem conclusão no sistema:"
                                                                     ];
 
-                                                                    // Frases de conexão aleatórias para quebrar o padrão
-                                                                    let conectores = [
-                                                                        "Houve uma atualização no sistema:",
-                                                                        "Temos novidades sobre este processo:",
-                                                                        "Veja os detalhes da movimentação abaixo:",
-                                                                        "Informações atualizadas agora há pouco:",
-                                                                        "O status foi alterado no GECOPE:",
-                                                                        "Acompanhe esta atualização:"
-                                                                    ];
+                                                                    const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-                                                                    // Personalização específica para Processos (conforme solicitado pelo usuário)
+                                                                    const nomeDestino = dados.ANALISTA || dados.NOME_FISCAL || dados.NOME_USUARIO || dados.FISCAL || 'Colega';
+                                                                    const agora = new Date().toLocaleTimeString('pt-BR');
+
+                                                                    let saudacao = "";
+                                                                    let conector = "";
+                                                                    let footer = "";
+
+                                                                    // Construção por tipo de evento
                                                                     if (evento === 'novo_processo') {
-                                                                        conectores = [
-                                                                            "Foi registrado um novo processo no sistema:",
-                                                                            "Um processo foi cadastrado na plataforma:",
-                                                                            "Há um novo processo aguardando análise:",
-                                                                            "Um novo registro de processo foi realizado:"
-                                                                        ];
+                                                                        saudacao = `*${rand(saudarAlerta)}*, *${nomeDestino}*.`;
+                                                                        conector = rand(conectorNovo);
+                                                                        footer = `_Enviado via GECOPE às ${agora}_`;
                                                                     } else if (evento === 'mudanca_status_processo') {
-                                                                        conectores = [
-                                                                            "O processo foi devolvido para reanálise:",
-                                                                            "O replanilhamento foi devolvido para ajustes:",
-                                                                            "O aditivo está novamente com a Fiscalização para reanálise:",
-                                                                            "Atenção: Processo devolvido para novos ajustes técnicos:"
-                                                                        ];
+                                                                        saudacao = `*${rand(saudarPadrao)}*, *${nomeDestino}*.`;
+                                                                        conector = rand(conectorMuda);
+                                                                        footer = `_Sistema GECOPE | ${agora}_`;
                                                                     } else if (evento === 'novas_metas_processo') {
-                                                                        conectores = [
-                                                                            "Atenção: A meta deste processo não foi cumprida:",
-                                                                            "Alerta de Atraso: O prazo estabelecido foi excedido:",
-                                                                            "Notificação de Meta: O processo encontra-se em atraso:"
-                                                                        ];
+                                                                        saudacao = `*Atenção*, *${nomeDestino}*.`;
+                                                                        conector = rand(conectorAtraso);
+                                                                        footer = `_Alerta automático GECOPE | ${agora}_`;
                                                                     } else if (evento === 'analista_designado') {
-                                                                        conectores = [
-                                                                            "Você foi designado como analista para o seguinte processo:",
-                                                                            "Há um novo processo sob sua responsabilidade técnica:",
-                                                                            "Informamos que você é o analista responsável por este processo:",
-                                                                            "Processo encaminhado para sua análise técnica:",
-                                                                            "Atenção: Novo processo atribuído à sua fila de análise:",
-                                                                            "Você foi escalado para analisar o seguinte processo:",
-                                                                            "Um processo acaba de entrar na sua lista de análise:"
-                                                                        ];
+                                                                        saudacao = `*Olá*, *${nomeDestino}*.`;
+                                                                        conector = rand(conectorDesigna);
+                                                                        footer = `_GECOPE | Movimentação em ${agora}_`;
+                                                                    } else {
+                                                                        saudacao = `*${rand(saudarPadrao)}*, *${nomeDestino}*.`;
+                                                                        conector = "Temos uma nova atualização no sistema:";
+                                                                        footer = `_GECOPE | ${agora}_`;
                                                                     }
 
-                                                                    const saudar = `${saudacoes[Math.floor(Math.random() * saudacoes.length)]}, *${dados.ANALISTA || dados.NOME_FISCAL || dados.NOME_USUARIO || dados.FISCAL || 'Colega'}*.`;
-                                                                    const conector = conectores[Math.floor(Math.random() * conectores.length)];
-
-
-                                                                    const agora = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                                                                    const enviadoPor = "GECOPE";
-
-                                                                    // Variantes de rodapé
-                                                                    const rodapes = [
-                                                                        `_Enviado via GECOPE às ${agora.split(' ')[1]}_`,
-                                                                        `_Sistema GECOPE | ${enviadoPor} | ${agora.split(' ')[1]}_`,
-                                                                        `_Notificação automática | Resp: ${enviadoPor} | Hora: ${agora.split(' ')[1]}_`
-                                                                    ];
-                                                                    const footer = `\n\n${rodapes[Math.floor(Math.random() * rodapes.length)]}`;
-
-                                                                    const objetoTexto = dados.NOME_OBRA || dados.DESCRICAO || dados.REF_ORCAMENTO || dados.TABELA_NOME;
-
-                                                                    // Escolha aleatória de subtítulo para Processos (Replanilhamento vs Aditivo)
-                                                                    let subtituloDinamico = conf.sub;
-                                                                    if (['novo_processo', 'mudanca_status_processo', 'novas_metas_processo', 'analista_designado'].includes(evento)) {
-                                                                        const subs = (evento === 'analista_designado') ? [' Replanilhamento'] : [' Replanilhamento', ' Aditivo de Serviços'];
-                                                                        subtituloDinamico = subs[Math.floor(Math.random() * subs.length)];
-                                                                    }
+                                                                    const objetoTexto = dados.NOME_OBRA || dados.DESCRICAO || 'Obra não informada';
+                                                                    const nup = dados.NUP_PROCESSO || 'Não informado';
 
                                                                     let linhas = [
-                                                                        ` *OBJETO:* ${objetoTexto || dados.NUP_PROCESSO || 'N/A'}`,
-                                                                        subtituloDinamico
+                                                                        ` 📑*OBJETO:* ${objetoTexto}`,
+                                                                        ` 📍 Aditivo de Serviços`,
+                                                                        ` 📍*NUP:* ${nup}`
                                                                     ];
 
-                                                                    if (dados.NUP_PROCESSO && objetoTexto) {
-                                                                        linhas.push(` *NUP:* ${dados.NUP_PROCESSO}`);
+                                                                    // Adiciona campos específicos
+                                                                    if (evento === 'novo_processo') {
+                                                                        linhas.push(` 📊*Status:* Análise Fiscal`);
+                                                                        if (dados.DATA_META) {
+                                                                            linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
+                                                                        }
+                                                                    } else if (evento === 'mudanca_status_processo') {
+                                                                        const stExibicao = (dados.NOVO_STATUS || "Análise Fiscal");
+                                                                        linhas.push(` 📊*Novo Status:* ${stExibicao}`);
+                                                                        if (dados.DATA_META) {
+                                                                            linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
+                                                                        }
+                                                                    } else if (evento === 'novas_metas_processo') {
+                                                                        linhas.push(` 🚨*Prazo Final:* Excedido!!!`);
+                                                                    } else if (evento === 'analista_designado') {
+                                                                        linhas.push(` 📊*Status:* Em Análise`);
                                                                     }
 
-                                                                    if (dados.NOVO_STATUS) {
-                                                                        const label = (evento === 'novo_processo') ? 'Status' : 'Novo Status';
-                                                                        const valorStatus = (evento === 'analista_designado') ? 'Em Análise' : dados.NOVO_STATUS;
-                                                                        linhas.push(` *${label}:* ${valorStatus}`);
-                                                                    }
+                                                                    const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAÇÃO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";
 
-                                                                    if (evento === 'novas_metas_processo') linhas.push(` *Prazo Final:* EXCEDIDO`);
-                                                                    if (dados.CODIGO_COMPOSICAO) linhas.push(` *Código:* ${dados.CODIGO_COMPOSICAO}`);
-
-                                                                    if (dados.VERSAO && evento === 'atualizacao_tabelas') {
-                                                                        linhas.push(` *Versão:* ${dados.VERSAO}`);
-                                                                    }
-
-                                                                    const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";
-
-                                                                    return `${conf.titulo}\n\n${saudar}\n${conector}\n\n${linhas.join('\n')}${avisoSuite}${footer}`;
+                                                                    return `*${conf.titulo.trim()}*\n\n${saudacao}\n${conector}\n\n${linhas.join('\n')}${avisoSuite}\n\n${footer}`;
                                                                 }
 
                                                                 // Cache para evitar disparos duplicados (debounce)
