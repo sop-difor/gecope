@@ -3174,7 +3174,7 @@
                                     <div class="card-body p-3 d-flex flex-column justify-content-between">
                                         <div class="d-flex align-items-center mb-1">
                                             <i class="bi bi-check-square-fill me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Análise</span>
+                                            <span class="small text-muted fw-bold text-uppercase">Análise Fiscal</span>
                                         </div>
                                         <h3 class="fw-bold mb-0" id="card_proc_aprovados">0</h3>
                                         <small class="text-muted" style="font-size: 0.75rem;">Status = ANÁLISE
@@ -3188,7 +3188,7 @@
                                     <div class="card-body p-3 d-flex flex-column justify-content-between">
                                         <div class="d-flex align-items-center mb-1">
                                             <i class="bi bi-calendar-event me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Reanálise</span>
+                                            <span class="small text-muted fw-bold text-uppercase">Reanálise Fiscal</span>
                                         </div>
                                         <h3 class="fw-bold mb-0" id="card_proc_dias">0</h3>
                                         <small class="text-muted" style="font-size: 0.75rem;">Status = REANÁLISE
@@ -3196,23 +3196,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- NOVO CARD: RADAR SUITE -->
-                            <div class="col-12 col-md-4 col-lg">
-                                <div class="card border-0 shadow-sm h-150"
-                                    style="border-bottom: 4px solid #dc3545 !important; background-color: #fffafb;">
-                                    <div class="card-body p-3 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center mb-1">
-                                            <i class="bi bi-radar me-2 text-danger"></i>
-                                            <span class="small text-danger fw-bold text-uppercase"
-                                                style="font-size: 0.7rem;">⚠️ NOVO NO SUITE</span>
-                                        </div>
-                                        <h3 class="fw-bold mb-0 text-danger" id="card_proc_radar"><i
-                                                class="spinner-border spinner-border-sm"></i></h3>
-                                        <small class="text-muted" style="font-size: 0.7rem; line-height: 1;">Processos
-                                            no GECOPE</small>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- Card 'NOVO NO SUITE' removido -->
                         </div>
 
                         <section class="filters-card mb-2">
@@ -6282,6 +6266,14 @@
                                         }
                                     }
                                     if (paneId === 'pane-reuniao') {
+                                        // Reset filtros estáticos ao abrir a aba para evitar filtros residuais
+                                        try {
+                                            if (window.mt) {
+                                                if (window.mt.meta) window.mt.meta.value = "";
+                                                if (window.mt.prioritario) window.mt.prioritario.value = "";
+                                                if (window.mt.search) window.mt.search.value = "";
+                                            }
+                                        } catch (e) { console.warn('Erro ao resetar filtros de reunião', e); }
                                         if (typeof updateReuniao === 'function') updateReuniao();
                                     }
                                     if (paneId === 'pane-prazos') {
@@ -7852,8 +7844,18 @@
                                     mt.search.addEventListener("input", debounce(updateReuniao, 300));
 
                                     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
-                                        e.preventDefault(); mt.search.value = "";
-                                        [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => { Array.from(el.options).forEach(o => o.selected = true); renderMultiSelectUI(el); });
+                                        e.preventDefault();
+                                        if (mt && mt.search) mt.search.value = "";
+                                        [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => {
+                                            if (!el) return;
+                                            if (el.multiple) {
+                                                Array.from(el.options).forEach(o => { if (o.value) o.selected = true; });
+                                                if (typeof renderMultiSelectUI === 'function') renderMultiSelectUI(el);
+                                            } else {
+                                                // Select simples: voltar para 'Todos' (valor vazio)
+                                                el.value = "";
+                                            }
+                                        });
                                         currentSort = []; updateReuniao();
                                     });
 
