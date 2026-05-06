@@ -7179,14 +7179,19 @@
 
                                     rows.sort((a, b) => {
                                         if (currentSort.length === 0) {
+                                            // 1. Prioridade por Status GECOPE
                                             const pA = statusPriority(a.status), pB = statusPriority(b.status);
                                             if (pA !== pB) return pA - pB;
 
-                                            // Ordenação dentro do bloco de status: Maior quantidade de dias para o menor
-                                            const diasA = calcularDiasNoStatus(a);
-                                            const diasB = calcularDiasNoStatus(b);
-                                            if (diasA !== diasB) return diasB - diasA;
+                                            // 2. Ordenação dentro do bloco: Maior tempo no status SUITE (ou GECOPE como fallback)
+                                            // Usamos a data de chegada na unidade (SUITE) se disponível, senão a última atualização do GECOPE.
+                                            // Data menor (mais antiga) = Maior tempo de permanência.
+                                            const timeA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0));
+                                            const timeB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0));
+                                            
+                                            if (timeA !== timeB) return timeA - timeB;
 
+                                            // 3. Fallback: Data de Abertura
                                             const dA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 8640000000000000;
                                             const dB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 8640000000000000;
                                             return dA - dB;
@@ -7272,7 +7277,7 @@
             </td>
             <td>
                 <div><span class="badge rounded-pill ${stCls} badge-custom-size">${formatStatusDisplay(d.status)}</span><span class="alerta-icone" style="display:none;"></span></div>
-                <div class="mt-1 text-muted px-1" style="font-size: 0.7rem; font-weight: 500;"><i class="bi bi-clock-history me-1"></i>${labelDias}</div>
+                <div class=\"mt-1 text-muted px-1\" style=\"font-size: 0.7rem; font-weight: 500; height: 1.1rem;\"></div>
             </td>
             <td class="suite-cell">
                 <div class="suite-badge-container"><span class="badge rounded-pill bg-light text-dark border badge-custom-size"><i class="spinner-border spinner-border-sm me-1" style="width: 0.7rem; height: 0.7rem;"></i>Consultando</span></div>
@@ -7386,8 +7391,13 @@
                                                 const badgeSigla = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color: #f8f9fa !important;">${escapeHTML(data.sigla)}</span>`;
                                                 suiteCell.innerHTML = badgeSigla;
 
-                                                if (data.tempo_permanencia_texto) {
-                                                    suiteTimeText.textContent = data.tempo_permanencia_texto;
+                                                if (data.data_chegada_unidade) {
+                                                    // Armazena no objeto para uso na ordenação posterior
+                                                    d.suite_data_chegada = data.data_chegada_unidade;
+
+                                                    const diffMs = new Date().getTime() - new Date(data.data_chegada_unidade).getTime();
+                                                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                                    suiteTimeText.textContent = diffDays > 0 ? `${diffDays} dia${diffDays > 1 ? 's' : ''}` : "Hoje";
                                                     suiteTime.style.display = 'block';
                                                 }
 
@@ -7423,7 +7433,7 @@
                                                             statusBadge.className = 'badge rounded-pill badge-custom-size badge-status-aprovado';
                                                         }
                                                         const timerText = tr.querySelector('td:nth-child(5) .text-muted');
-                                                        if (timerText) timerText.innerHTML = '<i class="bi bi-clock-history me-1"></i>Hoje';
+                                                         if (timerText) timerText.innerHTML = '';
                                                         if (window.showToast) window.showToast(`Processo ${d.processo} arquivado automaticamente!`, 'success');
                                                     }
                                                 }).catch(err => console.error("[Automação] Erro:", err));
