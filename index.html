@@ -4943,66 +4943,39 @@
 
                                 // Inicializa o cliente Supabase de forma defensiva (aguarda o carregamento da lib se necessário)
                                 let sbClient = null;
+
+                                // --- MÓDULO DE AUTOMAÇÃO GLOBAL (StatusSync) ---
+                                window.StatusSync = {
+                                    async verificarEAtualizarStatus(processoGecope, dadosSuite) {
+                                        try {
+                                            if (!sbClient) return { changed: false, reason: 'waiting_sbClient' };
+                                            const id = processoGecope.id;
+                                            const nup = processoGecope.processo;
+                                            const normalize = s => String(s || '').normalize('NFD').replace(/[ -\u036f]/g, '').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+                                            const statusGecope = normalize(processoGecope.status || '');
+                                            const statusSuite = normalize(dadosSuite.status_suite || dadosSuite.sigla || '');
+
+                                            if (statusSuite === 'ARQUIVADO') {
+                                                if (statusGecope === 'ARQUIVADO') return { changed: false };
+                                                const payload = { status: 'ARQUIVADO', updated_at: new Date().toISOString(), ultima_atualizacao: new Date().toISOString() };
+                                                console.log(`[StatusSync] Arquivando: ${nup}`);
+                                                let query = sbClient.from('processos').update(payload);
+                                                if (id) query = query.eq('id', id); else query = query.eq('processo', nup);
+                                                const { data, error } = await query.select();
+                                                if (error) throw error;
+                                                return { changed: !!(data && data.length), data };
+                                            }
+                                            return { changed: false };
+                                        } catch (e) { console.error("[StatusSync] Erro:", e); return { changed: false, error: e }; }
+                                    }
+                                };
+
                                 function initSupabaseClient() {
                                     if (!sbClient && window.supabase && typeof window.supabase.createClient === 'function') {
                                         sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY, {
-                                            auth: {
-                                                storage: cookieGuardStorage,
-                                                autoRefreshToken: true,
-                                                persistSession: true
-                                            }
+                                            auth: { storage: cookieGuardStorage, autoRefreshToken: true, persistSession: true }
                                         });
-                                        window.StatusSync = {
-                                            async verificarEAtualizarStatus(processoGecope, dadosSuite) {
-                                                try {
-                                                    const id = processoGecope.id;
-                                                    const nup = processoGecope.processo;
-                                                    const normalize = s => String(s || '').normalize('NFD').replace(/[ -\u036f]/g, '').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
-                                                    const statusGecope = normalize(processoGecope.status || '');
-                                                    const statusSuite = normalize(dadosSuite.status_suite || dadosSuite.sigla || '');
-
-                                                    console.log(`[StatusSync] Verificando ${nup}: GECOPE(${statusGecope}) vs SUITE(${statusSuite})`);
-
-                                                    if (statusSuite === 'ARQUIVADO') {
-                                                        if (statusGecope === 'ARQUIVADO') {
-                                                            console.log("[StatusSync] Já está arquivado no GECOPE.");
-                                                            return { changed: false };
-                                                        }
-
-                                                        const payload = { 
-                                                            status: 'ARQUIVADO', 
-                                                            updated_at: new Date().toISOString(),
-                                                            ultima_atualizacao: new Date().toISOString()
-                                                        };
-
-                                                        console.log("[StatusSync] Tentando arquivar no Supabase...", payload);
-                                                        let query = sbClient.from('processos').update(payload);
-                                                        if (id) query = query.eq('id', id);
-                                                        else query = query.eq('processo', nup);
-
-                                                        const { data, error } = await query.select();
-                                                        if (error) {
-                                                            console.error("[StatusSync] Erro no Supabase:", error);
-                                                            if (window.showToast) window.showToast("Erro ao arquivar: " + error.message, "error");
-                                                            throw error;
-                                                        }
-                                                        
-                                                        if (!data || data.length === 0) {
-                                                            console.warn("[StatusSync] Nenhum registro atualizado. ID/NUP não encontrado?");
-                                                            return { changed: false, reason: 'not_found' };
-                                                        }
-
-                                                        console.log("[StatusSync] Sucesso! Banco atualizado.");
-                                                        return { changed: true, data };
-                                                    }
-                                                    return { changed: false };
-                                                } catch (e) {
-                                                    console.error("[StatusSync] Erro crítico:", e);
-                                                    return { changed: false, error: e };
-                                                }
-                                            }
-                                        };
-                                        console.log("[StatusSync] Módulo embutido com diagnóstico.");
+                                        console.log("[Supabase] Conectado.");
                                     }
                                 }
                                 // Tenta inicializar agora ou ao carregar a página
