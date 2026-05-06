@@ -3970,7 +3970,7 @@
                                                     <div class="col-md-6">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Status Atual</label>
+                                                            style="font-size: 0.7rem;">Status Atual <span class="text-danger">*</span></label>
                                                         <select
                                                             class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
                                                             name="STATUS" id="det_status">
@@ -3991,14 +3991,14 @@
                                                     <div class="col-md-6">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Tipo de Processo</label>
+                                                            style="font-size: 0.7rem;">Tipologia <span class="text-danger">*</span></label>
                                                         <input type="text" class="form-control" name="TIPO"
                                                             id="det_tipo">
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Fiscal Responsável</label>
+                                                            style="font-size: 0.7rem;">Fiscal Responsável <span class="text-danger">*</span></label>
                                                         <select class="form-select" name="FISCAL" id="det_fiscal">
                                                             <option value="">Selecione...</option>
                                                         </select>
@@ -4006,7 +4006,7 @@
                                                     <div class="col-12">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Descrição do Objeto</label>
+                                                            style="font-size: 0.7rem;">Descrição do Objeto <span class="text-danger">*</span></label>
                                                         <textarea class="form-control" name="DESCRIÇÃO"
                                                             id="det_descricao" rows="6"
                                                             style="font-size: 0.9rem; min-height: 120px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
@@ -4103,14 +4103,14 @@
                                             <div class="card-body">
                                                 <div class="mb-3">
                                                     <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Contratante</label>
+                                                        style="font-size: 0.7rem;">Contratante <span class="text-danger">*</span></label>
                                                     <input type="text" class="form-control bg-light border-0"
                                                         name="CONTRATANTE" id="det_contratante"
                                                         style="font-size: 0.9rem;">
                                                 </div>
                                                 <div class="mb-3">
                                                     <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Contratada</label>
+                                                        style="font-size: 0.7rem;">Contratada <span class="text-danger">*</span></label>
                                                     <input type="text" class="form-control bg-light border-0"
                                                         name="CONTRATADA" id="det_contratada"
                                                         style="font-size: 0.9rem;">
@@ -5927,6 +5927,59 @@
                                     }
 
                                     if (actionType === 'update') {
+                                        // --- VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS ---
+                                        const camposObrigatorios = [
+                                            { id: 'det_status', nome: 'Status Atual' },
+                                            { id: 'det_tipo', nome: 'Tipologia' },
+                                            { id: 'det_fiscal', nome: 'Fiscal Responsável' },
+                                            { id: 'det_descricao', nome: 'Descrição do Objeto' },
+                                            { id: 'det_contratante', nome: 'Contratante' },
+                                            { id: 'det_contratada', nome: 'Contratada' }
+                                        ];
+
+                                        for (const campo of camposObrigatorios) {
+                                            const el = document.getElementById(campo.id);
+                                            if (!el || !el.value.trim()) {
+                                                alert(`O campo "${campo.nome}" é obrigatório.`);
+                                                el.focus();
+                                                return;
+                                            }
+                                        }
+
+                                        const statusAtual = document.getElementById('det_status').value;
+
+                                        // 2.1 Se o Status for AGUAR. ANÁLISE, o campo RECEBIMENTO deve estar preenchido
+                                        if (statusAtual === 'AGUAR. ANÁLISE') {
+                                            const valRecebimento = document.getElementById('det_data_recebimento').value.trim();
+                                            if (!valRecebimento) {
+                                                alert("Para o status 'AGUAR. ANÁLISE', o campo 'Recebimento' é obrigatório.");
+                                                document.getElementById('det_data_recebimento').focus();
+                                                return;
+                                            }
+                                        }
+
+                                        // 2.2 Se o Status for REANÁLISE FISCAL, o campo DEVOLUÇÃO PARA CORREÇÃO deve estar preenchido
+                                        if (statusAtual === 'DEVOLVIDO P/ REANÁLISE FISCAL') {
+                                            const valDevolucao = document.getElementById('det_data_devolucao').value.trim();
+                                            if (!valDevolucao) {
+                                                alert("Para o status 'REANÁLISE FISCAL', o campo 'Devolução p/ Correções' é obrigatório.");
+                                                document.getElementById('det_data_devolucao').focus();
+                                                return;
+                                            }
+                                        }
+
+                                        // 2.3 Se o Status for AGUAR. APROVAÇÃO ou APROVADO, ACRÉSCIMO, SUPRESSÃO e APROVAÇÃO GECOPE obrigatórios
+                                        if (statusAtual === 'AGUAR. APROVAÇÃO' || statusAtual === 'APROVADO') {
+                                            const valAcrescG = document.getElementById('det_acresc_g').value.trim();
+                                            const valSupressG = document.getElementById('det_supress_g').value.trim();
+                                            const valAprovacaoG = document.getElementById('det_data_aprovacao').value.trim();
+
+                                            if (!valAcrescG || !valSupressG || !valAprovacaoG) {
+                                                alert(`Para o status "${statusAtual}", os campos de ACRÉSCIMO (GECOPE), SUPRESSÃO (GECOPE) e APROVAÇÃO GECOPE devem estar preenchidos.`);
+                                                return;
+                                            }
+                                        }
+
                                         const formData = new FormData(form);
 
                                         const updates = {
