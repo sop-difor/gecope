@@ -4941,29 +4941,49 @@
                                     }
                                 };
 
-                                // Inicializa o cliente Supabase de forma defensiva (aguarda o carregamento da lib se necessário)
+                                // Inicializa o cliente Supabase de forma defensiva
                                 let sbClient = null;
 
                                 // --- MÓDULO DE AUTOMAÇÃO GLOBAL (StatusSync) ---
                                 window.StatusSync = {
                                     async verificarEAtualizarStatus(processoGecope, dadosSuite) {
                                         try {
-                                            if (!sbClient) return { changed: false, reason: 'waiting_sbClient' };
+                                            if (!sbClient) return { changed: false };
                                             const id = processoGecope.id;
                                             const nup = processoGecope.processo;
-                                            const normalize = s => String(s || '').normalize('NFD').replace(/[ -\u036f]/g, '').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
-                                            const statusGecope = normalize(processoGecope.status || '');
-                                            const statusSuite = normalize(dadosSuite.status_suite || dadosSuite.sigla || '');
+                                            const siglaSuite = String(dadosSuite.sigla || '').toUpperCase().trim();
+                                            const statusGecope = String(processoGecope.status || '').toUpperCase().trim();
+                                            let novoStatus = null;
 
-                                            if (statusSuite === 'ARQUIVADO') {
-                                                if (statusGecope === 'ARQUIVADO') return { changed: false };
-                                                const payload = { status: 'ARQUIVADO', updated_at: new Date().toISOString(), ultima_atualizacao: new Date().toISOString() };
-                                                console.log(`[StatusSync] Arquivando: ${nup}`);
+                                            // REGRA 1: ARQUIVAMENTO (Prioridade Máxima)
+                                            if (siglaSuite === 'ARQUIVADO') {
+                                                novoStatus = 'ARQUIVADO';
+                                            } 
+                                            // REGRA 2: RETORNO DE REANÁLISE (Prioridade sobre Análise Simples)
+                                            else if (siglaSuite === 'GECOPE' && statusGecope.includes('REANÁLISE FISCAL')) {
+                                                // Verifica se há analista designado (N, W, F, P, H)
+                                                const analista = String(processoGecope.analista || '').toUpperCase().trim();
+                                                const analistasValidos = ['N', 'W', 'F', 'P', 'H'];
+                                                if (analistasValidos.includes(analista)) {
+                                                    novoStatus = 'AGUAR. REANÁLISE';
+                                                }
+                                            }
+
+                                            if (novoStatus && novoStatus !== statusGecope) {
+                                                const payload = { 
+                                                    status: novoStatus, 
+                                                    ultima_atualizacao: new Date().toISOString(),
+                                                    atualizado_por: 'AUTOMAÇÃO SUITE'
+                                                };
                                                 let query = sbClient.from('processos').update(payload);
                                                 if (id) query = query.eq('id', id); else query = query.eq('processo', nup);
-                                                const { data, error } = await query.select();
-                                                if (error) throw error;
-                                                return { changed: !!(data && data.length), data };
+                                                
+                                                const { data, error } = await query.select('id, status');
+                                                if (error) {
+                                                    console.error("[StatusSync] ERRO DETALHADO:", error.message);
+                                                    return { changed: false, error: error.message };
+                                                }
+                                                return { changed: !!(data && data.length), data: data ? data[0] : null };
                                             }
                                             return { changed: false };
                                         } catch (e) { console.error("[StatusSync] Erro:", e); return { changed: false, error: e }; }
@@ -4976,9 +4996,9 @@
                                             auth: { storage: cookieGuardStorage, autoRefreshToken: true, persistSession: true }
                                         });
                                         console.log("[Supabase] Conectado.");
+                                        setTimeout(() => { if (window.showToast) window.showToast("Motor SOP v2 Ativo", "info"); }, 1500);
                                     }
                                 }
-                                // Tenta inicializar agora ou ao carregar a página
                                 initSupabaseClient();
                                 window.addEventListener('load', initSupabaseClient);
 
@@ -7338,13 +7358,14 @@
                                 async function atualizarTabelaSuite(rows) {
                                     let radarCount = 0;
                                     const radarVal = document.getElementById("card_proc_radar");
+                                    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
                                     if (rows.length === 0) {
                                         if (radarVal) radarVal.innerHTML = '0';
                                         return;
                                     }
 
-                                    const promises = rows.map(async (d) => {
+                                    const promises = rows.map(async (d, index) => {
                                         const num = escapeHTML(d.processo);
                                         const tr = document.querySelector(`tr[data-numero="${num}"]`);
                                         if (!tr) return;
@@ -7357,28 +7378,22 @@
 
                                         const renderData = (data) => {
                                             if (data && data.sucesso) {
-                                                // 1. Atualizar Radar Count
                                                 if (data.esta_no_gecop) {
                                                     radarCount++;
                                                     if (radarVal) radarVal.innerHTML = radarCount;
                                                 }
 
-                                                // 2. Atualizar Sigla
                                                 const badgeSigla = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color: #f8f9fa !important;">${escapeHTML(data.sigla)}</span>`;
                                                 suiteCell.innerHTML = badgeSigla;
 
-                                                // 3. Atualizar Tempo
                                                 if (data.tempo_permanencia_texto) {
                                                     suiteTimeText.textContent = data.tempo_permanencia_texto;
                                                     suiteTime.style.display = 'block';
                                                 }
 
-                                                // 4. Lógica de Alerta Fiscal (Caso esteja no GECOPE)
                                                 const ehFiscal = stTxt.includes('ANÁLISE FISCAL') || stTxt.includes('REANÁLISE FISCAL');
                                                 if (data.esta_no_gecop && ehFiscal) {
                                                     tr.classList.add('tr-alerta-fiscal');
-
-                                                    // Adicionar Badge Pulsante "Tramitado" ao lado do tempo
                                                     suiteTime.innerHTML += ` <span class="badge-tramitado-pulse">Tramitado</span>`;
                                                 }
                                             } else {
@@ -7387,7 +7402,7 @@
                                         };
 
                                         try {
-                                            // Integração REAL com Supabase Edge Function (Nuvem)
+                                            await delay(index * 150);
                                             const { data, error } = await sbClient.functions.invoke('consultar-suite', {
                                                 body: { numero: d.processo }
                                             });
@@ -7395,17 +7410,13 @@
                                             if (error) throw error;
                                             renderData(data);
 
-                                            // --- Automação Híbrida de Status ---
                                             if (window.StatusSync && data && data.sucesso) {
                                                 window.StatusSync.verificarEAtualizarStatus(d, {
                                                     status_suite: data.sigla,
                                                     sigla: data.sigla
                                                 }).then(res => {
-                                                    if (res && res.changed) {
-                                                        const novoStatus = res.data[0].status;
-                                                        console.log(`[Automação] Sincronizado: ${novoStatus}`);
-
-                                                        // Atualização Visual Imediata
+                                                    if (res && res.changed && res.data) {
+                                                        const novoStatus = res.data.status;
                                                         const statusBadge = tr.querySelector('td:nth-child(5) .badge');
                                                         if (statusBadge) {
                                                             statusBadge.textContent = formatStatusDisplay(novoStatus);
@@ -7413,7 +7424,6 @@
                                                         }
                                                         const timerText = tr.querySelector('td:nth-child(5) .text-muted');
                                                         if (timerText) timerText.innerHTML = '<i class="bi bi-clock-history me-1"></i>Hoje';
-
                                                         if (window.showToast) window.showToast(`Processo ${d.processo} arquivado automaticamente!`, 'success');
                                                     }
                                                 }).catch(err => console.error("[Automação] Erro:", err));
