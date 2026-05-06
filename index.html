@@ -4961,29 +4961,48 @@
                                                     const statusGecope = normalize(processoGecope.status || '');
                                                     const statusSuite = normalize(dadosSuite.status_suite || dadosSuite.sigla || '');
 
+                                                    console.log(`[StatusSync] Verificando ${nup}: GECOPE(${statusGecope}) vs SUITE(${statusSuite})`);
+
                                                     if (statusSuite === 'ARQUIVADO') {
+                                                        if (statusGecope === 'ARQUIVADO') {
+                                                            console.log("[StatusSync] Já está arquivado no GECOPE.");
+                                                            return { changed: false };
+                                                        }
+
                                                         const payload = { 
                                                             status: 'ARQUIVADO', 
                                                             updated_at: new Date().toISOString(),
                                                             ultima_atualizacao: new Date().toISOString()
                                                         };
-                                                        if (statusGecope === 'ARQUIVADO') return { changed: false };
 
+                                                        console.log("[StatusSync] Tentando arquivar no Supabase...", payload);
                                                         let query = sbClient.from('processos').update(payload);
                                                         if (id) query = query.eq('id', id);
                                                         else query = query.eq('processo', nup);
 
                                                         const { data, error } = await query.select();
-                                                        if (error) throw error;
+                                                        if (error) {
+                                                            console.error("[StatusSync] Erro no Supabase:", error);
+                                                            if (window.showToast) window.showToast("Erro ao arquivar: " + error.message, "error");
+                                                            throw error;
+                                                        }
+                                                        
+                                                        if (!data || data.length === 0) {
+                                                            console.warn("[StatusSync] Nenhum registro atualizado. ID/NUP não encontrado?");
+                                                            return { changed: false, reason: 'not_found' };
+                                                        }
+
+                                                        console.log("[StatusSync] Sucesso! Banco atualizado.");
                                                         return { changed: true, data };
                                                     }
                                                     return { changed: false };
                                                 } catch (e) {
-                                                    console.error("[StatusSync] Erro:", e);
+                                                    console.error("[StatusSync] Erro crítico:", e);
                                                     return { changed: false, error: e };
                                                 }
                                             }
                                         };
+                                        console.log("[StatusSync] Módulo embutido com diagnóstico.");
                                     }
                                 }
                                 // Tenta inicializar agora ou ao carregar a página
