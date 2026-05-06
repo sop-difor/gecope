@@ -17,7 +17,6 @@
 
     <!-- Critical scripts (loaded immediately) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="sync/statusSync.browser.js"></script>
 
     <!-- Deferred non-critical scripts for better performance -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
@@ -3970,7 +3969,8 @@
                                                     <div class="col-md-6">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Status Atual <span class="text-danger">*</span></label>
+                                                            style="font-size: 0.7rem;">Status Atual <span
+                                                                class="text-danger">*</span></label>
                                                         <select
                                                             class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
                                                             name="STATUS" id="det_status">
@@ -3979,8 +3979,7 @@
                                                             <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
                                                             <option value="EM REANÁLISE">EM REANÁLISE</option>
                                                             <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE
-                                                                FISCAL
-                                                            </option>
+                                                                FISCAL</option>
                                                             <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
                                                             <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
                                                             <option value="APROVADO">APROVADO</option>
@@ -3991,14 +3990,16 @@
                                                     <div class="col-md-6">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Tipologia <span class="text-danger">*</span></label>
+                                                            style="font-size: 0.7rem;">Tipologia <span
+                                                                class="text-danger">*</span></label>
                                                         <input type="text" class="form-control" name="TIPO"
                                                             id="det_tipo">
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Fiscal Responsável <span class="text-danger">*</span></label>
+                                                            style="font-size: 0.7rem;">Fiscal Responsável <span
+                                                                class="text-danger">*</span></label>
                                                         <select class="form-select" name="FISCAL" id="det_fiscal">
                                                             <option value="">Selecione...</option>
                                                         </select>
@@ -4006,7 +4007,8 @@
                                                     <div class="col-12">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Descrição do Objeto <span class="text-danger">*</span></label>
+                                                            style="font-size: 0.7rem;">Descrição do Objeto <span
+                                                                class="text-danger">*</span></label>
                                                         <textarea class="form-control" name="DESCRIÇÃO"
                                                             id="det_descricao" rows="6"
                                                             style="font-size: 0.9rem; min-height: 120px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
@@ -4103,14 +4105,16 @@
                                             <div class="card-body">
                                                 <div class="mb-3">
                                                     <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Contratante <span class="text-danger">*</span></label>
+                                                        style="font-size: 0.7rem;">Contratante <span
+                                                            class="text-danger">*</span></label>
                                                     <input type="text" class="form-control bg-light border-0"
                                                         name="CONTRATANTE" id="det_contratante"
                                                         style="font-size: 0.9rem;">
                                                 </div>
                                                 <div class="mb-3">
                                                     <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Contratada <span class="text-danger">*</span></label>
+                                                        style="font-size: 0.7rem;">Contratada <span
+                                                            class="text-danger">*</span></label>
                                                     <input type="text" class="form-control bg-light border-0"
                                                         name="CONTRATADA" id="det_contratada"
                                                         style="font-size: 0.9rem;">
@@ -4948,6 +4952,38 @@
                                                 persistSession: true
                                             }
                                         });
+                                        window.StatusSync = {
+                                            async verificarEAtualizarStatus(processoGecope, dadosSuite) {
+                                                try {
+                                                    const id = processoGecope.id;
+                                                    const nup = processoGecope.processo;
+                                                    const normalize = s => String(s || '').normalize('NFD').replace(/[ -\u036f]/g, '').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+                                                    const statusGecope = normalize(processoGecope.status || '');
+                                                    const statusSuite = normalize(dadosSuite.status_suite || dadosSuite.sigla || '');
+
+                                                    if (statusSuite === 'ARQUIVADO') {
+                                                        const payload = { 
+                                                            status: 'ARQUIVADO', 
+                                                            updated_at: new Date().toISOString(),
+                                                            ultima_atualizacao: new Date().toISOString()
+                                                        };
+                                                        if (statusGecope === 'ARQUIVADO') return { changed: false };
+
+                                                        let query = sbClient.from('processos').update(payload);
+                                                        if (id) query = query.eq('id', id);
+                                                        else query = query.eq('processo', nup);
+
+                                                        const { data, error } = await query.select();
+                                                        if (error) throw error;
+                                                        return { changed: true, data };
+                                                    }
+                                                    return { changed: false };
+                                                } catch (e) {
+                                                    console.error("[StatusSync] Erro:", e);
+                                                    return { changed: false, error: e };
+                                                }
+                                            }
+                                        };
                                     }
                                 }
                                 // Tenta inicializar agora ou ao carregar a página
@@ -7366,6 +7402,30 @@
 
                                             if (error) throw error;
                                             renderData(data);
+
+                                            // --- Automação Híbrida de Status ---
+                                            if (window.StatusSync && data && data.sucesso) {
+                                                window.StatusSync.verificarEAtualizarStatus(d, {
+                                                    status_suite: data.sigla,
+                                                    sigla: data.sigla
+                                                }).then(res => {
+                                                    if (res && res.changed) {
+                                                        const novoStatus = res.data[0].status;
+                                                        console.log(`[Automação] Sincronizado: ${novoStatus}`);
+                                                        
+                                                        // Atualização Visual Imediata
+                                                        const statusBadge = tr.querySelector('td:nth-child(5) .badge');
+                                                        if (statusBadge) {
+                                                            statusBadge.textContent = formatStatusDisplay(novoStatus);
+                                                            statusBadge.className = 'badge rounded-pill badge-custom-size badge-status-aprovado';
+                                                        }
+                                                        const timerText = tr.querySelector('td:nth-child(5) .text-muted');
+                                                        if (timerText) timerText.innerHTML = '<i class="bi bi-clock-history me-1"></i>Hoje';
+
+                                                        if (window.showToast) window.showToast(`Processo ${d.processo} arquivado automaticamente!`, 'success');
+                                                    }
+                                                }).catch(err => console.error("[Automação] Erro:", err));
+                                            }
                                         } catch (e) {
                                             console.error("Erro na integração SUITE:", e);
                                             suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-danger border" style="font-size: 0.60rem;">Erro Cloud</span>`;
