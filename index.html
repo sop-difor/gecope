@@ -4951,7 +4951,7 @@
                                             if (!sbClient) return { changed: false, reason: 'waiting_sbClient' };
                                             const id = processoGecope.id;
                                             const nup = processoGecope.processo;
-                                            const normalize = s => String(s || '').normalize('NFD').replace(/[ -\u036f]/g, '').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+                                            const normalize = s => String(s || '').normalize('NFD').replace(/[ -\u036f]/g, '').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
                                             const statusGecope = normalize(processoGecope.status || '');
                                             const statusSuite = normalize(dadosSuite.status_suite || dadosSuite.sigla || '');
 
@@ -7404,7 +7404,7 @@
                                                     if (res && res.changed) {
                                                         const novoStatus = res.data[0].status;
                                                         console.log(`[Automação] Sincronizado: ${novoStatus}`);
-                                                        
+
                                                         // Atualização Visual Imediata
                                                         const statusBadge = tr.querySelector('td:nth-child(5) .badge');
                                                         if (statusBadge) {
