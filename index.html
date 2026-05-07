@@ -6920,6 +6920,30 @@
                                             el.style.fontWeight = '500';
                                         }
                                     });
+                                    // Ao trocar de aba, garantir que os filtros de reunião estejam em "Todos"
+                                    try {
+                                        if (window.mt) {
+                                            // Para multiselects (status, fiscal) recria as opções selecionadas (Todos)
+                                            if (window.mt.status && typeof fillSelect === 'function' && Array.isArray(allData)) {
+                                                fillSelect(window.mt.status, allData.map(d => d.status));
+                                            }
+                                            if (window.mt.fiscal && typeof fillSelect === 'function' && Array.isArray(allData)) {
+                                                fillSelect(window.mt.fiscal, allData.map(d => d.fiscal));
+                                            }
+
+                                            // Para selects simples (meta, prioritario) definir como vazio => Todos
+                                            if (window.mt.meta) window.mt.meta.value = "";
+                                            if (window.mt.prioritario) window.mt.prioritario.value = "";
+
+                                            // Disparar eventos de change para atualizar labels/estado
+                                            ['status','fiscal','meta','prioritario'].forEach(k => {
+                                                try { window.mt[k]?.dispatchEvent(new Event('change')); } catch(e) { /* noop */ }
+                                            });
+                                        }
+                                    } catch (e) {
+                                        console.error('[switchProcessTab] erro ao resetar filtros', e);
+                                    }
+
                                     updateReuniao();
                                 }
 
