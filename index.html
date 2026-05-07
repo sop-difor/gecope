@@ -3188,7 +3188,8 @@
                                     <div class="card-body p-3 d-flex flex-column justify-content-between">
                                         <div class="d-flex align-items-center mb-1">
                                             <i class="bi bi-calendar-event me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Reanálise Fiscal</span>
+                                            <span class="small text-muted fw-bold text-uppercase">Reanálise
+                                                Fiscal</span>
                                         </div>
                                         <h3 class="fw-bold mb-0" id="card_proc_dias">0</h3>
                                         <small class="text-muted" style="font-size: 0.75rem;">Status = REANÁLISE
@@ -3197,6 +3198,22 @@
                                 </div>
                             </div>
                             <!-- Card 'NOVO NO SUITE' removido -->
+                        </div>
+
+                        <!-- [NOVO] NAVEGAÇÃO MINIMALISTA POR ABAS (3 PÁGINAS) -->
+                        <div class="d-flex my-3" id="process-tab-nav" style="gap: 32px;">
+                            <div class="pb-1 active-tab" id="btn-tab-ativos" onclick="switchProcessTab('ativos')"
+                                style="cursor: pointer; font-weight: 700; font-size: 0.9rem; color: var(--sop-green); border-bottom: 3px solid var(--sop-green); transition: all 0.2s;">
+                                PÁGINA 1: EM TRAMITAÇÃO
+                            </div>
+                            <div class="pb-1" id="btn-tab-aprovados" onclick="switchProcessTab('aprovados')"
+                                style="cursor: pointer; font-weight: 500; font-size: 0.9rem; color: #64748b; border-bottom: 3px solid transparent; transition: all 0.2s;">
+                                PÁGINA 2: APROVADOS
+                            </div>
+                            <div class="pb-1" id="btn-tab-arquivados" onclick="switchProcessTab('arquivados')"
+                                style="cursor: pointer; font-weight: 500; font-size: 0.9rem; color: #64748b; border-bottom: 3px solid transparent; transition: all 0.2s;">
+                                PÁGINA 3: ARQUIVADOS
+                            </div>
                         </div>
 
                         <section class="filters-card mb-2">
@@ -4942,26 +4959,25 @@
                                             // REGRA 1: ARQUIVAMENTO (Prioridade Máxima)
                                             if (siglaSuite === 'ARQUIVADO') {
                                                 novoStatus = 'ARQUIVADO';
-                                            } 
-                                            // REGRA 2: RETORNO DE REANÁLISE (Prioridade sobre Análise Simples)
+                                            }
+                                            // REGRA 2: RETORNO DE REANÁLISE (GECOPE)
                                             else if (siglaSuite === 'GECOPE' && statusGecope.includes('REANÁLISE FISCAL')) {
-                                                // Verifica se há analista designado (N, W, F, P, H)
-                                                const analista = String(processoGecope.analista || '').toUpperCase().trim();
-                                                const analistasValidos = ['N', 'W', 'F', 'P', 'H'];
-                                                if (analistasValidos.includes(analista)) {
-                                                    novoStatus = 'AGUAR. REANÁLISE';
-                                                }
+                                                novoStatus = 'AGUAR. REANÁLISE';
+                                            }
+                                            // REGRA 3: RETORNO DE ANÁLISE (GECOPE)
+                                            else if (siglaSuite === 'GECOPE' && statusGecope.includes('ANÁLISE FISCAL')) {
+                                                novoStatus = 'AGUAR. ANÁLISE';
                                             }
 
                                             if (novoStatus && novoStatus !== statusGecope) {
-                                                const payload = { 
-                                                    status: novoStatus, 
+                                                const payload = {
+                                                    status: novoStatus,
                                                     ultima_atualizacao: new Date().toISOString(),
                                                     atualizado_por: 'AUTOMAÇÃO SUITE'
                                                 };
                                                 let query = sbClient.from('processos').update(payload);
                                                 if (id) query = query.eq('id', id); else query = query.eq('processo', nup);
-                                                
+
                                                 const { data, error } = await query.select('id, status');
                                                 if (error) {
                                                     console.error("[StatusSync] ERRO DETALHADO:", error.message);
@@ -6871,7 +6887,6 @@
                                         return passF && passS;
                                     });
                                 }
-
                                 function updatePrazos() {
                                     const rows = getPrazosData();
                                     const aprov = rows.filter(d => String(d.status).toUpperCase().includes("APROVADO") && isFinite(d.prazoDias));
@@ -6887,6 +6902,27 @@
                                 // LOGIC: REUNIO
                                 const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: document.getElementById("meetingPrioritarioSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
                                 let mtBase = [];
+                                window.currentProcessesTab = 'ativos';
+
+                                function switchProcessTab(tab) {
+                                    window.currentProcessesTab = tab;
+                                    const tabIds = ['btn-tab-ativos', 'btn-tab-aprovados', 'btn-tab-arquivados'];
+                                    tabIds.forEach(id => {
+                                        const el = document.getElementById(id);
+                                        if (!el) return;
+                                        if (id === 'btn-tab-' + tab) {
+                                            el.style.color = 'var(--sop-green)';
+                                            el.style.borderBottom = '3px solid var(--sop-green)';
+                                            el.style.fontWeight = '700';
+                                        } else {
+                                            el.style.color = '#64748b';
+                                            el.style.borderBottom = '3px solid transparent';
+                                            el.style.fontWeight = '500';
+                                        }
+                                    });
+                                    updateReuniao();
+                                }
+
                                 function getMetaDate(row, setD) {
                                     const key = `meta:${row.processo}`;
                                     if (setD !== undefined) {
@@ -7059,6 +7095,19 @@
                                     if (mt.fiscal.options.length <= 1) fillSelect(mt.fiscal, fs);
                                     let rows = mtBase.slice();
 
+                                    // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
+                                    if (!window.currentProcessesTab) window.currentProcessesTab = 'ativos';
+                                    rows = rows.filter(d => {
+                                        const st = (d.status || "").toUpperCase().trim();
+                                        const isAprovado = st.includes("APROVADO") || st === "SEDUC";
+                                        const isArquivado = st.includes("ARQUIVADO");
+                                        
+                                        if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
+                                        if (window.currentProcessesTab === 'aprovados') return isAprovado;
+                                        if (window.currentProcessesTab === 'arquivados') return isArquivado;
+                                        return true;
+                                    });
+
                                     if (uRole === 'fiscal') {
                                         const nameParts = uName.trim().split(/[\s\.\-]+/).filter(p => p.length > 0);
                                         rows = rows.filter(d => {
@@ -7180,7 +7229,7 @@
                                             // Data menor (mais antiga) = Maior tempo de permanência.
                                             const timeA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0));
                                             const timeB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0));
-                                            
+
                                             if (timeA !== timeB) return timeA - timeB;
 
                                             // 3. Fallback: Data de Abertura
@@ -7422,11 +7471,19 @@
                                                         const statusBadge = tr.querySelector('td:nth-child(5) .badge');
                                                         if (statusBadge) {
                                                             statusBadge.textContent = formatStatusDisplay(novoStatus);
-                                                            statusBadge.className = 'badge rounded-pill badge-custom-size badge-status-aprovado';
+                                                            // Determina classe do badge dinamicamente
+                                                            let newCls = 'text-bg-light';
+                                                            const stUpper = novoStatus.toUpperCase();
+                                                            if (stUpper.includes("AGUAR")) {
+                                                                newCls = stUpper.includes("REAN") ? 'badge-status-aguar-reanalise' : 'badge-status-light-blue';
+                                                            } else if (stUpper.includes("ARQUIVADO")) {
+                                                                newCls = 'badge-status-aprovado';
+                                                            }
+                                                            statusBadge.className = `badge rounded-pill badge-custom-size ${newCls}`;
                                                         }
                                                         const timerText = tr.querySelector('td:nth-child(5) .text-muted');
-                                                         if (timerText) timerText.innerHTML = '';
-                                                        if (window.showToast) window.showToast(`Processo ${d.processo} arquivado automaticamente!`, 'success');
+                                                        if (timerText) timerText.innerHTML = '';
+                                                        if (window.showToast) window.showToast(`Processo ${d.processo} atualizado para ${novoStatus}!`, 'success');
                                                     }
                                                 }).catch(err => console.error("[Automação] Erro:", err));
                                             }
