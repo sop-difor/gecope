@@ -6936,8 +6936,8 @@
                                             if (window.mt.prioritario) window.mt.prioritario.value = "";
 
                                             // Disparar eventos de change para atualizar labels/estado
-                                            ['status','fiscal','meta','prioritario'].forEach(k => {
-                                                try { window.mt[k]?.dispatchEvent(new Event('change')); } catch(e) { /* noop */ }
+                                            ['status', 'fiscal', 'meta', 'prioritario'].forEach(k => {
+                                                try { window.mt[k]?.dispatchEvent(new Event('change')); } catch (e) { /* noop */ }
                                             });
                                         }
                                     } catch (e) {
@@ -7125,7 +7125,7 @@
                                         const st = (d.status || "").toUpperCase().trim();
                                         const isAprovado = st.includes("APROVADO") || st === "SEDUC";
                                         const isArquivado = st.includes("ARQUIVADO");
-                                        
+
                                         if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
                                         if (window.currentProcessesTab === 'aprovados') return isAprovado;
                                         if (window.currentProcessesTab === 'arquivados') return isArquivado;
