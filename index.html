@@ -3405,8 +3405,8 @@
 
                         <div class="mb-3 text-center" style="margin-top: -15px;">
                             <div class="d-flex justify-content-center align-items-center gap-3">
-                                <h4 class="fw-bold mb-0" style="color: var(--sop-green-dark);">PESQUISA DE PREOS DE
-                                    REFERNCIA
+                                <h4 class="fw-bold mb-0" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE
+                                    REFERÊNCIA
                                 </h4>
                                 <!-- Botão de Notificação de Tabelas (Apenas Admin) -->
                                 <button id="btn-notificar-tabelas"
@@ -3432,14 +3432,14 @@
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="form-label small fw-bold text-success">VERSO</label>
+                                    <label class="form-label small fw-bold text-success">VERSÃO</label>
                                     <select class="form-select form-select-sm" id="busca-versao">
                                         <option value="027.1">Tabela 027.1</option>
                                     </select>
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="form-label small fw-bold text-success">REFERNCIA</label>
+                                    <label class="form-label small fw-bold text-success">REFERÊNCIA</label>
                                     <select class="form-select form-select-sm" id="busca-ref">
                                         <option value="desonerada" selected>Desonerada</option>
                                         <option value="onerada">Onerada</option>
@@ -3467,7 +3467,7 @@
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="form-label small fw-bold text-success">CDIGO OU DESCRIÇÃO</label>
+                                    <label class="form-label small fw-bold text-success">CÓDIGO OU DESCRIÇÃO</label>
                                     <div class="input-group input-group-sm">
                                         <input type="text" class="form-control" id="busca-input-termo"
                                             placeholder="Composição, Insumo, Descrição..."
@@ -4281,7 +4281,7 @@
                             <div class="modal-footer justify-content-center">
                                 <button type="button" class="btn btn-primary w-100 fw-bold"
                                     onclick="enviarNovaVersao()">
-                                    <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSO
+                                    <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
                                 </button>
                             </div>
                         </div>
@@ -8174,7 +8174,7 @@
                                         console.log('[DEBUG] Landing overlay ocultado');
 
                                         // notifica
-                                        alert('Bem-vindo: ' + email + '\nPermissão: ' + role);
+                                        // alert('Bem-vindo: ' + email + '\\nPermissão: ' + role);
 
                                         console.log('[DEBUG] Carregando dados após login...');
                                         setTimeout(() => carregarDadosSupabase(), 500);
@@ -12362,15 +12362,15 @@
 
                                         doc.autoTable({
                                             startY: 45,
-                                            head: [['FONTE', 'VERSO', 'CDIGO', 'DESCRIÇÃO DO INSUMO', 'UNID', 'COEF.', 'P. UNIT.', 'TOTAL']],
+                                            head: [['FONTE', 'VERSÃO', 'CÓDIGO', 'DESCRIÇÃO DO INSUMO', 'UNID', 'COEF.', 'P. UNIT.', 'TOTAL']],
                                             body: body,
                                             theme: 'grid',
                                             styles: { fontSize: 7, cellPadding: 1.5, valign: 'middle', overflow: 'linebreak' },
                                             headStyles: { fillColor: cinzaHeader, textColor: 0, halign: 'center', fontStyle: 'bold' },
                                             columnStyles: {
                                                 0: { halign: 'center', cellWidth: 'auto' }, // FONTE
-                                                1: { halign: 'center', cellWidth: 'auto' }, // VERSO
-                                                2: { halign: 'center', cellWidth: 'auto' }, // CDIGO
+                                                1: { halign: 'center', cellWidth: 'auto' }, // VERSÃO
+                                                2: { halign: 'center', cellWidth: 'auto' }, // CÓDIGO
                                                 3: { cellWidth: '*' }, // DESCRIÇÃO DO INSUMO (Ocupa o resto)
                                                 4: { halign: 'center', cellWidth: 'auto' }, // UNID
                                                 5: { halign: 'center', cellWidth: 'auto' }, // COEF.
@@ -12819,8 +12819,8 @@
                                     <thead>
                                         <tr style="font-size: 0.75rem; background-color: #f5f5f5; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd; color: #333;">
                                             <th style="width: 8%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase">FONTE</th>
-                                            <th style="width: 7%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase">VERSO</th>
-                                            <th style="width: 8%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase text-center">CDIGO</th>
+                                            <th style="width: 7%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase">VERSÃO</th>
+                                            <th style="width: 8%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase text-center">CÓDIGO</th>
                                             <th style="width: 48%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase">DESCRIÇÃO DO INSUMO</th>
                                             <th style="width: 5%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase text-center">UNID.</th>
                                             <th style="width: 7%; padding: 0.75rem 0.5rem;" class="fw-bold text-uppercase text-center">COEF.</th>
@@ -12979,7 +12979,7 @@
                                     // 3. TABELA DE ITENS
                                     const headerRow = new TableRow({
                                         children: [
-                                            "FONTE", "VERSO", "CDIGO", "DESCRIÇÃO DO INSUMO", "UNID", "COEF.", "P. UNIT.", "TOTAL"
+                                            "FONTE", "VERSÃO", "CÓDIGO", "DESCRIÇÃO DO INSUMO", "UNID", "COEF.", "P. UNIT.", "TOTAL"
                                         ].map(h => new TableCell({
                                             shading: { fill: "343A40" },
                                             children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: "FFFFFF", size: 14 })], alignment: AlignmentType.CENTER })]
@@ -13375,7 +13375,7 @@
                                                         <div class="modal-footer justify-content-center">
                                                             <button type="button" class="btn btn-success w-100 fw-bold"
                                                                 onclick="enviarNovaVersaoComposicao()">
-                                                                <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSO
+                                                                <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
                                                             </button>
                                                         </div>
                                                     </div>
