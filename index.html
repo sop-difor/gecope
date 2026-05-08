@@ -6926,26 +6926,31 @@
                                     });
                                     // Ao trocar de aba, garantir que os filtros de reunião estejam em "Todos"
                                     try {
-                                        if (window.mt) {
+                                        if (typeof mt !== 'undefined' && mt) {
+                                            window.isResettingFilters = true; // Previne que updateReuniao rode múltiplas vezes
+                                            
                                             // Para multiselects (status, fiscal) recria as opções selecionadas (Todos)
-                                            if (window.mt.status && typeof fillSelect === 'function' && Array.isArray(allData)) {
-                                                fillSelect(window.mt.status, allData.map(d => d.status));
+                                            if (mt.status && typeof fillSelect === 'function' && Array.isArray(allData)) {
+                                                fillSelect(mt.status, allData.map(d => d.status));
                                             }
-                                            if (window.mt.fiscal && typeof fillSelect === 'function' && Array.isArray(allData)) {
-                                                fillSelect(window.mt.fiscal, allData.map(d => d.fiscal));
+                                            if (mt.fiscal && typeof fillSelect === 'function' && Array.isArray(allData)) {
+                                                fillSelect(mt.fiscal, allData.map(d => d.fiscal));
                                             }
 
                                             // Para selects simples (meta, prioritario) definir como vazio => Todos
-                                            if (window.mt.meta) window.mt.meta.value = "";
-                                            if (window.mt.prioritario) window.mt.prioritario.value = "";
+                                            if (mt.meta) mt.meta.value = "";
+                                            if (mt.prioritario) mt.prioritario.value = "";
 
-                                            // Disparar eventos de change para atualizar labels/estado
+                                            // Disparar eventos de change para atualizar labels/estado visual (ex: bootstrap-select)
                                             ['status', 'fiscal', 'meta', 'prioritario'].forEach(k => {
-                                                try { window.mt[k]?.dispatchEvent(new Event('change')); } catch (e) { /* noop */ }
+                                                try { mt[k]?.dispatchEvent(new Event('change')); } catch (e) { /* noop */ }
                                             });
+                                            
+                                            window.isResettingFilters = false;
                                         }
                                     } catch (e) {
                                         console.error('[switchProcessTab] erro ao resetar filtros', e);
+                                        window.isResettingFilters = false;
                                     }
 
                                     updateReuniao();
@@ -7113,6 +7118,7 @@
                                 function updateReuniaoFilters(rows) { mtBase = rows; updateReuniao(); }
 
                                 function updateReuniao() {
+                                    if (window.isResettingFilters) return; // Evita loop de re-render ao resetar filtros
                                     if (!mt.body) return;
                                     const uRole = (sessionStorage.getItem('sop_role') || "").toLowerCase();
 
@@ -7187,11 +7193,16 @@
                                     }
 
                                     if (qRaw) {
-
                                         const normalizeText = (text) => (text || "").normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
                                         const qNormalized = normalizeText(qRaw);
                                         const terms = qNormalized.split(/\s+/).filter(t => t.length > 0);
                                         const escapeRE = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                        
+                                        // Otimização: Compila os Regex UMA vez fora do loop
+                                        const compiledTerms = terms.map(term => ({
+                                            term: term,
+                                            regex: new RegExp(`\\b${escapeRE(term)}`, 'i')
+                                        }));
 
                                         rows = rows.filter(d => {
                                             const proc = (d.processo || "").toLowerCase();
@@ -7202,12 +7213,7 @@
                                             const status = normalizeText(d.status);
                                             const contratada = normalizeText(d.contratada);
 
-                                            return terms.every(term => {
-                                                const termEq = escapeRE(term);
-                                                // Usando \b garantimos que "pio" só encontre palavras que comecem com "pio" 
-                                                // (não achará dentro de "município")
-                                                const regex = new RegExp(`\\b${termEq}`, 'i');
-
+                                            return compiledTerms.every(({ term, regex }) => {
                                                 return proc.includes(term) ||
                                                     regex.test(contratada) ||
                                                     regex.test(contrat) ||
@@ -7433,17 +7439,19 @@
                                     atualizarTabelaSuite(rows);
                                 }
 
+                                window.suiteCache = window.suiteCache || {};
+
                                 async function atualizarTabelaSuite(rows) {
-                                    let radarCount = 0;
-                                    const radarVal = document.getElementById("card_proc_radar");
                                     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
                                     if (rows.length === 0) {
-                                        if (radarVal) radarVal.innerHTML = '0';
                                         return;
                                     }
 
-                                    const promises = rows.map(async (d, index) => {
+                                    // Filter out cached processes to apply delay only to new API requests
+                                    const nonCachedRows = rows.filter(d => !window.suiteCache[escapeHTML(d.processo)]);
+
+                                    const promises = rows.map(async (d) => {
                                         const num = escapeHTML(d.processo);
                                         const tr = document.querySelector(`tr[data-numero="${num}"]`);
                                         if (!tr) return;
@@ -7456,17 +7464,18 @@
 
                                         const renderData = (data) => {
                                             if (data && data.sucesso) {
-                                                if (data.esta_no_gecop) {
-                                                    radarCount++;
-                                                    if (radarVal) radarVal.innerHTML = radarCount;
-                                                }
-
                                                 const badgeSigla = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color: #f8f9fa !important;">${escapeHTML(data.sigla)}</span>`;
                                                 suiteCell.innerHTML = badgeSigla;
 
                                                 if (data.data_chegada_unidade) {
-                                                    // Armazena no objeto para uso na ordenação posterior
+                                                    // Armazena no objeto da tabela atual
                                                     d.suite_data_chegada = data.data_chegada_unidade;
+                                                    
+                                                    // Armazena no allData global para futuras re-ordenações nativas sem delay de DOM
+                                                    if (typeof allData !== 'undefined') {
+                                                        const globalRow = allData.find(x => x.processo === d.processo);
+                                                        if (globalRow) globalRow.suite_data_chegada = data.data_chegada_unidade;
+                                                    }
 
                                                     const diffMs = new Date().getTime() - new Date(data.data_chegada_unidade).getTime();
                                                     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -7484,13 +7493,27 @@
                                             }
                                         };
 
+                                        // Otimização: Cache de 5 minutos
+                                        const cached = window.suiteCache[num];
+                                        if (cached && (new Date().getTime() - cached.timestamp < 5 * 60 * 1000)) {
+                                            renderData(cached.data);
+                                            return;
+                                        }
+
                                         try {
-                                            await delay(index * 150);
+                                            // Aplica delay incremental apenas nas requisições reais (para não sobrecarregar API)
+                                            const reqIndex = nonCachedRows.findIndex(r => r.processo === d.processo);
+                                            if (reqIndex !== -1) await delay(reqIndex * 150);
+                                            
                                             const { data, error } = await sbClient.functions.invoke('consultar-suite', {
                                                 body: { numero: d.processo }
                                             });
 
                                             if (error) throw error;
+                                            
+                                            // Atualiza Cache
+                                            window.suiteCache[num] = { data: data, timestamp: new Date().getTime() };
+                                            
                                             renderData(data);
 
                                             if (window.StatusSync && data && data.sucesso) {
@@ -7526,9 +7549,9 @@
                                     });
 
                                     await Promise.all(promises);
-                                    if (radarVal) radarVal.innerHTML = radarCount;
 
-                                    // Após finalizar o fetch do SUITE, reordena o DOM para a página de ARQUIVADOS
+                                    // Após finalizar o fetch do SUITE, reordena o DOM para a página de ARQUIVADOS apenas
+                                    // se houve alguma atualização nova (o cache alimenta o sort inicial, evitando o pulo)
                                     if (window.currentProcessesTab === 'arquivados') {
                                         const tbody = document.getElementById("meetingTableBody");
                                         if (tbody) {
