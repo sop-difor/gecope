@@ -7248,18 +7248,22 @@
                                             const pA = statusPriority(a.status), pB = statusPriority(b.status);
                                             if (pA !== pB) return pA - pB;
 
-                                            // 2. Ordenação dentro do bloco: Maior tempo no status SUITE (ou GECOPE como fallback)
-                                            // Usamos a data de chegada na unidade (SUITE) se disponível, senão a última atualização do GECOPE.
-                                            // Data menor (mais antiga) = Maior tempo de permanência.
-                                            const timeA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0));
-                                            const timeB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0));
+                                            // 2. Regra Especial para Arquivados (Página 3): Ordenar por tempo no SUITE do mais recente para o mais antigo (menor nº de dias primeiro)
+                                            if (pA === 10) {
+                                                const tA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : 0);
+                                                const tB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : 0);
+                                                return tB - tA;
+                                            }
 
-                                            if (timeA !== timeB) return timeA - timeB;
+                                            // 3. Ordenação dentro do bloco: Tempo de Abertura (Maior tempo decorrido = mais antigo primeiro)
+                                            const dA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+                                            const dB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+                                            if (dA !== dB) return dA - dB;
 
-                                            // 3. Fallback: Data de Abertura
-                                            const dA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 8640000000000000;
-                                            const dB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 8640000000000000;
-                                            return dA - dB;
+                                            // 4. Fallback: Tempo no status SUITE
+                                            const timeA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : 0);
+                                            const timeB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : 0);
+                                            return timeA - timeB;
                                         }
 
                                         for (let sort of currentSort) {
@@ -7519,6 +7523,24 @@
 
                                     await Promise.all(promises);
                                     if (radarVal) radarVal.innerHTML = radarCount;
+
+                                    // Após finalizar o fetch do SUITE, reordena o DOM para a página de ARQUIVADOS
+                                    if (window.currentProcessesTab === 'arquivados') {
+                                        const tbody = document.getElementById("meetingTableBody");
+                                        if (tbody) {
+                                            const trs = Array.from(tbody.querySelectorAll("tr.tr-processo-row"));
+                                            trs.sort((trA, trB) => {
+                                                const numA = trA.getAttribute('data-numero');
+                                                const numB = trB.getAttribute('data-numero');
+                                                const rowA = rows.find(r => r.processo === numA);
+                                                const rowB = rows.find(r => r.processo === numB);
+                                                const tA = (rowA && rowA.suite_data_chegada) ? new Date(rowA.suite_data_chegada).getTime() : 0;
+                                                const tB = (rowB && rowB.suite_data_chegada) ? new Date(rowB.suite_data_chegada).getTime() : 0;
+                                                return tB - tA; // mais recente (menor qtde de dias) primeiro
+                                            });
+                                            trs.forEach(tr => tbody.appendChild(tr));
+                                        }
+                                    }
                                 }
 
                                 async function exportarProcessos() {
