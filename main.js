@@ -894,7 +894,7 @@
                                         if (r.analista === "N") nomeAnalista = "Nildeno";
                                         else if (r.analista === "W") nomeAnalista = "Walace";
 
-                                        return {
+                                        const obj = {
                                             id: r.id,
                                             processo: r.processo,
                                             status: r.status || "Não informado",
@@ -928,6 +928,23 @@
                                             excluido_por: r.excluido_por,
                                             data_exclusao: r.data_exclusao
                                         };
+
+                                        // Garantir que metas locais obsoletas sejam removidas
+                                        try {
+                                            const key = `meta:${r.processo}`;
+                                            const st = (r.status || "").toString().toUpperCase();
+                                            const isAnaliseFiscal = st.includes("FISCAL") && st.includes("ANALIS");
+
+                                            // Se o banco não tem meta ou o status atual não é Análise Fiscal,
+                                            // removemos qualquer meta armazenada localmente para evitar persistência indevida.
+                                            if (!r.data_compromisso_fiscal || !isAnaliseFiscal) {
+                                                localStorage.removeItem(key);
+                                                // sincroniza também o objeto em memória
+                                                obj.dataCompromissoFiscal = null;
+                                            }
+                                        } catch (e) { /* noop */ }
+
+                                        return obj;
                                     });
 
                                     // window.allData já foi atualizado acima; não é necessário reatribuir
