@@ -122,14 +122,16 @@
         if (!dataBase) return null;
         let data = (dataBase instanceof Date) ? new Date(dataBase) : new Date(dataBase);
 
+        // Inicia a contagem no próximo dia útil após a dataBase
         let amanha = new Date(data);
         amanha.setDate(amanha.getDate() + 1);
         let dataInicioContagem = obterProximoDiaUtil(amanha);
 
-        let dataFim = new Date(dataInicioContagem);
-        dataFim.setDate(dataFim.getDate() + diasParaSoma);
-
-        return obterProximoDiaUtil(dataFim);
+        // Soma exatamente 'diasParaSoma' dias úteis começando em dataInicioContagem
+        // Como 'somarDiasUteis' avança a partir da data fornecida, para contar
+        // dataInicioContagem como dia 1, somamos (diasParaSoma - 1)
+        const diasASomar = Math.max(0, diasParaSoma - 1);
+        return somarDiasUteis(dataInicioContagem, diasASomar);
     }
 
     function dateParaInput(dateObj) {

@@ -210,18 +210,44 @@
                                             const id = processoGecope.id;
                                             const nup = processoGecope.processo;
                                             const siglaSuite = String(dadosSuite.sigla || '').toUpperCase().trim();
+                                            const prevSigla = String(dadosSuite.prevSigla || '').toUpperCase().trim() || null;
                                             const statusGecope = String(processoGecope.status || '').toUpperCase().trim();
                                             let novoStatus = null;
+
+                                            // Segurança: se o processo foi criado há pouco tempo, respeitar o status definido no GECOPE
+                                            try {
+                                                const criado = processoGecope && processoGecope.created_at ? new Date(processoGecope.created_at) : null;
+                                                if (criado) {
+                                                    const agora = new Date();
+                                                    const diff = agora.getTime() - criado.getTime();
+                                                    // Se criado nos últimos 3 minutos, não aplicar mudanças automáticas
+                                                    if (diff >= 0 && diff < (3 * 60 * 1000)) {
+                                                        return { changed: false, reason: 'recently_created' };
+                                                    }
+                                                }
+                                            } catch (e) { /* noop */ }
 
                                             // REGRA 1: ARQUIVAMENTO (Prioridade Máxima)
                                             if (siglaSuite === 'ARQUIVADO') {
                                                 novoStatus = 'ARQUIVADO';
                                             }
-                                            // REGRA 2: RETORNO DE REANÁLISE (GECOPE)
-                                            else if (siglaSuite === 'GECOPE' && statusGecope.includes('REANÁLISE FISCAL')) {
-                                                novoStatus = 'AGUAR. REANÁLISE';
+                                            // REGRA: Atualização somente quando detectarmos que o processo
+                                            // retornou para GECOPE após ter transitado por outro setor.
+                                            // Detectado quando prevSigla existe e não era GECOPE, e a sigla atual é GECOPE.
+                                            else if (prevSigla && prevSigla !== 'GECOPE' && siglaSuite === 'GECOPE') {
+                                                const hasAnalista = processoGecope && processoGecope.analista && String(processoGecope.analista).trim() !== '';
+                                                // Se havia análise fiscal antes, definir reanálise/aguardo conforme analista
+                                                if (statusGecope.includes('REANÁLISE') || hasAnalista) {
+                                                    novoStatus = 'AGUAR. REANÁLISE';
+                                                } else {
+                                                    novoStatus = 'AGUAR. ANÁLISE';
+                                                }
                                             }
-                                            // REGRA 3: RETORNO DE ANÁLISE (GECOPE)
+                                            // Fallback: antigas regras aplicadas apenas quando não temos histórico de mudança
+                                            else if (siglaSuite === 'GECOPE' && statusGecope.includes('REANÁLISE FISCAL')) {
+                                                const hasAnalista = processoGecope && processoGecope.analista && String(processoGecope.analista).trim() !== '';
+                                                if (hasAnalista) novoStatus = 'AGUAR. REANÁLISE';
+                                            }
                                             else if (siglaSuite === 'GECOPE' && statusGecope.includes('ANÁLISE FISCAL')) {
                                                 novoStatus = 'AGUAR. ANÁLISE';
                                             }
@@ -593,17 +619,16 @@
                                     if (!dataBase) return null;
                                     let data = (dataBase instanceof Date) ? new Date(dataBase) : new Date(dataBase);
 
-                                    // 1. Encontra o ponto de partida (próximo dia útil APÓS o cadastro)
+                                    // Inicia a contagem no próximo dia útil após a dataBase
                                     let amanha = new Date(data);
                                     amanha.setDate(amanha.getDate() + 1);
                                     let dataInicioContagem = obterProximoDiaUtil(amanha);
 
-                                    // 2. Adiciona os 20 dias corridos a partir desse ponto
-                                    let dataFim = new Date(dataInicioContagem);
-                                    dataFim.setDate(dataFim.getDate() + diasParaSoma);
-
-                                    // 3. Se cair em fim de semana ou feriado, pula para o próximo dia útil
-                                    return obterProximoDiaUtil(dataFim);
+                                    // Soma exatamente 'diasParaSoma' dias úteis começando em dataInicioContagem
+                                    // Como 'somarDiasUteis' avança a partir da data fornecida, para contar
+                                    // dataInicioContagem como dia 1, somamos (diasParaSoma - 1)
+                                    const diasASomar = Math.max(0, diasParaSoma - 1);
+                                    return somarDiasUteis(dataInicioContagem, diasASomar);
                                 }
 
                                 function dateParaInput(dateObj) {
@@ -951,6 +976,42 @@
                                     /* window.allData já foi atualizado acima */
 
                                     try {
+                                        // Auto-estabelecer metas para processos em 'ANÁLISE FISCAL' sem meta
+                                        try {
+                                            const pendingMeta = [];
+                                            for (const row of window.allData) {
+                                                const st = (row.status || "").toString().toUpperCase();
+                                                const isAnaliseFiscal = st.includes("ANÁLISE FISCAL") || (st.includes("ANALISE") && st.includes("FISCAL"));
+                                                const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
+                                                if (isAnaliseFiscal && !row.dataCompromissoFiscal && row.id) {
+                                                    let base = null;
+                                                    let dias = 20; // padrão para Análise
+                                                    if (isReanalise) {
+                                                        // Para reanálises usamos 10 dias úteis a partir da data de devolução
+                                                        dias = 10;
+                                                        base = row.dataDevolucaoCorrecoes || row.dataRecebimento || row.dataAbertura || row.created_at || new Date();
+                                                    } else {
+                                                        // Para análises normais, base preferencial: dataRecebimento, dataAbertura, created_at
+                                                        base = row.dataRecebimento || row.dataAbertura || row.created_at || new Date();
+                                                    }
+                                                    const metaDate = calcularDataMeta(base, dias);
+                                                    if (metaDate) {
+                                                        const iso = metaDate.toISOString().substring(0, 10);
+                                                        // Atualiza objeto em memória para UI imediata
+                                                        row.dataCompromissoFiscal = isoParaDate(iso);
+                                                        pendingMeta.push({ id: row.id, data_compromisso_fiscal: iso });
+                                                    }
+                                                }
+                                            }
+                                            if (pendingMeta.length > 0) {
+                                                // Persistir no banco (em paralelo)
+                                                await Promise.all(pendingMeta.map(u => sbClient.from('processos').update({ data_compromisso_fiscal: u.data_compromisso_fiscal }).eq('id', u.id)));
+                                                console.log(`[AutoMeta] metas automáticas salvas: ${pendingMeta.length}`);
+                                            }
+                                        } catch (e) {
+                                            console.error('[AutoMeta] falha ao estabelecer metas automáticas:', e);
+                                        }
+
                                         populateAllTabFilters();
                                         renderLastUpdate();
                                         updateDashboard();
@@ -1053,9 +1114,19 @@
                                         ultima_atualizacao: new Date().toISOString()
                                     };
 
-                                    // Automação GECOPE: Data Meta (Análise Fiscal)
-                                    if (formData.get("STATUS") === 'ANÁLISE FISCAL' && !payload.data_compromisso_fiscal) {
-                                        const metaCalculada = calcularDataMeta(new Date());
+                                    // Automação GECOPE: Data Meta
+                                    const statusInicial = formData.get("STATUS");
+                                    if (statusInicial === 'ANÁLISE FISCAL' && !payload.data_compromisso_fiscal) {
+                                        const metaCalculada = calcularDataMeta(new Date(), 20);
+                                        payload.data_compromisso_fiscal = metaCalculada.toISOString().substring(0, 10);
+                                    } else if (statusInicial === 'DEVOLVIDO P/ REANÁLISE FISCAL' && !payload.data_compromisso_fiscal) {
+                                        // Se houver data de devolução no formulário, usar como base; senão, usar data_recebimento ou created
+                                        const devolStr = formData.get("DATA DEVOLUO CORREES");
+                                        let base = null;
+                                        if (devolStr) base = new Date(devolStr);
+                                        else if (payload.data_recebimento) base = isoParaDate(payload.data_recebimento);
+                                        else base = new Date();
+                                        const metaCalculada = calcularDataMeta(base, 10);
                                         payload.data_compromisso_fiscal = metaCalculada.toISOString().substring(0, 10);
                                     }
 
@@ -1326,9 +1397,17 @@
                                         if (novoStatus && novoStatus !== statusAntigo) {
                                             updates.ultima_atualizacao = new Date().toISOString(); // Reinicia o contador de dias
 
-                                            // Automação GECOPE: Se mudar para "ANÁLISE FISCAL", define meta automática de 20 dias
+                                            // Automação GECOPE: definir metas automáticas ao mudar de status
                                             if (updates.status === 'ANÁLISE FISCAL') {
-                                                const metaAuto = calcularDataMeta(new Date());
+                                                const base = new Date();
+                                                const metaAuto = calcularDataMeta(base, 20);
+                                                updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
+                                            } else if (updates.status === 'DEVOLVIDO P/ REANÁLISE FISCAL' || updates.status === 'REANÁLISE FISCAL') {
+                                                // Para reanálises, preferir a data de devolução informada no formulário
+                                                let base = null;
+                                                if (updates.data_devolucao_correcoes) base = isoParaDate(updates.data_devolucao_correcoes);
+                                                else base = new Date();
+                                                const metaAuto = calcularDataMeta(base, 10);
                                                 updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
                                             } else {
                                                 updates.data_compromisso_fiscal = null;
@@ -2341,15 +2420,18 @@
 
                                             if (error) throw error;
                                             
+                                            // Determina sigla anterior (se houver) antes de atualizar o cache
+                                            const prevSigla = window.suiteCache[num] && window.suiteCache[num].data ? String(window.suiteCache[num].data.sigla || '').toUpperCase().trim() : null;
                                             // Atualiza Cache
                                             window.suiteCache[num] = { data: data, timestamp: new Date().getTime() };
-                                            
+
                                             renderData(data);
 
                                             if (window.StatusSync && data && data.sucesso) {
                                                 window.StatusSync.verificarEAtualizarStatus(d, {
                                                     status_suite: data.sigla,
-                                                    sigla: data.sigla
+                                                    sigla: data.sigla,
+                                                    prevSigla: prevSigla
                                                 }).then(res => {
                                                     if (res && res.changed && res.data) {
                                                         const novoStatus = res.data.status;
