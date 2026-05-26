@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // --- 1. CONFIGURAÇÕES E CONEXAO
     window.SUPABASE_URL = 'https://qexdnxqmiaarzwwwrcor.supabase.co';
     window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFleGRueHFtaWFhcnp3d3dyY29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDYyNDUsImV4cCI6MjA4NTQyMjI0NX0.RJnLpsXMMzzhcq_YKHI7wObBqubKgdltauvBvGpz4dc';
@@ -8,3 +9,13 @@
     window.EVO_INSTANCE = 'SOP';
     // Endpoint público onde a função de aprovação será deployada. Configure após deploy.
     window.APPROVE_USER_ENDPOINT = window.APPROVE_USER_ENDPOINT || '';
+=======
+// --- 1. CONFIGURAÇÕES E CONEXAO
+    window.SUPABASE_URL = 'https://qexdnxqmiaarzwwwrcor.supabase.co';
+    window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFleGRueHFtaWFhcnp3d3dyY29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDYyNDUsImV4cCI6MjA4NTQyMjI0NX0.RJnLpsXMMzzhcq_YKHI7wObBqubKgdltauvBvGpz4dc';
+
+// --- 2. CONFIGURAÇÕES EVOLUTION API (WhatsApp Local) 
+    window.EVO_API_URL = 'https://evolution-api-production-1522.up.railway.app';
+    window.EVO_API_KEY = 'sopgecope2026';
+    window.EVO_INSTANCE = 'SOP';
+>>>>>>> 0bd2ac0295faf153d6d9554a1117a795a12f4273
