@@ -427,8 +427,6 @@
         if (!notifId) return alert('Notificação inválida.');
         if (!confirm(`Confirmar aprovação de ${matricula || nome} como ${role.toUpperCase()}?`)) return;
         try {
-            // Call server-side approve endpoint to perform insertion using service_role
-            const endpoint = window.APPROVE_USER_ENDPOINT || '/.netlify/functions/approve-user';
             // get current access token
             let token = null;
             try {
@@ -439,32 +437,54 @@
             let success = false;
             let errorMsg = '';
 
+            // 1. Tentativa principal: invocar a Edge Function do Supabase diretamente
             try {
-                const resp = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token ? { Authorization: `Bearer ${token}` } : {})
-                    },
-                    body: JSON.stringify({ notifId, role, matricula, nome })
+                const { data: invokeData, error: invokeErr } = await sbClient.functions.invoke('approve-user', {
+                    body: { notifId, role, matricula, nome }
                 });
 
-                if (resp.ok) {
+                if (!invokeErr) {
                     success = true;
                 } else {
-                    const text = await resp.text();
-                    let body = null;
-                    try { body = JSON.parse(text); } catch (e) { body = text; }
-                    errorMsg = body?.error || (typeof body === 'string' ? body : null) || `HTTP ${resp.status}`;
+                    errorMsg = invokeErr.message || String(invokeErr);
                 }
-            } catch (fetchErr) {
-                errorMsg = fetchErr.message || String(fetchErr);
+            } catch (invokeErr) {
+                errorMsg = invokeErr.message || String(invokeErr);
+            }
+
+            // 2. Segunda tentativa: Chamada HTTP ao endpoint configurado (Netlify/Vercel)
+            if (!success) {
+                const endpoint = window.APPROVE_USER_ENDPOINT || '/.netlify/functions/approve-user';
+                // Apenas tenta se não for a rota relativa padrão do Netlify (já que em páginas estáticas não funcionará)
+                if (window.APPROVE_USER_ENDPOINT || !window.location.hostname.includes('github.io')) {
+                    try {
+                        const resp = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(token ? { Authorization: `Bearer ${token}` } : {})
+                            },
+                            body: JSON.stringify({ notifId, role, matricula, nome })
+                        });
+
+                        if (resp.ok) {
+                            success = true;
+                        } else {
+                            const text = await resp.text();
+                            let body = null;
+                            try { body = JSON.parse(text); } catch (e) { body = text; }
+                            errorMsg = body?.error || (typeof body === 'string' ? body : null) || `HTTP ${resp.status}`;
+                        }
+                    } catch (fetchErr) {
+                        errorMsg = fetchErr.message || String(fetchErr);
+                    }
+                }
             }
 
             if (!success) {
-                console.warn('[ADMIN] Falha ao chamar endpoint de aprovação. Tentando inserção direta via sbClient...', errorMsg);
+                console.warn('[ADMIN] Falha ao chamar endpoint/função de aprovação. Tentando inserção direta via sbClient (pode falhar por políticas de RLS)...', errorMsg);
                 
-                // Inserção direta via frontend como fallback (caso não utilize a função servidora localmente)
+                // Inserção direta via frontend como fallback
                 const emailToCreate = matricula ? `${matricula}@gecope.app` : `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`;
                 const payload = {
                     email: emailToCreate,
@@ -478,7 +498,7 @@
                 // 1. Insere o usuário na tabela
                 const { error: insertErr } = await sbClient.from('app_users').insert([payload]);
                 if (insertErr) {
-                    throw new Error(`Erro na inserção direta: ${insertErr.message} (Tentativa original falhou com: ${errorMsg})`);
+                    throw new Error(`Erro na inserção direta (RLS): ${insertErr.message}. Nota: A criação de usuários por terceiros é restrita pelas políticas de segurança do banco. Certifique-se de que a Edge Function "approve-user" está implantada no painel do Supabase. (Tentativa original falhou com: ${errorMsg})`);
                 }
 
                 // 2. Marca notificação de solicitação como lida
