@@ -120,6 +120,15 @@
 
                                     // Inicialização
                                     if (typeof carregarListaFiscais === 'function') carregarListaFiscais();
+
+                                    // Garantir que o modal de cadastro esteja no final do body para evitar problemas de visibilidade
+                                    try {
+                                        const modalCadastroEl = document.getElementById('modalCadastro');
+                                        if (modalCadastroEl && modalCadastroEl.parentElement !== document.body) {
+                                            document.body.appendChild(modalCadastroEl);
+                                            console.log('[INIT] modalCadastro movido para document.body');
+                                        }
+                                    } catch (e) { console.warn('[INIT] Falha ao mover modalCadastro:', e); }
                                 });
 
 
@@ -1034,6 +1043,26 @@
                                     if (!form.checkValidity()) { form.reportValidity(); return; }
 
                                     const formData = new FormData(form);
+
+                                    // Validações obrigatórias adicionais (campos essenciais)
+                                    const requiredFields = [
+                                        { key: 'PROCESSO N.', label: 'Número do Processo' },
+                                        { key: 'STATUS', label: 'Status Inicial' },
+                                        { key: 'TIPO', label: 'Tipologia' },
+                                        { key: 'FISCAL', label: 'Fiscal Responsável' },
+                                        { key: 'DESCRIÇÃO', label: 'Descrição do Objeto' },
+                                        { key: 'CONTRATANTE', label: 'Contratante' },
+                                        { key: 'CONTRATADA', label: 'Contratada' },
+                                        { key: 'DATA DE ABERTURA', label: 'Data de Abertura' }
+                                    ];
+
+                                    for (const f of requiredFields) {
+                                        const v = formData.get(f.key);
+                                        if (!v || (typeof v === 'string' && v.trim() === '')) {
+                                            alert(`Campo obrigatório: ${f.label}`);
+                                            return;
+                                        }
+                                    }
                                     const numProcessoRaw = formData.get("PROCESSO N.");
                                     const numProcesso = numProcessoRaw ? numProcessoRaw.trim() : "";
 
@@ -1088,6 +1117,8 @@
 
                                     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> SALVANDO...';
 
+                                    const safeVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+
                                     const payload = {
                                         processo: numProcesso,
                                         tipo: formData.get("TIPO"),
@@ -1102,12 +1133,12 @@
                                         data_recebimento: dataParaISO(formData.get("DATA RECEBIMENTO")),
                                         data_compromisso_fiscal: dataParaISO(formData.get("DATA COMPROMISSO FISCAL")),
 
-                                        acresc_fiscal: parseMoneyInput(document.getElementById('acresc_fisc').value),
-                                        supress_fiscal: parseMoneyInput(document.getElementById('supress_fisc').value),
-                                        reperc_fiscal: parseMoneyInput(document.getElementById('reperc_fisc').value),
-                                        acresc_gecope: parseMoneyInput(document.getElementById('acresc_gec').value),
-                                        supress_gecope: parseMoneyInput(document.getElementById('supress_gec').value),
-                                        reperc_gecope: parseMoneyInput(document.getElementById('reperc_gec').value),
+                                        acresc_fiscal: parseMoneyInput(safeVal('acresc_fisc')),
+                                        supress_fiscal: parseMoneyInput(safeVal('supress_fisc')),
+                                        reperc_fiscal: parseMoneyInput(safeVal('reperc_fisc')),
+                                        acresc_gecope: parseMoneyInput(safeVal('acresc_gec')),
+                                        supress_gecope: parseMoneyInput(safeVal('supress_gec')),
+                                        reperc_gecope: parseMoneyInput(safeVal('reperc_gec')),
 
                                         // Audit: Criação
                                         criador: sessionStorage.getItem('sop_user_name') || 'Sistema',
@@ -1130,7 +1161,20 @@
                                         payload.data_compromisso_fiscal = metaCalculada.toISOString().substring(0, 10);
                                     }
 
-                                    const { data, error } = await sbClient.from('processos').insert([payload]);
+                                    let data = null; let error = null;
+                                    try {
+                                        if (!window.sbClient) throw new Error('Supabase client não inicializado');
+                                        const res = await sbClient.from('processos').insert([payload]);
+                                        data = res.data; error = res.error;
+                                    } catch (e) {
+                                        console.error('Erro ao inserir processo:', e);
+                                        msg.style.display = 'block';
+                                        msg.className = 'alert alert-danger mt-3';
+                                        msg.innerHTML = `Erro ao salvar: ${e.message || e}`;
+                                        btn.disabled = false;
+                                        btn.innerHTML = 'SALVAR';
+                                        return;
+                                    }
 
                                     if (error) {
                                         console.error(error);

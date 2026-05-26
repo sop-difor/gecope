@@ -308,6 +308,27 @@
         renderHBar("chart_tempo_por_tipo", topN(groupAvg(aprov, d => d.tipo, d => d.prazoDias), 20), "Dias (média)");
     }
 
+    // Clear helpers for filters (compat with legacy calls from main.js)
+    function clearGerencial() {
+        [ger.fiscal, ger.status].forEach(el => {
+            if (el) {
+                Array.from(el.options).forEach(o => o.selected = true);
+                renderMultiSelectUI(el);
+            }
+        });
+        updateGerencial();
+    }
+
+    function clearPrazos() {
+        [pr.fiscal, pr.status].forEach(el => {
+            if (el) {
+                Array.from(el.options).forEach(o => o.selected = true);
+                renderMultiSelectUI(el);
+            }
+        });
+        updatePrazos();
+    }
+
     // Agrupamentos e utilitários pequenos
     function groupCount(rows, kFn) { const c = {}; rows.forEach(r => { const k = kFn(r); c[k] = (c[k] || 0) + 1; }); return Object.keys(c).map(k => ({ key: k, value: c[k] })); }
     function groupAvg(rows, kFn, vFn) { const s = {}, c = {}; rows.forEach(r => { const k = kFn(r), v = vFn(r); if (isFiniteNumber(v)) { s[k] = (s[k] || 0) + v; c[k] = (c[k] || 0) + 1; } }); return Object.keys(s).map(k => ({ key: k, value: c[k] > 0 ? s[k] / c[k] : 0 })).filter(d => d.value > 0); }
@@ -337,6 +358,8 @@
     window.topN = topNArr;
     window.quantile = quantile;
     window.renderHBar = renderHBar;
+    window.clearGerencial = clearGerencial;
+    window.clearPrazos = clearPrazos;
 
 })(window);
 (function (window) {

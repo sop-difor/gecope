@@ -2566,8 +2566,140 @@
                                 </div>
                             </div>
 
-                            <script
-                                src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+                            <!-- Modal de Cadastro de Processo (layout consistente com GERENCIAR PROCESSO) -->
+                            <div class="modal fade" id="modalCadastro" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-dark text-white">
+                                            <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>NOVO PROCESSO</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4 bg-light-subtle">
+                                            <form id="formCadastro">
+                                                <div class="row g-4">
+                                                    <div class="col-lg-7">
+                                                        <div class="card border-0 shadow-sm mb-4">
+                                                            <div class="card-header bg-white py-3">
+                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES GERAIS</h6>
+                                                            </div>
+                                                            <div class="card-body">
+                                                                <div class="row g-3">
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Número do Processo</label>
+                                                                        <input name="PROCESSO N." type="text" class="form-control form-control-lg bg-light border-0 fw-bold text-primary" id="cad_processo" placeholder="00000.000000/0000-00" required oninput="this.value = mascaraProcesso(this.value)">
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Status Inicial</label>
+                                                                        <select name="STATUS" id="cad_status" class="form-select form-select-lg border-primary-subtle text-primary fw-bold" required>
+                                                                            <option value="" selected>Selecionar Status</option>
+                                                                            <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
+                                                                            <option value="EM ANÁLISE">EM ANÁLISE</option>
+                                                                            <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
+                                                                            <option value="EM REANÁLISE">EM REANÁLISE</option>
+                                                                            <option value="DEVOLVIDO P/ REANÁLISE FISCAL">DEVOLVIDO P/ REANÁLISE FISCAL</option>
+                                                                            <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
+                                                                            <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
+                                                                            <option value="APROVADO">APROVADO</option>
+                                                                            <option value="ARQUIVADO">ARQUIVADO</option>
+                                                                            <option value="CONTRATANTE">CONTRATANTE</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Tipologia</label>
+                                                                        <input name="TIPO" type="text" class="form-control" id="cad_tipo" required>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Fiscal Responsável</label>
+                                                                        <select name="FISCAL" id="cad-fiscal" class="form-select" required><option value="">Selecione...</option></select>
+                                                                    </div>
+                                                                    <div class="col-12">
+                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Descrição do Objeto</label>
+                                                                        <textarea name="DESCRIÇÃO" id="cad_descricao" class="form-control" rows="5" style="font-size: 0.9rem; min-height: 100px;" required></textarea>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="card border-0 shadow-sm">
+                                                            <div class="card-header bg-white py-3">
+                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack me-2 text-success"></i>ANÁLISE FINANCEIRA</h6>
+                                                            </div>
+                                                            <div class="card-body">
+                                                                <div class="row g-3">
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small text-muted">Acréscimo (FISCAL)</label>
+                                                                        <input id="acresc_fisc" class="form-control mask-money" value="0,00">
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small text-muted">Supressão (FISCAL)</label>
+                                                                        <input id="supress_fisc" class="form-control mask-money text-danger" value="0,00">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-lg-5">
+                                                        <div class="card border-0 shadow-sm mb-4">
+                                                            <div class="card-header bg-white py-3">
+                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-people me-2 text-info"></i>AGENTES DO CONTRATO</h6>
+                                                            </div>
+                                                            <div class="card-body">
+                                                                <div class="mb-3">
+                                                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Contratante</label>
+                                                                    <input name="CONTRATANTE" id="cad_contratante" class="form-control bg-light border-0" style="font-size: 0.9rem;">
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Contratada</label>
+                                                                    <input name="CONTRATADA" id="cad_contratada" class="form-control bg-light border-0" style="font-size: 0.9rem;">
+                                                                </div>
+                                                                <div class="mb-0">
+                                                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Analista Designado</label>
+                                                                    <select name="ANALISTA" id="cad_analista" class="form-select bg-light border-0" style="font-size: 0.9rem;">
+                                                                        <option value="">Selecione...</option>
+                                                                        <option value="N">Nildeno</option>
+                                                                        <option value="W">Walace</option>
+                                                                        <option value="P">Pedro</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="card border-0 shadow-sm mb-4">
+                                                            <div class="card-header bg-white py-3">
+                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA E METAS</h6>
+                                                            </div>
+                                                            <div class="card-body">
+                                                                <div class="row g-3">
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small text-muted mb-1">Data Abertura</label>
+                                                                        <input name="DATA DE ABERTURA" id="cad_data_abertura" class="form-control form-control-sm mask-date" placeholder="dd/mm/aaaa">
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <label class="form-label small text-muted mb-1">Recebimento</label>
+                                                                        <input name="DATA RECEBIMENTO" id="cad_data_recebimento" class="form-control form-control-sm mask-date" placeholder="dd/mm/aaaa">
+                                                                    </div>
+                                                                    <div class="col-12 mt-2">
+                                                                        <label class="form-label small text-muted mb-1">Meta Fiscal</label>
+                                                                        <input name="DATA COMPROMISSO FISCAL" id="cad_data_compromisso" class="form-control form-control-sm mask-date border-warning-subtle" placeholder="dd/mm/aaaa">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div id="msg-feedback" class="mt-3" style="display:none"></div>
+                                            </form>
+                                        </div>
+                                        <div class="modal-footer bg-light">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                            <button type="button" class="btn btn-success px-4" id="btn-salvar" onclick="enviarParaPlanilha()"><i class="bi bi-check-lg"></i> SALVAR</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
                             <div class="modal fade" id="modalAtenderRevisao" tabindex="-1">
                                 <div class="modal-dialog">
