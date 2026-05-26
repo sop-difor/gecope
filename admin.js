@@ -104,6 +104,37 @@
             });
             const actives = data.filter(u => u.role !== 'pending');
 
+            // Also fetch new_user_request notifications to surface requests that did not create app_users
+            let notifPendings = [];
+            try {
+                const { data: notes, error: notesErr } = await sbClient.from('app_notifications').select('id,type,payload,read,created_at').eq('type', 'new_user_request').order('created_at', { ascending: false }).limit(200);
+                if (!notesErr && Array.isArray(notes)) {
+                    for (const n of notes) {
+                        let parsed = null;
+                        try { parsed = JSON.parse(n.payload || '{}'); } catch (e) { parsed = null; }
+                        const matricula = parsed?.matricula || null;
+                        const nome = parsed?.nome || null;
+                        const email = matricula ? `${matricula}@gecope.app` : null;
+
+                        // Check if there is an app_user with this matricula/email
+                        const found = data.find(u => (u.matricula && matricula && String(u.matricula) === String(matricula)) || (u.email && email && u.email.toLowerCase() === email.toLowerCase()));
+
+                        // Only surface if no app_user exists OR existing user is not active (not approved)
+                        if (!found || (found && found.role === 'pending')) {
+                            notifPendings.push({
+                                id: found?.id || null,
+                                email: email || (found ? found.email : 'N/A'),
+                                matricula: matricula,
+                                nome: nome,
+                                created_at: n.created_at,
+                                notif_id: n.id,
+                                notification_raw: n
+                            });
+                        }
+                    }
+                }
+            } catch (e) { console.error('Erro ao buscar notificações de cadastro:', e); }
+
             const roleOrder = { 'admin': 1, 'fiscal': 2, 'gerente': 3, 'externo': 4 };
             actives.sort((a, b) => {
                 const orderA = roleOrder[a.role] || 99;
@@ -114,14 +145,17 @@
                 return nameA.localeCompare(nameB, 'pt-BR');
             });
 
+            const totalPending = pendings.length + notifPendings.length;
             if (statTotal) statTotal.textContent = data.length;
-            if (statPending) statPending.textContent = pendings.length;
+            if (statPending) statPending.textContent = totalPending;
             if (statAdmins) statAdmins.textContent = data.filter(u => u.role === 'admin').length;
             if (statOthers) statOthers.textContent = data.filter(u => u.role !== 'admin' && u.role !== 'pending').length;
-            if (pendingTabBadge) pendingTabBadge.textContent = pendings.length;
-            if (sectionPending) sectionPending.style.display = pendings.length > 0 ? 'block' : 'none';
+            if (pendingTabBadge) pendingTabBadge.textContent = totalPending;
+            if (sectionPending) sectionPending.style.display = totalPending > 0 ? 'block' : 'none';
 
             tbodyPending.innerHTML = '';
+
+            // Render pending users from app_users
             pendings.forEach(u => {
                 const dataSolic = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : 'N/A';
                 const nomeComp = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'N/A').toUpperCase();
@@ -146,6 +180,39 @@
                                 <i class="bi bi-check-lg me-1"></i> Aprovar
                             </button>
                             <button class="btn btn-sm btn-outline-danger" onclick="excluirUsuario('${u.email}')" title="Recusar">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbodyPending.appendChild(tr);
+            });
+
+            // Render pending requests coming from notifications (not yet present in app_users)
+            notifPendings.forEach((n, idx) => {
+                const dataSolic = n.created_at ? new Date(n.created_at).toLocaleDateString('pt-BR') : 'N/A';
+                const nomeComp = (n.nome || 'N/A').toUpperCase();
+                const tr = document.createElement('tr');
+                const selectId = `role-notif-${n.notif_id || idx}`;
+                tr.innerHTML = `
+                    <td class="ps-4">
+                        <div class="fw-bold text-dark">${nomeComp} <small class="text-muted">(notificação)</small></div>
+                        <div class="small text-muted">${n.matricula ? (n.matricula + '@gecope.app') : 'sem matrícula'}</div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${n.matricula || '-'}</span></td>
+                    <td><span class="text-muted small">${dataSolic}</span></td>
+                    <td class="text-end pe-4">
+                        <div class="d-flex justify-content-end gap-2">
+                            <select class="form-select form-select-sm" style="width: 120px;" id="${selectId}">
+                                <option value="externo">EXTERNO</option>
+                                <option value="fiscal">FISCAL</option>
+                                <option value="gerente">GERENTE</option>
+                                <option value="admin">ADMIN</option>
+                            </select>
+                            <button class="btn btn-sm btn-success" onclick="aprovarFromNotification('${n.notif_id}', document.getElementById('${selectId}').value, '${n.matricula}', '${(n.nome||'').replace(/'/g,'&#39;')}')">
+                                <i class="bi bi-check-lg me-1"></i> Aprovar
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="recusarNotification('${n.notif_id}')" title="Recusar">
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
@@ -356,6 +423,95 @@
         } catch (e) { alert('Erro ao excluir: ' + e.message); }
     }
 
+    async function aprovarFromNotification(notifId, role, matricula, nome) {
+        if (!notifId) return alert('Notificação inválida.');
+        if (!confirm(`Confirmar aprovação de ${matricula || nome} como ${role.toUpperCase()}?`)) return;
+        try {
+            // Call server-side approve endpoint to perform insertion using service_role
+            const endpoint = window.APPROVE_USER_ENDPOINT || '/.netlify/functions/approve-user';
+            // get current access token
+            let token = null;
+            try {
+                const s = await sbClient.auth.getSession();
+                token = s?.data?.session?.access_token || null;
+            } catch (e) { token = null; }
+
+            let success = false;
+            let errorMsg = '';
+
+            try {
+                const resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify({ notifId, role, matricula, nome })
+                });
+
+                if (resp.ok) {
+                    success = true;
+                } else {
+                    const text = await resp.text();
+                    let body = null;
+                    try { body = JSON.parse(text); } catch (e) { body = text; }
+                    errorMsg = body?.error || (typeof body === 'string' ? body : null) || `HTTP ${resp.status}`;
+                }
+            } catch (fetchErr) {
+                errorMsg = fetchErr.message || String(fetchErr);
+            }
+
+            if (!success) {
+                console.warn('[ADMIN] Falha ao chamar endpoint de aprovação. Tentando inserção direta via sbClient...', errorMsg);
+                
+                // Inserção direta via frontend como fallback (caso não utilize a função servidora localmente)
+                const emailToCreate = matricula ? `${matricula}@gecope.app` : `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`;
+                const payload = {
+                    email: emailToCreate,
+                    matricula: matricula || null,
+                    nome: nome || null,
+                    sobrenome: null,
+                    role: role || 'externo',
+                    created_at: new Date().toISOString()
+                };
+
+                // 1. Insere o usuário na tabela
+                const { error: insertErr } = await sbClient.from('app_users').insert([payload]);
+                if (insertErr) {
+                    throw new Error(`Erro na inserção direta: ${insertErr.message} (Tentativa original falhou com: ${errorMsg})`);
+                }
+
+                // 2. Marca notificação de solicitação como lida
+                if (notifId) {
+                    const { error: notifErr } = await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
+                    if (notifErr) {
+                        console.error('[ADMIN] Erro ao marcar notificação como lida:', notifErr);
+                    }
+                }
+                success = true;
+            }
+
+            alert('Usuário criado e aprovado com sucesso.');
+            if (typeof loadAllUsers === 'function') loadAllUsers();
+            if (typeof fetchPendingCount === 'function') fetchPendingCount();
+        } catch (e) {
+            console.error('Erro ao aprovar via notificação:', e);
+            alert('Erro ao aprovar: ' + (e.message || String(e)));
+        }
+    }
+
+    async function recusarNotification(notifId) {
+        if (!notifId) return;
+        if (!confirm('Recusar esta solicitação?')) return;
+        try {
+            const { error } = await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
+            if (error) throw error;
+            alert('Solicitação recusada.');
+            if (typeof loadAllUsers === 'function') loadAllUsers();
+            if (typeof fetchPendingCount === 'function') fetchPendingCount();
+        } catch (e) { alert('Erro ao recusar: ' + (e.message || String(e))); }
+    }
+
     function filterAdminUsers() {
         const term = document.getElementById('admin-user-search').value.toLowerCase();
         const rows = document.querySelectorAll('#admin-users-table-body tr[data-search]');
@@ -406,6 +562,81 @@
         } catch (err) { console.error('Erro ao buscar notificações', err); }
     }
 
+    // Open pending section (used by clickable stat card)
+    async function openAdminPendings() {
+        try {
+            if (typeof loadAllUsers === 'function') await loadAllUsers();
+            const sec = document.getElementById('admin-pending-section');
+            if (sec) {
+                // ensure visible even when zero so admin can see message
+                sec.style.display = 'block';
+                try { const closeBtn = document.getElementById('admin-pending-close-btn'); if (closeBtn) { closeBtn.style.display = 'inline-block'; const icon = closeBtn.querySelector('i'); if (icon) icon.className = 'bi bi-chevron-up'; } } catch(e){}
+                sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                alert('Seção de pendentes não encontrada.');
+            }
+        } catch (e) { console.error('Erro ao abrir pendentes:', e); alert('Erro ao abrir pendentes: ' + (e.message || e)); }
+    }
+
+    // Diagnostic helper: fetch raw user rows and notifications (shows modal with JSON)
+    async function diagnosePendingFetch() {
+        try {
+            const outEl = document.getElementById('admin-diag-output');
+            if (outEl) outEl.textContent = 'Executando diagnóstico...';
+
+            const results = {};
+
+            try {
+                const { data, error } = await sbClient.from('app_users').select('id,email,role,matricula,created_at').order('created_at', { ascending: false }).limit(50);
+                results.users = data || null;
+                results.users_error = error ? (error.message || String(error)) : null;
+            } catch (e) { results.users_error = String(e); }
+
+            try {
+                const { data: notes, error: noteErr } = await sbClient.from('app_notifications').select('id,type,payload,read,created_at').order('created_at', { ascending: false }).limit(50);
+                results.notifications = notes || null;
+                results.notifications_error = noteErr ? (noteErr.message || String(noteErr)) : null;
+            } catch (e) { results.notifications_error = String(e); }
+
+            // Add Supabase client / auth state info
+            try {
+                results.sbClient_exists = !!window.sbClient;
+                if (window.sbClient && window.sbClient.auth) {
+                    try {
+                        const sessionResp = await window.sbClient.auth.getSession();
+                        results.auth_session = sessionResp || null;
+                    } catch (sErr) { results.auth_session_error = String(sErr); }
+
+                    try {
+                        const userResp = await window.sbClient.auth.getUser();
+                        results.auth_user = userResp || null;
+                    } catch (uErr) { results.auth_user_error = String(uErr); }
+                }
+            } catch (e) { results.sbclient_error = String(e); }
+
+            // Add local sessionStorage hints
+            try {
+                results.sessionStorage = {
+                    sop_user: sessionStorage.getItem('sop_user'),
+                    sop_role: sessionStorage.getItem('sop_role'),
+                    is_admin_gecope: sessionStorage.getItem('is_admin_gecope')
+                };
+            } catch (e) { results.sessionStorage_error = String(e); }
+
+            if (outEl) outEl.textContent = JSON.stringify(results, null, 2);
+            const modalEl = document.getElementById('modalAdminDiag');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            } else {
+                alert('Diagnóstico executado. Veja console para detalhes.');
+            }
+        } catch (err) {
+            console.error('Erro no diagnóstico:', err);
+            alert('Erro ao executar diagnóstico: ' + err.message);
+        }
+    }
+
     async function promoteAdmin99030487() {
         const targetEmail = '99030487@gecope.app';
         try {
@@ -438,6 +669,11 @@
     window.fetchPendingCount = fetchPendingCount;
     window.fetchNotifications = fetchNotifications;
     window.promoteAdmin99030487 = promoteAdmin99030487;
+    window.aprovarFromNotification = aprovarFromNotification;
+    window.recusarNotification = recusarNotification;
+    window.diagnosePendingFetch = diagnosePendingFetch;
+    window.diagnosePendingFetch = diagnosePendingFetch;
+    window.openAdminPendings = openAdminPendings;
 
     // Init actions
     document.addEventListener('DOMContentLoaded', () => {
@@ -564,12 +800,13 @@
                 return nameA.localeCompare(nameB, 'pt-BR');
             });
 
+            const totalPending = pendings.length + notifPendings.length;
             if (statTotal) statTotal.textContent = data.length;
-            if (statPending) statPending.textContent = pendings.length;
+            if (statPending) statPending.textContent = totalPending;
             if (statAdmins) statAdmins.textContent = data.filter(u => u.role === 'admin').length;
             if (statOthers) statOthers.textContent = data.filter(u => u.role !== 'admin' && u.role !== 'pending').length;
-            if (pendingTabBadge) pendingTabBadge.textContent = pendings.length;
-            if (sectionPending) sectionPending.style.display = pendings.length > 0 ? 'block' : 'none';
+            if (pendingTabBadge) pendingTabBadge.textContent = totalPending;
+            if (sectionPending) sectionPending.style.display = totalPending > 0 ? 'block' : 'none';
 
             tbodyPending.innerHTML = '';
             pendings.forEach(u => {

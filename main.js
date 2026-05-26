@@ -11,6 +11,16 @@
                                         document.body.classList.remove('login-active');
                                     }
                                 }
+                            
+                                function hideAdminPendings() {
+                                    const sec = document.getElementById('admin-pending-section');
+                                    if (sec) sec.style.display = 'none';
+                                    const closeBtn = document.getElementById('admin-pending-close-btn');
+                                    if (closeBtn) {
+                                        const icon = closeBtn.querySelector('i');
+                                        if (icon) icon.className = 'bi bi-chevron-down';
+                                    }
+                                }
 
                                 /**
                                  * Calcular Dias Devolução - Função faltava, adicionada
@@ -1650,6 +1660,8 @@
                                     }
                                     if (paneId === 'pane-admin') {
                                         if (typeof loadAllUsers === 'function') loadAllUsers();
+                                        // also ensure close button hidden if no pendings
+                                        try { const cb = document.getElementById('admin-pending-close-btn'); if (cb) cb.style.display = 'none'; } catch(e){}
                                     }
                                     if (paneId === 'pane-atividades') {
                                         if (typeof carregarAtividades === 'function') carregarAtividades();
@@ -2618,13 +2630,14 @@
                                         const { data, error } = await sbClient.auth.signUp(options);
 
                                         if (error) {
-                                            alert('Erro ao realizar cadastro: ' + error.message);
-                                            return;
+                                            console.error('[SIGNUP] Erro no Auth.signUp:', error);
+                                            alert('Erro ao realizar cadastro (Auth): ' + (error.message || String(error)));
+                                            return false;
                                         }
 
                                         // 2. Criar registro na tabela app_users (com novas colunas)
                                         // Obs: Assume-se que a tabela foi ajustada para ter matricula/nome/sobrenome
-                                        await sbClient.from('app_users').insert([{
+                                        const { data: insertData, error: insertError } = await sbClient.from('app_users').insert([{
                                             email: email, // Mantém email para vínculo
                                             matricula: matricula,
                                             nome: nome,
@@ -2634,9 +2647,19 @@
                                             created_at: new Date().toISOString()
                                         }]);
 
-                                        await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}` }), created_at: new Date().toISOString(), read: false }]);
+                                        if (insertError) {
+                                            console.error('[SIGNUP] Erro ao inserir app_users:', insertError);
+                                            alert('Erro ao registrar solicitação (DB): ' + (insertError.message || String(insertError)));
+                                            return false;
+                                        }
+
+                                        const { data: noteData, error: noteError } = await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}` }), created_at: new Date().toISOString(), read: false }]);
+                                        if (noteError) {
+                                            console.warn('[SIGNUP] Falha ao inserir notificação:', noteError);
+                                        }
 
                                         alert(`Solicitação enviada para a matrícula ${matricula}.\nAguarde aprovação do Admin!`);
+                                        return true;
                                     } catch (err) { console.error(err); alert('Erro inesperado ao solicitar acesso.'); }
                                 }
 
@@ -3029,15 +3052,42 @@
                                             return nameA.localeCompare(nameB, 'pt-BR');
                                         });
 
+                                        // Também verifica notificações de cadastro para somar pendentes
+                                        let notifPendingCount = 0;
+                                        try {
+                                            const { data: notes, error: notesErr } = await sbClient.from('app_notifications').select('id,payload,read,created_at').eq('type', 'new_user_request').limit(500);
+                                            if (!notesErr && Array.isArray(notes) && notes.length) {
+                                                for (const n of notes) {
+                                                    let parsed = null;
+                                                    try { parsed = JSON.parse(n.payload || '{}'); } catch (e) { parsed = null; }
+                                                    const matricula = parsed?.matricula || null;
+                                                    const email = matricula ? `${matricula}@gecope.app` : null;
+                                                    const found = data.find(u => (u.matricula && matricula && String(u.matricula) === String(matricula)) || (u.email && email && u.email.toLowerCase() === (email || '').toLowerCase()));
+                                                    if (!found) notifPendingCount++;
+                                                }
+                                            }
+                                        } catch (e) { console.warn('Erro ao buscar notificações pendentes:', e); }
+
                                         // Atualiza Indicadores
+                                        const totalPending = pendings.length + notifPendingCount;
                                         if (statTotal) statTotal.textContent = data.length;
-                                        if (statPending) statPending.textContent = pendings.length;
+                                        if (statPending) statPending.textContent = totalPending;
                                         if (statAdmins) statAdmins.textContent = data.filter(u => u.role === 'admin').length;
                                         if (statOthers) statOthers.textContent = data.filter(u => u.role !== 'admin' && u.role !== 'pending').length;
-                                        if (pendingTabBadge) pendingTabBadge.textContent = pendings.length;
+                                        if (pendingTabBadge) pendingTabBadge.textContent = totalPending;
 
-                                        // Exibe seção de pendentes se houver solicitações
-                                        if (sectionPending) sectionPending.style.display = pendings.length > 0 ? 'block' : 'none';
+                                        // Exibe seção de pendentes se houver solicitações (inclui notificações)
+                                        if (sectionPending) sectionPending.style.display = totalPending > 0 ? 'block' : 'none';
+
+                                        // Atualiza ícone do botão de fechar (se presente)
+                                        try {
+                                            const closeBtn = document.getElementById('admin-pending-close-btn');
+                                            if (closeBtn) {
+                                                closeBtn.style.display = totalPending > 0 ? 'inline-block' : 'none';
+                                                const icon = closeBtn.querySelector('i');
+                                                if (icon) icon.className = 'bi bi-chevron-up';
+                                            }
+                                        } catch (e) { /* ignore */ }
 
                                         // Renderizar Pendentes
                                         tbodyPending.innerHTML = '';
@@ -3575,6 +3625,9 @@
                                     const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalModuleSelector'));
                                     modal.show();
                                 }
+
+// Expose helper to global (for onclick from HTML)
+try { window.hideAdminPendings = hideAdminPendings; } catch(e) { /* ignore */ }
 
                                 // Botão do cabeçalho agora abre seleção se estiver logado, ou landing se não
                                 document.getElementById('btn-admin-login')?.addEventListener('click', () => {

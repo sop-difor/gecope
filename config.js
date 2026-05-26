@@ -6,3 +6,5 @@
     window.EVO_API_URL = 'https://evolution-api-production-1522.up.railway.app';
     window.EVO_API_KEY = 'sopgecope2026';
     window.EVO_INSTANCE = 'SOP';
+    // Endpoint público onde a função de aprovação será deployada. Configure após deploy.
+    window.APPROVE_USER_ENDPOINT = window.APPROVE_USER_ENDPOINT || '';

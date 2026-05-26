@@ -7,12 +7,14 @@
     <meta content="width=device-width, initial-scale=1" name="viewport" />
 
     <!-- Fontes e Estilos Externos -->
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <!-- Preload da imagem de fundo -->
-    <link rel="preload" as="image" href="https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/unnamed22.jpg">
+    <link rel="preload" as="image"
+        href="https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/unnamed22.jpg">
 
     <!-- NOSSO NOVO ARQUIVO DE ESTILOS MODULARIZADO (A Mágica acontece aqui!) -->
     <link rel="stylesheet" href="style.css">
@@ -21,7 +23,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"
+        defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
     <script src="https://unpkg.com/docx@7.1.0/build/index.js" defer></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer></script>
@@ -109,6 +112,28 @@
                 <div>
                     <div class="sop-title-main">SUPERINTENDNCIA DE OBRAS PBLICAS</div>
                     <div class="sop-title-sub">Governo do Estado do Ceará Secretaria das Cidades</div>
+                </div>
+
+                <!-- Modal Diagnóstico Admin -->
+                <div class="modal fade" id="modalAdminDiag" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header bg-secondary text-white">
+                                <h5 class="modal-title">Diagnóstico: Verificação de Pendentes</h5>
+                                <button type="button" class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="small text-muted">Resultado bruto das consultas (até 50 registros).</p>
+                                <pre id="admin-diag-output"
+                                    style="white-space:pre-wrap; word-break:break-word; max-height:60vh; overflow:auto; background:#f8f9fa; padding:12px; border-radius:6px;">Aguardando diagnóstico...</pre>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="sop-header-right d-flex align-items-center gap-3">
@@ -210,6 +235,8 @@
                                 <i class="bi bi-graph-up-arrow"></i>
                             </div>
                         </div>
+
+                        <!-- diagnóstico removido para retornar layout anterior -->
                         <div class="home-stat-card">
                             <div class="home-stat-info">
                                 <h4>Processos Em Análise</h4>
@@ -333,7 +360,8 @@
                                 </div>
                             </div>
                             <div class="col-6 col-md-3">
-                                <div class="admin-stat-card shadow-sm">
+                                <div class="admin-stat-card shadow-sm" id="admin-stat-card-pendentes"
+                                    style="cursor:pointer;" onclick="openAdminPendings()">
                                     <div class="admin-stat-icon-wrapper icon-bg-orange">
                                         <i class="bi bi-person-plus fs-4"></i>
                                     </div>
@@ -375,6 +403,10 @@
                                 </h5>
                                 <span class="badge bg-warning text-dark rounded-pill"
                                     id="admin-pending-badge-tab">0</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-auto" id="admin-pending-close-btn"
+                                    onclick="hideAdminPendings()" title="Fechar painel de pendentes">
+                                    <i class="bi bi-chevron-up"></i>
+                                </button>
                             </div>
                             <div class="card border-0 shadow-sm mb-4 overflow-hidden" style="border-radius: 12px;">
                                 <div class="table-responsive">
@@ -2210,17 +2242,20 @@
                                             </table>
                                         </div>
                                     </div>
-                                    <div class="card-footer bg-light d-flex flex-wrap justify-content-around align-items-center">
+                                    <div
+                                        class="card-footer bg-light d-flex flex-wrap justify-content-around align-items-center">
                                         <div class="text-center">
                                             <small class="text-muted d-block" style="font-size:0.7rem">MATERIAL</small>
                                             <span class="fw-bold text-secondary" id="total-material">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">MÃO DE OBRA</small>
+                                            <small class="text-muted d-block" style="font-size:0.7rem">MÃO DE
+                                                OBRA</small>
                                             <span class="fw-bold text-secondary" id="total-mao-de-obra">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">EQUIPAMENTOS</small>
+                                            <small class="text-muted d-block"
+                                                style="font-size:0.7rem">EQUIPAMENTOS</small>
                                             <span class="fw-bold text-secondary" id="total-equipamentos">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
@@ -2232,11 +2267,13 @@
                                             <span class="fw-bold text-primary" id="total-bdi">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">TOTAL DESC.</small>
+                                            <small class="text-muted d-block" style="font-size:0.7rem">TOTAL
+                                                DESC.</small>
                                             <span class="fw-bold text-danger" id="total-desconto">R$ 0,00</span>
                                         </div>
                                         <div class="border-start ps-3 text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">CUSTO TOTAL UNIT.</small>
+                                            <small class="text-muted d-block" style="font-size:0.7rem">CUSTO TOTAL
+                                                UNIT.</small>
                                             <span class="fw-bold text-success fs-5" id="total-geral">R$ 0,00</span>
                                         </div>
                                     </div>
@@ -2567,12 +2604,14 @@
                             </div>
 
                             <!-- Modal de Cadastro de Processo (layout consistente com GERENCIAR PROCESSO) -->
-                            <div class="modal fade" id="modalCadastro" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                            <div class="modal fade" id="modalCadastro" tabindex="-1" aria-hidden="true"
+                                data-bs-backdrop="static">
                                 <div class="modal-dialog modal-xl modal-dialog-scrollable">
                                     <div class="modal-content">
                                         <div class="modal-header bg-dark text-white">
                                             <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>NOVO PROCESSO</h5>
-                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            <button type="button" class="btn-close btn-close-white"
+                                                data-bs-dismiss="modal"></button>
                                         </div>
                                         <div class="modal-body p-4 bg-light-subtle">
                                             <form id="formCadastro">
@@ -2580,41 +2619,80 @@
                                                     <div class="col-lg-7">
                                                         <div class="card border-0 shadow-sm mb-4">
                                                             <div class="card-header bg-white py-3">
-                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES GERAIS</h6>
+                                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                                        class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES
+                                                                    GERAIS</h6>
                                                             </div>
                                                             <div class="card-body">
                                                                 <div class="row g-3">
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Número do Processo</label>
-                                                                        <input name="PROCESSO N." type="text" class="form-control form-control-lg bg-light border-0 fw-bold text-primary" id="cad_processo" placeholder="00000.000000/0000-00" required oninput="this.value = mascaraProcesso(this.value)">
+                                                                        <label
+                                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                                            style="font-size: 0.7rem;">Número do
+                                                                            Processo</label>
+                                                                        <input name="PROCESSO N." type="text"
+                                                                            class="form-control form-control-lg bg-light border-0 fw-bold text-primary"
+                                                                            id="cad_processo"
+                                                                            placeholder="00000.000000/0000-00" required
+                                                                            oninput="this.value = mascaraProcesso(this.value)">
                                                                     </div>
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Status Inicial</label>
-                                                                        <select name="STATUS" id="cad_status" class="form-select form-select-lg border-primary-subtle text-primary fw-bold" required>
-                                                                            <option value="" selected>Selecionar Status</option>
-                                                                            <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
-                                                                            <option value="EM ANÁLISE">EM ANÁLISE</option>
-                                                                            <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
-                                                                            <option value="EM REANÁLISE">EM REANÁLISE</option>
-                                                                            <option value="DEVOLVIDO P/ REANÁLISE FISCAL">DEVOLVIDO P/ REANÁLISE FISCAL</option>
-                                                                            <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
-                                                                            <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
+                                                                        <label
+                                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                                            style="font-size: 0.7rem;">Status
+                                                                            Inicial</label>
+                                                                        <select name="STATUS" id="cad_status"
+                                                                            class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
+                                                                            required>
+                                                                            <option value="" selected>Selecionar Status
+                                                                            </option>
+                                                                            <option value="AGUAR. ANÁLISE">AGUAR.
+                                                                                ANÁLISE</option>
+                                                                            <option value="EM ANÁLISE">EM ANÁLISE
+                                                                            </option>
+                                                                            <option value="AGUAR. REANÁLISE">AGUAR.
+                                                                                REANÁLISE</option>
+                                                                            <option value="EM REANÁLISE">EM REANÁLISE
+                                                                            </option>
+                                                                            <option
+                                                                                value="DEVOLVIDO P/ REANÁLISE FISCAL">
+                                                                                DEVOLVIDO P/ REANÁLISE FISCAL</option>
+                                                                            <option value="ANÁLISE FISCAL">ANÁLISE
+                                                                                FISCAL</option>
+                                                                            <option value="AGUAR. APROVAÇÃO">AGUAR.
+                                                                                APROVAÇÃO</option>
                                                                             <option value="APROVADO">APROVADO</option>
                                                                             <option value="ARQUIVADO">ARQUIVADO</option>
-                                                                            <option value="CONTRATANTE">CONTRATANTE</option>
+                                                                            <option value="CONTRATANTE">CONTRATANTE
+                                                                            </option>
                                                                         </select>
                                                                     </div>
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Tipologia</label>
-                                                                        <input name="TIPO" type="text" class="form-control" id="cad_tipo" required>
+                                                                        <label
+                                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                                            style="font-size: 0.7rem;">Tipologia</label>
+                                                                        <input name="TIPO" type="text"
+                                                                            class="form-control" id="cad_tipo" required>
                                                                     </div>
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Fiscal Responsável</label>
-                                                                        <select name="FISCAL" id="cad-fiscal" class="form-select" required><option value="">Selecione...</option></select>
+                                                                        <label
+                                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                                            style="font-size: 0.7rem;">Fiscal
+                                                                            Responsável</label>
+                                                                        <select name="FISCAL" id="cad-fiscal"
+                                                                            class="form-select" required>
+                                                                            <option value="">Selecione...</option>
+                                                                        </select>
                                                                     </div>
                                                                     <div class="col-12">
-                                                                        <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Descrição do Objeto</label>
-                                                                        <textarea name="DESCRIÇÃO" id="cad_descricao" class="form-control" rows="5" style="font-size: 0.9rem; min-height: 100px;" required></textarea>
+                                                                        <label
+                                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                                            style="font-size: 0.7rem;">Descrição do
+                                                                            Objeto</label>
+                                                                        <textarea name="DESCRIÇÃO" id="cad_descricao"
+                                                                            class="form-control" rows="5"
+                                                                            style="font-size: 0.9rem; min-height: 100px;"
+                                                                            required></textarea>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2622,17 +2700,27 @@
 
                                                         <div class="card border-0 shadow-sm">
                                                             <div class="card-header bg-white py-3">
-                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-cash-stack me-2 text-success"></i>ANÁLISE FINANCEIRA</h6>
+                                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                                        class="bi bi-cash-stack me-2 text-success"></i>ANÁLISE
+                                                                    FINANCEIRA</h6>
                                                             </div>
                                                             <div class="card-body">
                                                                 <div class="row g-3">
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small text-muted">Acréscimo (FISCAL)</label>
-                                                                        <input id="acresc_fisc" class="form-control mask-money" value="0,00">
+                                                                        <label
+                                                                            class="form-label small text-muted">Acréscimo
+                                                                            (FISCAL)</label>
+                                                                        <input id="acresc_fisc"
+                                                                            class="form-control mask-money"
+                                                                            value="0,00">
                                                                     </div>
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small text-muted">Supressão (FISCAL)</label>
-                                                                        <input id="supress_fisc" class="form-control mask-money text-danger" value="0,00">
+                                                                        <label
+                                                                            class="form-label small text-muted">Supressão
+                                                                            (FISCAL)</label>
+                                                                        <input id="supress_fisc"
+                                                                            class="form-control mask-money text-danger"
+                                                                            value="0,00">
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2642,20 +2730,35 @@
                                                     <div class="col-lg-5">
                                                         <div class="card border-0 shadow-sm mb-4">
                                                             <div class="card-header bg-white py-3">
-                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-people me-2 text-info"></i>AGENTES DO CONTRATO</h6>
+                                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                                        class="bi bi-people me-2 text-info"></i>AGENTES
+                                                                    DO CONTRATO</h6>
                                                             </div>
                                                             <div class="card-body">
                                                                 <div class="mb-3">
-                                                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Contratante</label>
-                                                                    <input name="CONTRATANTE" id="cad_contratante" class="form-control bg-light border-0" style="font-size: 0.9rem;">
+                                                                    <label
+                                                                        class="form-label small fw-bold text-muted text-uppercase"
+                                                                        style="font-size: 0.7rem;">Contratante</label>
+                                                                    <input name="CONTRATANTE" id="cad_contratante"
+                                                                        class="form-control bg-light border-0"
+                                                                        style="font-size: 0.9rem;">
                                                                 </div>
                                                                 <div class="mb-3">
-                                                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Contratada</label>
-                                                                    <input name="CONTRATADA" id="cad_contratada" class="form-control bg-light border-0" style="font-size: 0.9rem;">
+                                                                    <label
+                                                                        class="form-label small fw-bold text-muted text-uppercase"
+                                                                        style="font-size: 0.7rem;">Contratada</label>
+                                                                    <input name="CONTRATADA" id="cad_contratada"
+                                                                        class="form-control bg-light border-0"
+                                                                        style="font-size: 0.9rem;">
                                                                 </div>
                                                                 <div class="mb-0">
-                                                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Analista Designado</label>
-                                                                    <select name="ANALISTA" id="cad_analista" class="form-select bg-light border-0" style="font-size: 0.9rem;">
+                                                                    <label
+                                                                        class="form-label small fw-bold text-muted text-uppercase"
+                                                                        style="font-size: 0.7rem;">Analista
+                                                                        Designado</label>
+                                                                    <select name="ANALISTA" id="cad_analista"
+                                                                        class="form-select bg-light border-0"
+                                                                        style="font-size: 0.9rem;">
                                                                         <option value="">Selecione...</option>
                                                                         <option value="N">Nildeno</option>
                                                                         <option value="W">Walace</option>
@@ -2667,21 +2770,37 @@
 
                                                         <div class="card border-0 shadow-sm mb-4">
                                                             <div class="card-header bg-white py-3">
-                                                                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA E METAS</h6>
+                                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                                        class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA
+                                                                    E METAS</h6>
                                                             </div>
                                                             <div class="card-body">
                                                                 <div class="row g-3">
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small text-muted mb-1">Data Abertura</label>
-                                                                        <input name="DATA DE ABERTURA" id="cad_data_abertura" class="form-control form-control-sm mask-date" placeholder="dd/mm/aaaa">
+                                                                        <label
+                                                                            class="form-label small text-muted mb-1">Data
+                                                                            Abertura</label>
+                                                                        <input name="DATA DE ABERTURA"
+                                                                            id="cad_data_abertura"
+                                                                            class="form-control form-control-sm mask-date"
+                                                                            placeholder="dd/mm/aaaa">
                                                                     </div>
                                                                     <div class="col-md-6">
-                                                                        <label class="form-label small text-muted mb-1">Recebimento</label>
-                                                                        <input name="DATA RECEBIMENTO" id="cad_data_recebimento" class="form-control form-control-sm mask-date" placeholder="dd/mm/aaaa">
+                                                                        <label
+                                                                            class="form-label small text-muted mb-1">Recebimento</label>
+                                                                        <input name="DATA RECEBIMENTO"
+                                                                            id="cad_data_recebimento"
+                                                                            class="form-control form-control-sm mask-date"
+                                                                            placeholder="dd/mm/aaaa">
                                                                     </div>
                                                                     <div class="col-12 mt-2">
-                                                                        <label class="form-label small text-muted mb-1">Meta Fiscal</label>
-                                                                        <input name="DATA COMPROMISSO FISCAL" id="cad_data_compromisso" class="form-control form-control-sm mask-date border-warning-subtle" placeholder="dd/mm/aaaa">
+                                                                        <label
+                                                                            class="form-label small text-muted mb-1">Meta
+                                                                            Fiscal</label>
+                                                                        <input name="DATA COMPROMISSO FISCAL"
+                                                                            id="cad_data_compromisso"
+                                                                            class="form-control form-control-sm mask-date border-warning-subtle"
+                                                                            placeholder="dd/mm/aaaa">
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -2692,14 +2811,18 @@
                                             </form>
                                         </div>
                                         <div class="modal-footer bg-light">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                                            <button type="button" class="btn btn-success px-4" id="btn-salvar" onclick="enviarParaPlanilha()"><i class="bi bi-check-lg"></i> SALVAR</button>
+                                            <button type="button" class="btn btn-secondary"
+                                                data-bs-dismiss="modal">Fechar</button>
+                                            <button type="button" class="btn btn-success px-4" id="btn-salvar"
+                                                onclick="enviarParaPlanilha()"><i class="bi bi-check-lg"></i>
+                                                SALVAR</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+                            <script
+                                src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
                             <div class="modal fade" id="modalAtenderRevisao" tabindex="-1">
                                 <div class="modal-dialog">
@@ -3195,21 +3318,21 @@
                                                                         </div>
                                                                     </div>
 
-                        
 
-<script src="config.js"></script>
 
-<script src="whatsapp.js"></script>
-<script src="relatorio.js"></script>
+                                                                    <script src="config.js"></script>
 
-<!-- Modularized app scripts (load order matters) -->
-<script src="utils.js"></script>
-<script src="database.js"></script>
-<script src="dashboard.js"></script>
-<script src="admin.js"></script>
+                                                                    <script src="whatsapp.js"></script>
+                                                                    <script src="relatorio.js"></script>
 
-<script src="app.js"></script>
-<script src="main.js"></script>
+                                                                    <!-- Modularized app scripts (load order matters) -->
+                                                                    <script src="utils.js"></script>
+                                                                    <script src="database.js"></script>
+                                                                    <script src="dashboard.js"></script>
+                                                                    <script src="admin.js"></script>
+
+                                                                    <script src="app.js"></script>
+                                                                    <script src="main.js"></script>
 
 </body>
 
