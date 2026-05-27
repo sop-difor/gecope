@@ -877,7 +877,7 @@
             /* Fundo com imagem e gradiente overlay para melhorar leitura e "profissionalismo" */
             background:
                 linear-gradient(135deg, rgba(0, 40, 20, 0.85), rgba(0, 20, 40, 0.75)),
-                url('https://qexdnxqmiaarzwwwrcor.supabase.co/storage/v1/object/public/sop_inicial/unnamed22.jpg') no-repeat center center;
+                url('unnamed22.webp') no-repeat center center;
             background-size: cover;
             display: flex;
             align-items: center;
@@ -937,6 +937,7 @@
 
         .landing-input {
             padding-left: 45px !important;
+            padding-right: 45px !important;
             border-radius: 8px !important;
             border: 1px solid #ced4da !important;
             height: 54px !important;

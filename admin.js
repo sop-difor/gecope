@@ -107,9 +107,10 @@
             // Also fetch new_user_request notifications to surface requests that did not create app_users
             let notifPendings = [];
             try {
-                const { data: notes, error: notesErr } = await sbClient.from('app_notifications').select('id,type,payload,read,created_at').eq('type', 'new_user_request').order('created_at', { ascending: false }).limit(200);
+                const { data: notes, error: notesErr } = await sbClient.from('app_notifications').select('id,type,payload,read,created_at').eq('type', 'new_user_request').eq('read', false).order('created_at', { ascending: false }).limit(200);
                 if (!notesErr && Array.isArray(notes)) {
                     for (const n of notes) {
+                        if (n.read) continue;
                         let parsed = null;
                         try { parsed = JSON.parse(n.payload || '{}'); } catch (e) { parsed = null; }
                         const matricula = parsed?.matricula || null;
