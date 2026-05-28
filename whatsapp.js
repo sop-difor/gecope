@@ -510,6 +510,16 @@
                                                                                 return isOk;
                                                                             } catch (err) {
                                                                                 console.error("[WhatsApp] Erro no disparo:", err);
+                                                                                if (logRow && logRow.id) {
+                                                                                    try {
+                                                                                        await sbClient.from('whatsapp_logs').update({
+                                                                                            status: 'falha',
+                                                                                            erro_detalhe: `Erro de rede/API: ${err.message || String(err)}`
+                                                                                        }).eq('id', logRow.id);
+                                                                                    } catch (dbErr) {
+                                                                                        console.warn("[WhatsApp] Não foi possível atualizar o log de erro no banco:", dbErr);
+                                                                                    }
+                                                                                }
                                                                                 return false;
                                                                             }
                                                                         }

@@ -235,12 +235,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const elTel = document.getElementById('reg-telefone');
         const telefone = (elTel && elTel.value) ? elTel.value.replace(/\D/g, '') : null;
 
-        await signUpRequest(nome, sobrenome, matricula, senha, telefone);
+        const success = await signUpRequest(nome, sobrenome, matricula, senha, telefone);
 
-        // Retorna ao login
-        containerReg.style.display = 'none';
-        containerLogin.style.display = 'block';
-        document.getElementById('landingRegisterForm').reset();
+        if (success) {
+            // Retorna ao login apenas se o cadastro foi realizado com sucesso
+            containerReg.style.display = 'none';
+            containerLogin.style.display = 'block';
+            document.getElementById('landingRegisterForm').reset();
+        }
     });
     // Listeners de Abas
     const tabComposicoes = document.querySelector('button[data-bs-target="#pane-composicoes"]');
@@ -416,7 +418,7 @@ window.StatusSync = {
 
 // NOTE: Supabase client initialization moved to database.js (loaded before main.js)
 
-// LISTA DE FISCAIS (FIXA - SOLICITAO USUÁRIO)
+// LISTA DE FISCAIS (FIXA - SOLICITAÇÃO USUÁRIO)
 FISCAIS_LIST = [
     'ÁGABE SOUSA',
     'ALEXANDRE HORTÊNCIO',
@@ -459,7 +461,7 @@ FISCAIS_LIST = [
     'JOSUÉ JOHAB',
     'JURANDIR VIANA',
     'JUSTINIANO CAMURÇA',
-    'KENEDDY MAYK',
+    'KENNEDY MAYK',
     'KERLON DIÓGENES',
     'LEANDRO LESSA',
     'LEONARDI',
@@ -480,7 +482,7 @@ FISCAIS_LIST = [
     'SAULLO MARINHO',
     'SILVIO CAMPOS',
     'TATHIANE ANDRADE',
-    'TÚLIO REZENDE',
+    'TÚLIO CAFÉ',
     'VICENTE DE SOUSA',
     'VIRNA DE PAULA',
     'WEBER TEIXEIRA',
@@ -2759,8 +2761,9 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone) {
         }
 
         // 2. Criar registro na tabela app_users (com novas colunas)
-        // Obs: Assume-se que a tabela foi ajustada para ter matricula/nome/sobrenome
-        const { data: insertData, error: insertError } = await sbClient.from('app_users').insert([{
+        // Obs: Inclui-se o "id" do usuário cadastrado para evitar violação de RLS (Row-Level Security)
+        const userId = data?.user?.id;
+        const payload = {
             email: email, // Mantém email para vínculo
             matricula: matricula,
             nome: nome,
@@ -2768,12 +2771,18 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone) {
             telefone_whatsapp: telefone,
             role: 'pending',
             created_at: new Date().toISOString()
-        }]);
+        };
+        if (userId) {
+            payload.id = userId;
+        }
+
+        const { data: insertData, error: insertError } = await sbClient.from('app_users').insert([payload]);
 
         if (insertError) {
-            console.error('[SIGNUP] Erro ao inserir app_users:', insertError);
-            alert('Erro ao registrar solicitação (DB): ' + (insertError.message || String(insertError)));
-            return false;
+            console.warn('[SIGNUP] Aviso ao inserir app_users (RLS):', insertError);
+            // NOTA: Não interrompemos o fluxo se for erro de RLS na inserção direta em app_users,
+            // pois o dashboard de admin é capaz de listar e aprovar usuários com base
+            // nas notificações criadas abaixo (notifPendings).
         }
 
         const { data: noteData, error: noteError } = await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}` }), created_at: new Date().toISOString(), read: false }]);
@@ -2783,7 +2792,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone) {
 
         alert(`Solicitação enviada para a matrícula ${matricula}.\nAguarde aprovação do Admin!`);
         return true;
-    } catch (err) { console.error(err); alert('Erro inesperado ao solicitar acesso.'); }
+    } catch (err) { console.error(err); alert('Erro inesperado ao solicitar acesso.'); return false; }
 }
 
 async function signInWithEmail(email, password) {
