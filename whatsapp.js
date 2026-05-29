@@ -197,10 +197,7 @@
 
                                                                                     const filteredUsers = Array.from(uniqueUsersMap.values());
 
-                                                                                    // 3. Coleta fiscais da lista estática que NO estão no banco (nem como ghost nem como real)
-                                                                                    const ghostFiscals = FISCAIS_LIST.filter(name => !uniqueUsersMap.has(name.toUpperCase()));
-
-                                                                                    // 4. Monta lista de opções
+                                                                                    // 3. Monta lista de opções
                                                                                     let html = '<option value="">Selecione...</option>';
 
                                                                                     // Adiciona Ativos e Cadastrados
@@ -209,11 +206,6 @@
                                                                                         html += `<option value="${u.telefone_whatsapp || 'missing_' + u.name}" data-name="${u.name}" data-email="${u.email}" ${!hasPhone ? 'style="color: #dc3545;"' : ''}>
                                 ${u.name} (${u.role.toUpperCase()}) ${u.isGhost ? '[CONTATO SALVO]' : ''} ${!hasPhone ? ' [SEM WHATSAPP]' : ''}
                             </option>`;
-                                                                                    });
-
-                                                                                    // Adiciona Fiscais que nunca entraram nem tiveram número salvo
-                                                                                    ghostFiscals.sort().forEach(name => {
-                                                                                        html += `<option value="missing_${name}" data-name="${name}" data-email="ghost" style="color: #dc3545;">${name.toUpperCase()} (NO CADASTRADO) [SEM WHATSAPP]</option>`;
                                                                                     });
 
                                                                                     select.innerHTML = html;

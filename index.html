@@ -47,7 +47,7 @@
                 <form id="landingLoginForm">
                     <div class="landing-input-group">
                         <i class="bi bi-person"></i>
-                        <input id="landing-matricula" type="text" placeholder="Matrícula"
+                        <input id="landing-matricula" type="text" placeholder="E-mail ou Matrícula"
                             class="form-control landing-input" required />
                     </div>
                     <div class="landing-input-group">
@@ -87,6 +87,8 @@
                                 class="form-control" required /></div>
                     </div>
                     <div class="mb-3"><input id="reg-matricula" type="text" placeholder="Matrícula" class="form-control"
+                            required /></div>
+                    <div class="mb-3"><input id="reg-email" type="email" placeholder="E-mail Institucional" class="form-control"
                             required /></div>
                     <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha" class="form-control"
                             required /></div>
@@ -136,6 +138,52 @@
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary btn-sm"
                                     data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Editar Usuário Admin -->
+                <div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Editar Usuário</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="formEditarUsuario">
+                                    <input type="hidden" id="edit-user-email-original">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col"><label class="form-label small fw-bold">Nome</label><input type="text" id="edit-user-nome" class="form-control form-control-sm" required></div>
+                                        <div class="col"><label class="form-label small fw-bold">Sobrenome</label><input type="text" id="edit-user-sobrenome" class="form-control form-control-sm"></div>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col"><label class="form-label small fw-bold">Matrícula</label><input type="text" id="edit-user-matricula" class="form-control form-control-sm"></div>
+                                        <div class="col"><label class="form-label small fw-bold">GEDOP</label><input type="text" id="edit-user-gedop" class="form-control form-control-sm"></div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-bold">E-mail Institucional</label>
+                                        <input type="email" id="edit-user-email" class="form-control form-control-sm" required>
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col"><label class="form-label small fw-bold">WhatsApp</label><input type="text" id="edit-user-whatsapp" class="form-control form-control-sm" placeholder="Ex: 85988887777"></div>
+                                        <div class="col">
+                                            <label class="form-label small fw-bold">Função</label>
+                                            <select id="edit-user-role" class="form-select form-select-sm">
+                                                <option value="externo">EXTERNO</option>
+                                                <option value="fiscal">FISCAL</option>
+                                                <option value="gerente">GERENTE</option>
+                                                <option value="admin">ADMIN</option>
+                                                <option value="pending">PENDENTE</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
                             </div>
                         </div>
                     </div>
@@ -461,7 +509,10 @@
                                                     class="form-control border-0 bg-light"
                                                     placeholder="Filtrar por nome..." onkeyup="filterAdminUsers()">
                                             </div>
-                                            <button class="btn btn-sm btn-light border" onclick="loadAllUsers()">
+                                            <button class="btn btn-sm btn-primary fw-bold" onclick="abrirModalNovoUsuario()">
+                                                <i class="bi bi-plus-lg me-1"></i> Novo Usuário
+                                            </button>
+                                            <button class="btn btn-sm btn-light border" onclick="loadAllUsers()" title="Atualizar Tabela">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
                                         </div>
@@ -476,6 +527,7 @@
                                                     <th>E-mail</th>
                                                     <th>WhatsApp</th>
                                                     <th>Matrícula</th>
+                                                    <th>GEDOP</th>
                                                     <th>Função / Perfil</th>
                                                     <th class="text-end pe-4">Ações</th>
                                                 </tr>
@@ -484,49 +536,6 @@
                                                 <tr>
                                                     <td colspan="6" class="text-center py-4 text-muted small">Carregando
                                                         usuários...</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Diretório de Contatos (Para fiscais sem cadastro) -->
-                        <div class="card admin-accordion-card">
-                            <div class="card-header admin-accordion-header header-soft-dark d-flex justify-content-between align-items-center"
-                                role="button" data-bs-toggle="collapse" data-bs-target="#collapseFiscalDirectory"
-                                aria-expanded="false" onclick="loadFiscalDirectory()">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-person-rolodex me-2"></i>Banco de Dados
-                                    (Fiscais
-                                    sem Cadastro)</h6>
-                                <i class="bi bi-chevron-down"></i>
-                            </div>
-
-                            <div id="collapseFiscalDirectory" class="collapse">
-                                <div class="card-body bg-light p-0">
-                                    <div
-                                        class="p-3 bg-white border-bottom d-flex align-items-center justify-content-between">
-                                        <div class="small text-secondary"><i
-                                                class="bi bi-journal-text me-2"></i>Cadastro manual
-                                            de WhatsApp para fiscais sem login.</div>
-                                        <span class="badge bg-light text-dark border">Lista Estática</span>
-                                    </div>
-
-                                    <div class="table-responsive" style="max-height: 400px;">
-                                        <table class="table table-hover align-middle mb-0 bg-white">
-                                            <thead class="bg-light sticky-top shadow-sm">
-                                                <tr>
-                                                    <th class="ps-4">Nome do Fiscal</th>
-                                                    <th>WhatsApp Temporário</th>
-                                                    <th class="text-end pe-4">Ação</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="fiscal-directory-table-body">
-                                                <tr>
-                                                    <td colspan="3" class="text-center py-4 text-muted small">Clique
-                                                        para
-                                                        carregar a lista...</td>
                                                 </tr>
                                             </tbody>
                                         </table>

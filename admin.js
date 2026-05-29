@@ -115,7 +115,7 @@
                         try { parsed = JSON.parse(n.payload || '{}'); } catch (e) { parsed = null; }
                         const matricula = parsed?.matricula || null;
                         const nome = parsed?.nome || null;
-                        const email = matricula ? `${matricula}@gecope.app` : null;
+                        const email = parsed?.email || (matricula ? `${matricula}@gecope.app` : null);
 
                         // Check if there is an app_user with this matricula/email
                         const found = data.find(u => (u.matricula && matricula && String(u.matricula) === String(matricula)) || (u.email && email && u.email.toLowerCase() === email.toLowerCase()));
@@ -235,36 +235,29 @@
                 else if (u.role === 'fiscal') roleColor = 'bg-success';
                 else if (u.role === 'externo') roleColor = 'bg-dark';
 
-                const roles = ['admin', 'gerente', 'fiscal', 'externo'];
-                const optionsHtml = roles.map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r.toUpperCase()}</option>`).join('');
-
-                let fiscalInfo = '';
-                if (u.role === 'fiscal' && u.nome) {
-                    const nomeCompleto = (u.nome + (u.sobrenome ? ' ' + u.sobrenome : '')).trim();
-                    const encontradoNaLista = (typeof findFiscalNameInList === 'function') ? findFiscalNameInList(nomeCompleto) : null;
-                    if (encontradoNaLista) {
-                        fiscalInfo = `<span class="badge bg-info text-dark ms-2" title="Fiscal encontrado na lista">${encontradoNaLista}</span>`;
-                    } else {
-                        fiscalInfo = `<span class="badge bg-warning text-dark ms-2" title="Não encontrado na lista">️</span>`;
-                    }
-                }
-
                 const tr = document.createElement('tr');
-                tr.setAttribute('data-search', `${fullNome.toLowerCase()} ${u.matricula} ${u.email.toLowerCase()}`);
+                tr.setAttribute('data-search', `${fullNome.toLowerCase()} ${u.matricula || ''} ${u.email.toLowerCase()} ${u.gedop || ''}`);
+                
+                // Tratar exibição do nome e ghost
+                let isGhost = u.email && u.email.includes('@sop-ghost.internal');
+                let displayEmail = isGhost ? '<span class="badge bg-light text-secondary border">FANTASMA (S/ LOGIN)</span>' : u.email;
+                let ghostBadge = isGhost ? '<span class="badge bg-warning text-dark ms-2" title="Fiscal sem login">Somente WhatsApp</span>' : '';
+
                 tr.innerHTML = `
                     <td class="ps-4"><div class="fw-bold text-dark">${fullNome}</div></td>
-                    <td><div class="small text-muted">${u.email}</div></td>
+                    <td><div class="small text-muted">${displayEmail}</div></td>
                     <td><div class="small fw-bold text-secondary">${u.telefone_whatsapp || '-'}</div></td>
                     <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${u.gedop || '-'}</span></td>
                     <td>
                         <span class="badge ${roleColor} rounded-pill px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span>
-                        ${fiscalInfo}
+                        ${ghostBadge}
                     </td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
-                            <select class="form-select form-select-sm border-0 bg-light" style="width:130px;" onchange="updateUserRole('${u.email}', this.value)">
-                                ${optionsHtml}
-                            </select>
+                            <button class="btn btn-sm btn-outline-primary border-0" onclick="abrirModalEdicaoUsuario('${u.email}')" title="Editar Usuário">
+                                <i class="bi bi-pencil"></i>
+                            </button>
                             <button class="btn btn-sm btn-outline-danger border-0" onclick="excluirUsuario('${u.email}')" title="Excluir Usuário">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -280,73 +273,100 @@
         }
     }
 
-    async function loadFiscalDirectory() {
-        const tbody = document.getElementById('fiscal-directory-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small"><div class="spinner-border spinner-border-sm me-2"></div>Carregando fiscais...</td></tr>';
+    window.abrirModalEdicaoUsuario = async function(email) {
         try {
-            const { data: users, error } = await sbClient.from('app_users').select('nome, sobrenome, full_name, telefone_whatsapp, email');
+            const { data, error } = await sbClient.from('app_users').select('*').eq('email', email).single();
             if (error) throw error;
-            const realFiscals = new Set();
-            users.forEach(u => {
-                if (!u.email.includes('@sop-ghost.internal')) {
-                    const name = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '').toUpperCase();
-                    if (name) realFiscals.add(name);
-                }
-            });
-            const directoryData = FISCAIS_LIST.filter(name => !realFiscals.has(name.toUpperCase())).map(name => {
-                const ghost = users.find(u => {
-                    const uName = (u.full_name || '').toUpperCase();
-                    return u.email.includes('@sop-ghost.internal') && uName === name.toUpperCase();
-                });
-                return { name: name, phone: ghost ? (ghost.telefone_whatsapp || '') : '', isGhost: !!ghost };
-            });
 
-            tbody.innerHTML = '';
-            if (directoryData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small">Todos os fiscais da lista já possuem cadastro oficial.</td></tr>';
-                return;
-            }
+            document.getElementById('edit-user-email-original').value = data.email || '';
+            document.getElementById('edit-user-nome').value = data.nome || '';
+            document.getElementById('edit-user-sobrenome').value = data.sobrenome || '';
+            document.getElementById('edit-user-matricula').value = data.matricula || '';
+            document.getElementById('edit-user-gedop').value = data.gedop || '';
+            document.getElementById('edit-user-email').value = data.email || '';
+            document.getElementById('edit-user-whatsapp').value = data.telefone_whatsapp || '';
+            document.getElementById('edit-user-role').value = data.role || 'externo';
 
-            directoryData.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="ps-4 fw-bold text-dark">${item.name.toUpperCase()}</td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm" style="max-width: 200px;" id="dir-phone-${item.name.replace(/\s+/g, '_')}" value="${item.phone}" placeholder="Ex: 85988887777">
-                    </td>
-                    <td class="text-end pe-4">
-                        <button class="btn btn-sm btn-outline-success" onclick="saveFiscalContact('${item.name}', 'dir-phone-${item.name.replace(/\s+/g, '_')}')">
-                            <i class="bi bi-save me-1"></i> Salvar
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-        } catch (e) {
-            console.error('Erro ao carregar diretório:', e);
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger py-4 small">Erro: ' + e.message + '</td></tr>';
-        }
-    }
-
-    async function saveFiscalContact(name, inputId) {
-        const input = document.getElementById(inputId);
-        if (!input) return;
-        const phone = input.value.trim();
-        const btn = event?.target?.closest('button');
-        const originalHtml = btn ? btn.innerHTML : '';
-        try {
-            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
-            await WhatsAppConfigManager.savePhoneForUser(name, 'ghost', phone);
-            if (typeof showToast === 'function') showToast(`Contato de ${name} atualizado com sucesso!`);
+            const modal = new bootstrap.Modal(document.getElementById('modalEditarUsuario'));
+            modal.show();
         } catch (e) {
             console.error(e);
-            alert("Erro ao salvar contato.");
-        } finally {
-            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+            alert("Erro ao buscar dados do usuário.");
         }
-    }
+    };
+
+    window.abrirModalNovoUsuario = function() {
+        document.getElementById('formEditarUsuario').reset();
+        document.getElementById('edit-user-email-original').value = '';
+        document.getElementById('edit-user-email').value = `${Date.now()}@sop-ghost.internal`; // E-mail fictício default
+        document.getElementById('edit-user-role').value = 'fiscal'; // Role default
+        
+        const modal = new bootstrap.Modal(document.getElementById('modalEditarUsuario'));
+        modal.show();
+    };
+
+    window.salvarEdicaoUsuario = async function() {
+        const emailOriginal = document.getElementById('edit-user-email-original').value;
+        const nome = document.getElementById('edit-user-nome').value.trim();
+        const sobrenome = document.getElementById('edit-user-sobrenome').value.trim();
+        const matricula = document.getElementById('edit-user-matricula').value.trim();
+        const gedop = document.getElementById('edit-user-gedop').value.trim();
+        const emailNovo = document.getElementById('edit-user-email').value.trim();
+        const whatsapp = document.getElementById('edit-user-whatsapp').value.trim().replace(/\D/g, '');
+        const role = document.getElementById('edit-user-role').value;
+
+        if (!nome || !emailNovo) {
+            alert("Nome e E-mail são obrigatórios.");
+            return;
+        }
+
+        try {
+            const btn = document.querySelector('#modalEditarUsuario .btn-primary');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
+            btn.disabled = true;
+
+            const payload = {
+                nome: nome,
+                sobrenome: sobrenome,
+                matricula: matricula || null,
+                gedop: gedop || null,
+                email: emailNovo,
+                telefone_whatsapp: whatsapp || null,
+                role: role,
+                full_name: `${nome} ${sobrenome}`.trim()
+            };
+
+            let reqError;
+            if (emailOriginal) {
+                const { error } = await sbClient.from('app_users').update(payload).eq('email', emailOriginal);
+                reqError = error;
+            } else {
+                const { error } = await sbClient.from('app_users').insert([payload]);
+                reqError = error;
+            }
+
+            if (reqError) throw reqError;
+
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarUsuario'));
+            if (modal) modal.hide();
+            
+            if (typeof showToast === 'function') showToast(emailOriginal ? "Usuário atualizado com sucesso." : "Usuário criado com sucesso.");
+            
+            // Recarrega lista
+            loadAllUsers();
+            if (typeof carregarListaFiscais === 'function') carregarListaFiscais();
+            
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao salvar edição: " + e.message);
+            const btn = document.querySelector('#modalEditarUsuario .btn-primary');
+            btn.innerHTML = 'Salvar Alterações';
+            btn.disabled = false;
+        }
+    };
 
     let _vincularContext = null;
 
@@ -681,9 +701,8 @@
     window.alternarModoAdmin = alternarModoAdmin;
     window.handleLoginSubmit = handleLoginSubmit;
     window.loadAllUsers = loadAllUsers;
-    window.loadFiscalDirectory = loadFiscalDirectory;
-    window.saveFiscalContact = saveFiscalContact;
     window.abrirModalVinculo = abrirModalVinculo;
+    window.abrirModalNovoUsuario = abrirModalNovoUsuario;
     window.aprovarUsuario = aprovarUsuario;
     window.excluirUsuario = excluirUsuario;
     window.filterAdminUsers = filterAdminUsers;

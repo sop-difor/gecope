@@ -97,9 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle Login
     document.getElementById('landingLoginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const matricula = document.getElementById('landing-matricula').value.trim();
+        const loginInput = document.getElementById('landing-matricula').value.trim();
         const password = document.getElementById('landing-password').value;
-        const email = `${matricula}@gecope.app`;
+        const email = loginInput.includes('@') ? loginInput : `${loginInput}@gecope.app`;
         await signInWithEmail(email, password);
     });
 
@@ -231,11 +231,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const nome = document.getElementById('reg-nome').value.trim();
         const sobrenome = document.getElementById('reg-sobrenome').value.trim();
         const matricula = document.getElementById('reg-matricula').value.trim();
+        const email = document.getElementById('reg-email').value.trim();
         const senha = document.getElementById('reg-senha').value;
         const elTel = document.getElementById('reg-telefone');
         const telefone = (elTel && elTel.value) ? elTel.value.replace(/\D/g, '') : null;
 
-        const success = await signUpRequest(nome, sobrenome, matricula, senha, telefone);
+        const success = await signUpRequest(nome, sobrenome, matricula, senha, telefone, email);
 
         if (success) {
             // Retorna ao login apenas se o cadastro foi realizado com sucesso
@@ -268,7 +269,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // Ensure FISCAIS_LIST exists (avoid TDZ) and Performance tweak: optionally silence verbose console logs in production
-var FISCAIS_LIST = window.FISCAIS_LIST || [];
+var FISCAIS_LIST = [
+    'ÁGABE SOUSA',
+    'ALEXANDRE HORTÊNCIO',
+    'ANTÔNIO EDSON',
+    'ANTÔNIO ELDER',
+    'ANTÔNIO ROLIM',
+    'ARTHUR EDÍSIO',
+    'CARLOS RIOS',
+    'CAIO TIMBÓ',
+    'CLOVIS FONTENELE',
+    'CRISTIANA PALÁCIO',
+    'CRISTIANO GUILHERME',
+    'DAVI BRAGA',
+    'DAVI GADELHA',
+    'DAVID MACHADO',
+    'DIEGO DEMÉTRIO',
+    'EDGAR PEIXOTO',
+    'EDILSON JR.',
+    'EDUARDO CIDRÃO',
+    'EDUARDO STÊNIO',
+    'EMMANUEL CRUZ',
+    'FÁBIO BONFIM',
+    'FLÁVIO COLARES',
+    'FLEURY NAPOLEÃO',
+    'FRANCISCO GOIANA',
+    'FRANCISCO PARENTE',
+    'FRANCISCO TALES',
+    'GECOPE DIFOR',
+    'GUILHERME MAIA',
+    'HEBERT ALAN',
+    'IGGO EMANUEL',
+    'ÍTALO HENRIQUE',
+    'JÉSSICA DINIZ',
+    'JOHN HERBERT',
+    'JOSÉ LEONÉZIO',
+    'JOSÉ MICHELL',
+    'JOSÉ MUNIZ',
+    'JOSÉ ROSEMBERG',
+    'JOSÉ WILLIAN',
+    'JOSUÉ JOHAB',
+    'JURANDIR VIANA',
+    'JUSTINIANO CAMURÇA',
+    'KENEDDY MAYK',
+    'KERLON DIÓGENES',
+    'LEANDRO LESSA',
+    'LEONARDI',
+    'LUCAS ARAÚJO',
+    'LUCIANO DENIZARDY',
+    'MANOEL LUCAS',
+    'MÁRCIO MONTENEGRO',
+    'MÁRIO EDSON',
+    'MAURO JOSÉ',
+    'NERTAN FONSECA',
+    'NILDENO ARAGÃO',
+    'ORLANDO LIMA',
+    'PAULO LOIOLA',
+    'ROBERTO BRINGEL',
+    'ROBERTO HOLANDA',
+    'ROBERTO XAVIER',
+    'RUI DE PAULA',
+    'SAULLO MARINHO',
+    'SILVIO CAMPOS',
+    'TATHIANE ANDRADE',
+    'TÚLIO REZENDE',
+    'VICENTE DE SOUSA',
+    'VIRNA DE PAULA',
+    'WEBER TEIXEIRA',
+    'WESLEY PEDROSA',
+    'WILSON MACHADO'
+];
+FISCAIS_LIST.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 // Ensure EVO API globals exist to avoid ReferenceError if referenced early
 window.EVO_API_URL = window.EVO_API_URL || '';
 window.EVO_API_KEY = window.EVO_API_KEY || '';
@@ -418,81 +489,28 @@ window.StatusSync = {
 
 // NOTE: Supabase client initialization moved to database.js (loaded before main.js)
 
-// LISTA DE FISCAIS (FIXA - SOLICITAÇÃO USUÁRIO)
-FISCAIS_LIST = [
-    'ÁGABE SOUSA',
-    'ALEXANDRE HORTÊNCIO',
-    'ANTÔNIO EDSON',
-    'ANTÔNIO ELDER',
-    'ANTÔNIO ROLIM',
-    'ARTHUR EDÍSIO',
-    'CARLOS RIOS',
-    'CAIO TIMBÓ',
-    'CLOVIS FONTENELE',
-    'CRISTIANA PALÁCIO',
-    'CRISTIANO GUILHERME',
-    'DAVI BRAGA',
-    'DAVI GADELHA',
-    'DAVID MACHADO',
-    'DIEGO DEMÉTRIO',
-    'EDGAR PEIXOTO',
-    'EDILSON JR.',
-    'EDUARDO CIDRÃO',
-    'EDUARDO STÊNIO',
-    'EMMANUEL CRUZ',
-    'FÁBIO BONFIM',
-    'FLÁVIO COLARES',
-    'FLEURY NAPOLEÃO',
-    'FRANCISCO GOIANA',
-    'FRANCISCO PARENTE',
-    'FRANCISCO TALES',
-    'GECOPE DIFOR',
-    'GUILHERME MAIA',
-    'HEBERT ALAN',
-    'IGGO EMANUEL',
-    'ÍTALO HENRIQUE',
-    'JÉSSICA DINIZ',
-    'JOHN HERBERT',
-    'JOSÉ LEONÉZIO',
-    'JOSÉ MICHELL',
-    'JOSÉ MUNIZ',
-    'JOSÉ ROSEMBERG',
-    'JOSÉ WILLIAN',
-    'JOSUÉ JOHAB',
-    'JURANDIR VIANA',
-    'JUSTINIANO CAMURÇA',
-    'KENNEDY MAYK',
-    'KERLON DIÓGENES',
-    'LEANDRO LESSA',
-    'LEONARDI',
-    'LUCAS ARAÚJO',
-    'LUCIANO DENIZARDY',
-    'MANOEL LUCAS',
-    'MÁRCIO MONTENEGRO',
-    'MÁRIO EDSON',
-    'MAURO JOSÉ',
-    'NERTAN FONSECA',
-    'NILDENO ARAGÃO',
-    'ORLANDO LIMA',
-    'PAULO LOIOLA',
-    'ROBERTO BRINGEL',
-    'ROBERTO HOLANDA',
-    'ROBERTO XAVIER',
-    'RUI DE PAULA',
-    'SAULLO MARINHO',
-    'SILVIO CAMPOS',
-    'TATHIANE ANDRADE',
-    'TÚLIO CAFÉ',
-    'VICENTE DE SOUSA',
-    'VIRNA DE PAULA',
-    'WEBER TEIXEIRA',
-    'WESLEY PEDROSA',
-    'WILSON MACHADO',
-];
+window.dynamicUsers = [];
 
-function carregarListaFiscais() {
-    console.log('Lista de Usuários carregada (Estática):', FISCAIS_LIST.length);
-    atualizarDropdownsFiscais();
+async function carregarListaFiscais() {
+    try {
+        const { data } = await sbClient.from('app_users').select('nome, sobrenome, full_name');
+        let dbUsers = [];
+        if (data) {
+            dbUsers = data.map(u => (u.full_name || `${u.nome || ''} ${u.sobrenome || ''}`).trim().toUpperCase()).filter(n => n);
+        }
+        
+        // Mescla a lista estática original com os cadastros do banco para robustez máxima
+        const combined = [...new Set([...FISCAIS_LIST, ...dbUsers])];
+        
+        // Ordenação alfabética robusta que lida com caracteres latinos e acentuações do português
+        combined.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        
+        window.dynamicUsers = combined;
+        FISCAIS_LIST = combined;
+        atualizarDropdownsFiscais();
+    } catch(e) {
+        console.error('Erro carregarListaFiscais:', e);
+    }
 }
 
 // --- 1. MÁSCARA PROCESSO ---
@@ -566,7 +584,7 @@ async function limparArquivosComentariosResolvidos(table, storageBucket, comenta
 function atualizarDropdownsFiscais() {
     // Atualiza apenas dropdowns estáticos que precisam ser populados logo após o carregamento
     // Modais como 'share-user-select' ou 'coment-fiscal' são populados ao abrir, usando a FISCAIS_LIST atualizada
-    const ids = ['cad-fiscal'];
+    const ids = ['cad-fiscal', 'det_fiscal'];
 
     ids.forEach(id => {
         const sel = document.getElementById(id);
@@ -623,7 +641,7 @@ function findFiscalNameInList(nomeCompleto) {
     }
 
     // 3. Procura reversa: todos os nomes do fiscal devem estar no input
-    for (const fiscal of FISCAIS_LIST) {
+    for (const fiscal of window.dynamicUsers) {
         const fiscalNormal = normalizar(fiscal);
         const partesFiscal = fiscalNormal.split(/\s+/).filter(p => p.length > 0);
         if (partesFiscal.every(parte => inputNormal.includes(parte))) {
@@ -634,7 +652,7 @@ function findFiscalNameInList(nomeCompleto) {
 
     // 4. Procura por iniciais: se o input começa com as iniciais do fiscal
     const iniciaisInput = partes.map(p => p[0]).join('');
-    for (const fiscal of FISCAIS_LIST) {
+    for (const fiscal of window.dynamicUsers) {
         const fiscalNormal = normalizar(fiscal);
         const partesFiscal = fiscalNormal.split(/\s+/).filter(p => p.length > 0);
         const iniciaisFiscal = partesFiscal.map(p => p[0]).join('');
@@ -1101,7 +1119,7 @@ async function carregarDadosSupabase() {
         // Garantir que metas locais obsoletas sejam removidas
         try {
             const key = `meta:${r.processo}`;
-            const st = (r.status || "").toString().toUpperCase();
+            const st = (r.status || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const isAnaliseFiscal = st.includes("FISCAL") && st.includes("ANALIS");
 
             // Se o banco não tem meta ou o status atual não é Análise Fiscal,
@@ -1127,23 +1145,51 @@ async function carregarDadosSupabase() {
                 const st = (row.status || "").toString().toUpperCase();
                 const isAnaliseFiscal = st.includes("ANÁLISE FISCAL") || (st.includes("ANALISE") && st.includes("FISCAL"));
                 const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
-                if (isAnaliseFiscal && !row.dataCompromissoFiscal && row.id) {
+                let precisaRecalcular = false;
+                if (isAnaliseFiscal && row.id) {
                     let base = null;
                     let dias = 20; // padrão para Análise
                     if (isReanalise) {
-                        // Para reanálises usamos 10 dias úteis a partir da data de devolução
                         dias = 10;
-                        base = row.dataDevolucaoCorrecoes || row.dataRecebimento || row.dataAbertura || row.created_at || new Date();
+                        base = row.dataDevolucaoCorrecoes || row.created_at || new Date();
                     } else {
-                        // Para análises normais, base preferencial: dataRecebimento, dataAbertura, created_at
-                        base = row.dataRecebimento || row.dataAbertura || row.created_at || new Date();
+                        dias = 20;
+                        base = row.created_at || new Date();
+                    }
+                    
+                    const metaDate = calcularDataMeta(base, dias);
+                    if (metaDate) {
+                        const isoMeta = metaDate.toISOString().substring(0, 10);
+                        
+                        // Se não tem meta, ou se a meta salva é diferente da calculada com as novas regras
+                        const isoAtual = row.dataCompromissoFiscal ? (row.dataCompromissoFiscal instanceof Date ? row.dataCompromissoFiscal.toISOString().substring(0, 10) : new Date(row.dataCompromissoFiscal).toISOString().substring(0, 10)) : null;
+                        
+                        if (isoAtual !== isoMeta) {
+                            precisaRecalcular = true;
+                        }
+                    }
+                }
+
+                if (precisaRecalcular) {
+                    let base = null;
+                    let dias = 20; // padrão para Análise
+                    if (isReanalise) {
+                        // Regra de Reanálise: Usar data de devolução para correção no cálculo da nova meta
+                        dias = 10;
+                        base = row.dataDevolucaoCorrecoes || row.created_at || new Date();
+                    } else {
+                        // Regra de Cadastro: Usar a data de cadastro no GECOPE (created_at)
+                        dias = 20;
+                        base = row.created_at || new Date();
                     }
                     const metaDate = calcularDataMeta(base, dias);
                     if (metaDate) {
                         const iso = metaDate.toISOString().substring(0, 10);
                         // Atualiza objeto em memória para UI imediata
                         row.dataCompromissoFiscal = isoParaDate(iso);
-                        pendingMeta.push({ id: row.id, data_compromisso_fiscal: iso });
+                        const baseDate = base instanceof Date ? base : new Date(base);
+                        const est = baseDate.toISOString().substring(0, 10);
+                        pendingMeta.push({ id: row.id, data_compromisso_fiscal: iso, registros: est });
                     }
                 }
             }
@@ -1151,6 +1197,25 @@ async function carregarDadosSupabase() {
                 // Persistir no banco (em paralelo)
                 await Promise.all(pendingMeta.map(u => sbClient.from('processos').update({ data_compromisso_fiscal: u.data_compromisso_fiscal }).eq('id', u.id)));
                 console.log(`[AutoMeta] metas automáticas salvas: ${pendingMeta.length}`);
+
+                // Gravar histórico de metas em lote
+                try {
+                    const logs = pendingMeta.map(u => {
+                        const row = window.allData.find(r => r.id === u.id);
+                        const st = row ? (row.status || "").toString().toUpperCase() : "";
+                        const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
+                        return {
+                            processo_id: u.id,
+                            registros: u.registros || u.data_estabelecimento,
+                            dias_estipulados: isReanalise ? 10 : 20,
+                            meta: u.data_compromisso_fiscal,
+                            autor: 'Sistema'
+                        };
+                    });
+                    await sbClient.from('historico_metas').insert(logs);
+                } catch (errBatch) {
+                    console.error('[AutoMeta] falha ao registrar lote no historico_metas:', errBatch);
+                }
             }
         } catch (e) {
             console.error('[AutoMeta] falha ao estabelecer metas automáticas:', e);
@@ -1280,21 +1345,9 @@ async function enviarParaPlanilha() {
         ultima_atualizacao: new Date().toISOString()
     };
 
-    // Automação GECOPE: Data Meta
-    const statusInicial = formData.get("STATUS");
-    if (statusInicial === 'ANÁLISE FISCAL' && !payload.data_compromisso_fiscal) {
-        const metaCalculada = calcularDataMeta(new Date(), 20);
-        payload.data_compromisso_fiscal = metaCalculada.toISOString().substring(0, 10);
-    } else if (statusInicial === 'DEVOLVIDO P/ REANÁLISE FISCAL' && !payload.data_compromisso_fiscal) {
-        // Se houver data de devolução no formulário, usar como base; senão, usar data_recebimento ou created
-        const devolStr = formData.get("DATA DEVOLUO CORREES");
-        let base = null;
-        if (devolStr) base = new Date(devolStr);
-        else if (payload.data_recebimento) base = isoParaDate(payload.data_recebimento);
-        else base = new Date();
-        const metaCalculada = calcularDataMeta(base, 10);
-        payload.data_compromisso_fiscal = metaCalculada.toISOString().substring(0, 10);
-    }
+    // Nota: meta será estabelecida a partir do created_at retornado pelo banco
+    // (ou data_devolucao_correcoes para reanálises). Não definimos meta antes do insert
+    // para garantir que a base usada seja a data de cadastro persistida.
 
     let data = null; let error = null;
     try {
@@ -1322,6 +1375,42 @@ async function enviarParaPlanilha() {
         msg.style.display = 'block';
         msg.className = 'alert alert-success mt-3';
         msg.innerHTML = ' Salvo com sucesso no Banco de Dados!';
+
+        // Após inserir, calcular a meta a partir do created_at (ou data_devolucao_correcoes para reanálises)
+        (async () => {
+            try {
+                const { data: pData, error: errP } = await sbClient.from('processos').select('id, data_devolucao_correcoes, created_at, status').eq('processo', numProcesso).maybeSingle();
+                if (errP) throw errP;
+                if (pData && pData.id) {
+                    const st = (pData.status || '').toString().toUpperCase();
+                    const isReanalise = st.includes('REANÁLISE') || st.includes('REANALISE') || st.includes('DEVOLVIDO');
+                    const dias = isReanalise ? 10 : 20;
+                    const baseStr = (isReanalise && pData.data_devolucao_correcoes) ? pData.data_devolucao_correcoes : pData.created_at;
+                    const baseDate = baseStr ? isoParaDate(baseStr) : new Date();
+                    const metaDate = calcularDataMeta(baseDate, dias);
+                    if (metaDate) {
+                        const iso = metaDate.toISOString().substring(0,10);
+                        // Atualiza processo com a meta correta calculada a partir do created_at
+                        const { error: errUp } = await sbClient.from('processos').update({ data_compromisso_fiscal: iso }).eq('id', pData.id);
+                        if (errUp) console.error('[ERRO] Falha ao atualizar processo com meta calculada:', errUp.message);
+
+                        // Inserir histórico de metas registrando o 'registro' (data da base) e dias
+                        const est = baseDate.toISOString().substring(0,10);
+                        const { error: errHist } = await sbClient.from('historico_metas').insert([{
+                            processo_id: pData.id,
+                            registros: est,
+                            dias_estipulados: dias,
+                            meta: iso,
+                            autor: 'Sistema'
+                        }]);
+                        if (errHist) console.error('[ERRO] Falha ao registrar log de meta inicial:', errHist.message);
+                    }
+                }
+            } catch (e) {
+                console.error('[ERRO] Ao calcular/gravar meta pós-inserção:', e);
+            }
+        })();
+        
 
         // Log de Atividade
         registrarAtividade('PROCESSO', `cadastrou o processo Nº ${numProcesso}`, numProcesso, formData.get("DESCRIÇÃO"), formData.get("FISCAL"));
@@ -1578,7 +1667,7 @@ async function executarAcaoDetalhes(actionType) {
 
             // Automação GECOPE: definir metas automáticas ao mudar de status
             if (updates.status === 'ANÁLISE FISCAL') {
-                const base = new Date();
+                const base = registroOriginal.created_at || new Date();
                 const metaAuto = calcularDataMeta(base, 20);
                 updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
             } else if (updates.status === 'DEVOLVIDO P/ REANÁLISE FISCAL' || updates.status === 'REANÁLISE FISCAL') {
@@ -1614,6 +1703,45 @@ async function executarAcaoDetalhes(actionType) {
             msg.style.display = 'block';
             msg.className = 'alert alert-success';
             msg.innerHTML = ' Dados atualizados!';
+
+            // Gravar log no historico_metas se a meta mudou ou foi zerada
+            const dataLimiteOriginal = registroOriginal.data_compromisso_fiscal || null;
+            const dataLimiteNova = updates.data_compromisso_fiscal || null;
+
+            if (dataLimiteNova !== dataLimiteOriginal) {
+                let dias = null;
+                let baseDate = new Date();
+                const statusNovo = (updates.status || registroOriginal.status || "").toString().trim().toUpperCase();
+
+                if (statusNovo === 'ANÁLISE FISCAL') {
+                    dias = 20;
+                    // Regra de Cadastro: Usar a data de cadastro no GECOPE (created_at)
+                    baseDate = registroOriginal.created_at || new Date();
+                } else if (statusNovo === 'DEVOLVIDO P/ REANÁLISE FISCAL' || statusNovo === 'REANÁLISE FISCAL') {
+                    dias = 10;
+                    // Regra de Reanálise: Usar data de devolução para correção no cálculo da nova meta
+                    const devDate = updates.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes;
+                    baseDate = devDate ? (devDate instanceof Date ? devDate : isoParaDate(devDate)) : new Date();
+                } else if (dataLimiteNova) {
+                    // Regra Manual: Usar a data de estabelecimento da meta (hoje/agora)
+                    baseDate = new Date();
+                    const diffTime = Math.abs(new Date(dataLimiteNova) - baseDate);
+                    dias = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                }
+
+                const autor = sessionStorage.getItem('sop_user_name') || 'Sistema';
+
+                const estStr = (baseDate instanceof Date ? baseDate.toISOString().substring(0,10) : (new Date(baseDate).toISOString().substring(0,10)));
+                sbClient.from('historico_metas').insert([{
+                    processo_id: idUnico,
+                    registros: estStr,
+                    dias_estipulados: dias,
+                    meta: dataLimiteNova,
+                    autor: autor
+                }]).then(({ error: errHist }) => {
+                    if (errHist) console.error('[ERRO] Falha ao registrar log no historico_metas (Edição):', errHist.message);
+                });
+            }
 
             // Notificação WhatsApp (Apenas para Devolução para Reanálise)
             const statusAlvo = ['DEVOLVIDO P/ REANÁLISE FISCAL'];
@@ -2074,6 +2202,32 @@ function getMetaDate(row, setD) {
                         const acao = valSupabase ? `definiu a meta para ${valSupabase.split('-').reverse().join('/')}` : 'removeu a meta';
                         registrarAtividade('PROCESSO', `Usuário ${acao} no processo Nº ${row.processo}`, row.processo, (row && row.descricao) || '', (row && row.fiscal) || '');
                     } catch (e) { }
+
+                    // Gravar histórico de metas
+                    try {
+                        const autor = sessionStorage.getItem('sop_user_name') || 'Usuário';
+                        let dias = null;
+                        if (valSupabase) {
+                            const hoje = new Date();
+                            hoje.setHours(0, 0, 0, 0);
+                            const limite = new Date(valSupabase);
+                            limite.setHours(0, 0, 0, 0);
+                            const diffTime = limite.getTime() - hoje.getTime();
+                            dias = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        }
+
+                        sbClient.from('historico_metas').insert([{
+                            processo_id: row.id,
+                            registros: new Date().toISOString().substring(0,10),
+                            dias_estipulados: dias,
+                            meta: valSupabase,
+                            autor: autor
+                        }]).then(({ error: errHist }) => {
+                            if (errHist) console.error('[ERRO] Falha ao registrar log no historico_metas:', errHist.message);
+                        });
+                    } catch (e) {
+                        console.error('[ERRO] Falha ao registrar histórico de metas no getMetaDate:', e);
+                    }
                 }
             });
 
@@ -2094,46 +2248,34 @@ function getMetaSt(row) {
 function statusPriority(status) {
     const raw = (status || "").toString().toUpperCase().trim();
     const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (s.includes("AGUAR") && s.includes("REAN")) return 1;
-    if (s.includes("EM REAN") || (s.startsWith("EM") && s.includes("REAN"))) return 2;
-    if (s.includes("AGUAR") && s.includes("ANALIS") && !s.includes("FISCAL") && !s.includes("REAN")) return 3;
-    if ((s.includes("EM ANALIS") || s === "ANALISE") && !s.includes("FISCAL") && !s.includes("REAN")) return 4;
+    
+    // 1. EM REANÁLISE
+    if (s.includes("EM REAN") || (s.startsWith("EM") && s.includes("REAN"))) return 1;
+    // 2. EM ANÁLISE
+    if ((s.includes("EM ANALIS") || s === "ANALISE") && !s.includes("FISCAL") && !s.includes("REAN")) return 2;
+    // 3. AGUAR. REANÁLISE
+    if (s.includes("AGUAR") && s.includes("REAN")) return 3;
+    // 4. AGUAR. ANÁLISE
+    if (s.includes("AGUAR") && s.includes("ANALIS") && !s.includes("FISCAL") && !s.includes("REAN")) return 4;
+    // 5. AGUAR. APROVAÇÃO
     if (s.includes("AGUAR") && s.includes("APROVA")) return 5;
-    if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO")) return 6;
-    if (s.includes("DEVOLVIDO")) return 7;
+    // 6. REANÁLISE FISCAL (DEVOLVIDO P/ REANÁLISE FISCAL)
+    if (s.includes("DEVOLVIDO") || (s.includes("REAN") && s.includes("FISCAL"))) return 6;
+    // 7. ANÁLISE FISCAL
+    if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO") && !s.includes("REAN")) return 7;
+    // 8. CONTRATANTE
     if (s.includes("CONTRATANTE")) return 8;
+    
+    // Status adicionais (Aprovado e Arquivado)
     if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
     if (s.includes("ARQUIVADO")) return 10;
+    
     return 99;
 }
 
 // Ordem REVISADA (aplicada apenas ao "filtro"/setinha da coluna Status quando clicada)
 function statusFilterPriority(status) {
-    const raw = (status || "").toString().toUpperCase().trim();
-    const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-    // 1. Em Reanálise
-    if (s.includes("EM REAN") || (s.startsWith("EM") && s.includes("REAN"))) return 1;
-    // 2. Em Análise
-    if ((s.includes("EM ANALIS") || s === "ANALISE") && !s.includes("FISCAL") && !s.includes("REAN")) return 2;
-    // 3. Aguard. Reanálise
-    if (s.includes("AGUAR") && s.includes("REAN")) return 3;
-    // 4. Aguard. Análise
-    if (s.includes("AGUAR") && s.includes("ANALIS") && !s.includes("FISCAL") && !s.includes("REAN")) return 4;
-    // 5. Devolvido p/ Reanálise Fiscal
-    if (s.includes("DEVOLVIDO")) return 5;
-    // 6. Análise Fiscal
-    if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO")) return 6;
-    // 7. Aguard. Aprovação
-    if (s.includes("AGUAR") && s.includes("APROVA")) return 7;
-    // 8. Contratante
-    if (s.includes("CONTRATANTE")) return 8;
-    // 9. Aprovado
-    if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
-    // 10. Arquivado
-    if (s.includes("ARQUIVADO")) return 10;
-
-    return 99;
+    return statusPriority(status);
 }
 
 // Funções para gerenciar processos prioritários
@@ -2183,7 +2325,27 @@ async function setPrioritario(processo, isPriority) {
     }
 }
 
+function safeCompare(valA, valB, dir) {
+    const isEmptyA = valA === undefined || valA === null || valA === "";
+    const isEmptyB = valB === undefined || valB === null || valB === "";
+
+    if (isEmptyA && isEmptyB) return 0;
+    if (isEmptyA) return dir === 'asc' ? 1 : -1; // Envia vazios para o final
+    if (isEmptyB) return dir === 'asc' ? -1 : 1;
+
+    if (typeof valA === 'string' && typeof valB === 'string') {
+        const cmp = valA.localeCompare(valB, 'pt-BR');
+        return dir === 'asc' ? cmp : -cmp;
+    }
+
+    if (valA < valB) return dir === 'asc' ? -1 : 1;
+    if (valA > valB) return dir === 'asc' ? 1 : -1;
+    return 0;
+}
+
 let currentSort = []; // Array of { col, dir }
+window.currentSort = currentSort;
+
 function changeSort(columnKey) {
     const index = currentSort.findIndex(s => s.col === columnKey);
     if (index !== -1) {
@@ -2197,14 +2359,18 @@ function changeSort(columnKey) {
     }
     updateReuniao();
 }
+window.changeSort = changeSort;
+
 function getSortIcon(columnKey) {
     const sort = currentSort.find(s => s.col === columnKey);
     const sortIndex = currentSort.findIndex(s => s.col === columnKey);
     const indexBadge = currentSort.length > 1 && sortIndex !== -1 ? `<span class="badge bg-success ms-1" style="font-size: 0.6rem; padding: 2px 4px;">${sortIndex + 1}</span>` : '';
 
     if (!sort) { return '<i class="bi bi-arrow-down-up text-secondary ms-1" style="font-size: 1rem; opacity: 0.4;"></i>'; }
-    return (sort.dir === 'asc' ? '<i class="bi bi-sort-down-alt text-success ms-1" style="font-size: 1.1rem;"></i>' : '<i class="bi bi-sort-up text-success ms-1" style="font-size: 1.1rem;"></i>') + indexBadge;
+    return (sort.dir === 'asc' ? '<i class="bi bi-sort-up text-success ms-1" style="font-size: 1.1rem;"></i>' : '<i class="bi bi-sort-down-alt text-success ms-1" style="font-size: 1.1rem;"></i>') + indexBadge;
 }
+window.getSortIcon = getSortIcon;
+
 function updateReuniaoFilters(rows) { mtBase = rows; updateReuniao(); }
 
 function updateReuniao() {
@@ -2371,20 +2537,43 @@ function updateReuniao() {
             switch (sort.col) {
                 case 'prioritario': valA = isPrioritario(a) ? 1 : 0; valB = isPrioritario(b) ? 1 : 0; break;
                 case 'processo': valA = a.processo || ""; valB = b.processo || ""; break;
-                case 'meta': const mA = getMetaDate(a); const mB = getMetaDate(b); valA = mA ? mA.getTime() : 0; valB = mB ? mB.getTime() : 0; break;
+                case 'meta': {
+                    const mA = getMetaDate(a);
+                    const mB = getMetaDate(b);
+                    valA = mA ? mA.getTime() : 0;
+                    valB = mB ? mB.getTime() : 0;
+                    break;
+                }
                 case 'status': valA = statusFilterPriority(a.status); valB = statusFilterPriority(b.status); break;
-                case 'analista': valA = (a.analista || "").toString(); valB = (b.analista || "").toString(); break;
+                case 'analista': valA = a.analista || ""; valB = b.analista || ""; break;
                 case 'abertura': valA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 0; valB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 0; break;
                 case 'dias': valA = a.dataAbertura instanceof Date ? -(new Date() - a.dataAbertura) : 1; valB = b.dataAbertura instanceof Date ? -(new Date() - b.dataAbertura) : 1; break;
-                case 'contratante': valA = (a.contratante || "").toLowerCase(); valB = (b.contratante || "").toLowerCase(); break;
-                case 'contratada': valA = (a.contratada || "").toLowerCase(); valB = (b.contratada || "").toLowerCase(); break;
-                case 'descricao': valA = (a.descricao || "").toLowerCase(); valB = (b.descricao || "").toLowerCase(); break;
+                case 'contratante': valA = a.contratante || ""; valB = b.contratante || ""; break;
+                case 'contratada': valA = a.contratada || ""; valB = b.contratada || ""; break;
+                case 'descricao': valA = a.descricao || ""; valB = b.descricao || ""; break;
                 default: continue;
             }
-            if (valA < valB) return sort.dir === 'asc' ? -1 : 1;
-            if (valA > valB) return sort.dir === 'asc' ? 1 : -1;
+            const cmp = safeCompare(valA, valB, sort.dir);
+            if (cmp !== 0) return cmp;
         }
-        return 0;
+
+        // Empate no sort personalizado: aplica a Ordem Normal (Status GECOPE -> Tempo Abertura) como desempate final!
+        const pA = statusPriority(a.status), pB = statusPriority(b.status);
+        if (pA !== pB) return pA - pB;
+
+        if (pA === 10) {
+            const tA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : 0);
+            const tB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : 0);
+            return tB - tA;
+        }
+
+        const dA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const dB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        if (dA !== dB) return dA - dB;
+
+        const timeA = a.suite_data_chegada ? new Date(a.suite_data_chegada).getTime() : (a.ultima_atualizacao ? new Date(a.ultima_atualizacao).getTime() : 0);
+        const timeB = b.suite_data_chegada ? new Date(b.suite_data_chegada).getTime() : (b.ultima_atualizacao ? new Date(b.ultima_atualizacao).getTime() : 0);
+        return timeA - timeB;
     });
 
     mt.body.innerHTML = rows.map(d => {
@@ -2425,8 +2614,8 @@ function updateReuniao() {
         const btnSuite = `<a href="https://suite.ce.gov.br/consultar-processo/${nupLimpo}" target="_blank" class="btn btn-sm btn-light border" title="Abrir no SUITE"><i class="bi bi-box-arrow-up-right" style="color: var(--sop-green);"></i></a>`;
 
         // Lógica da Meta
-        const metaOnclick = uRole === 'admin' ? `window.abrirModalMeta('${escapeHTML(d.processo)}', '${mIso}')` : 'return false;';
-        const metaStyle = uRole === 'admin' ? 'cursor: pointer;' : 'cursor: not-allowed; opacity: 0.6;';
+        const metaOnclick = `window.abrirModalMeta('${escapeHTML(d.processo)}', '${mIso}')`;
+        const metaStyle = 'cursor: pointer;';
 
         return `
         <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row">
@@ -2464,28 +2653,154 @@ function updateReuniao() {
 
     // SweetAlert para definir Meta
     window.abrirModalMeta = async function (processo, dataAtual) {
-        if (!canMarkDateAsMeta()) {
-            alert('Você não tem permissão para alterar a meta.');
-            return;
+        const isAdmin = canMarkDateAsMeta();
+
+        let historicoHTML = '';
+        try {
+            const { data: pData } = await sbClient.from('processos').select('id').eq('processo', processo).maybeSingle();
+            if (pData && pData.id) {
+                const { data: rawHistorico } = await sbClient
+                    .from('historico_metas')
+                    .select('*')
+                    .eq('processo_id', pData.id)
+                    .order('registros', { ascending: false });
+                
+                const historico = [];
+                if (rawHistorico) {
+                    const pRow = (window.allData || []).find(r => r.processo === processo);
+                    const chavesVistas = new Set();
+                    for (const h of rawHistorico) {
+                        let estDate = h.registros;
+                        if (h.autor === 'Sistema' && pRow && !h.registros) {
+                            const st = (pRow.status || "").toString().toUpperCase();
+                            const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
+                            if (isReanalise && pRow.dataDevolucaoCorrecoes) {
+                                estDate = pRow.dataDevolucaoCorrecoes;
+                            } else if (pRow.created_at) {
+                                estDate = pRow.created_at;
+                            }
+                        }
+                        
+                        // Filtra logs obsoletos ou duplicados do Sistema para a mesma data base de estabelecimento.
+                        // Mantém apenas o primeiro encontrado (o mais recente/atualizado, ordenado por registros DESC).
+                        const diaEst = estDate ? new Date(estDate).toISOString().substring(0, 10) : '';
+                        const chave = h.autor === 'Sistema' ? `sistema_${diaEst}` : `manual_${h.meta}_${h.dias_estipulados}`;
+                        
+                        if (!chavesVistas.has(chave)) {
+                            historico.push(h);
+                            chavesVistas.add(chave);
+                        }
+                    }
+                }
+                
+                if (historico && historico.length > 0) {
+                    const totalDiasAcumulado = historico.reduce((sum, h) => sum + (h.dias_estipulados || 0), 0);
+                    historicoHTML = `
+                        <div class="mt-4 text-start">
+                            <label class="form-label text-muted fw-bold d-flex justify-content-between align-items-center w-100" style="font-size: 0.85rem;">
+                                <span><i class="bi bi-clock-history me-1"></i> Histórico de Metas</span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem; background-color: #e6f4ea !important; color: #008F3D !important; border: 1px solid #c3e6cb !important;">Acumulado: ${totalDiasAcumulado} dias</span>
+                            </label>
+                            <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light sticky-top" style="z-index: 1;">
+                                        <tr>
+                                            <th>REGISTRO</th>
+                                            <th class="text-center">DIAS</th>
+                                            <th>META</th>
+                                            <th>AUTOR</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${historico.map(h => {
+                                            const pRow = (window.allData || []).find(r => r.processo === processo);
+                                            let estDate = h.registros;
+                                            if (h.autor === 'Sistema' && pRow && !h.registros) {
+                                                const st = (pRow.status || "").toString().toUpperCase();
+                                                const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
+                                                if (isReanalise && pRow.dataDevolucaoCorrecoes) {
+                                                    estDate = pRow.dataDevolucaoCorrecoes;
+                                                } else if (pRow.created_at) {
+                                                    estDate = pRow.created_at;
+                                                }
+                                            }
+                                            const dtEst = estDate ? new Date(estDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+                                            // Calcula meta exibida: usa h.meta se existir, senão tenta calcular a partir de registros + dias_estipulados
+                                            let metaVal = h.meta || null;
+                                            if (!metaVal) {
+                                                try {
+                                                    const diasVal = (h.dias_estipulados === null || h.dias_estipulados === undefined) ? null : Number(h.dias_estipulados);
+                                                    const baseIso = estDate ? (new Date(estDate)).toISOString().substring(0,10) : null;
+                                                    const baseDateObj = baseIso ? isoParaDate(baseIso) : null;
+                                                    if (baseDateObj && diasVal !== null && !isNaN(diasVal)) {
+                                                        const computed = calcularDataMeta(baseDateObj, diasVal);
+                                                        if (computed) metaVal = computed.toISOString().substring(0,10);
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Erro ao calcular meta a partir de registros:', e);
+                                                }
+                                            }
+                                            const dtLim = metaVal ? metaVal.split('-').reverse().join('/') : 'Zerada';
+                                            const dias = h.dias_estipulados !== null && h.dias_estipulados !== undefined ? h.dias_estipulados : '-';
+                                            const autor = h.autor || 'Sistema';
+                                            return `
+                                                <tr style="vertical-align: middle;">
+                                                    <td>${dtEst}</td>
+                                                    <td class="text-center font-monospace">${dias}</td>
+                                                    <td>
+                                                        ${h.meta ? 
+                                                            `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">${dtLim}</span>` : 
+                                                            `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">Zerada</span>`
+                                                        }
+                                                    </td>
+                                                    <td class="fw-semibold">${autor}</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    historicoHTML = `
+                        <div class="mt-4 text-start text-muted py-2 text-center" style="font-size: 0.8rem; border: 1px dashed #dee2e6; border-radius: 8px; background-color: #f8f9fa;">
+                            <i class="bi bi-info-circle me-1"></i> Nenhum histórico de meta registrado para este processo.
+                        </div>
+                    `;
+                }
+            }
+        } catch (errHist) {
+            console.error('Erro ao buscar histórico de metas:', errHist);
+            historicoHTML = `
+                <div class="mt-4 text-start text-danger py-2 text-center" style="font-size: 0.8rem; border: 1px dashed #f8d7da; border-radius: 8px;">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Não foi possível carregar o histórico de metas.
+                </div>
+            `;
         }
+
+        const inputDisabled = isAdmin ? '' : 'disabled';
+        const inputBg = isAdmin ? '' : 'background-color: #f8f9fa; color: #666; cursor: not-allowed;';
 
         const htmlContent = `
                         <div class="mt-2 text-start">
                             <label for="swal-input-date" class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Selecione a data máxima esperada</label>
-                            <input id="swal-input-date" type="date" class="form-control form-control-lg" value="${dataAtual}" style="border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1rem; color: #333; box-shadow: none;">
+                            <input id="swal-input-date" type="date" class="form-control form-control-lg" value="${dataAtual}" ${inputDisabled} style="border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1rem; color: #333; box-shadow: none; ${inputBg}">
                         </div>
+                        ${historicoHTML}
                     `;
 
         const { value: formValues, isConfirmed, isDenied } = await Swal.fire({
-            title: `<div style="font-size: 1.3rem; font-weight: 700; color: #1B5E20; display: flex; align-items: center;"><i class="bi bi-calendar-check text-success me-2" style="font-size: 1.5rem;"></i> Definir Meta</div><div style="font-size: 0.9rem; color: #666; margin-top: 6px; font-weight: 500;">Processo: <span class="text-dark fw-bold">${processo}</span></div>`,
+            title: `<div style="font-size: 1.3rem; font-weight: 700; color: #1B5E20; display: flex; align-items: center;"><i class="bi bi-calendar-check text-success me-2" style="font-size: 1.5rem;"></i> ${isAdmin ? 'Definir Meta' : 'Visualizar Meta'}</div><div style="font-size: 0.9rem; color: #666; margin-top: 6px; font-weight: 500;">Processo: <span class="text-dark fw-bold">${processo}</span></div>`,
             html: htmlContent,
             showCancelButton: true,
-            showDenyButton: !!dataAtual, // Apenas mostra o botão Remover se já existir uma meta
+            showConfirmButton: isAdmin,
+            showDenyButton: isAdmin && !!dataAtual, // Apenas mostra o botão Remover se já existir uma meta e for admin
             confirmButtonColor: '#008F3D',
             denyButtonColor: '#feebec',
             cancelButtonColor: '#f4f4f4',
             confirmButtonText: '<i class="bi bi-check2-circle me-1"></i>Salvar',
-            cancelButtonText: 'Cancelar',
+            cancelButtonText: isAdmin ? 'Cancelar' : 'Fechar',
             denyButtonText: '<i class="bi bi-trash me-1"></i>Remover',
             customClass: {
                 popup: 'rounded-4 shadow-lg border-0',
@@ -2741,10 +3056,8 @@ if (typeof verificarAdminSalvo === 'function') verificarAdminSalvo();
 -------------------------------------------------------------- */
 
 // Cadastro reformulado: NOME, SOBRENOME, MATRICULA, SENHA
-async function signUpRequest(nome, sobrenome, matricula, senha, telefone) {
+async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email) {
     try {
-        const email = `${matricula}@gecope.app`;
-
         // 1. Criar usuário no Auth
         const options = {
             email: email,
@@ -2760,32 +3073,49 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone) {
             return false;
         }
 
-        // 2. Criar registro na tabela app_users (com novas colunas)
-        // Obs: Inclui-se o "id" do usuário cadastrado para evitar violação de RLS (Row-Level Security)
         const userId = data?.user?.id;
-        const payload = {
-            email: email, // Mantém email para vínculo
-            matricula: matricula,
-            nome: nome,
-            sobrenome: sobrenome,
-            telefone_whatsapp: telefone,
-            role: 'pending',
-            created_at: new Date().toISOString()
-        };
-        if (userId) {
-            payload.id = userId;
+
+        // 2. Buscar se já existe um registro fantasma pela matrícula
+        const { data: existingGhost, error: searchError } = await sbClient
+            .from('app_users')
+            .select('*')
+            .eq('matricula', matricula)
+            .maybeSingle();
+
+        if (existingGhost) {
+            // Fazer UPDATE no registro existente (mantendo o ID original intacto)
+            const payload = {
+                email: email,
+                nome: nome,
+                sobrenome: sobrenome,
+                telefone_whatsapp: telefone || existingGhost.telefone_whatsapp,
+                role: 'pending'
+            };
+            
+            const { error: updateError } = await sbClient.from('app_users').update(payload).eq('id', existingGhost.id);
+            if (updateError) {
+                console.warn('[SIGNUP] Aviso ao atualizar app_users (RLS):', updateError);
+            }
+        } else {
+            // Não existe, fazer INSERT de um novo
+            const payload = {
+                email: email,
+                matricula: matricula,
+                nome: nome,
+                sobrenome: sobrenome,
+                telefone_whatsapp: telefone,
+                role: 'pending',
+                created_at: new Date().toISOString()
+            };
+            if (userId) payload.id = userId; // Fallback to auth ID if allowed, usually app_users might have bigserial id though. The schema check will determine.
+            
+            const { error: insertError } = await sbClient.from('app_users').insert([payload]);
+            if (insertError) {
+                console.warn('[SIGNUP] Aviso ao inserir app_users (RLS):', insertError);
+            }
         }
 
-        const { data: insertData, error: insertError } = await sbClient.from('app_users').insert([payload]);
-
-        if (insertError) {
-            console.warn('[SIGNUP] Aviso ao inserir app_users (RLS):', insertError);
-            // NOTA: Não interrompemos o fluxo se for erro de RLS na inserção direta em app_users,
-            // pois o dashboard de admin é capaz de listar e aprovar usuários com base
-            // nas notificações criadas abaixo (notifPendings).
-        }
-
-        const { data: noteData, error: noteError } = await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}` }), created_at: new Date().toISOString(), read: false }]);
+        const { error: noteError } = await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}`, email: email }), created_at: new Date().toISOString(), read: false }]);
         if (noteError) {
             console.warn('[SIGNUP] Falha ao inserir notificação:', noteError);
         }
@@ -3141,489 +3471,7 @@ function canMarkDateAsMeta() {
     return role === 'admin';
 }
 
-// --- ADMIN DASHBOARD LOGIC ---
-// --- ADMIN DASHBOARD LOGIC (REVISADO) ---
-// --- LGICA DO PAINEL ADMINISTRATIVO (USUÁRIOS) ---
-async function loadAllUsers() {
-    const tbodyActive = document.getElementById('admin-users-table-body');
-    const tbodyPending = document.getElementById('admin-pending-table-body');
-    const sectionPending = document.getElementById('admin-pending-section');
 
-    // Elementos de Estatística
-    const statTotal = document.getElementById('admin-stat-total');
-    const statPending = document.getElementById('admin-stat-pending');
-    const statAdmins = document.getElementById('admin-stat-admins');
-    const statOthers = document.getElementById('admin-stat-others');
-    const pendingTabBadge = document.getElementById('admin-pending-badge-tab');
-
-    if (!tbodyActive || !tbodyPending) return;
-
-    tbodyActive.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Carregando usuários...</td></tr>';
-
-    try {
-        const { data, error } = await sbClient.from('app_users').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-
-        const pendings = data.filter(u => u.role === 'pending').sort((a, b) => {
-            const nameA = (`${(a.nome || '')} ${(a.sobrenome || '')}`.trim() || a.full_name || '').toUpperCase();
-            const nameB = (`${(b.nome || '')} ${(b.sobrenome || '')}`.trim() || b.full_name || '').toUpperCase();
-            return nameA.localeCompare(nameB, 'pt-BR');
-        });
-        const actives = data.filter(u => u.role !== 'pending');
-
-        // 1. Clasificação por Função (Admin, Fiscal, Gerente, Externo)
-        // 2. Classificação Alfabética dentro de cada função
-        const roleOrder = { 'admin': 1, 'fiscal': 2, 'gerente': 3, 'externo': 4 };
-        actives.sort((a, b) => {
-            const orderA = roleOrder[a.role] || 99;
-            const orderB = roleOrder[b.role] || 99;
-            if (orderA !== orderB) return orderA - orderB;
-
-            const nameA = (`${(a.nome || '')} ${(a.sobrenome || '')}`.trim() || a.full_name || '').toUpperCase();
-            const nameB = (`${(b.nome || '')} ${(b.sobrenome || '')}`.trim() || b.full_name || '').toUpperCase();
-            return nameA.localeCompare(nameB, 'pt-BR');
-        });
-
-        // Também verifica notificações de cadastro para somar pendentes
-        let notifPendingCount = 0;
-        try {
-            const { data: notes, error: notesErr } = await sbClient.from('app_notifications').select('id,payload,read,created_at').eq('type', 'new_user_request').eq('read', false).limit(500);
-            if (!notesErr && Array.isArray(notes) && notes.length) {
-                for (const n of notes) {
-                    if (n.read) continue;
-                    let parsed = null;
-                    try { parsed = JSON.parse(n.payload || '{}'); } catch (e) { parsed = null; }
-                    const matricula = parsed?.matricula || null;
-                    const email = matricula ? `${matricula}@gecope.app` : null;
-                    const found = data.find(u => (u.matricula && matricula && String(u.matricula) === String(matricula)) || (u.email && email && u.email.toLowerCase() === (email || '').toLowerCase()));
-                    if (!found) notifPendingCount++;
-                }
-            }
-        } catch (e) { console.warn('Erro ao buscar notificações pendentes:', e); }
-
-        // Atualiza Indicadores
-        const totalPending = pendings.length + notifPendingCount;
-        if (statTotal) statTotal.textContent = data.length;
-        if (statPending) statPending.textContent = totalPending;
-        if (statAdmins) statAdmins.textContent = data.filter(u => u.role === 'admin').length;
-        if (statOthers) statOthers.textContent = data.filter(u => u.role !== 'admin' && u.role !== 'pending').length;
-        if (pendingTabBadge) pendingTabBadge.textContent = totalPending;
-
-        // Exibe seção de pendentes se houver solicitações (inclui notificações)
-        if (sectionPending) sectionPending.style.display = totalPending > 0 ? 'block' : 'none';
-
-        // Atualiza ícone do botão de fechar (se presente)
-        try {
-            const closeBtn = document.getElementById('admin-pending-close-btn');
-            if (closeBtn) {
-                closeBtn.style.display = totalPending > 0 ? 'inline-block' : 'none';
-                const icon = closeBtn.querySelector('i');
-                if (icon) icon.className = 'bi bi-chevron-up';
-            }
-        } catch (e) { /* ignore */ }
-
-        // Renderizar Pendentes
-        tbodyPending.innerHTML = '';
-        pendings.forEach(u => {
-            const dataSolic = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : 'N/A';
-            // 3. Nome sempre em caixa alta
-            const nomeComp = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'N/A').toUpperCase();
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                                <td class="ps-4">
-                                    <div class="fw-bold text-dark">${nomeComp}</div>
-                                    <div class="small text-muted">${u.email}</div>
-                                </td>
-                                <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
-                                <td><span class="text-muted small">${dataSolic}</span></td>
-                                <td class="text-end pe-4">
-                                    <div class="d-flex justify-content-end gap-2">
-                                        <select class="form-select form-select-sm" style="width: 120px;" id="role-pending-${u.id}">
-                                            <option value="externo">EXTERNO</option>
-                                            <option value="fiscal">FISCAL</option>
-                                            <option value="gerente">GERENTE</option>
-                                            <option value="admin">ADMIN</option>
-                                        </select>
-                                        <button class="btn btn-sm btn-success" onclick="aprovarUsuario('${u.email}', document.getElementById('role-pending-${u.id}').value)">
-                                            <i class="bi bi-check-lg me-1"></i> Aprovar
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="excluirUsuario('${u.email}')" title="Recusar">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            `;
-            tbodyPending.appendChild(tr);
-        });
-
-        // Renderizar Ativos
-        tbodyActive.innerHTML = '';
-        if (actives.length === 0) {
-            tbodyActive.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nenhum usuário ativo.</td></tr>';
-        }
-
-        actives.forEach(u => {
-            // 3. Nome sempre em caixa alta
-            const fullNome = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'Não informado').toUpperCase();
-            let roleColor = 'bg-secondary';
-            if (u.role === 'admin') roleColor = 'bg-danger';
-            else if (u.role === 'gerente') roleColor = 'bg-primary';
-            else if (u.role === 'fiscal') roleColor = 'bg-success';
-            else if (u.role === 'externo') roleColor = 'bg-dark';
-
-            const roles = ['admin', 'gerente', 'fiscal', 'externo'];
-            const optionsHtml = roles.map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r.toUpperCase()}</option>`).join('');
-
-            // Se for fiscal, valida se o nome está na FISCAIS_LIST
-            let fiscalInfo = '';
-            if (u.role === 'fiscal' && u.nome) {
-                const nomeCompleto = (u.nome + (u.sobrenome ? ' ' + u.sobrenome : '')).trim();
-                const encontradoNaLista = findFiscalNameInList(nomeCompleto);
-                if (encontradoNaLista) {
-                    fiscalInfo = `<span class="badge bg-info text-dark ms-2" title="Fiscal encontrado na lista">${encontradoNaLista}</span>`;
-                } else {
-                    fiscalInfo = `<span class="badge bg-warning text-dark ms-2" title="Não encontrado na lista">️</span>`;
-                }
-            }
-
-            const tr = document.createElement('tr');
-            tr.setAttribute('data-search', `${fullNome.toLowerCase()} ${u.matricula} ${u.email.toLowerCase()}`);
-            tr.innerHTML = `
-                                <td class="ps-4">
-                                    <div class="fw-bold text-dark">${fullNome}</div>
-                                </td>
-                                <td><div class="small text-muted">${u.email}</div></td>
-                                <td><div class="small fw-bold text-secondary">${u.telefone_whatsapp || '-'}</div></td>
-                                <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
-                                <td>
-                                    <span class="badge ${roleColor} rounded-pill px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span>
-                                    ${fiscalInfo}
-                                </td>
-                                <td class="text-end pe-4">
-                                    <div class="d-flex justify-content-end gap-2">
-                                        <select class="form-select form-select-sm border-0 bg-light" style="width:130px;" onchange="updateUserRole('${u.email}', this.value)">
-                                            ${optionsHtml}
-                                        </select>
-                                        <button class="btn btn-sm btn-outline-danger border-0" onclick="excluirUsuario('${u.email}')" title="Excluir Usuário">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            `;
-            tbodyActive.appendChild(tr);
-        });
-
-    } catch (e) {
-        console.error('Erro ao listar usuários:', e);
-        tbodyActive.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Erro ao carregar banco de usuários: ${e.message}</td></tr>`;
-    }
-}
-
-async function loadFiscalDirectory() {
-    const tbody = document.getElementById('fiscal-directory-table-body');
-    if (!tbody) return;
-
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small"><div class="spinner-border spinner-border-sm me-2"></div>Carregando fiscais...</td></tr>';
-
-    try {
-        // 1. Busca usuários registrados e ghost
-        const { data: users, error } = await sbClient.from('app_users').select('nome, sobrenome, full_name, telefone_whatsapp, email');
-        if (error) throw error;
-
-        // 2. Filtra quem é real (fiscal cadastrado)
-        const realFiscals = new Set();
-        users.forEach(u => {
-            if (!u.email.includes('@sop-ghost.internal')) {
-                const name = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '').toUpperCase();
-                if (name) realFiscals.add(name);
-            }
-        });
-
-        // 3. Identifica quem da FISCAIS_LIST não tem cadastro real
-        const directoryData = FISCAIS_LIST.filter(name => !realFiscals.has(name.toUpperCase())).map(name => {
-            const ghost = users.find(u => {
-                const uName = (u.full_name || '').toUpperCase();
-                return u.email.includes('@sop-ghost.internal') && uName === name.toUpperCase();
-            });
-            return {
-                name: name,
-                phone: ghost ? (ghost.telefone_whatsapp || '') : '',
-                isGhost: !!ghost
-            };
-        });
-
-        // 4. Renderiza
-        tbody.innerHTML = '';
-        if (directoryData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small">Todos os fiscais da lista já possuem cadastro oficial.</td></tr>';
-            return;
-        }
-
-        directoryData.sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                            <td class="ps-4 fw-bold text-dark">${item.name.toUpperCase()}</td>
-                            <td>
-                                <input type="text" class="form-control form-control-sm" style="max-width: 200px;" 
-                                    id="dir-phone-${item.name.replace(/\s+/g, '_')}" value="${item.phone}" placeholder="Ex: 85988887777">
-                            </td>
-                            <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-outline-success" onclick="saveFiscalContact('${item.name}', 'dir-phone-${item.name.replace(/\s+/g, '_')}')">
-                                    <i class="bi bi-save me-1"></i> Salvar
-                                </button>
-                            </td>
-                        `;
-            tbody.appendChild(tr);
-        });
-
-    } catch (e) {
-        console.error('Erro ao carregar diretório:', e);
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger py-4 small">Erro: ' + e.message + '</td></tr>';
-    }
-}
-
-async function saveFiscalContact(name, inputId) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-
-    const phone = input.value.trim();
-    const btn = event.target.closest('button');
-    const originalHtml = btn.innerHTML;
-
-    try {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-        // Usa a lógica já existente no WhatsAppConfigManager
-        await WhatsAppConfigManager.savePhoneForUser(name, 'ghost', phone);
-
-        showToast(`Contato de ${name} atualizado com sucesso!`);
-    } catch (e) {
-        console.error(e);
-        alert("Erro ao salvar contato.");
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-    }
-}
-
-// --- VARIÁVEIS DE CONTROLE PARA VÍNCULO DE FISCAL ---
-let _vincularContext = null;
-
-document.addEventListener('DOMContentLoaded', () => {
-    const btnConfirmar = document.getElementById('btn-confirmar-vinculo');
-    if (btnConfirmar) {
-        btnConfirmar.addEventListener('click', async () => {
-            if (!_vincularContext) return;
-
-            const select = document.getElementById('vincular-fiscal-select');
-            const novoNome = select.value;
-
-            if (!novoNome) {
-                alert("Por favor, selecione um nome da lista.");
-                return;
-            }
-
-            try {
-                btnConfirmar.disabled = true;
-                btnConfirmar.innerHTML = "Salvando...";
-
-                // Atualiza nome no banco
-                const partes = novoNome.split(' ');
-                const nome = partes[0];
-                const sobrenome = partes.slice(1).join(' ');
-
-                const { error } = await sbClient.from('app_users').update({
-                    full_name: novoNome,
-                    nome: nome,
-                    sobrenome: sobrenome
-                }).eq('email', _vincularContext.email);
-
-                if (error) throw error;
-
-                // Sucesso na atualização do nome
-                alert(` Usuário vinculado a "${novoNome}" com sucesso!`);
-
-                // Fecha modal
-                const modalEL = document.getElementById('modalVincularFiscal');
-                const modal = bootstrap.Modal.getInstance(modalEL);
-                modal.hide();
-
-                // Retoma a ação original (sem confirmação extra)
-                if (_vincularContext.action === 'aprovar') {
-                    aprovarUsuario(_vincularContext.email, _vincularContext.role, true); // true = skipConfirm
-                } else if (_vincularContext.action === 'update') {
-                    updateUserRole(_vincularContext.email, _vincularContext.role, true); // true = skipConfirm
-                }
-
-            } catch (e) {
-                alert("Erro ao vincular: " + e.message);
-            } finally {
-                btnConfirmar.disabled = false;
-                btnConfirmar.innerHTML = "Confirmar Vínculo";
-            }
-        });
-    }
-});
-
-function abrirModalVinculo(nomeAtual, email, role, action) {
-    _vincularContext = { email, role, action };
-    document.getElementById('vincular-usuario-nome').textContent = nomeAtual || email;
-
-    const sel = document.getElementById('vincular-fiscal-select');
-    sel.innerHTML = '<option value="">Selecione...</option>';
-    FISCAIS_LIST.forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = f;
-        opt.textContent = f;
-        sel.appendChild(opt);
-    });
-
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalVincularFiscal')).show();
-}
-
-async function aprovarUsuario(email, role = 'externo', skipConfirm = false) {
-    if (!skipConfirm && !confirm(`Confirmar aprovação de ${email} como ${role.toUpperCase()}?`)) return;
-    try {
-        // Se for fiscal, encontra e valida o nome correspondente na FISCAIS_LIST
-        if (role === 'fiscal') {
-            const { data: userData, error: userError } = await sbClient
-                .from('app_users')
-                .select('nome, sobrenome, full_name')
-                .eq('email', email)
-                .single();
-
-            if (!userError && userData) {
-                let nomeCompleto = '';
-                if (userData.full_name && !/^\d+$/.test(userData.full_name)) {
-                    nomeCompleto = userData.full_name;
-                } else if (userData.nome) {
-                    nomeCompleto = (userData.nome + (userData.sobrenome ? ' ' + userData.sobrenome : '')).trim();
-                }
-
-                if (nomeCompleto) {
-                    // Match na FISCAIS_LIST
-                    const fiscalFromList = findFiscalNameInList(nomeCompleto);
-                    console.log('[ADMIN] Usuário:', nomeCompleto, '-> Match na lista:', fiscalFromList);
-
-                    if (!fiscalFromList) {
-                        // AQUI ENTRA O MODAL DE VÍNCULO EM VEZ DO ALERT
-                        abrirModalVinculo(nomeCompleto, email, role, 'aprovar');
-                        return; // Interrompe para aguardar o modal
-                    }
-                }
-            }
-        }
-
-        const { error } = await sbClient.from('app_users').update({ role: role }).eq('email', email);
-        if (error) throw error;
-
-        if (!skipConfirm) alert('Usuário aprovado com sucesso!'); // Só alerta se for fluxo manual
-
-        loadAllUsers();
-        if (typeof fetchPendingCount === 'function') fetchPendingCount();
-    } catch (e) { alert('Erro ao aprovar: ' + e.message); }
-}
-
-async function excluirUsuario(email) {
-    if (!confirm(`Remover definitivamente o usuário ${email}?`)) return;
-    try {
-        const { error } = await sbClient.from('app_users').delete().eq('email', email);
-        if (error) throw error;
-        alert('Usuário removido.');
-        loadAllUsers();
-        if (typeof fetchPendingCount === 'function') fetchPendingCount();
-    } catch (e) { alert('Erro ao excluir: ' + e.message); }
-}
-
-function filterAdminUsers() {
-    const term = document.getElementById('admin-user-search').value.toLowerCase();
-    const rows = document.querySelectorAll('#admin-users-table-body tr[data-search]');
-    rows.forEach(row => {
-        row.style.display = row.getAttribute('data-search').includes(term) ? '' : 'none';
-    });
-}
-
-async function updateUserRole(email, newRole, skipConfirm = false) {
-    if (!skipConfirm && !confirm(`Alterar perfil de ${email} para ${newRole.toUpperCase()}?`)) {
-        loadAllUsers();
-        return;
-    }
-    try {
-        if (newRole === 'fiscal') {
-            const { data: userData, error: userError } = await sbClient
-                .from('app_users')
-                .select('nome, sobrenome, full_name')
-                .eq('email', email)
-                .single();
-
-            if (!userError && userData) {
-                let nomeCompleto = '';
-                if (userData.full_name && !/^\d+$/.test(userData.full_name)) {
-                    nomeCompleto = userData.full_name;
-                } else if (userData.nome) {
-                    nomeCompleto = (userData.nome + (userData.sobrenome ? ' ' + userData.sobrenome : '')).trim();
-                }
-
-                if (nomeCompleto) {
-                    const fiscalFromList = findFiscalNameInList(nomeCompleto);
-                    console.log('[ADMIN] Usuário:', nomeCompleto, '-> Match na lista:', fiscalFromList);
-
-                    if (!fiscalFromList) {
-                        // MODAL DE VÍNCULO
-                        abrirModalVinculo(nomeCompleto, email, newRole, 'update');
-                        return;
-                    }
-                }
-            }
-        }
-
-        const { error } = await sbClient.from('app_users').update({ role: newRole }).eq('email', email);
-        if (error) throw error;
-
-        if (!skipConfirm) alert('Perfil atualizado!');
-        loadAllUsers();
-    } catch (e) { alert('Erro ao atualizar cargo: ' + e.message); }
-}
-
-// Polling de notificações (admin) - otimizado
-let _notifIntervalId = null;
-function startNotificationsPoll() {
-    if (_notifIntervalId) return;
-    fetchNotifications();
-    _notifIntervalId = setInterval(fetchNotifications, 45000); // Otimizado para melhor performance
-}
-function stopNotificationsPoll() {
-    if (_notifIntervalId) { clearInterval(_notifIntervalId); _notifIntervalId = null; }
-}
-
-async function fetchPendingCount() {
-    try {
-        const { data, error } = await sbClient.from('app_users').select('id').eq('role', 'pending');
-        if (error) throw error;
-        const count = Array.isArray(data) ? data.length : 0;
-        const badgeEl = document.getElementById('pending-badge');
-        if (badgeEl) badgeEl.textContent = count > 0 ? String(count) : '';
-    } catch (err) { console.error('Erro ao buscar pendentes', err); }
-}
-
-async function fetchNotifications() {
-    try {
-        const { data, error } = await sbClient.from('app_notifications').select('*').eq('read', false).order('created_at', { ascending: true });
-        if (error) throw error;
-        if (data && data.length) {
-            // Notifica admin (silencioso - apenas log, badge ou toast futuro)
-            data.forEach(async n => {
-                try {
-                    console.log('Nova Notificação:', n.type, n.payload);
-                    // Marca como lida
-                    await sbClient.from('app_notifications').update({ read: true }).eq('id', n.id);
-                } catch (e) { console.error(e); }
-            });
-        }
-    } catch (err) { console.error('Erro ao buscar notificações', err); }
-}
 // Ao carregar, aplica role salvo (se houver)
 (function () {
     const savedRole = sessionStorage.getItem('sop_role') || 'guest';
