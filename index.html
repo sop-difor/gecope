@@ -88,8 +88,8 @@
                     </div>
                     <div class="mb-3"><input id="reg-matricula" type="text" placeholder="Matrícula" class="form-control"
                             required /></div>
-                    <div class="mb-3"><input id="reg-email" type="email" placeholder="E-mail Institucional" class="form-control"
-                            required /></div>
+                    <div class="mb-3"><input id="reg-email" type="email" placeholder="E-mail Institucional"
+                            class="form-control" required /></div>
                     <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha" class="form-control"
                             required /></div>
                     <div class="mb-3">
@@ -149,25 +149,37 @@
                         <div class="modal-content">
                             <div class="modal-header bg-primary text-white">
                                 <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Editar Usuário</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <form id="formEditarUsuario">
                                     <input type="hidden" id="edit-user-email-original">
                                     <div class="row g-2 mb-2">
-                                        <div class="col"><label class="form-label small fw-bold">Nome</label><input type="text" id="edit-user-nome" class="form-control form-control-sm" required></div>
-                                        <div class="col"><label class="form-label small fw-bold">Sobrenome</label><input type="text" id="edit-user-sobrenome" class="form-control form-control-sm"></div>
+                                        <div class="col"><label class="form-label small fw-bold">Nome</label><input
+                                                type="text" id="edit-user-nome" class="form-control form-control-sm"
+                                                required></div>
+                                        <div class="col"><label class="form-label small fw-bold">Sobrenome</label><input
+                                                type="text" id="edit-user-sobrenome"
+                                                class="form-control form-control-sm"></div>
                                     </div>
                                     <div class="row g-2 mb-2">
-                                        <div class="col"><label class="form-label small fw-bold">Matrícula</label><input type="text" id="edit-user-matricula" class="form-control form-control-sm"></div>
-                                        <div class="col"><label class="form-label small fw-bold">GEDOP</label><input type="text" id="edit-user-gedop" class="form-control form-control-sm"></div>
+                                        <div class="col"><label class="form-label small fw-bold">Matrícula</label><input
+                                                type="text" id="edit-user-matricula"
+                                                class="form-control form-control-sm"></div>
+                                        <div class="col"><label class="form-label small fw-bold">GEDOP</label><input
+                                                type="text" id="edit-user-gedop" class="form-control form-control-sm">
+                                        </div>
                                     </div>
                                     <div class="mb-2">
                                         <label class="form-label small fw-bold">E-mail Institucional</label>
-                                        <input type="email" id="edit-user-email" class="form-control form-control-sm" required>
+                                        <input type="email" id="edit-user-email" class="form-control form-control-sm"
+                                            required>
                                     </div>
                                     <div class="row g-2 mb-2">
-                                        <div class="col"><label class="form-label small fw-bold">WhatsApp</label><input type="text" id="edit-user-whatsapp" class="form-control form-control-sm" placeholder="Ex: 85988887777"></div>
+                                        <div class="col"><label class="form-label small fw-bold">WhatsApp</label><input
+                                                type="text" id="edit-user-whatsapp" class="form-control form-control-sm"
+                                                placeholder="Ex: 85988887777"></div>
                                         <div class="col">
                                             <label class="form-label small fw-bold">Função</label>
                                             <select id="edit-user-role" class="form-select form-select-sm">
@@ -182,8 +194,10 @@
                                 </form>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-primary btn-sm fw-bold"
+                                    onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
                             </div>
                         </div>
                     </div>
@@ -509,10 +523,12 @@
                                                     class="form-control border-0 bg-light"
                                                     placeholder="Filtrar por nome..." onkeyup="filterAdminUsers()">
                                             </div>
-                                            <button class="btn btn-sm btn-primary fw-bold" onclick="abrirModalNovoUsuario()">
+                                            <button class="btn btn-sm btn-primary fw-bold"
+                                                onclick="abrirModalNovoUsuario()">
                                                 <i class="bi bi-plus-lg me-1"></i> Novo Usuário
                                             </button>
-                                            <button class="btn btn-sm btn-light border" onclick="loadAllUsers()" title="Atualizar Tabela">
+                                            <button class="btn btn-sm btn-light border" onclick="loadAllUsers()"
+                                                title="Atualizar Tabela">
                                                 <i class="bi bi-arrow-clockwise"></i>
                                             </button>
                                         </div>
@@ -2777,6 +2793,7 @@
                                                                         <option value="N">Nildeno</option>
                                                                         <option value="W">Walace</option>
                                                                         <option value="P">Pedro</option>
+                                                                        <option value="H">Helder</option>
                                                                     </select>
                                                                 </div>
                                                             </div>
