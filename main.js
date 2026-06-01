@@ -441,29 +441,53 @@ window.StatusSync = {
                 }
             } catch (e) { /* noop */ }
 
-            // REGRA 1: ARQUIVAMENTO (Prioridade Máxima)
+            const suiteGecope = String(processoGecope.suite || '').toUpperCase().trim();
+            const analista = String(processoGecope.analista || '').trim().toUpperCase();
+            const isAnalistaEspecial = ["N", "W", "H", "P", "F"].includes(analista) || 
+                                       ["N", "W", "H", "P", "F"].includes(analista.charAt(0));
+            const historico = dadosSuite.historico || [];
+
+            // REGRA 2: ARQUIVAMENTO (Prioridade Máxima)
             if (siglaSuite === 'ARQUIVADO') {
                 novoStatus = 'ARQUIVADO';
             }
-            // REGRA: Atualização somente quando detectarmos que o processo
-            // retornou para GECOPE após ter transitado por outro setor.
-            // Detectado quando prevSigla existe e não era GECOPE, e a sigla atual é GECOPE.
-            else if (prevSigla && prevSigla !== 'GECOPE' && siglaSuite === 'GECOPE') {
-                const hasAnalista = processoGecope && processoGecope.analista && String(processoGecope.analista).trim() !== '';
-                // Se havia análise fiscal antes, definir reanálise/aguardo conforme analista
-                if (statusGecope.includes('REANÁLISE') || hasAnalista) {
-                    novoStatus = 'AGUAR. REANÁLISE';
-                } else {
+            // REGRA 1
+            else if (statusGecope === 'AGUAR. APROVAÇÃO' && 
+                     (suiteGecope === 'DIFOR' || suiteGecope === 'GECOPE') && 
+                     isAnalistaEspecial && 
+                     (siglaSuite !== 'DIFOR' && siglaSuite !== 'GECOPE')) {
+                novoStatus = 'APROVADO';
+            }
+            // REGRA 3
+            else if (statusGecope === 'REANÁLISE FISCAL' && 
+                     suiteGecope !== 'GECOPE' && 
+                     isAnalistaEspecial && 
+                     siglaSuite === 'GECOPE') {
+                novoStatus = 'AGUAR. REANÁLISE';
+            }
+            // REGRA 4
+            else if (statusGecope === 'ANÁLISE FISCAL' && 
+                     !isAnalistaEspecial && 
+                     siglaSuite === 'GECOPE') {
+                
+                let entradasGecope = 0;
+                if (Array.isArray(historico) && historico.length > 0) {
+                    entradasGecope = historico.filter(h => {
+                        if (!h) return false;
+                        const s = typeof h === 'string' ? h.toUpperCase() : JSON.stringify(h).toUpperCase();
+                        return s.includes('"GECOPE"') || s.includes(':"GECOPE"') || s.includes(': GECOPE') || s.includes(' GECOPE ') || s === 'GECOPE' || 
+                               (h.sigla && h.sigla.toUpperCase() === 'GECOPE') || 
+                               (h.setor && h.setor.toUpperCase() === 'GECOPE') || 
+                               (h.unidade && h.unidade.toUpperCase() === 'GECOPE');
+                    }).length;
+                } else if (prevSigla && prevSigla !== 'GECOPE') {
+                    // Fallback de rastreabilidade do cache caso o histórico não venha no array
+                    entradasGecope = 2;
+                }
+
+                if (entradasGecope >= 2) {
                     novoStatus = 'AGUAR. ANÁLISE';
                 }
-            }
-            // Fallback: antigas regras aplicadas apenas quando não temos histórico de mudança
-            else if (siglaSuite === 'GECOPE' && statusGecope.includes('REANÁLISE FISCAL')) {
-                const hasAnalista = processoGecope && processoGecope.analista && String(processoGecope.analista).trim() !== '';
-                if (hasAnalista) novoStatus = 'AGUAR. REANÁLISE';
-            }
-            else if (siglaSuite === 'GECOPE' && statusGecope.includes('ANÁLISE FISCAL')) {
-                novoStatus = 'AGUAR. ANÁLISE';
             }
 
             if (novoStatus && novoStatus !== statusGecope) {
@@ -2927,7 +2951,8 @@ async function atualizarTabelaSuite(rows) {
                 window.StatusSync.verificarEAtualizarStatus(d, {
                     status_suite: data.sigla,
                     sigla: data.sigla,
-                    prevSigla: prevSigla
+                    prevSigla: prevSigla,
+                    historico: data.historico || data.tramites || data.movimentacoes || []
                 }).then(res => {
                     if (res && res.changed && res.data) {
                         const novoStatus = res.data.status;
