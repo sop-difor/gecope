@@ -459,7 +459,7 @@ window.StatusSync = {
                 novoStatus = 'APROVADO';
             }
             // REGRA 3
-            else if (statusGecope === 'REANÁLISE FISCAL' && 
+            else if ((statusGecope === 'REANÁLISE FISCAL' || statusGecope === 'DEVOLVIDO P/ REANÁLISE FISCAL') && 
                      suiteGecope !== 'GECOPE' && 
                      isAnalistaEspecial && 
                      siglaSuite === 'GECOPE') {
