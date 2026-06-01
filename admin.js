@@ -120,8 +120,10 @@
                         // Check if there is an app_user with this matricula/email
                         const found = data.find(u => (u.matricula && matricula && String(u.matricula) === String(matricula)) || (u.email && email && u.email.toLowerCase() === email.toLowerCase()));
 
+                        const isAlreadyInPendings = pendings.some(pu => pu.email === email || (pu.matricula && String(pu.matricula) === String(matricula)));
+
                         // Only surface if no app_user exists OR existing user is not active (not approved)
-                        if (!found || (found && found.role === 'pending')) {
+                        if (!isAlreadyInPendings && (!found || (found && found.role === 'pending'))) {
                             notifPendings.push({
                                 id: found?.id || null,
                                 email: email || (found ? found.email : 'N/A'),
@@ -600,6 +602,7 @@
             if (error) throw error;
             if (data && data.length) {
                 data.forEach(async n => {
+                    if (n.type === 'new_user_request') return; // Skip mark as read for new user requests so they appear in pending
                     try { console.log('Nova Notificação:', n.type, n.payload); await sbClient.from('app_notifications').update({ read: true }).eq('id', n.id); } catch (e) { console.error(e); }
                 });
             }
