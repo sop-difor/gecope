@@ -1544,10 +1544,56 @@ async function abrirDetalhes(processoStr) {
     }
     document.getElementById('det_atualizacao').value = txtUpdate;
 
-
+    // Buscar histórico de prioridades
+    carregarHistoricoPrioridades(processoStr);
 
     const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
     modal.show();
+}
+
+async function carregarHistoricoPrioridades(processoStr) {
+    const container = document.getElementById('det_historico_prioridade');
+    if (!container) return;
+    
+    container.innerHTML = '<em class="text-muted">Carregando histórico...</em>';
+    
+    try {
+        const { data, error } = await sbClient
+            .from('app_atividades')
+            .select('usuario, descricao, created_at')
+            .eq('tipo', 'PROCESSO')
+            .eq('contexto', processoStr)
+            .ilike('descricao', '%prioritário%')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<em class="text-muted">Nenhum registro de prioridade encontrado.</em>';
+            return;
+        }
+
+        container.innerHTML = data.map(registro => {
+            const dt = new Date(registro.created_at).toLocaleString('pt-BR');
+            const isMarcar = registro.descricao.toLowerCase().includes('marcou');
+            const icon = isMarcar ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '<i class="bi bi-star text-secondary me-1"></i>';
+            const actionText = isMarcar ? 'Marcou como prioritário' : 'Desmarcou como prioritário';
+            
+            return `
+                <div class="mb-2 pb-2 border-bottom border-light">
+                    <div class="d-flex align-items-center mb-1">
+                        ${icon} <span class="fw-bold text-dark">${registro.usuario}</span>
+                    </div>
+                    <div class="ps-3 text-muted" style="font-size: 0.65rem;">
+                        ${actionText} em ${dt}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error("Erro ao carregar histórico de prioridades:", err);
+        container.innerHTML = '<em class="text-danger">Erro ao carregar histórico.</em>';
+    }
 }
 
 async function executarAcaoDetalhes(actionType) {
