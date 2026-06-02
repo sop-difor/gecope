@@ -1575,9 +1575,10 @@ async function carregarHistoricoPrioridades(processoStr) {
 
         container.innerHTML = data.map(registro => {
             const dt = new Date(registro.created_at).toLocaleString('pt-BR');
-            const isMarcar = registro.descricao.toLowerCase().includes('marcou');
-            const icon = isMarcar ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '<i class="bi bi-star text-secondary me-1"></i>';
-            const actionText = isMarcar ? 'Marcou como prioritário' : 'Desmarcou como prioritário';
+            const desc = registro.descricao.toLowerCase();
+            const isDesmarcar = desc.includes('desmarcou');
+            const icon = !isDesmarcar ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '<i class="bi bi-star text-secondary me-1"></i>';
+            const actionText = !isDesmarcar ? 'Marcou como prioritário' : 'Desmarcou como prioritário';
             
             return `
                 <div class="mb-2 pb-2 border-bottom border-light">
