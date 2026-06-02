@@ -29,14 +29,12 @@ function calcularDiasDevolucao() {
     try {
         const elDevolucao = document.getElementById('det_data_devolucao');
         const elBadge = document.getElementById('det_badge_dias_dev');
-        const elRecebimento = document.getElementById('det_data_recebimento');
 
-        if (!elDevolucao || !elBadge || !elRecebimento) {
+        if (!elDevolucao || !elBadge) {
             console.warn('[WARN] Elementos não encontrados para calcularDiasDevolucao');
             return;
         }
 
-        const strDataRecebimento = elRecebimento.value;
         const strDataDevolucao = elDevolucao.value;
 
         if (!strDataDevolucao) {
@@ -44,11 +42,14 @@ function calcularDiasDevolucao() {
             return;
         }
 
-        const dataRecebimento = isoParaDate(dataParaISO(strDataRecebimento));
         const dataDevolucao = isoParaDate(dataParaISO(strDataDevolucao));
 
-        if (dataRecebimento && dataDevolucao && !isNaN(dataRecebimento) && !isNaN(dataDevolucao)) {
-            const dias = Math.round((dataDevolucao - dataRecebimento) / (1000 * 60 * 60 * 24));
+        if (dataDevolucao && !isNaN(dataDevolucao)) {
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            const devDate = new Date(dataDevolucao);
+            devDate.setHours(0, 0, 0, 0);
+            const dias = Math.round((hoje - devDate) / (1000 * 60 * 60 * 24));
             elBadge.textContent = dias + ' dias';
         }
     } catch (err) {
@@ -468,26 +469,9 @@ window.StatusSync = {
             // REGRA 4
             else if (statusGecope === 'ANÁLISE FISCAL' && 
                      !isAnalistaEspecial && 
+                     suiteGecope !== 'GECOPE' &&
                      siglaSuite === 'GECOPE') {
-                
-                let entradasGecope = 0;
-                if (Array.isArray(historico) && historico.length > 0) {
-                    entradasGecope = historico.filter(h => {
-                        if (!h) return false;
-                        const s = typeof h === 'string' ? h.toUpperCase() : JSON.stringify(h).toUpperCase();
-                        return s.includes('"GECOPE"') || s.includes(':"GECOPE"') || s.includes(': GECOPE') || s.includes(' GECOPE ') || s === 'GECOPE' || 
-                               (h.sigla && h.sigla.toUpperCase() === 'GECOPE') || 
-                               (h.setor && h.setor.toUpperCase() === 'GECOPE') || 
-                               (h.unidade && h.unidade.toUpperCase() === 'GECOPE');
-                    }).length;
-                } else if (prevSigla && prevSigla !== 'GECOPE') {
-                    // Fallback de rastreabilidade do cache caso o histórico não venha no array
-                    entradasGecope = 2;
-                }
-
-                if (entradasGecope >= 2) {
-                    novoStatus = 'AGUAR. ANÁLISE';
-                }
+                novoStatus = 'AGUAR. ANÁLISE';
             }
 
             if (novoStatus && novoStatus !== statusGecope) {
@@ -1682,26 +1666,37 @@ async function executarAcaoDetalhes(actionType) {
             // A data 'ultima_atualizacao' não é definida aqui para não resetar o contador de dias sem mudança de status
         };
 
-        // NOVA LÓGICA: Se o status mudar, reiniciar o contador de dias e remover a meta
-        const novoStatus = (updates.status || "").toString().trim().toUpperCase();
+        // NOVA LÓGICA: Recalcular metas automáticas se o status mudar ou se a data de devolução for alterada
+        const novoStatus = (updates.status || registroOriginal.status || "").toString().trim().toUpperCase();
         const statusAntigo = (registroOriginal.status || "").toString().trim().toUpperCase();
+        const dataDevNova = updates.data_devolucao_correcoes;
+        const dataDevAntiga = registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes ? 
+                              (isoParaDate(registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes).toISOString().substring(0, 10)) : null;
 
-        if (novoStatus && novoStatus !== statusAntigo) {
-            updates.ultima_atualizacao = new Date().toISOString(); // Reinicia o contador de dias
+        const statusMudou = novoStatus && novoStatus !== statusAntigo;
+        const dataDevMudou = dataDevNova && dataDevNova !== dataDevAntiga;
 
-            // Automação GECOPE: definir metas automáticas ao mudar de status
-            if (updates.status === 'ANÁLISE FISCAL') {
+        if (statusMudou) {
+            updates.ultima_atualizacao = new Date().toISOString(); // Reinicia o contador de dias se o status mudar
+        }
+
+        if (statusMudou || dataDevMudou) {
+            // Automação GECOPE: definir metas automáticas
+            if (novoStatus === 'ANÁLISE FISCAL') {
                 const base = registroOriginal.created_at || new Date();
                 const metaAuto = calcularDataMeta(base, 20);
                 updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
-            } else if (updates.status === 'DEVOLVIDO P/ REANÁLISE FISCAL' || updates.status === 'REANÁLISE FISCAL') {
-                // Para reanálises, preferir a data de devolução informada no formulário
+            } else if (novoStatus === 'DEVOLVIDO P/ REANÁLISE FISCAL' || novoStatus === 'REANÁLISE FISCAL') {
+                // Para reanálises, usar a data de devolução informada no formulário
                 let base = null;
-                if (updates.data_devolucao_correcoes) base = isoParaDate(updates.data_devolucao_correcoes);
+                const devolucaoFinal = updates.data_devolucao_correcoes || dataDevAntiga;
+                if (devolucaoFinal) base = isoParaDate(devolucaoFinal);
                 else base = new Date();
+                
                 const metaAuto = calcularDataMeta(base, 10);
                 updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
-            } else {
+            } else if (statusMudou) {
+                // Remove a meta se o status mudou para algo que não tem meta automática
                 updates.data_compromisso_fiscal = null;
                 const key = `meta:${processoNome}`;
                 localStorage.removeItem(key);
