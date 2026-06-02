@@ -1402,8 +1402,13 @@
                                         id="meetingStatusSelect"></select>
                                 </div>
                                 <div class="col">
-                                    <label
-                                        class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label small text-muted fw-bold text-uppercase mb-0">Buscar</label>
+                                        <div class="form-check form-switch mb-0 d-flex align-items-center" style="min-height: auto; padding-left: 2.5em;">
+                                            <input class="form-check-input mt-0" type="checkbox" role="switch" id="searchGlobalToggle" title="Buscar em todas as abas" style="cursor: pointer;">
+                                            <label class="form-check-label small text-muted ms-1" for="searchGlobalToggle" style="font-size: 0.65rem; cursor: pointer; user-select: none;" title="Buscar em todas as abas">Global</label>
+                                        </div>
+                                    </div>
                                     <div class="input-group input-group-sm">
                                         <input type="text" class="form-control border-secondary-subtle"
                                             id="meetingSearch"

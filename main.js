@@ -2406,16 +2406,23 @@ function updateReuniao() {
 
     // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
     if (!window.currentProcessesTab) window.currentProcessesTab = 'ativos';
-    rows = rows.filter(d => {
-        const st = (d.status || "").toUpperCase().trim();
-        const isAprovado = st.includes("APROVADO") || st === "SEDUC";
-        const isArquivado = st.includes("ARQUIVADO");
+    
+    // Filtro Global: Ignorar paginação (aba atual) se ativado
+    const elGlobalToggle = document.getElementById('searchGlobalToggle');
+    const isGlobalSearch = elGlobalToggle && elGlobalToggle.checked;
+    
+    if (!isGlobalSearch) {
+        rows = rows.filter(d => {
+            const st = (d.status || "").toUpperCase().trim();
+            const isAprovado = st.includes("APROVADO") || st === "SEDUC";
+            const isArquivado = st.includes("ARQUIVADO");
 
-        if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
-        if (window.currentProcessesTab === 'aprovados') return isAprovado;
-        if (window.currentProcessesTab === 'arquivados') return isArquivado;
-        return true;
-    });
+            if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
+            if (window.currentProcessesTab === 'aprovados') return isAprovado;
+            if (window.currentProcessesTab === 'arquivados') return isArquivado;
+            return true;
+        });
+    }
 
     if (uRole === 'fiscal') {
         const nameParts = uName.trim().split(/[\s\.\-]+/).filter(p => p.length > 0);
@@ -3040,10 +3047,13 @@ function wireEvents() {
     mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
     // Debounce no search de reunião
     mt.search.addEventListener("input", debounce(updateReuniao, 300));
+    const globalSearchToggle = document.getElementById("searchGlobalToggle");
+    if (globalSearchToggle) globalSearchToggle.addEventListener("change", updateReuniao);
 
     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
         e.preventDefault();
         if (mt && mt.search) mt.search.value = "";
+        if (globalSearchToggle) globalSearchToggle.checked = false;
         [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => {
             if (!el) return;
             if (el.multiple) {
