@@ -707,6 +707,11 @@ function moedaParaNumero(strValor) {
 
 function isoParaDate(isoStr) {
     if (!isoStr) return null;
+    if (isoStr instanceof Date) return isNaN(isoStr.getTime()) ? null : isoStr;
+    if (typeof isoStr !== 'string') {
+        const d = new Date(isoStr);
+        return isNaN(d.getTime()) ? null : d;
+    }
     // Força o horário local para evitar problemas de fuso horário (UTC vs Local)
     const d = isoStr.includes('T') ? new Date(isoStr) : new Date(isoStr + "T00:00:00");
     return isNaN(d.getTime()) ? null : d;
