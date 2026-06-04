@@ -452,12 +452,15 @@ window.StatusSync = {
             if (siglaSuite === 'ARQUIVADO') {
                 novoStatus = 'ARQUIVADO';
             }
-            // REGRA 1
+            // REGRA 1: Aprovação Automática
             else if (statusGecope === 'AGUAR. APROVAÇÃO' && 
-                     (suiteGecope === 'DIFOR' || suiteGecope === 'GECOPE') && 
                      isAnalistaEspecial && 
-                     (siglaSuite !== 'DIFOR' && siglaSuite !== 'GECOPE')) {
+                     siglaSuite !== 'DIFOR' && 
+                     siglaSuite !== 'GECOPE' && 
+                     siglaSuite !== '') { 
+                
                 novoStatus = 'APROVADO';
+                
             }
             // REGRA 3
             else if ((statusGecope === 'REANÁLISE FISCAL' || statusGecope === 'DEVOLVIDO P/ REANÁLISE FISCAL') && 
