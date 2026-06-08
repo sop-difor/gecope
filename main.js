@@ -425,7 +425,6 @@ window.StatusSync = {
             const id = processoGecope.id;
             const nup = processoGecope.processo;
             const siglaSuite = String(dadosSuite.sigla || '').toUpperCase().trim();
-            const prevSigla = String(dadosSuite.prevSigla || '').toUpperCase().trim() || null;
             const statusGecope = String(processoGecope.status || '').toUpperCase().trim();
             let novoStatus = null;
 
@@ -442,11 +441,10 @@ window.StatusSync = {
                 }
             } catch (e) { /* noop */ }
 
-            const suiteGecope = String(processoGecope.suite || '').toUpperCase().trim();
             const analista = String(processoGecope.analista || '').trim().toUpperCase();
-            const isAnalistaEspecial = ["N", "W", "H", "P", "F"].includes(analista) ||
-                ["N", "W", "H", "P", "F"].includes(analista.charAt(0));
-            const historico = dadosSuite.historico || [];
+
+            // Melhoria: Código mais limpo e à prova de falhas para checar a inicial do analista
+            const isAnalistaEspecial = analista ? ["N", "W", "H", "P", "F"].includes(analista.charAt(0)) : false;
 
             // REGRA 2: ARQUIVAMENTO (Prioridade Máxima)
             if (siglaSuite === 'ARQUIVADO') {
@@ -458,32 +456,32 @@ window.StatusSync = {
                 siglaSuite !== 'DIFOR' &&
                 siglaSuite !== 'GECOPE' &&
                 siglaSuite !== '') {
-
                 novoStatus = 'APROVADO';
-
             }
-            // REGRA 3
+            // REGRA 3: Entrada para Reanálise (Agora mais robusta, sem depender de cache antigo)
             else if ((statusGecope === 'REANÁLISE FISCAL' || statusGecope === 'DEVOLVIDO P/ REANÁLISE FISCAL') &&
-                suiteGecope !== 'GECOPE' &&
                 isAnalistaEspecial &&
                 siglaSuite === 'GECOPE') {
                 novoStatus = 'AGUAR. REANÁLISE';
             }
-            // REGRA 4
+            // REGRA 4: Entrada para Análise (Também ajustada)
             else if (statusGecope === 'ANÁLISE FISCAL' &&
                 !isAnalistaEspecial &&
-                suiteGecope !== 'GECOPE' &&
                 siglaSuite === 'GECOPE') {
                 novoStatus = 'AGUAR. ANÁLISE';
             }
 
+            // Se encontrou um novo status diferente do atual, envia para o banco
             if (novoStatus && novoStatus !== statusGecope) {
+
+                // Melhoria: Payload agora atualiza a coluna 'suite' para manter o sistema e o painel consistentes
                 const payload = {
                     status: novoStatus,
-                    suite: siglaSuite, // <- Esta linha garante a consistência do sistema
+                    suite: siglaSuite,
                     ultima_atualizacao: new Date().toISOString(),
                     atualizado_por: 'AUTOMAÇÃO SUITE'
                 };
+
                 let query = sbClient.from('processos').update(payload);
                 if (id) query = query.eq('id', id); else query = query.eq('processo', nup);
 
@@ -495,7 +493,11 @@ window.StatusSync = {
                 return { changed: !!(data && data.length), data: data ? data[0] : null };
             }
             return { changed: false };
-        } catch (e) { console.error("[StatusSync] Erro:", e); return { changed: false, error: e }; }
+
+        } catch (e) {
+            console.error("[StatusSync] Erro:", e);
+            return { changed: false, error: e };
+        }
     }
 };
 
