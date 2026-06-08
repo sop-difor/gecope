@@ -444,39 +444,43 @@ window.StatusSync = {
 
             const suiteGecope = String(processoGecope.suite || '').toUpperCase().trim();
             const analista = String(processoGecope.analista || '').trim().toUpperCase();
-            const isAnalistaEspecial = ["N", "W", "H", "P", "F"].includes(analista) || 
-                                       ["N", "W", "H", "P", "F"].includes(analista.charAt(0));
+            const isAnalistaEspecial = ["N", "W", "H", "P", "F"].includes(analista) ||
+                ["N", "W", "H", "P", "F"].includes(analista.charAt(0));
             const historico = dadosSuite.historico || [];
 
             // REGRA 2: ARQUIVAMENTO (Prioridade Máxima)
             if (siglaSuite === 'ARQUIVADO') {
                 novoStatus = 'ARQUIVADO';
             }
-            // REGRA 1
-            else if (statusGecope === 'AGUAR. APROVAÇÃO' && 
-                     (suiteGecope === 'DIFOR' || suiteGecope === 'GECOPE') && 
-                     isAnalistaEspecial && 
-                     (siglaSuite !== 'DIFOR' && siglaSuite !== 'GECOPE')) {
+            // REGRA 1: Aprovação Automática
+            else if (statusGecope === 'AGUAR. APROVAÇÃO' &&
+                isAnalistaEspecial &&
+                siglaSuite !== 'DIFOR' &&
+                siglaSuite !== 'GECOPE' &&
+                siglaSuite !== '') {
+
                 novoStatus = 'APROVADO';
+
             }
             // REGRA 3
-            else if ((statusGecope === 'REANÁLISE FISCAL' || statusGecope === 'DEVOLVIDO P/ REANÁLISE FISCAL') && 
-                     suiteGecope !== 'GECOPE' && 
-                     isAnalistaEspecial && 
-                     siglaSuite === 'GECOPE') {
+            else if ((statusGecope === 'REANÁLISE FISCAL' || statusGecope === 'DEVOLVIDO P/ REANÁLISE FISCAL') &&
+                suiteGecope !== 'GECOPE' &&
+                isAnalistaEspecial &&
+                siglaSuite === 'GECOPE') {
                 novoStatus = 'AGUAR. REANÁLISE';
             }
             // REGRA 4
-            else if (statusGecope === 'ANÁLISE FISCAL' && 
-                     !isAnalistaEspecial && 
-                     suiteGecope !== 'GECOPE' &&
-                     siglaSuite === 'GECOPE') {
+            else if (statusGecope === 'ANÁLISE FISCAL' &&
+                !isAnalistaEspecial &&
+                suiteGecope !== 'GECOPE' &&
+                siglaSuite === 'GECOPE') {
                 novoStatus = 'AGUAR. ANÁLISE';
             }
 
             if (novoStatus && novoStatus !== statusGecope) {
                 const payload = {
                     status: novoStatus,
+                    suite: siglaSuite, // <- Esta linha garante a consistência do sistema
                     ultima_atualizacao: new Date().toISOString(),
                     atualizado_por: 'AUTOMAÇÃO SUITE'
                 };
@@ -506,17 +510,17 @@ async function carregarListaFiscais() {
         if (data) {
             dbUsers = data.map(u => (u.full_name || `${u.nome || ''} ${u.sobrenome || ''}`).trim().toUpperCase()).filter(n => n);
         }
-        
+
         // Mescla a lista estática original com os cadastros do banco para robustez máxima
         const combined = [...new Set([...FISCAIS_LIST, ...dbUsers])];
-        
+
         // Ordenação alfabética robusta que lida com caracteres latinos e acentuações do português
         combined.sort((a, b) => a.localeCompare(b, 'pt-BR'));
-        
+
         window.dynamicUsers = combined;
         FISCAIS_LIST = combined;
         atualizarDropdownsFiscais();
-    } catch(e) {
+    } catch (e) {
         console.error('Erro carregarListaFiscais:', e);
     }
 }
@@ -1169,14 +1173,14 @@ async function carregarDadosSupabase() {
                         dias = 20;
                         base = row.created_at || new Date();
                     }
-                    
+
                     const metaDate = calcularDataMeta(base, dias);
                     if (metaDate) {
                         const isoMeta = metaDate.toISOString().substring(0, 10);
-                        
+
                         // Se não tem meta, ou se a meta salva é diferente da calculada com as novas regras
                         const isoAtual = row.dataCompromissoFiscal ? (row.dataCompromissoFiscal instanceof Date ? row.dataCompromissoFiscal.toISOString().substring(0, 10) : new Date(row.dataCompromissoFiscal).toISOString().substring(0, 10)) : null;
-                        
+
                         if (isoAtual !== isoMeta) {
                             precisaRecalcular = true;
                         }
@@ -1402,13 +1406,13 @@ async function enviarParaPlanilha() {
                     const baseDate = baseStr ? isoParaDate(baseStr) : new Date();
                     const metaDate = calcularDataMeta(baseDate, dias);
                     if (metaDate) {
-                        const iso = metaDate.toISOString().substring(0,10);
+                        const iso = metaDate.toISOString().substring(0, 10);
                         // Atualiza processo com a meta correta calculada a partir do created_at
                         const { error: errUp } = await sbClient.from('processos').update({ data_compromisso_fiscal: iso }).eq('id', pData.id);
                         if (errUp) console.error('[ERRO] Falha ao atualizar processo com meta calculada:', errUp.message);
 
                         // Inserir histórico de metas registrando o 'registro' (data da base) e dias
-                        const est = baseDate.toISOString().substring(0,10);
+                        const est = baseDate.toISOString().substring(0, 10);
                         const { error: errHist } = await sbClient.from('historico_metas').insert([{
                             processo_id: pData.id,
                             registros: est,
@@ -1423,7 +1427,7 @@ async function enviarParaPlanilha() {
                 console.error('[ERRO] Ao calcular/gravar meta pós-inserção:', e);
             }
         })();
-        
+
 
         // Log de Atividade
         registrarAtividade('PROCESSO', `cadastrou o processo Nº ${numProcesso}`, numProcesso, formData.get("DESCRIÇÃO"), formData.get("FISCAL"));
@@ -1554,9 +1558,9 @@ async function abrirDetalhes(processoStr) {
 async function carregarHistoricoPrioridades(processoStr) {
     const container = document.getElementById('det_historico_prioridade');
     if (!container) return;
-    
+
     container.innerHTML = '<em class="text-muted">Carregando histórico...</em>';
-    
+
     try {
         const { data, error } = await sbClient
             .from('app_atividades')
@@ -1579,7 +1583,7 @@ async function carregarHistoricoPrioridades(processoStr) {
             const isDesmarcar = desc.includes('desmarcou');
             const icon = !isDesmarcar ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '<i class="bi bi-star text-secondary me-1"></i>';
             const actionText = !isDesmarcar ? 'Marcou como prioritário' : 'Desmarcou como prioritário';
-            
+
             return `
                 <div class="mb-2 pb-2 border-bottom border-light">
                     <div class="d-flex align-items-center mb-1">
@@ -1722,8 +1726,8 @@ async function executarAcaoDetalhes(actionType) {
         const novoStatus = (updates.status || registroOriginal.status || "").toString().trim().toUpperCase();
         const statusAntigo = (registroOriginal.status || "").toString().trim().toUpperCase();
         const dataDevNova = updates.data_devolucao_correcoes;
-        const dataDevAntiga = registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes ? 
-                              (isoParaDate(registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes).toISOString().substring(0, 10)) : null;
+        const dataDevAntiga = registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes ?
+            (isoParaDate(registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes).toISOString().substring(0, 10)) : null;
 
         const statusMudou = novoStatus && novoStatus !== statusAntigo;
         const dataDevMudou = dataDevNova && dataDevNova !== dataDevAntiga;
@@ -1744,7 +1748,7 @@ async function executarAcaoDetalhes(actionType) {
                 const devolucaoFinal = updates.data_devolucao_correcoes || dataDevAntiga;
                 if (devolucaoFinal) base = isoParaDate(devolucaoFinal);
                 else base = new Date();
-                
+
                 const metaAuto = calcularDataMeta(base, 10);
                 updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
             } else if (statusMudou) {
@@ -1802,7 +1806,7 @@ async function executarAcaoDetalhes(actionType) {
 
                 const autor = sessionStorage.getItem('sop_user_name') || 'Sistema';
 
-                const estStr = (baseDate instanceof Date ? baseDate.toISOString().substring(0,10) : (new Date(baseDate).toISOString().substring(0,10)));
+                const estStr = (baseDate instanceof Date ? baseDate.toISOString().substring(0, 10) : (new Date(baseDate).toISOString().substring(0, 10)));
                 sbClient.from('historico_metas').insert([{
                     processo_id: idUnico,
                     registros: estStr,
@@ -2289,7 +2293,7 @@ function getMetaDate(row, setD) {
 
                         sbClient.from('historico_metas').insert([{
                             processo_id: row.id,
-                            registros: new Date().toISOString().substring(0,10),
+                            registros: new Date().toISOString().substring(0, 10),
                             dias_estipulados: dias,
                             meta: valSupabase,
                             autor: autor
@@ -2319,7 +2323,7 @@ function getMetaSt(row) {
 function statusPriority(status) {
     const raw = (status || "").toString().toUpperCase().trim();
     const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    
+
     // 1. EM REANÁLISE
     if (s.includes("EM REAN") || (s.startsWith("EM") && s.includes("REAN"))) return 1;
     // 2. EM ANÁLISE
@@ -2336,11 +2340,11 @@ function statusPriority(status) {
     if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO") && !s.includes("REAN")) return 7;
     // 8. CONTRATANTE
     if (s.includes("CONTRATANTE")) return 8;
-    
+
     // Status adicionais (Aprovado e Arquivado)
     if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
     if (s.includes("ARQUIVADO")) return 10;
-    
+
     return 99;
 }
 
@@ -2458,11 +2462,11 @@ function updateReuniao() {
 
     // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
     if (!window.currentProcessesTab) window.currentProcessesTab = 'ativos';
-    
+
     // Filtro Global: Ignorar paginação (aba atual) se ativado
     const elGlobalToggle = document.getElementById('searchGlobalToggle');
     const isGlobalSearch = elGlobalToggle && elGlobalToggle.checked;
-    
+
     if (!isGlobalSearch) {
         rows = rows.filter(d => {
             const st = (d.status || "").toUpperCase().trim();
@@ -2742,7 +2746,7 @@ function updateReuniao() {
                     .select('*')
                     .eq('processo_id', pData.id)
                     .order('registros', { ascending: false });
-                
+
                 const historico = [];
                 if (rawHistorico) {
                     const pRow = (window.allData || []).find(r => r.processo === processo);
@@ -2758,19 +2762,19 @@ function updateReuniao() {
                                 estDate = pRow.created_at;
                             }
                         }
-                        
+
                         // Filtra logs obsoletos ou duplicados do Sistema para a mesma data base de estabelecimento.
                         // Mantém apenas o primeiro encontrado (o mais recente/atualizado, ordenado por registros DESC).
                         const diaEst = estDate ? new Date(estDate).toISOString().substring(0, 10) : '';
                         const chave = h.autor === 'Sistema' ? `sistema_${diaEst}` : `manual_${h.meta}_${h.dias_estipulados}`;
-                        
+
                         if (!chavesVistas.has(chave)) {
                             historico.push(h);
                             chavesVistas.add(chave);
                         }
                     }
                 }
-                
+
                 if (historico && historico.length > 0) {
                     const totalDiasAcumulado = historico.reduce((sum, h) => sum + (h.dias_estipulados || 0), 0);
                     historicoHTML = `
@@ -2791,50 +2795,50 @@ function updateReuniao() {
                                     </thead>
                                     <tbody>
                                         ${historico.map(h => {
-                                            const pRow = (window.allData || []).find(r => r.processo === processo);
-                                            let estDate = h.registros;
-                                            if (h.autor === 'Sistema' && pRow && !h.registros) {
-                                                const st = (pRow.status || "").toString().toUpperCase();
-                                                const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
-                                                if (isReanalise && pRow.dataDevolucaoCorrecoes) {
-                                                    estDate = pRow.dataDevolucaoCorrecoes;
-                                                } else if (pRow.created_at) {
-                                                    estDate = pRow.created_at;
-                                                }
-                                            }
-                                            const dtEst = estDate ? new Date(estDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
-                                            // Calcula meta exibida: usa h.meta se existir, senão tenta calcular a partir de registros + dias_estipulados
-                                            let metaVal = h.meta || null;
-                                            if (!metaVal) {
-                                                try {
-                                                    const diasVal = (h.dias_estipulados === null || h.dias_estipulados === undefined) ? null : Number(h.dias_estipulados);
-                                                    const baseIso = estDate ? (new Date(estDate)).toISOString().substring(0,10) : null;
-                                                    const baseDateObj = baseIso ? isoParaDate(baseIso) : null;
-                                                    if (baseDateObj && diasVal !== null && !isNaN(diasVal)) {
-                                                        const computed = calcularDataMeta(baseDateObj, diasVal);
-                                                        if (computed) metaVal = computed.toISOString().substring(0,10);
-                                                    }
-                                                } catch (e) {
-                                                    console.error('Erro ao calcular meta a partir de registros:', e);
-                                                }
-                                            }
-                                            const dtLim = metaVal ? metaVal.split('-').reverse().join('/') : 'Zerada';
-                                            const dias = h.dias_estipulados !== null && h.dias_estipulados !== undefined ? h.dias_estipulados : '-';
-                                            const autor = h.autor || 'Sistema';
-                                            return `
+                        const pRow = (window.allData || []).find(r => r.processo === processo);
+                        let estDate = h.registros;
+                        if (h.autor === 'Sistema' && pRow && !h.registros) {
+                            const st = (pRow.status || "").toString().toUpperCase();
+                            const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
+                            if (isReanalise && pRow.dataDevolucaoCorrecoes) {
+                                estDate = pRow.dataDevolucaoCorrecoes;
+                            } else if (pRow.created_at) {
+                                estDate = pRow.created_at;
+                            }
+                        }
+                        const dtEst = estDate ? new Date(estDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+                        // Calcula meta exibida: usa h.meta se existir, senão tenta calcular a partir de registros + dias_estipulados
+                        let metaVal = h.meta || null;
+                        if (!metaVal) {
+                            try {
+                                const diasVal = (h.dias_estipulados === null || h.dias_estipulados === undefined) ? null : Number(h.dias_estipulados);
+                                const baseIso = estDate ? (new Date(estDate)).toISOString().substring(0, 10) : null;
+                                const baseDateObj = baseIso ? isoParaDate(baseIso) : null;
+                                if (baseDateObj && diasVal !== null && !isNaN(diasVal)) {
+                                    const computed = calcularDataMeta(baseDateObj, diasVal);
+                                    if (computed) metaVal = computed.toISOString().substring(0, 10);
+                                }
+                            } catch (e) {
+                                console.error('Erro ao calcular meta a partir de registros:', e);
+                            }
+                        }
+                        const dtLim = metaVal ? metaVal.split('-').reverse().join('/') : 'Zerada';
+                        const dias = h.dias_estipulados !== null && h.dias_estipulados !== undefined ? h.dias_estipulados : '-';
+                        const autor = h.autor || 'Sistema';
+                        return `
                                                 <tr style="vertical-align: middle;">
                                                     <td>${dtEst}</td>
                                                     <td class="text-center font-monospace">${dias}</td>
                                                     <td>
-                                                        ${h.meta ? 
-                                                            `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">${dtLim}</span>` : 
-                                                            `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">Zerada</span>`
-                                                        }
+                                                        ${h.meta ?
+                                `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">${dtLim}</span>` :
+                                `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">Zerada</span>`
+                            }
                                                     </td>
                                                     <td class="fw-semibold">${autor}</td>
                                                 </tr>
                                             `;
-                                        }).join('')}
+                    }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -3173,7 +3177,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
                 telefone_whatsapp: telefone || existingGhost.telefone_whatsapp,
                 role: 'pending'
             };
-            
+
             const { error: updateError } = await sbClient.from('app_users').update(payload).eq('id', existingGhost.id);
             if (updateError) {
                 console.warn('[SIGNUP] Aviso ao atualizar app_users (RLS):', updateError);
@@ -3190,7 +3194,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
                 created_at: new Date().toISOString()
             };
             if (userId) payload.id = userId; // Fallback to auth ID if allowed, usually app_users might have bigserial id though. The schema check will determine.
-            
+
             const { error: insertError } = await sbClient.from('app_users').insert([payload]);
             if (insertError) {
                 console.warn('[SIGNUP] Aviso ao inserir app_users (RLS):', insertError);
