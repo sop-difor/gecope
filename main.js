@@ -2270,10 +2270,13 @@ function getMetaDate(row, setD) {
         // Sincroniza ativamente com o Supabase quando alterado pelo Painel (Tabela)
         sbClient.from('processos')
             .update({ data_compromisso_fiscal: valSupabase })
-            .eq('processo', row.processo)
-            .then(({ error }) => {
+            .eq('id', row.id)
+            .select('id')
+            .then(({ data: updData, error }) => {
                 if (error) {
                     console.error('[ERRO] Falha ao sincronizar meta na base de dados: ', error.message);
+                } else if (!updData || updData.length === 0) {
+                    console.error('[ERRO] Nenhuma linha atualizada ao definir meta para o processo:', row.processo);
                 } else {
                     try {
                         const acao = valSupabase ? `definiu a meta para ${valSupabase.split('-').reverse().join('/')}` : 'removeu a meta';
@@ -2319,7 +2322,9 @@ function getMetaSt(row) {
     if (st.includes("APROVADO")) return "Cumprido";
     if (!md) return "Sem meta";
 
-    return md.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0) ? "Atrasado" : "No prazo";
+    const mdTime = new Date(md.getFullYear(), md.getMonth(), md.getDate()).getTime();
+    const todayTime = new Date().setHours(0, 0, 0, 0);
+    return mdTime < todayTime ? "Atrasado" : "No prazo";
 }
 // Ordem ORIGINAL (para preservar a ordem de carregamento padrão da tela inicial)
 function statusPriority(status) {
