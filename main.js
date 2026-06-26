@@ -3193,7 +3193,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
             .maybeSingle();
 
         if (existingGhost) {
-            // Fazer UPDATE no registro existente (mantendo o ID original intacto)
+            // Tenta UPDATE no registro ghost existente
             const payload = {
                 email: email,
                 nome: nome,
@@ -3202,9 +3202,12 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
                 role: 'pending'
             };
 
-            const { error: updateError } = await sbClient.from('app_users').update(payload).eq('id', existingGhost.id);
-            if (updateError) {
-                console.warn('[SIGNUP] Aviso ao atualizar app_users (RLS):', updateError);
+            const { data: updated, error: updateError } = await sbClient.from('app_users').update(payload).eq('id', existingGhost.id).select();
+            // Se UPDATE falhar por RLS (0 linhas afetadas) ou erro, insere novo registro com email real
+            if (updateError || !updated || updated.length === 0) {
+                console.warn('[SIGNUP] UPDATE do ghost falhou (RLS?), tentando INSERT com email real:', updateError?.message);
+                const { error: insertFallbackError } = await sbClient.from('app_users').insert([{ ...payload, matricula }]);
+                if (insertFallbackError) console.warn('[SIGNUP] INSERT fallback também falhou:', insertFallbackError.message);
             }
         } else {
             // Não existe, fazer INSERT de um novo
