@@ -3252,15 +3252,8 @@ async function signInWithEmail(email, password) {
         }
 
         console.log('[DEBUG] Autenticação bem-sucedida. Buscando perfil no app_users...');
-        // Busca perfil: tenta primeiro por ID (respeita RLS), depois por email como fallback
-        const authUserId = data?.user?.id;
-        let profile = null;
-        if (authUserId) {
-            profile = await sbClient.from('app_users').select('*').eq('id', authUserId).maybeSingle();
-        }
-        if (!profile?.data) {
-            profile = await sbClient.from('app_users').select('*').eq('email', email).maybeSingle();
-        }
+        // Busca perfil por email (app_users.id é bigserial, não UUID do Auth)
+        const profile = await sbClient.from('app_users').select('*').eq('email', email).maybeSingle();
         const role = profile?.data?.role || 'pending';
 
         console.log('[DEBUG] Perfil encontrado:', { email, role });
