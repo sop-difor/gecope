@@ -100,8 +100,25 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const loginInput = document.getElementById('landing-matricula').value.trim();
         const password = document.getElementById('landing-password').value;
-        const email = loginInput.includes('@') ? loginInput : `${loginInput}@gecope.app`;
-        await signInWithEmail(email, password);
+
+        if (loginInput.includes('@')) {
+            // Entrada já é um email
+            await signInWithEmail(loginInput, password);
+        } else {
+            // Entrada é matrícula: tenta gecope.app primeiro, depois busca email real no app_users
+            const emailGecopeApp = `${loginInput}@gecope.app`;
+            const result = await signInWithEmail(emailGecopeApp, password, { silent: true });
+            if (!result) {
+                // Busca email real cadastrado com essa matrícula
+                const { data: userRecord } = await sbClient.from('app_users').select('email').eq('matricula', loginInput).maybeSingle();
+                if (userRecord?.email && userRecord.email !== emailGecopeApp) {
+                    await signInWithEmail(userRecord.email, password);
+                } else {
+                    // Exibe o erro original (sem email alternativo encontrado)
+                    await signInWithEmail(emailGecopeApp, password);
+                }
+            }
+        }
     });
 
     // Toggle Password Visibility
@@ -3218,7 +3235,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
     } catch (err) { console.error(err); alert('Erro inesperado ao solicitar acesso.'); return false; }
 }
 
-async function signInWithEmail(email, password) {
+async function signInWithEmail(email, password, opts = {}) {
     try {
         // Garantia: aguarda inicialização do cliente Supabase (se necessário)
         if (!sbClient) {
@@ -3232,23 +3249,22 @@ async function signInWithEmail(email, password) {
             const ok = await waitInit;
             if (!ok) {
                 Swal.fire('Erro de Autenticação', 'Serviço de autenticação não iniciado. Recarregue a página.', 'error');
-                return;
+                return false;
             }
         }
 
         console.log('[DEBUG] signInWithEmail iniciado para:', email);
-
-        // REMOVIDA VALIDAO SOP
-        // if (!email.endsWith('@sop.ce.gov.br')) { ... }
 
         console.log('[DEBUG] Autenticando com Supabase Auth...');
         const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
 
         if (error) {
             console.error('[ERRO] Falha Auth:', error.message);
-            document.getElementById('landing-feedback').style.display = 'block';
-            document.getElementById('landing-feedback').textContent = error.message;
-            return;
+            if (!opts.silent) {
+                document.getElementById('landing-feedback').style.display = 'block';
+                document.getElementById('landing-feedback').textContent = error.message;
+            }
+            return false;
         }
 
         console.log('[DEBUG] Autenticação bem-sucedida. Buscando perfil no app_users...');
@@ -3290,10 +3306,14 @@ async function signInWithEmail(email, password) {
 
         console.log('[DEBUG] Carregando dados após login...');
         setTimeout(() => carregarDadosSupabase(), 500);
+        return true;
     } catch (err) {
         console.error('[ERRO] Exceção em signInWithEmail:', err);
-        document.getElementById('landing-feedback').style.display = 'block';
-        document.getElementById('landing-feedback').textContent = 'Erro ao autenticar: ' + (err.message || err);
+        if (!opts.silent) {
+            document.getElementById('landing-feedback').style.display = 'block';
+            document.getElementById('landing-feedback').textContent = 'Erro ao autenticar: ' + (err.message || err);
+        }
+        return false;
     }
 }
 
