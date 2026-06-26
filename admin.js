@@ -431,8 +431,9 @@
                     }
                 }
             }
-            const { error } = await sbClient.from('app_users').update({ role: role }).eq('email', email);
+            const { data: updated, error } = await sbClient.from('app_users').update({ role: role }).eq('email', email).select();
             if (error) throw error;
+            if (!updated || updated.length === 0) throw new Error('Nenhuma linha foi atualizada. Verifique as políticas RLS do banco de dados — o admin precisa de permissão de UPDATE em app_users.');
             if (!skipConfirm) alert('Usuário aprovado com sucesso!');
             loadAllUsers(); if (typeof fetchPendingCount === 'function') fetchPendingCount();
         } catch (e) { alert('Erro ao aprovar: ' + e.message); }
