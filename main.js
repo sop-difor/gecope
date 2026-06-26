@@ -3252,9 +3252,16 @@ async function signInWithEmail(email, password) {
         }
 
         console.log('[DEBUG] Autenticação bem-sucedida. Buscando perfil no app_users...');
-        // Busca perfil e roles na tabela app_users
-        const profile = await sbClient.from('app_users').select('*').eq('email', email).single();
-        const role = profile.data?.role || 'pending';
+        // Busca perfil: tenta primeiro por ID (respeita RLS), depois por email como fallback
+        const authUserId = data?.user?.id;
+        let profile = null;
+        if (authUserId) {
+            profile = await sbClient.from('app_users').select('*').eq('id', authUserId).maybeSingle();
+        }
+        if (!profile?.data) {
+            profile = await sbClient.from('app_users').select('*').eq('email', email).maybeSingle();
+        }
+        const role = profile?.data?.role || 'pending';
 
         console.log('[DEBUG] Perfil encontrado:', { email, role });
 
