@@ -212,7 +212,7 @@
                                 <option value="gerente">GERENTE</option>
                                 <option value="admin">ADMIN</option>
                             </select>
-                            <button class="btn btn-sm btn-success" onclick="aprovarFromNotification('${n.notif_id}', document.getElementById('${selectId}').value, '${n.matricula}', '${(n.nome||'').replace(/'/g,'&#39;')}')">
+                            <button class="btn btn-sm btn-success" onclick="aprovarFromNotification('${n.notif_id}', document.getElementById('${selectId}').value, '${n.matricula}', '${(n.nome||'').replace(/'/g,'&#39;')}', '${(n.email||'').replace(/'/g,'&#39;')}')">
                                 <i class="bi bi-check-lg me-1"></i> Aprovar
                             </button>
                             <button class="btn btn-sm btn-outline-danger" onclick="recusarNotification('${n.notif_id}')" title="Recusar">
@@ -446,11 +446,32 @@
         } catch (e) { alert('Erro ao excluir: ' + e.message); }
     }
 
-    async function aprovarFromNotification(notifId, role, matricula, nome) {
+    async function aprovarFromNotification(notifId, role, matricula, nome, emailCadastro) {
         if (!notifId) return alert('Notificação inválida.');
         if (!confirm(`Confirmar aprovação de ${matricula || nome} como ${role.toUpperCase()}?`)) return;
         try {
-            // get current access token
+            // 1. Tentativa prioritária: atualizar registro pendente existente diretamente no banco
+            // Isso cobre o caso mais comum: usuário se cadastrou e ficou com role='pending'
+            const emailReal = emailCadastro || (matricula ? `${matricula}@gecope.app` : null);
+            let updatedExisting = false;
+
+            if (emailReal) {
+                const { data: existing, error: findErr } = await sbClient.from('app_users').select('id,role').eq('email', emailReal).maybeSingle();
+                if (!findErr && existing) {
+                    const { error: updateErr } = await sbClient.from('app_users').update({ role: role }).eq('email', emailReal);
+                    if (!updateErr) {
+                        updatedExisting = true;
+                        // Marca notificação como lida
+                        await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
+                        alert('Usuário aprovado com sucesso!');
+                        if (typeof loadAllUsers === 'function') loadAllUsers();
+                        if (typeof fetchPendingCount === 'function') fetchPendingCount();
+                        return;
+                    }
+                }
+            }
+
+            // 2. Se não encontrou registro existente, tenta via Edge Function (cria novo usuário)
             let token = null;
             try {
                 const s = await sbClient.auth.getSession();
@@ -460,7 +481,6 @@
             let success = false;
             let errorMsg = '';
 
-            // 1. Tentativa principal: invocar a Edge Function do Supabase diretamente
             try {
                 const { data: invokeData, error: invokeErr } = await sbClient.functions.invoke('approve-user', {
                     body: { notifId, role, matricula, nome }
@@ -475,10 +495,9 @@
                 errorMsg = `Edge Function: ${invokeErr.message || String(invokeErr)}`;
             }
 
-            // 2. Segunda tentativa: Chamada HTTP ao endpoint configurado (Netlify/Vercel)
+            // 3. Fallback: Chamada HTTP ao endpoint configurado (Netlify/Vercel)
             if (!success) {
                 const endpoint = window.APPROVE_USER_ENDPOINT || '/.netlify/functions/approve-user';
-                // Apenas tenta se APPROVE_USER_ENDPOINT estiver configurado OU se não for local (Live Server no 127.0.0.1 / localhost não suporta POST)
                 const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
                 if (window.APPROVE_USER_ENDPOINT || (!window.location.hostname.includes('github.io') && !isLocal)) {
                     try {
@@ -507,11 +526,11 @@
                 }
             }
 
+            // 4. Último fallback: inserção direta
             if (!success) {
-                console.warn('[ADMIN] Falha ao chamar endpoint/função de aprovação. Tentando inserção direta via sbClient (pode falhar por políticas de RLS)...', errorMsg);
-                
-                // Inserção direta via frontend como fallback
-                const emailToCreate = matricula ? `${matricula}@gecope.app` : `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`;
+                console.warn('[ADMIN] Falha ao chamar endpoint/função de aprovação. Tentando inserção direta via sbClient...', errorMsg);
+
+                const emailToCreate = emailReal || `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`;
                 const payload = {
                     email: emailToCreate,
                     matricula: matricula || null,
@@ -521,18 +540,13 @@
                     created_at: new Date().toISOString()
                 };
 
-                // 1. Insere o usuário na tabela
                 const { error: insertErr } = await sbClient.from('app_users').insert([payload]);
                 if (insertErr) {
-                    throw new Error(`Erro na inserção direta (RLS): ${insertErr.message}. Nota: A criação de usuários por terceiros é restrita pelas políticas de segurança do banco. Certifique-se de que a Edge Function "approve-user" está implantada no painel do Supabase. (Detalhes do erro original: ${errorMsg || 'desconhecido'})`);
+                    throw new Error(`Erro na inserção direta (RLS): ${insertErr.message}. Certifique-se de que a Edge Function "approve-user" está implantada no painel do Supabase. (Detalhes: ${errorMsg || 'desconhecido'})`);
                 }
 
-                // 2. Marca notificação de solicitação como lida
                 if (notifId) {
-                    const { error: notifErr } = await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
-                    if (notifErr) {
-                        console.error('[ADMIN] Erro ao marcar notificação como lida:', notifErr);
-                    }
+                    await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
                 }
                 success = true;
             }
