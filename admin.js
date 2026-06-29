@@ -458,16 +458,16 @@
             if (emailReal) {
                 const { data: existing, error: findErr } = await sbClient.from('app_users').select('id,role').eq('email', emailReal).maybeSingle();
                 if (!findErr && existing) {
-                    const { error: updateErr } = await sbClient.from('app_users').update({ role: role }).eq('email', emailReal);
-                    if (!updateErr) {
+                    const { data: updated, error: updateErr } = await sbClient.from('app_users').update({ role: role }).eq('email', emailReal).select();
+                    if (!updateErr && updated && updated.length > 0) {
                         updatedExisting = true;
-                        // Marca notificação como lida
                         await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
                         alert('Usuário aprovado com sucesso!');
                         if (typeof loadAllUsers === 'function') loadAllUsers();
                         if (typeof fetchPendingCount === 'function') fetchPendingCount();
                         return;
                     }
+                    if (updateErr) console.warn('[ADMIN] Falha ao atualizar registro existente:', updateErr.message);
                 }
             }
 
