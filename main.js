@@ -1197,10 +1197,10 @@ async function carregarDadosSupabase() {
                     if (metaDate) {
                         const isoMeta = metaDate.toISOString().substring(0, 10);
 
-                        // Se não tem meta, ou se a meta salva é diferente da calculada com as novas regras
+                        // Se não tem meta, estabelece automaticamente
                         const isoAtual = row.dataCompromissoFiscal ? (row.dataCompromissoFiscal instanceof Date ? row.dataCompromissoFiscal.toISOString().substring(0, 10) : new Date(row.dataCompromissoFiscal).toISOString().substring(0, 10)) : null;
 
-                        if (isoAtual !== isoMeta) {
+                        if (!isoAtual) {
                             precisaRecalcular = true;
                         }
                     }
