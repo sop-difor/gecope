@@ -1110,6 +1110,39 @@ async function carregarDadosFinanceiro() {
     }
 }
 
+function exportarFinanceiroExcel() {
+    const rows = window.finDrilldownRows || [];
+    if (rows.length === 0) {
+        alert("Nenhum dado visível para exportar.");
+        return;
+    }
+    if (typeof XLSX === 'undefined') {
+        alert("Biblioteca de exportação não carregada ainda. Aguarde e tente novamente.");
+        return;
+    }
+
+    const data = rows.map(d => ({
+        'Processo': d.processo || '',
+        'Status': d.status || '',
+        'Fiscal': d.fiscal || '',
+        'Analista': d.nomeAnalista || '',
+        'Contratada': d.contratada || '',
+        'Abertura': d.dataAbertura instanceof Date ? d.dataAbertura.toLocaleDateString('pt-BR') : '',
+        'Aprovação GECOPE': d.dataAprovacao instanceof Date ? d.dataAprovacao.toLocaleDateString('pt-BR') : '',
+        'Prazo (dias)': (typeof d.prazoDias === 'number' && isFinite(d.prazoDias)) ? d.prazoDias : '',
+        'Repercussão Fiscal': d.repercFiscal || 0,
+        'Repercussão GECOPE': d.repercGecope || 0,
+        'Diferença': d._diff || 0,
+        '% Revisão': typeof d._diffPerc === 'number' ? Number(d._diffPerc.toFixed(1)) : 0
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Painel Financeiro');
+    const nomeArquivo = `painel_financeiro_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, nomeArquivo);
+}
+
 async function carregarDadosSupabase() {
     const loader = document.getElementById("load-error");
     if (loader) loader.style.display = "none";
@@ -3140,6 +3173,7 @@ function populateAllTabFilters() {
 }
 function wireEvents() {
     fin.status.addEventListener("change", updateFinanceiro); fin.tipo.addEventListener("change", updateFinanceiro); fin.fiscal.addEventListener("change", updateFinanceiro);
+    fin.analista.addEventListener("change", updateFinanceiro);
     fin.contratada.addEventListener("change", updateFinanceiro); fin.contratante.addEventListener("change", updateFinanceiro); fin.ano.addEventListener("change", updateFinanceiro);
     fin.clear.addEventListener("click", (e) => { e.preventDefault(); clearFinanceiro(); });
     fin.totAno.addEventListener("change", updateFinanceiro); fin.totMes.addEventListener("change", updateFinanceiro); fin.diffMetric.addEventListener("change", updateFinanceiro);
