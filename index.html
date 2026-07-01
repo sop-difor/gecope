@@ -967,6 +967,8 @@
                                     id="filter-tipo"></select></div>
                             <div><label class="form-label">Fiscal</label><select class="form-select form-select-sm"
                                     id="filter-fiscal"></select></div>
+                            <div><label class="form-label">Analista</label><select class="form-select form-select-sm"
+                                    id="filter-analista"></select></div>
                             <div><label class="form-label">Contratada</label><select class="form-select form-select-sm"
                                     id="filter-contratada"></select></div>
                             <div><label class="form-label">Contratante</label><select class="form-select form-select-sm"
@@ -976,6 +978,19 @@
                         </div>
                         <div class="mt-2">
                             <button class="btn btn-sm btn-grid-clear" id="btn-clear-filters">Limpar</button>
+                        </div>
+                    </section>
+
+                    <section class="mb-3">
+                        <div class="kpi-count-card">
+                            <div>
+                                <div class="kpi-label">Processos considerados nesta análise</div>
+                                <div class="kpi-count-value" id="fin-count-total">0 processos</div>
+                            </div>
+                            <div class="kpi-count-breakdown">
+                                <span><b id="fin-count-aprovados">0</b> Aprovados</span>
+                                <span><b id="fin-count-arquivados">0</b> Arquivados revisados pela GECOPE</span>
+                            </div>
                         </div>
                     </section>
 
@@ -1145,6 +1160,114 @@
                                     </div>
                                     <div class="chart-placeholder" id="chart-reperc-total"></div>
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="mb-3 hide-fiscal">
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <div class="chart-title">Evolução mensal — Fiscalização vs GECOPE</div>
+                                        <div class="chart-subtitle">Repercussão por mês de aprovação GECOPE</div>
+                                    </div>
+                                    <div class="chart-placeholder" id="chart-fin-evolucao"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="mb-3 hide-fiscal">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-7">
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <div class="chart-title">Repercussão por Fiscal — Fiscalização vs GECOPE</div>
+                                    </div>
+                                    <div class="chart-placeholder" id="chart-fin-fiscal"></div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <div class="chart-title">Repercussão revisada por Analista GECOPE</div>
+                                    </div>
+                                    <div class="chart-placeholder" id="chart-fin-analista"></div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <div class="chart-title">Índice médio de revisão (%) por Fiscal</div>
+                                        <div class="chart-subtitle">Fiscais com maior divergência frente à GECOPE</div>
+                                    </div>
+                                    <div class="chart-placeholder" id="chart-fin-indice-fiscal"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="mb-3 hide-fiscal">
+                        <div class="row g-2">
+                            <div class="col-12 col-md-4">
+                                <div class="kpi-card kpi-reperc-fiscal">
+                                    <div class="kpi-header">
+                                        <div class="kpi-icon"
+                                            style="background:rgba(1,138,189,0.14);color:var(--sop-blue);"><i
+                                                class="bi bi-hourglass-split"></i></div>
+                                        <div class="kpi-label">Prazo médio (processos considerados)</div>
+                                    </div>
+                                    <div class="kpi-value" id="kpi-fin-prazo-medio">0 dias</div>
+                                    <div class="kpi-sub">Abertura → Aprovação GECOPE</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-8">
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <div class="chart-title">Valor revisado (barra) × Prazo médio em dias (linha) por
+                                            Fiscal</div>
+                                    </div>
+                                    <div class="chart-placeholder" id="chart-fin-prazo-valor"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="mb-3 hide-fiscal">
+                        <div class="chart-card">
+                            <div class="chart-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="chart-title">Processos detalhados</div>
+                                    <div class="chart-subtitle" id="fin-drilldown-count">0 processos · clique numa
+                                        coluna para ordenar</div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-success fw-bold" id="btn-fin-export"
+                                    onclick="exportarFinanceiroExcel()" title="Exportar tabela para Excel">
+                                    <i class="bi bi-file-earmark-excel"></i> Excel
+                                </button>
+                            </div>
+                            <div class="table-responsive" style="max-height: 420px;">
+                                <table class="table table-hover table-striped align-middle mb-0"
+                                    style="font-size: 0.82rem;">
+                                    <thead class="table-light">
+                                        <tr id="fin-drilldown-head">
+                                            <th data-key="processo" style="cursor:pointer;">Processo</th>
+                                            <th data-key="status" style="cursor:pointer;">Status</th>
+                                            <th data-key="fiscal" style="cursor:pointer;">Fiscal</th>
+                                            <th data-key="nomeAnalista" style="cursor:pointer;">Analista</th>
+                                            <th data-key="contratada" style="cursor:pointer;">Contratada</th>
+                                            <th data-key="dataAbertura" style="cursor:pointer;">Abertura</th>
+                                            <th data-key="dataAprovacao" style="cursor:pointer;">Aprov. GECOPE</th>
+                                            <th data-key="prazoDias" style="cursor:pointer;">Prazo</th>
+                                            <th data-key="repercFiscal" style="cursor:pointer;">Repercussão Fiscal</th>
+                                            <th data-key="repercGecope" style="cursor:pointer;">Repercussão GECOPE</th>
+                                            <th data-key="_diff" style="cursor:pointer;">Diferença</th>
+                                            <th data-key="_diffPerc" style="cursor:pointer;">% Revisão</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fin-drilldown-body"></tbody>
+                                </table>
                             </div>
                         </div>
                     </section>
