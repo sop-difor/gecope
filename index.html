@@ -963,12 +963,8 @@
                         <div class="filter-group-compact">
                             <div><label class="form-label">Status</label><select class="form-select form-select-sm"
                                     id="filter-status"></select></div>
-                            <div><label class="form-label">Tipo</label><select class="form-select form-select-sm"
-                                    id="filter-tipo"></select></div>
                             <div><label class="form-label">Fiscal</label><select class="form-select form-select-sm"
                                     id="filter-fiscal"></select></div>
-                            <div><label class="form-label">Analista</label><select class="form-select form-select-sm"
-                                    id="filter-analista"></select></div>
                             <div><label class="form-label">Contratada</label><select class="form-select form-select-sm"
                                     id="filter-contratada"></select></div>
                             <div><label class="form-label">Contratante</label><select class="form-select form-select-sm"
@@ -1115,94 +1111,14 @@
                         </div>
                     </section>
 
-                    <section class="mb-3">
-                        <div class="d-flex justify-content-end align-items-center mb-2 gap-2">
-                            <div class="chart-tools"><span>Período:</span><select class="form-select form-select-sm"
-                                    id="tot-ano" style="width:125px;">
-                                    <option value="">Ano: Todos</option>
-                                </select><select class="form-select form-select-sm" id="tot-mes" style="width:135px;">
-                                    <option value="">Mês: Todos</option>
-                                    <option value="1">Jan</option>
-                                    <option value="2">Fev</option>
-                                    <option value="3">Mar</option>
-                                    <option value="4">Abr</option>
-                                    <option value="5">Mai</option>
-                                    <option value="6">Jun</option>
-                                    <option value="7">Jul</option>
-                                    <option value="8">Ago</option>
-                                    <option value="9">Set</option>
-                                    <option value="10">Out</option>
-                                    <option value="11">Nov</option>
-                                    <option value="12">Dez</option>
-                                </select></div>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-12 col-lg-4">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Acréscimo</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-acresc-total"></div>
-                                </div>
-                            </div>
-                            <div class="col-12 col-lg-4">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Supressão</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-supress-total"></div>
-                                </div>
-                            </div>
-                            <div class="col-12 col-lg-4">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Repercussão</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-reperc-total"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
                     <section class="mb-3 hide-fiscal">
                         <div class="row g-2">
                             <div class="col-12">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Evolução mensal — Fiscalização vs GECOPE</div>
-                                        <div class="chart-subtitle">Repercussão por mês de aprovação GECOPE</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-fin-evolucao"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="mb-3 hide-fiscal">
-                        <div class="row g-2">
-                            <div class="col-12 col-lg-7">
                                 <div class="chart-card">
                                     <div class="chart-header">
                                         <div class="chart-title">Repercussão por Fiscal — Fiscalização vs GECOPE</div>
                                     </div>
                                     <div class="chart-placeholder" id="chart-fin-fiscal"></div>
-                                </div>
-                            </div>
-                            <div class="col-12 col-lg-5">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Repercussão revisada por Analista GECOPE</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-fin-analista"></div>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Índice médio de revisão (%) por Fiscal</div>
-                                        <div class="chart-subtitle">Fiscais com maior divergência frente à GECOPE</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-fin-indice-fiscal"></div>
                                 </div>
                             </div>
                         </div>
