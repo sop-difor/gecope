@@ -698,6 +698,7 @@ function findFiscalNameInList(nomeCompleto) {
 }
 
 window.allData = window.allData || [];
+window.financeiroData = window.financeiroData || [];
 let currentTabelaData = []; // Cache para recálculo de BDI/Desconto
 
 // --- 2. FUNES UTILITÁRIAS DE FORMATAO ---
@@ -1045,6 +1046,70 @@ function getAtividadeIcon(tipo) {
     }
 }
 
+function mapProcessoRow(r) {
+    const dataAbertura = isoParaDate(r.data_abertura);
+    const dataAprov = isoParaDate(r.data_aprovacao_gecope);
+    let prazoDias = null;
+    if (dataAbertura && dataAprov) {
+        prazoDias = Math.round((dataAprov - dataAbertura) / (1000 * 60 * 60 * 24));
+    }
+
+    let nomeAnalista = r.analista;
+    if (r.analista === "N") nomeAnalista = "Nildeno";
+    else if (r.analista === "W") nomeAnalista = "Walace";
+
+    return {
+        id: r.id,
+        processo: r.processo,
+        status: r.status || "Não informado",
+        tipo: r.tipo || "Não informado",
+        descricao: r.descricao || "",
+        fiscal: r.fiscal || "Não informado",
+        contratada: r.contratada || "Não informado",
+        contratante: r.contratante || "Não informado",
+        analista: r.analista,
+        nomeAnalista: nomeAnalista,
+        dataAbertura: dataAbertura,
+        anoAbertura: dataAbertura ? dataAbertura.getFullYear() : null,
+        mesAbertura: dataAbertura ? (dataAbertura.getMonth() + 1) : null,
+        dataRecebimento: isoParaDate(r.data_recebimento),
+        dataCompromissoFiscal: isoParaDate(r.data_compromisso_fiscal),
+        dataAprovacao: dataAprov,
+        dataDevolucaoCorrecoes: isoParaDate(r.data_devolucao_correcoes),
+        prazoDias: prazoDias,
+        acrescFiscal: Number(r.acresc_fiscal) || 0,
+        supressFiscal: Number(r.supress_fiscal) || 0,
+        repercFiscal: Number(r.reperc_fiscal) || 0,
+        acrescGecope: Number(r.acresc_gecope) || 0,
+        supressGecope: Number(r.supress_gecope) || 0,
+        repercGecope: Number(r.reperc_gecope) || 0,
+        prioritario: r.prioritario || false,
+        avisoAtrasoEnviado: r.aviso_atraso_enviado || false,
+        criador: r.criador,
+        created_at: isoParaDate(r.created_at),
+        atualizado_por: r.atualizado_por,
+        ultima_atualizacao: isoParaDate(r.ultima_atualizacao),
+        excluido_por: r.excluido_por,
+        data_exclusao: r.data_exclusao
+    };
+}
+
+async function carregarDadosFinanceiro() {
+    try {
+        const { data, error } = await sbClient
+            .from('vw_processos_financeiro')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw new Error(`View "vw_processos_financeiro" não acessível: ${error.message}`);
+        if (!Array.isArray(data)) throw new Error('Tipo de dados inválido: esperado array');
+
+        window.financeiroData = data.map(mapProcessoRow);
+    } catch (err) {
+        console.error('[ERRO] Falha ao carregar dados financeiros:', err);
+    }
+}
+
 async function carregarDadosSupabase() {
     const loader = document.getElementById("load-error");
     if (loader) loader.style.display = "none";
@@ -1106,51 +1171,7 @@ async function carregarDadosSupabase() {
     if (!Array.isArray(data)) return;
 
     window.allData = data.map(r => {
-        const dataAbertura = isoParaDate(r.data_abertura);
-        const dataAprov = isoParaDate(r.data_aprovacao_gecope);
-        let prazoDias = null;
-        if (dataAbertura && dataAprov) {
-            prazoDias = Math.round((dataAprov - dataAbertura) / (1000 * 60 * 60 * 24));
-        }
-
-        let nomeAnalista = r.analista;
-        if (r.analista === "N") nomeAnalista = "Nildeno";
-        else if (r.analista === "W") nomeAnalista = "Walace";
-
-        const obj = {
-            id: r.id,
-            processo: r.processo,
-            status: r.status || "Não informado",
-            tipo: r.tipo || "Não informado",
-            descricao: r.descricao || "",
-            fiscal: r.fiscal || "Não informado",
-            contratada: r.contratada || "Não informado",
-            contratante: r.contratante || "Não informado",
-            analista: r.analista,
-            nomeAnalista: nomeAnalista,
-            dataAbertura: dataAbertura,
-            anoAbertura: dataAbertura ? dataAbertura.getFullYear() : null,
-            mesAbertura: dataAbertura ? (dataAbertura.getMonth() + 1) : null,
-            dataRecebimento: isoParaDate(r.data_recebimento),
-            dataCompromissoFiscal: isoParaDate(r.data_compromisso_fiscal),
-            dataAprovacao: dataAprov,
-            dataDevolucaoCorrecoes: isoParaDate(r.data_devolucao_correcoes),
-            prazoDias: prazoDias,
-            acrescFiscal: Number(r.acresc_fiscal) || 0,
-            supressFiscal: Number(r.supress_fiscal) || 0,
-            repercFiscal: Number(r.reperc_fiscal) || 0,
-            acrescGecope: Number(r.acresc_gecope) || 0,
-            supressGecope: Number(r.supress_gecope) || 0,
-            repercGecope: Number(r.reperc_gecope) || 0,
-            prioritario: r.prioritario || false,
-            avisoAtrasoEnviado: r.aviso_atraso_enviado || false,
-            criador: r.criador,
-            created_at: isoParaDate(r.created_at),
-            atualizado_por: r.atualizado_por,
-            ultima_atualizacao: isoParaDate(r.ultima_atualizacao),
-            excluido_por: r.excluido_por,
-            data_exclusao: r.data_exclusao
-        };
+        const obj = mapProcessoRow(r);
 
         // Garantir que metas locais obsoletas sejam removidas
         try {
@@ -1256,6 +1277,8 @@ async function carregarDadosSupabase() {
         } catch (e) {
             console.error('[AutoMeta] falha ao estabelecer metas automáticas:', e);
         }
+
+        await carregarDadosFinanceiro();
 
         populateAllTabFilters();
         renderLastUpdate();
