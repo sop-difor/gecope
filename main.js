@@ -3172,11 +3172,10 @@ function populateAllTabFilters() {
     }
 }
 function wireEvents() {
-    fin.status.addEventListener("change", updateFinanceiro); fin.tipo.addEventListener("change", updateFinanceiro); fin.fiscal.addEventListener("change", updateFinanceiro);
-    fin.analista.addEventListener("change", updateFinanceiro);
+    fin.status.addEventListener("change", updateFinanceiro); fin.fiscal.addEventListener("change", updateFinanceiro);
     fin.contratada.addEventListener("change", updateFinanceiro); fin.contratante.addEventListener("change", updateFinanceiro); fin.ano.addEventListener("change", updateFinanceiro);
     fin.clear.addEventListener("click", (e) => { e.preventDefault(); clearFinanceiro(); });
-    fin.totAno.addEventListener("change", updateFinanceiro); fin.totMes.addEventListener("change", updateFinanceiro); fin.diffMetric.addEventListener("change", updateFinanceiro);
+    fin.diffMetric.addEventListener("change", updateFinanceiro);
     ger.fiscal.addEventListener("change", updateGerencial); ger.status.addEventListener("change", updateGerencial);
     ger.clear.addEventListener("click", (e) => { e.preventDefault(); clearGerencial(); });
     pr.fiscal.addEventListener("change", updatePrazos); pr.status.addEventListener("change", updatePrazos);
