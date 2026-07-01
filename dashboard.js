@@ -191,8 +191,9 @@
     const fin = { status: document.getElementById("filter-status"), tipo: document.getElementById("filter-tipo"), fiscal: document.getElementById("filter-fiscal"), contratada: document.getElementById("filter-contratada"), contratante: document.getElementById("filter-contratante"), ano: document.getElementById("filter-ano"), clear: document.getElementById("btn-clear-filters"), totAno: document.getElementById("tot-ano"), totMes: document.getElementById("tot-mes"), diffMetric: document.getElementById("metric-diff") };
 
     function populateFinanceiroFilters() {
-        fillSelect(fin.status, window.allData.map(d => d.status)); fillSelect(fin.tipo, window.allData.map(d => d.tipo)); fillSelect(fin.fiscal, window.allData.map(d => d.fiscal)); fillSelect(fin.contratada, window.allData.map(d => d.contratada)); fillSelect(fin.contratante, window.allData.map(d => d.contratante));
-        const anos = Array.from(new Set(window.allData.map(d => d.anoAbertura).filter(v => v))); fillSelect(fin.ano, anos);
+        const base = window.financeiroData || [];
+        fillSelect(fin.status, base.map(d => d.status)); fillSelect(fin.tipo, base.map(d => d.tipo)); fillSelect(fin.fiscal, base.map(d => d.fiscal)); fillSelect(fin.contratada, base.map(d => d.contratada)); fillSelect(fin.contratante, base.map(d => d.contratante));
+        const anos = Array.from(new Set(base.map(d => d.anoAbertura).filter(v => v))); fillSelect(fin.ano, anos);
         if (fin.totAno) fin.totAno.innerHTML = '<option value="">Ano: Todos</option>' + anos.map(a => `<option value="${a}">${a}</option>`).join("");
     }
 
@@ -203,7 +204,7 @@
         const role = getCurrentUserRole();
         const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
 
-        return window.allData.filter(d => {
+        return (window.financeiroData || []).filter(d => {
             if (role === 'fiscal' && userFiscal) {
                 const dFiscal = (d.fiscal || "").toUpperCase().trim();
                 const userFiscalUpper = userFiscal.toUpperCase().trim();
@@ -554,8 +555,9 @@
     var fin = { status: document.getElementById("filter-status"), tipo: document.getElementById("filter-tipo"), fiscal: document.getElementById("filter-fiscal"), contratada: document.getElementById("filter-contratada"), contratante: document.getElementById("filter-contratante"), ano: document.getElementById("filter-ano"), clear: document.getElementById("btn-clear-filters"), totAno: document.getElementById("tot-ano"), totMes: document.getElementById("tot-mes"), diffMetric: document.getElementById("metric-diff") };
 
     function populateFinanceiroFilters() {
-        fillSelect(fin.status, window.allData.map(d => d.status)); fillSelect(fin.tipo, window.allData.map(d => d.tipo)); fillSelect(fin.fiscal, window.allData.map(d => d.fiscal)); fillSelect(fin.contratada, window.allData.map(d => d.contratada)); fillSelect(fin.contratante, window.allData.map(d => d.contratante));
-        const anos = Array.from(new Set(window.allData.map(d => d.anoAbertura).filter(v => v))); fillSelect(fin.ano, anos);
+        const base = window.financeiroData || [];
+        fillSelect(fin.status, base.map(d => d.status)); fillSelect(fin.tipo, base.map(d => d.tipo)); fillSelect(fin.fiscal, base.map(d => d.fiscal)); fillSelect(fin.contratada, base.map(d => d.contratada)); fillSelect(fin.contratante, base.map(d => d.contratante));
+        const anos = Array.from(new Set(base.map(d => d.anoAbertura).filter(v => v))); fillSelect(fin.ano, anos);
         fin.totAno.innerHTML = '<option value="">Ano: Todos</option>' + anos.map(a => `<option value="${a}">${a}</option>`).join("");
     }
 
@@ -566,7 +568,7 @@
         const role = window.getCurrentUserRole ? window.getCurrentUserRole() : (sessionStorage.getItem('sop_role') || 'guest');
         const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
 
-        return (window.allData || []).filter(d => {
+        return (window.financeiroData || []).filter(d => {
             if (role === 'fiscal' && userFiscal) {
                 const dFiscal = (d.fiscal || "").toUpperCase().trim();
                 const userFiscalUpper = userFiscal.toUpperCase().trim();
