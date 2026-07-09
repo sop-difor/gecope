@@ -1573,6 +1573,12 @@
             border: 1px solid #cdd600;
         }
 
+        .badge-status-diligencia {
+            background-color: #FF6B35;
+            color: #ffffff;
+            border: 1px solid #e85a2a;
+        }
+
         /* CORES METAS */
         .badge-meta-sem {
             background-color: #FFFFFF;
