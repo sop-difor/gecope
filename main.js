@@ -487,6 +487,12 @@ window.StatusSync = {
                 siglaSuite === 'GECOPE') {
                 novoStatus = 'AGUAR. ANÁLISE';
             }
+            // REGRA 5: Retorno de Processo Aprovado para Diligência
+            // Um processo já APROVADO que volta a tramitar na GECOPE precisa de
+            // correções/diligências adicionais antes de seguir seu fluxo normal.
+            else if (statusGecope === 'APROVADO' && siglaSuite === 'GECOPE') {
+                novoStatus = 'DILIGÊNCIA';
+            }
 
             // Se encontrou um novo status diferente do atual, envia para o banco
             if (novoStatus && novoStatus !== statusGecope) {
@@ -2420,6 +2426,8 @@ function statusPriority(status) {
     if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO") && !s.includes("REAN")) return 7;
     // 8. CONTRATANTE
     if (s.includes("CONTRATANTE")) return 8;
+    // 8.5 DILIGÊNCIA (processo aprovado que retornou para correções)
+    if (s.includes("DILIGEN")) return 8.5;
 
     // Status adicionais (Aprovado e Arquivado)
     if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
@@ -2749,6 +2757,7 @@ function updateReuniao() {
         const stTxt = (d.status || "").toString().toUpperCase().trim();
         let stCls = "text-bg-light";
         if (stTxt.includes("DEVOLVIDO")) { stCls = "badge-status-devolvido"; }
+        else if (stTxt.includes("DILIGEN")) { stCls = "badge-status-diligencia"; }
         else if (stTxt.includes("CONTRATANTE")) { stCls = "badge-status-contratante"; }
         else if (stTxt.includes("APROVAÇÃO")) { stCls = "badge-status-dark-blue"; }
         else if (stTxt.includes("FISCAL") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-fiscal"; }
@@ -3104,6 +3113,8 @@ async function atualizarTabelaSuite(rows) {
                                 newCls = stUpper.includes("REAN") ? 'badge-status-aguar-reanalise' : 'badge-status-light-blue';
                             } else if (stUpper.includes("ARQUIVADO")) {
                                 newCls = 'badge-status-aprovado';
+                            } else if (stUpper.includes("DILIGEN")) {
+                                newCls = 'badge-status-diligencia';
                             }
                             statusBadge.className = `badge rounded-pill badge-custom-size ${newCls}`;
                         }
