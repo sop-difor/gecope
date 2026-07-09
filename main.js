@@ -2410,6 +2410,8 @@ function statusPriority(status) {
     const raw = (status || "").toString().toUpperCase().trim();
     const s = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+    // 0. DILIGÊNCIA (topo da lista: processo aprovado que retornou para correções, exige atenção prioritária)
+    if (s.includes("DILIGEN")) return 0;
     // 1. EM REANÁLISE
     if (s.includes("EM REAN") || (s.startsWith("EM") && s.includes("REAN"))) return 1;
     // 2. EM ANÁLISE
@@ -2426,8 +2428,6 @@ function statusPriority(status) {
     if (s.includes("FISCAL") && s.includes("ANALIS") && !s.includes("DEVOLVIDO") && !s.includes("REAN")) return 7;
     // 8. CONTRATANTE
     if (s.includes("CONTRATANTE")) return 8;
-    // 8.5 DILIGÊNCIA (processo aprovado que retornou para correções)
-    if (s.includes("DILIGEN")) return 8.5;
 
     // Status adicionais (Aprovado e Arquivado)
     if (s === "APROVADO" || (s.includes("APROVADO") && !s.includes("AGUAR"))) return 9;
