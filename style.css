@@ -1705,10 +1705,12 @@
         .proc-kpi-card.accent-green { border-left: 4px solid var(--sop-green); }
         .proc-kpi-card.accent-orange { border-left: 4px solid var(--sop-orange); }
         .proc-kpi-card.accent-purple { border-left: 4px solid #6f42c1; }
+        .proc-kpi-card.accent-blue { border-left: 4px solid #0d6efd; }
 
         .proc-kpi-icon.bg-green { background: var(--sop-green); box-shadow: 0 4px 10px -2px var(--sop-green); }
         .proc-kpi-icon.bg-orange { background: var(--sop-orange); box-shadow: 0 4px 10px -2px var(--sop-orange); }
         .proc-kpi-icon.bg-purple { background: #6f42c1; box-shadow: 0 4px 10px -2px #6f42c1; }
+        .proc-kpi-icon.bg-blue { background: #0d6efd; box-shadow: 0 4px 10px -2px #0d6efd; }
 
         /* Abas por página (pill segmentado) */
         .proc-tabs {

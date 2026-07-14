@@ -1422,7 +1422,7 @@ tbody td { padding: 10px 15px; vertical-align: top; }
 <main>
 
 <div class="nav-wrapper">
-  <button class="btn-back-minimal" onclick="window.location.href='index.html'">
+  <button class="btn-back-minimal" onmouseenter="prefetchPagina('index.html')" onclick="window.location.href='index.html'">
     <i class="bi bi-arrow-left"></i>
     <span>Painel Principal</span>
   </button>
@@ -1431,7 +1431,7 @@ tbody td { padding: 10px 15px; vertical-align: top; }
     <button onclick="mostrarAba('concluidas',this)" id="btn-aba-concluidas"><i class="bi bi-check2-circle"></i> Concluídas</button>
     <button onclick="mostrarAba('relatorio',this)"><i class="bi bi-calendar3"></i> Cronograma</button>
     <button class="ativo" onclick="mostrarAba('painel',this)"><i class="bi bi-clipboard-data"></i> Painel Geral</button>
-    <button onclick="window.location.href='index.html?pane=pane-reuniao'"><i class="bi bi-file-earmark-text"></i> Processos</button>
+    <button onmouseenter="prefetchPagina('index.html')" onclick="window.location.href='index.html?pane=pane-reuniao'"><i class="bi bi-file-earmark-text"></i> Processos</button>
     <button onclick="mostrarAba('rotinas',this)"><i class="bi bi-arrow-repeat"></i> Rotinas</button>
   </nav>
 </div>
@@ -3730,14 +3730,28 @@ async function iniciarApp() {
     }
   });
 
-  // Puxa/atualiza tarefas a partir dos processos em tramitação antes da primeira renderização
-  try { await sincronizarComProcessos(); } catch (e) { console.error('[Sync Processos] Falha inesperada:', e); }
-
+  // Renderiza imediatamente com os dados já carregados — não espera a rede.
   renderPainel();
   atualizarBadgeConcluidas();
+
+  // Sincronização com Processos roda em segundo plano, sem travar a primeira tela;
+  // ao concluir, atualiza a renderização com o que mudou.
+  sincronizarComProcessos()
+    .then(() => { renderPainel(); atualizarBadgeConcluidas(); })
+    .catch(e => console.error('[Sync Processos] Falha inesperada:', e));
 }
 
 iniciarApp();
+
+// Pré-carrega a página de destino (HTML + assets) assim que o mouse passa por cima
+// do botão de navegação, para a troca de aba parecer instantânea ao clicar.
+function prefetchPagina(url) {
+  if (document.querySelector(`link[rel="prefetch"][href="${url}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = url;
+  document.head.appendChild(link);
+}
 </script>
 </body>
 </html>

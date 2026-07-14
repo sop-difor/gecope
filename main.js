@@ -1,3 +1,13 @@
+// Pré-carrega a página de destino (HTML + assets) assim que o mouse passa por cima
+// do botão de navegação, para a troca de aba parecer instantânea ao clicar.
+function prefetchPagina(url) {
+    if (document.querySelector(`link[rel="prefetch"][href="${url}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = url;
+    document.head.appendChild(link);
+}
+
 function toggleLanding(show) {
     const landing = document.getElementById('landingOverlay');
     const appContent = document.getElementById('app-content');
@@ -4011,14 +4021,33 @@ async function carregarOrcamentos() {
     }
 
     if (queryError) { container.innerHTML = `Erro: ${queryError.message}`; return; }
+
+    const dataFiltrada = data.filter(item => {
+        if (!termoBusca) return true;
+        const nomeObra = (item.nome_obra || "").toLowerCase();
+        const categoria = (item.categoria || "").toLowerCase();
+        return nomeObra.includes(termoBusca) || categoria.includes(termoBusca);
+    });
+
+    // --- KPIs DO PAINEL (refletem o que está filtrado na tela) ---
+    let kpiRevisao = 0, kpiAtualizado = 0;
+    dataFiltrada.forEach(item => {
+        let hist = [];
+        try { hist = typeof item.comentarios_revisao === 'string' ? JSON.parse(item.comentarios_revisao) : (item.comentarios_revisao || []); } catch (e) { hist = []; }
+        if (!Array.isArray(hist)) hist = [];
+        if (hist.some(c => c.decisao === 'pendente')) kpiRevisao++;
+        else if (item.status === 'Atualizado' || parseInt((item.versao_atual || '').replace(/[^0-9]/g, '')) > 1) kpiAtualizado++;
+    });
+    const setKpi = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setKpi('orc-kpi-total', dataFiltrada.length);
+    setKpi('orc-kpi-disponivel', dataFiltrada.length - kpiRevisao - kpiAtualizado);
+    setKpi('orc-kpi-revisao', kpiRevisao);
+    setKpi('orc-kpi-atualizado', kpiAtualizado);
+
     if (data.length === 0) { container.innerHTML = `<div class="text-center mt-5 text-muted">Nenhum orçamento encontrado.</div>`; return; }
 
     const arvore = {};
-    data.forEach(item => {
-        const nomeObra = (item.nome_obra || "").toLowerCase();
-        const categoria = (item.categoria || "").toLowerCase();
-        if (termoBusca && !nomeObra.includes(termoBusca) && !categoria.includes(termoBusca)) return;
-
+    dataFiltrada.forEach(item => {
         const cat = item.categoria || "Sem Categoria";
         const sub = item.subcategoria || "Sem Subcategoria";
 
@@ -4199,7 +4228,7 @@ async function carregarOrcamentos() {
         }
         html += `   </div></div></div>`;
     }
-    container.innerHTML = html;
+    container.innerHTML = html || `<div class="text-center mt-5 text-muted">Nenhum orçamento encontrado para "${document.getElementById('orcamento-search').value}".</div>`;
 }
 
 /* --- FUNES DE DECISO (ATUALIZADAS E SIMPLIFICADAS) --- */
