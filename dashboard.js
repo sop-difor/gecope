@@ -499,18 +499,16 @@
     }
 
     // LOGIC: DASHBOARDS
-    var fin = { status: document.getElementById("filter-status"), tipo: document.getElementById("filter-tipo"), fiscal: document.getElementById("filter-fiscal"), analista: document.getElementById("filter-analista"), contratada: document.getElementById("filter-contratada"), contratante: document.getElementById("filter-contratante"), ano: document.getElementById("filter-ano"), clear: document.getElementById("btn-clear-filters"), totAno: document.getElementById("tot-ano"), totMes: document.getElementById("tot-mes"), diffMetric: document.getElementById("metric-diff") };
+    var fin = { status: document.getElementById("filter-status"), fiscal: document.getElementById("filter-fiscal"), contratada: document.getElementById("filter-contratada"), contratante: document.getElementById("filter-contratante"), ano: document.getElementById("filter-ano"), clear: document.getElementById("btn-clear-filters"), diffMetric: document.getElementById("metric-diff") };
 
     function populateFinanceiroFilters() {
         const base = window.financeiroData || [];
-        fillSelect(fin.status, base.map(d => d.status)); fillSelect(fin.tipo, base.map(d => d.tipo)); fillSelect(fin.fiscal, base.map(d => d.fiscal)); fillSelect(fin.analista, base.map(d => d.nomeAnalista)); fillSelect(fin.contratada, base.map(d => d.contratada)); fillSelect(fin.contratante, base.map(d => d.contratante));
+        fillSelect(fin.status, base.map(d => d.status)); fillSelect(fin.fiscal, base.map(d => d.fiscal)); fillSelect(fin.contratada, base.map(d => d.contratada)); fillSelect(fin.contratante, base.map(d => d.contratante));
         const anos = Array.from(new Set(base.map(d => d.anoAbertura).filter(v => v))); fillSelect(fin.ano, anos);
-        fin.totAno.innerHTML = '<option value="">Ano: Todos</option>' + anos.map(a => `<option value="${a}">${a}</option>`).join("");
     }
 
     function getFinanceiroData() {
-        const sts = getSelectedValues(fin.status); const tps = getSelectedValues(fin.tipo); const fis = getSelectedValues(fin.fiscal);
-        const ants = getSelectedValues(fin.analista);
+        const sts = getSelectedValues(fin.status); const fis = getSelectedValues(fin.fiscal);
         const cts = getSelectedValues(fin.contratada); const crs = getSelectedValues(fin.contratante); const ans = getSelectedValues(fin.ano);
 
         const role = window.getCurrentUserRole ? window.getCurrentUserRole() : (sessionStorage.getItem('sop_role') || 'guest');
@@ -526,9 +524,7 @@
             }
 
             if (sts.length > 0 && !sts.includes(d.status)) return false;
-            if (tps.length > 0 && !tps.includes(d.tipo)) return false;
             if (fis.length > 0 && !fis.includes(d.fiscal)) return false;
-            if (ants.length > 0 && !ants.includes(d.nomeAnalista)) return false;
             if (cts.length > 0 && !cts.includes(d.contratada)) return false;
             if (crs.length > 0 && !crs.includes(d.contratante)) return false;
             if (ans.length > 0 && !ans.includes(String(d.anoAbertura))) return false;
@@ -537,17 +533,8 @@
     }
 
     function clearFinanceiro() {
-        [fin.status, fin.tipo, fin.fiscal, fin.analista, fin.contratada, fin.contratante, fin.ano].forEach(el => { if (el) { Array.from(el.options).forEach(o => o.selected = true); renderMultiSelectUI(el); } });
+        [fin.status, fin.fiscal, fin.contratada, fin.contratante, fin.ano].forEach(el => { if (el) { Array.from(el.options).forEach(o => o.selected = true); renderMultiSelectUI(el); } });
         updateFinanceiro();
-    }
-
-    function applyPeriodo(rows, ano, mes) {
-        if (!ano && !mes) return rows;
-        return rows.filter(d => {
-            const dAno = String(d.anoAbertura || ""); const dMes = String(d.mesAbertura || "");
-            const matchAno = !ano || dAno === ano; const matchMes = !mes || dMes === mes;
-            return matchAno && matchMes;
-        });
     }
 
     function renderKPIsFinanceiro(rows) {
@@ -572,40 +559,6 @@
         document.getElementById("kpi-diff-perc").textContent = window.formatPercentage ? window.formatPercentage(diffPerc) : String(diffPerc);
     }
 
-    function renderTotaisFinanceiro(rows) {
-        const base = applyPeriodo(rows, fin.totAno.value, fin.totMes.value);
-        const isFiscal = sessionStorage.getItem('sop_role') === 'fiscal';
-
-        const render = (id, v1, v2, tit) => {
-            const labels = isFiscal ? ["Fiscalização"] : ["Fiscalização", "GECOPE"];
-            const vs = isFiscal ? [v1] : [v1, v2];
-            const colors = isFiscal ? ["#008F3D"] : ["#008F3D", "#018ABD"];
-
-            const tp = vs.map(v => v >= 0 ? "outside" : "inside");
-            const data = [{
-                x: labels,
-                y: vs,
-                type: "bar",
-                marker: { color: colors },
-                text: vs.map(v => window.formatCompact ? window.formatCompact(v) : String(v)),
-                textposition: tp,
-                insidetextanchor: "end",
-                textfont: { size: 11 },
-                cliponaxis: false,
-                hovertemplate: "%{x}: R$ %{y:,.2f}<extra></extra>"
-            }];
-            const layout = {
-                margin: { l: 95, r: 10, t: 10, b: 70 },
-                yaxis: { title: tit, tickprefix: "R$ ", separatethousands: true, automargin: true },
-                xaxis: { automargin: true, tickfont: { size: 11 } }
-            };
-            if (window.Plotly) Plotly.react(document.getElementById(id), data, layout, { displayModeBar: false, responsive: true });
-        };
-        render("chart-acresc-total", (window.sum ? window.sum(base, d => d.acrescFiscal) : 0), (window.sum ? window.sum(base, d => d.acrescGecope) : 0), "Acréscimo");
-        render("chart-supress-total", (window.sum ? window.sum(base, d => d.supressFiscal) : 0), (window.sum ? window.sum(base, d => d.supressGecope) : 0), "Supressão");
-        render("chart-reperc-total", (window.sum ? window.sum(base, d => d.repercFiscal) : 0), (window.sum ? window.sum(base, d => d.repercGecope) : 0), "Repercussão");
-    }
-
     function renderContadorFinanceiro(rows) {
         const aprovados = rows.filter(d => String(d.status).toUpperCase() === "APROVADO").length;
         const arquivados = rows.filter(d => String(d.status).toUpperCase() === "ARQUIVADO").length;
@@ -616,8 +569,6 @@
         if (aprovEl) aprovEl.textContent = String(aprovados);
         if (arqEl) arqEl.textContent = String(arquivados);
     }
-
-    const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
     function groupSumPair(rows, kFn, v1Fn, v2Fn) {
         const m = new Map();
@@ -632,22 +583,6 @@
         return Array.from(m.values());
     }
 
-    function renderEvolucaoFinanceiro(rows) {
-        const withData = rows.filter(d => d.dataAprovacao instanceof Date && !isNaN(d.dataAprovacao));
-        const grupos = groupSumPair(withData,
-            d => `${d.dataAprovacao.getFullYear()}-${String(d.dataAprovacao.getMonth() + 1).padStart(2, "0")}`,
-            d => d.repercFiscal, d => d.repercGecope);
-        grupos.sort((a, b) => a.key.localeCompare(b.key));
-
-        const labels = grupos.map(g => { const [y, m] = g.key.split("-"); return `${MESES_ABREV[Number(m) - 1]}/${y.slice(2)}`; });
-        const data = [
-            { x: labels, y: grupos.map(g => g.v1), name: "Fiscalização", mode: "lines+markers", line: { color: "#008F3D", width: 3 }, marker: { size: 7 } },
-            { x: labels, y: grupos.map(g => g.v2), name: "GECOPE", mode: "lines+markers", line: { color: "#018ABD", width: 3 }, marker: { size: 7 } }
-        ];
-        const layout = { margin: { l: 70, r: 20, t: 10, b: 40 }, yaxis: { title: "Repercussão", tickprefix: "R$ ", separatethousands: true }, legend: { orientation: "h", y: -0.2 } };
-        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-evolucao"), grupos.length ? data : [], layout, { displayModeBar: false, responsive: true });
-    }
-
     function renderPorFiscalFinanceiro(rows) {
         const grupos = groupSumPair(rows, d => d.fiscal || "Não informado", d => d.repercFiscal, d => d.repercGecope);
         grupos.sort((a, b) => (Math.abs(b.v1) + Math.abs(b.v2)) - (Math.abs(a.v1) + Math.abs(a.v2)));
@@ -658,31 +593,6 @@
         ];
         const layout = { margin: { l: 140, r: 20, t: 10, b: 40 }, barmode: "group", xaxis: { title: "Repercussão", tickprefix: "R$ " }, legend: { orientation: "h", y: -0.15 }, height: Math.max(300, 34 * top.length + 80) };
         if (window.Plotly) Plotly.react(document.getElementById("chart-fin-fiscal"), top.length ? data : [], layout, { displayModeBar: false, responsive: true });
-    }
-
-    function renderPorAnalistaFinanceiro(rows) {
-        const m = new Map();
-        rows.forEach(d => { const k = d.nomeAnalista || "Não informado"; m.set(k, (m.get(k) || 0) + (d.repercGecope || 0)); });
-        const entries = Array.from(m.entries()).filter(([, v]) => v !== 0).sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
-        const data = [{ labels: entries.map(e => e[0]), values: entries.map(e => Math.abs(e[1])), type: "pie", marker: { colors: ["#008F3D", "#018ABD", "#F28C00", "#8e44ad", "#d35400"] }, textinfo: "label+percent" }];
-        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-analista"), entries.length ? data : [], { margin: { l: 10, r: 10, t: 10, b: 10 }, height: 320 }, { displayModeBar: false, responsive: true });
-    }
-
-    function renderIndiceFiscalFinanceiro(rows) {
-        const m = new Map();
-        rows.forEach(d => {
-            const k = d.fiscal || "Não informado";
-            if (!m.has(k)) m.set(k, { num: 0, den: 0 });
-            const g = m.get(k);
-            g.num += Math.abs((d.repercGecope || 0) - (d.repercFiscal || 0));
-            g.den += Math.abs(d.repercFiscal || 0);
-        });
-        const grupos = Array.from(m.entries()).filter(([, g]) => g.den > 0).map(([key, g]) => ({ key, value: (g.num / g.den) * 100 }));
-        grupos.sort((a, b) => b.value - a.value);
-        const top = grupos.slice(0, 15).reverse();
-        const data = [{ y: top.map(g => g.key), x: top.map(g => g.value), type: "bar", orientation: "h", marker: { color: "#8e44ad" }, text: top.map(g => g.value.toFixed(1) + "%"), textposition: "outside" }];
-        const layout = { margin: { l: 140, r: 30, t: 10, b: 40 }, xaxis: { title: "% de revisão" }, height: Math.max(280, 34 * top.length + 60) };
-        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-indice-fiscal"), top.length ? data : [], layout, { displayModeBar: false, responsive: true });
     }
 
     function renderPrazoValorFinanceiro(rows) {
@@ -788,12 +698,8 @@
         }
 
         renderKPIsFinanceiro(filtered);
-        renderTotaisFinanceiro(filtered);
         renderContadorFinanceiro(filtered);
-        renderEvolucaoFinanceiro(filtered);
         renderPorFiscalFinanceiro(filtered);
-        renderPorAnalistaFinanceiro(filtered);
-        renderIndiceFiscalFinanceiro(filtered);
         renderPrazoValorFinanceiro(filtered);
         renderDrilldownFinanceiro(filtered);
     }

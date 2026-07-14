@@ -327,6 +327,7 @@ var FISCAIS_LIST = [
     'JOSÉ ROSEMBERG',
     'JOSÉ WILLIAN',
     'JOSUÉ JOHAB',
+    'JOVANKA RANGEL',
     'JURANDIR VIANA',
     'JUSTINIANO CAMURÇA',
     'KENEDDY MAYK',
@@ -3169,11 +3170,10 @@ function populateAllTabFilters() {
     }
 }
 function wireEvents() {
-    fin.status.addEventListener("change", updateFinanceiro); fin.tipo.addEventListener("change", updateFinanceiro); fin.fiscal.addEventListener("change", updateFinanceiro);
-    fin.analista.addEventListener("change", updateFinanceiro);
+    fin.status.addEventListener("change", updateFinanceiro); fin.fiscal.addEventListener("change", updateFinanceiro);
     fin.contratada.addEventListener("change", updateFinanceiro); fin.contratante.addEventListener("change", updateFinanceiro); fin.ano.addEventListener("change", updateFinanceiro);
     fin.clear.addEventListener("click", (e) => { e.preventDefault(); clearFinanceiro(); });
-    fin.totAno.addEventListener("change", updateFinanceiro); fin.totMes.addEventListener("change", updateFinanceiro); fin.diffMetric.addEventListener("change", updateFinanceiro);
+    fin.diffMetric.addEventListener("change", updateFinanceiro);
     ger.fiscal.addEventListener("change", updateGerencial); ger.status.addEventListener("change", updateGerencial);
     ger.clear.addEventListener("click", (e) => { e.preventDefault(); clearGerencial(); });
     mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
