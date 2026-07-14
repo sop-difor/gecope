@@ -1,3 +1,13 @@
+// Pré-carrega a página de destino (HTML + assets) assim que o mouse passa por cima
+// do botão de navegação, para a troca de aba parecer instantânea ao clicar.
+function prefetchPagina(url) {
+    if (document.querySelector(`link[rel="prefetch"][href="${url}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = url;
+    document.head.appendChild(link);
+}
+
 function toggleLanding(show) {
     const landing = document.getElementById('landingOverlay');
     const appContent = document.getElementById('app-content');

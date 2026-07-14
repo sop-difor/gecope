@@ -36,7 +36,6 @@
             // Sincroniza também com window
             window.sbClient = sbClient;
             console.log("[Supabase] Conectado.");
-            setTimeout(() => { if (window.showToast) window.showToast("Motor SOP v2 Ativo", "info"); }, 1500);
         }
     }
 
