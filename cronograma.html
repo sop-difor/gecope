@@ -351,7 +351,7 @@ main {
 .tarefa.concluida  { opacity: .55; }
 
 .tarefa-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
-.tarefa-titulo { font-size: .92rem; font-weight: 700; line-height: 1.5; flex: 1; }
+.tarefa-titulo { font-size: .85rem; font-weight: 700; line-height: 1.5; flex: 1; text-align: justify; text-justify: inter-word; }
 .tarefa-status { font-size: .72rem; padding: 4px 10px; border-radius: 99px; font-weight: 800; white-space: nowrap; letter-spacing: .3px; }
 .tarefa-status.ativa      { background: var(--ativa-bg);      color: #166534; }
 .tarefa-status.fila       { background: var(--fila-bg);       color: #92400e; }
@@ -888,7 +888,8 @@ main {
 /* ── ABA CONCLUÍDAS ── */
 .conc-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-items: start;
   gap: 20px;
 }
 .conc-card {
@@ -1451,7 +1452,7 @@ tbody td { padding: 10px 15px; vertical-align: top; }
         <option value="">Todos os status</option>
         <option value="ativa">EM EXECUÇÃO</option>
         <option value="fila">EM FILA</option>
-        <option value="bloqueada">AGUARDANDO</option>
+        <option value="bloqueada">DEVOLVIDA</option>
         <option value="paralisada">PARALISADA</option>
         <option value="concluida">CONCLUÍDA</option>
       </select>
@@ -1508,6 +1509,12 @@ tbody td { padding: 10px 15px; vertical-align: top; }
       <strong style="font-size:.95rem;color:#374151">Histórico de Tarefas Concluídas</strong>
       <p style="font-size:.78rem;color:#6b7280;margin-top:2px">Tarefas finalizadas ficam aqui, fora do painel principal.</p>
     </div>
+    <select id="filtro-conc-periodo" onchange="renderConcluidas()" style="border:1px solid var(--borda);border-radius:var(--radius-sm);padding:7px 12px;font-size:.8rem;font-family:'Montserrat',sans-serif;background:white">
+      <option value="">Todo o período</option>
+      <option value="dia">Hoje</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes">Este mês</option>
+    </select>
     <select id="filtro-conc-analista" onchange="renderConcluidas()" style="border:1px solid var(--borda);border-radius:var(--radius-sm);padding:7px 12px;font-size:.8rem;font-family:'Montserrat',sans-serif;background:white">
       <option value="">Todos os analistas</option>
     </select>
@@ -1528,7 +1535,7 @@ tbody td { padding: 10px 15px; vertical-align: top; }
     <option value="">Todos os status</option>
     <option value="ativa">EM EXECUÇÃO</option>
     <option value="fila">EM FILA</option>
-    <option value="bloqueada">AGUARDANDO</option>
+    <option value="bloqueada">DEVOLVIDA</option>
   </select>
 
   <!-- Vista Lista (oculta, mantida para compatibilidade) -->
@@ -1658,7 +1665,7 @@ tbody td { padding: 10px 15px; vertical-align: top; }
       <select id="t-status" onchange="onStatusChange()">
         <option value="ativa">EM EXECUÇÃO – Em andamento</option>
         <option value="fila">EM FILA – Ainda não iniciada</option>
-        <option value="bloqueada">AGUARDANDO – Retornou ao fiscal</option>
+        <option value="bloqueada">DEVOLVIDA – Retornou ao fiscal</option>
         <option value="paralisada">PARALISADA – Iniciada, mas suspensa por algum motivo</option>
         <option value="concluida">CONCLUÍDA</option>
       </select>
@@ -2036,7 +2043,7 @@ function renderPainel() {
     const chipsOutras = [
       nAtrasado ? `<span class="toggle-chip atrasado">${nAtrasado} atrasada${nAtrasado>1?'s':''}</span>` : '',
       nSb       ? `<span class="toggle-chip fila">${nSb} em fila</span>` : '',
-      nBlo      ? `<span class="toggle-chip bloqueada">${nBlo} aguardando</span>` : '',
+      nBlo      ? `<span class="toggle-chip bloqueada">${nBlo} devolvida${nBlo>1?'s':''}</span>` : '',
       nPar      ? `<span class="toggle-chip paralisada">${nPar} paralisada${nPar>1?'s':''}</span>` : '',
     ].join('');
 
@@ -2052,7 +2059,7 @@ function renderPainel() {
         <div class="badges">
           ${ativas     ? `<span class="badge ativa">${ativas} em execução</span>` : ''}
           ${standby    ? `<span class="badge fila">${standby} em fila</span>` : ''}
-          ${bloqueadas ? `<span class="badge bloqueada">${bloqueadas} aguardando</span>` : ''}
+          ${bloqueadas ? `<span class="badge bloqueada">${bloqueadas} devolvida${bloqueadas>1?'s':''}</span>` : ''}
           ${paralisada ? `<span class="badge paralisada">${paralisada} paralisada${paralisada>1?'s':''}</span>` : ''}
         </div>
       </div>
@@ -2277,7 +2284,7 @@ document.addEventListener('click', e => {
 });
 
 function labelStatus(s) {
-  return {ativa:'EM EXECUÇÃO', fila:'EM FILA', bloqueada:'AGUARDANDO', atrasado:'ATRASADO', paralisada:'PARALISADA', concluida:'CONCLUÍDA'}[s]||s;
+  return {ativa:'EM EXECUÇÃO', fila:'EM FILA', bloqueada:'DEVOLVIDA', atrasado:'ATRASADO', paralisada:'PARALISADA', concluida:'CONCLUÍDA'}[s]||s;
 }
 
 // ── FORMATAÇÃO RICH TEXT ──
@@ -2420,7 +2427,7 @@ function renderResumo() {
     </div>
     <div class="card-resumo bloqueada">
       <i class="bi bi-pause-circle-fill ico-bg" aria-hidden="true"></i>
-      <div class="cr-texto"><div class="num">${b}</div><div class="label">AGUARDANDO</div></div>
+      <div class="cr-texto"><div class="num">${b}</div><div class="label">DEVOLVIDA</div></div>
     </div>
     <div class="card-resumo paralisada">
       <i class="bi bi-slash-circle ico-bg" aria-hidden="true"></i>
@@ -3374,9 +3381,26 @@ function renderConcluidas() {
   popularFiltros('filtro-conc-analista');
   const filtroAn  = document.getElementById('filtro-conc-analista').value;
   const filtroBu  = (document.getElementById('filtro-conc-busca').value || '').toLowerCase();
-  const listaAn   = filtroAn ? analistas.filter(a => a.id === filtroAn) : analistas;
+  const filtroPer = document.getElementById('filtro-conc-periodo').value;
+  const listaAn   = (filtroAn ? analistas.filter(a => a.id === filtroAn) : analistas.slice())
+    .sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   const grid      = document.getElementById('conc-grid');
   grid.innerHTML  = '';
+
+  // Limites do período selecionado (dia/semana/mês corrente), com base em atualizadoEm
+  const agora        = new Date();
+  const inicioHoje   = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const inicioSemana = new Date(inicioHoje); inicioSemana.setDate(inicioHoje.getDate() - inicioHoje.getDay());
+  const inicioMes    = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const dentroPeriodo = (t) => {
+    if (!filtroPer) return true;
+    if (!t.atualizadoEm) return false;
+    const d = new Date(t.atualizadoEm);
+    if (filtroPer === 'dia')    return d >= inicioHoje;
+    if (filtroPer === 'semana') return d >= inicioSemana;
+    if (filtroPer === 'mes')    return d >= inicioMes;
+    return true;
+  };
 
   let totalConc = 0;
 
@@ -3386,6 +3410,7 @@ function renderConcluidas() {
       (t.descricao||'').toLowerCase().includes(filtroBu) ||
       (t.processo||'').toLowerCase().includes(filtroBu)
     );
+    concl = concl.filter(dentroPeriodo);
     if (concl.length === 0) return;
     totalConc += concl.length;
 
@@ -3445,9 +3470,8 @@ function reabrirTarefa(id) {
 }
 
 function atualizarBadgeConcluidas() {
-  const total = tarefas.filter(t => t.status === 'concluida').length;
   const btn = document.getElementById('btn-aba-concluidas');
-  if (btn) btn.innerHTML = total > 0 ? `<i class="bi bi-check2-circle"></i> Concluídas (${total})` : '<i class="bi bi-check2-circle"></i> Concluídas';
+  if (btn) btn.innerHTML = '<i class="bi bi-check2-circle"></i> Concluídas';
 }
 
 // ══════════════════════════════════════════════════════════
