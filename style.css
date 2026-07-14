@@ -379,6 +379,17 @@
 
             --sop-card-shadow: var(--shadow-sm);
             --sop-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+            /* Tokens usados no redesign do Painel de Processos */
+            --text-heading: var(--sop-slate-900);
+            --text-muted: var(--sop-slate-500);
+            --shadow-card-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+            --transition-fast: 0.2s ease;
+            --radius-lg: 16px;
+            --radius-sm: 8px;
+            --icon-bg-slate: var(--sop-slate-100);
+            --icon-fg-slate: var(--sop-slate-600);
+            --filetype-pdf-fg: #DC3545;
         }
 
         /* HOME DASHBOARD STYLES */
@@ -1472,6 +1483,18 @@
             white-space: nowrap;
         }
 
+        /* Badge de Meta — mais fino e discreto que os badges de Status */
+        .badge-meta-size {
+            min-width: 0;
+            height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
         .badge-status-devolvido {
             background-color: #F8D7DA;
             color: #842029;
@@ -1499,7 +1522,8 @@
         .badge-status-aguar-reanalise {
             background-color: #FFC107;
             color: #000000;
-            border: 1px solid #e0a800;
+            border: 1px solid #FFC107;
+            font-weight: 700;
         }
 
         .badge-status-light-green {
@@ -1509,20 +1533,22 @@
         }
 
         .badge-status-fiscal {
-            background-color: #ff4d4d;
+            background-color: #000000;
             color: #ffffff;
-            border: 1px solid #e60000;
+            border: 1px solid #000000;
         }
 
         /* ALERTA FISCAL PREMIUM */
+        /* Bootstrap 5 pinta o fundo por <td> via var(--bs-table-bg); background-color na <tr> é
+           coberto pelas células. Sobrescrever a variável propaga a cor corretamente. */
         .tr-alerta-fiscal {
-            background-color: #fff8f8 !important;
+            --bs-table-bg: #fff8f8 !important;
             border-left: 5px solid #ff4d4d !important;
             transition: all 0.3s ease;
         }
 
         .tr-alerta-fiscal:hover {
-            background-color: #fff0f0 !important;
+            --bs-table-bg: #fff0f0 !important;
         }
 
         .badge-tramitado-pulse {
@@ -1573,10 +1599,15 @@
             border: 1px solid #cdd600;
         }
 
+        .badge-status-arquivado {
+            background-color: #E2E8F0;
+            color: #475569;
+        }
+
         .badge-status-diligencia {
-            background-color: #FF6B35;
+            background-color: #DC3545;
             color: #ffffff;
-            border: 1px solid #e85a2a;
+            border: 1px solid #DC3545;
         }
 
         /* CORES METAS */
@@ -1601,27 +1632,292 @@
             color: #fff;
         }
 
-        /* Checkbox Prioritário */
-        .checkbox-prioritario {
-            width: 20px;
-            height: 20px;
+        /* ------------------------------------------------------------------------
+           PAINEL DE PROCESSOS — REDESIGN (aba Processos)
+           ------------------------------------------------------------------------ */
+
+        /* Cards de KPI */
+        .proc-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .proc-kpi-card {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card-subtle);
+            border: 1px solid var(--sop-slate-100);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: var(--transition-fast);
+        }
+
+        .proc-kpi-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-3px);
+        }
+
+        .proc-kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+        }
+
+        .proc-kpi-icon i {
+            color: #fff;
+            font-size: 1.2rem;
+        }
+
+        .proc-kpi-text {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .proc-kpi-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+        }
+
+        .proc-kpi-value {
+            font-size: 2.1rem;
+            font-weight: 800;
+            color: var(--text-heading);
+            line-height: 1;
+        }
+
+        .proc-kpi-sub {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .proc-kpi-card.accent-green { border-left: 4px solid var(--sop-green); }
+        .proc-kpi-card.accent-orange { border-left: 4px solid var(--sop-orange); }
+        .proc-kpi-card.accent-purple { border-left: 4px solid #6f42c1; }
+
+        .proc-kpi-icon.bg-green { background: var(--sop-green); box-shadow: 0 4px 10px -2px var(--sop-green); }
+        .proc-kpi-icon.bg-orange { background: var(--sop-orange); box-shadow: 0 4px 10px -2px var(--sop-orange); }
+        .proc-kpi-icon.bg-purple { background: #6f42c1; box-shadow: 0 4px 10px -2px #6f42c1; }
+
+        /* Abas por página (pill segmentado) */
+        .proc-tabs {
+            display: flex;
+            width: fit-content;
+            gap: 4px;
+            background: var(--sop-slate-100);
+            border-radius: 999px;
+            padding: 5px;
+            margin: 6px auto 18px;
+        }
+
+        .proc-tab {
+            padding: 9px 20px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--sop-slate-500);
+            background: transparent;
+            border: none;
             cursor: pointer;
-            accent-color: var(--sop-green);
+            transition: var(--transition-fast);
+            white-space: nowrap;
         }
 
-        .checkbox-prioritario:hover:not(:disabled) {
-            opacity: 0.8;
+        .proc-tab.active {
+            background: #fff;
+            color: var(--sop-green);
+            box-shadow: var(--shadow-sm);
         }
 
-        .checkbox-prioritario:checked:not(:disabled) {
-            box-shadow: 0 0 4px rgba(13, 110, 253, 0.5);
+        /* Painel de Filtros de Pesquisa reforçado */
+        #pane-reuniao .filters-card {
+            box-shadow: 0 16px 32px -10px rgba(0, 0, 0, 0.22);
+            border-radius: var(--radius-lg);
         }
 
-        /* Efeito visual "marca d'água" para checkbox como "readonly" (não-admin) */
-        .checkbox-prioritario.readonly-checkbox {
-            opacity: 0.6;
-            cursor: not-allowed;
-            /* Diferente do atributo "disabled" do HTML, isso não mata a accent-color principal */
+        .proc-filter-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            width: 100%;
+        }
+
+        .proc-filter-col {
+            flex: 1.3;
+            min-width: 0;
+        }
+
+        .proc-filter-col-search {
+            flex: 3.2;
+            min-width: 0;
+        }
+
+        /* Todos os controles do filtro (selects + multiselect Fiscal/Status + busca)
+           alinhados em 38px, como os botões */
+        .proc-filter-row .form-select,
+        .proc-filter-row .proc-search-wrap input.form-control,
+        .proc-filter-row .multiselect-btn {
+            height: 38px !important;
+            min-height: 38px !important;
+            max-height: 38px !important;
+            box-sizing: border-box !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            line-height: 36px !important;
+        }
+
+        /* Campo de busca — mesmo visual (borda/altura/radius) dos selects, ícone sobreposto */
+        .proc-search-wrap {
+            position: relative;
+        }
+
+        .proc-search-wrap input.form-control {
+            padding-right: 34px !important;
+        }
+
+        .proc-search-wrap .proc-search-icon {
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            color: var(--sop-slate-500);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+
+        .proc-filter-actions {
+            flex: 0 0 auto;
+            display: flex;
+            gap: 6px;
+        }
+
+        .proc-filter-actions .btn {
+            height: 38px !important;
+            box-sizing: border-box;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.82rem;
+            white-space: nowrap;
+        }
+
+        .proc-btn-pdf {
+            border: 1px solid var(--filetype-pdf-fg);
+            color: var(--filetype-pdf-fg);
+            background: #fff;
+        }
+
+        .proc-btn-pdf:hover {
+            background: var(--filetype-pdf-fg);
+            color: #fff;
+        }
+
+        /* Container da tabela */
+        .proc-table-wrap {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card-subtle);
+            border: 1px solid var(--sop-slate-100);
+            margin-top: 18px;
+            /* Sem overflow:hidden — isso criaria um contexto de rolagem próprio e
+               quebraria o cabeçalho sticky (ele grudaria nesse container, não na página).
+               Os cantos são arredondados diretamente nas células de borda abaixo. */
+        }
+
+        .proc-table-wrap thead tr:first-child th:first-child {
+            border-top-left-radius: var(--radius-lg);
+        }
+
+        .proc-table-wrap thead tr:first-child th:last-child {
+            border-top-right-radius: var(--radius-lg);
+        }
+
+        .proc-table-wrap tbody tr:last-child td:first-child {
+            border-bottom-left-radius: var(--radius-lg);
+        }
+
+        .proc-table-wrap tbody tr:last-child td:last-child {
+            border-bottom-right-radius: var(--radius-lg);
+        }
+
+        .proc-table-wrap table {
+            font-size: 1.02rem;
+        }
+
+        .proc-table-wrap thead th {
+            position: sticky;
+            top: -1px;
+            z-index: 1030;
+            background-color: var(--sop-slate-50) !important;
+            padding: 13px 14px;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--sop-slate-600);
+        }
+
+        .proc-table-wrap tbody tr.tr-processo-row {
+            border-bottom: 1px solid var(--sop-slate-100);
+        }
+
+        .proc-table-wrap .badge-custom-size,
+        .proc-table-wrap td .badge.rounded-pill {
+            font-size: 0.76rem !important;
+        }
+
+        .proc-table-wrap tbody tr.tr-processo-row:hover {
+            /* Bootstrap 5 pinta o fundo em cada <td> via var(--bs-table-bg); sobrescrever
+               a variável na linha propaga a cor para as células (background-color na tr não funciona).
+               !important garante prioridade sobre a regra de zebra (que tem um #id, mais específica). */
+            --bs-table-bg: #d6dee8 !important;
+        }
+
+        /* Avatar circular do Analista */
+        .proc-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--icon-bg-slate);
+            color: var(--icon-fg-slate);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin: 0 auto;
+        }
+
+        /* Rodapé da tabela */
+        .proc-table-footer-pill {
+            background: #fff;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 999px;
+            padding: 6px 16px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* Zebra striping sutil nas linhas da tabela de processos */
+        #pane-reuniao table tbody tr.tr-processo-row:nth-child(even) {
+            --bs-table-bg: var(--sop-slate-100, #f1f5f9);
+        }
+
+        .proc-star-prioritario:hover {
+            opacity: 0.75;
         }
 
         /* CSS MULTI-SELECT */

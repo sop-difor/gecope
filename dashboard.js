@@ -270,45 +270,6 @@
         renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
     }
 
-    // Prazos
-    const pr = { fiscal: document.getElementById("prazos-filter-fiscal"), status: document.getElementById("prazos-filter-status"), clear: document.getElementById("btn-prazos-clear") };
-    let przBase = [];
-    function updatePrazosFilters(rows) { przBase = rows; fillSelect(pr.fiscal, przBase.map(d => d.fiscal)); fillSelect(pr.status, przBase.map(d => d.status)); updatePrazos(); }
-    function getPrazosData() {
-        const f = getSelectedValues(pr.fiscal);
-        const s = getSelectedValues(pr.status);
-        const totalF = pr.fiscal?.options?.length || 0;
-        const totalS = pr.status?.options?.length || 0;
-
-        const role = getCurrentUserRole();
-        const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
-
-        return przBase.filter(d => {
-            if (role === 'fiscal' && userFiscal) {
-                const dFiscal = (d.fiscal || "").toUpperCase().trim();
-                const userFiscalUpper = userFiscal.toUpperCase().trim();
-                const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
-                const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
-                if (dFiscalNorm !== userFiscalNorm) return false;
-            }
-
-            const passF = (f.length === totalF || f.includes(d.fiscal || "Não informado"));
-            const passS = (s.length === totalS || s.includes(d.status || "Não informado"));
-            return passF && passS;
-        });
-    }
-    function updatePrazos() {
-        const rows = getPrazosData();
-        const aprov = rows.filter(d => String(d.status).toUpperCase().includes("APROVADO") && isFinite(d.prazoDias));
-        const dias = aprov.map(d => d.prazoDias).sort((a, b) => a - b);
-        document.getElementById("kpi-aprovados_qtd") && (document.getElementById("kpi-aprovados_qtd").textContent = String(aprov.length));
-        document.getElementById("kpi-tempo_medio") && (document.getElementById("kpi-tempo_medio").textContent = dias.length ? Math.round(dias.reduce((a, b) => a + b, 0) / dias.length) : "");
-        document.getElementById("kpi-tempo_mediana") && (document.getElementById("kpi-tempo_mediana").textContent = dias.length ? Math.round(quantile(dias, 0.5)) : "");
-        document.getElementById("kpi-tempo_p90") && (document.getElementById("kpi-tempo_p90").textContent = dias.length ? Math.round(quantile(dias, 0.9)) : "");
-        renderHBar("chart_tempo_por_fiscal", topN(groupAvg(aprov, d => d.fiscal, d => d.prazoDias), 20), "Dias (média)");
-        renderHBar("chart_tempo_por_tipo", topN(groupAvg(aprov, d => d.tipo, d => d.prazoDias), 20), "Dias (média)");
-    }
-
     // Clear helpers for filters (compat with legacy calls from main.js)
     function clearGerencial() {
         [ger.fiscal, ger.status].forEach(el => {
@@ -318,16 +279,6 @@
             }
         });
         updateGerencial();
-    }
-
-    function clearPrazos() {
-        [pr.fiscal, pr.status].forEach(el => {
-            if (el) {
-                Array.from(el.options).forEach(o => o.selected = true);
-                renderMultiSelectUI(el);
-            }
-        });
-        updatePrazos();
     }
 
     // Agrupamentos e utilitários pequenos
@@ -351,16 +302,12 @@
     window.updateGerencialFilters = updateGerencialFilters;
     window.getGerencialData = getGerencialData;
     window.updateGerencial = updateGerencial;
-    window.updatePrazosFilters = updatePrazosFilters;
-    window.getPrazosData = getPrazosData;
-    window.updatePrazos = updatePrazos;
     window.groupCount = groupCount;
     window.groupAvg = groupAvg;
     window.topN = topNArr;
     window.quantile = quantile;
     window.renderHBar = renderHBar;
     window.clearGerencial = clearGerencial;
-    window.clearPrazos = clearPrazos;
 
 })(window);
 (function (window) {
@@ -808,44 +755,6 @@
         renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
     }
 
-    var pr = { fiscal: document.getElementById("prazos-filter-fiscal"), status: document.getElementById("prazos-filter-status"), clear: document.getElementById("btn-prazos-clear") };
-    let przBase = [];
-    function updatePrazosFilters(rows) { przBase = rows; fillSelect(pr.fiscal, przBase.map(d => d.fiscal)); fillSelect(pr.status, przBase.map(d => d.status)); updatePrazos(); }
-    function getPrazosData() {
-        const f = getSelectedValues(pr.fiscal);
-        const s = getSelectedValues(pr.status);
-        const totalF = pr.fiscal.options.length;
-        const totalS = pr.status.options.length;
-
-        const role = window.getCurrentUserRole ? window.getCurrentUserRole() : (sessionStorage.getItem('sop_role') || 'guest');
-        const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
-
-        return (przBase || []).filter(d => {
-            if (role === 'fiscal' && userFiscal) {
-                const dFiscal = (d.fiscal || "").toUpperCase().trim();
-                const userFiscalUpper = userFiscal.toUpperCase().trim();
-                const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
-                const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
-                if (dFiscalNorm !== userFiscalNorm) return false;
-            }
-
-            const passF = (f.length === totalF || f.includes(d.fiscal || "Não informado"));
-            const passS = (s.length === totalS || s.includes(d.status || "Não informado"));
-            return passF && passS;
-        });
-    }
-    function updatePrazos() {
-        const rows = getPrazosData();
-        const aprov = rows.filter(d => String(d.status).toUpperCase().includes("APROVADO") && window.isFiniteNumber ? window.isFiniteNumber(d.prazoDias) : (typeof d.prazoDias === 'number' && isFinite(d.prazoDias)));
-        const dias = aprov.map(d => d.prazoDias).sort((a, b) => a - b);
-        document.getElementById("kpi-aprovados_qtd").textContent = String(aprov.length);
-        document.getElementById("kpi-tempo_medio").textContent = dias.length ? Math.round(dias.reduce((a, b) => a + b, 0) / dias.length) : "";
-        document.getElementById("kpi-tempo_mediana").textContent = dias.length ? Math.round(quantile(dias, 0.5)) : "";
-        document.getElementById("kpi-tempo_p90").textContent = dias.length ? Math.round(quantile(dias, 0.9)) : "";
-        renderHBar("chart_tempo_por_fiscal", topN(groupAvg(aprov, d => d.fiscal, d => d.prazoDias), 20), "Dias (média)");
-        renderHBar("chart_tempo_por_tipo", topN(groupAvg(aprov, d => d.tipo, d => d.prazoDias), 20), "Dias (média)");
-    }
-
     // Expose globals
     window.getSelectedValues = getSelectedValues;
     window.renderMultiSelectUI = renderMultiSelectUI;
@@ -863,11 +772,8 @@
     window.updateGerencialFilters = updateGerencialFilters;
     window.getGerencialData = getGerencialData;
     window.updateGerencial = updateGerencial;
-    window.updatePrazosFilters = updatePrazosFilters;
-    window.getPrazosData = getPrazosData;
-    window.updatePrazos = updatePrazos;
 
-    // Also expose fin/ger/pr as globals
-    window.fin = fin; window.ger = ger; window.pr = pr;
+    // Also expose fin/ger as globals
+    window.fin = fin; window.ger = ger;
 
 })(window);

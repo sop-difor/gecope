@@ -1325,7 +1325,6 @@ async function carregarDadosSupabase() {
         updateDashboard();
         clearFinanceiro();
         clearGerencial();
-        clearPrazos();
         updateFinanceiro();
         if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
     } catch (e) {
@@ -2050,7 +2049,6 @@ function showPane(paneId) {
         'pane-home': 'Painel Gerencial — Aditivos de Obras',
         'pane-financeiro': 'Painel Financeiro',
         'pane-gerencial': 'Painel Gerencial - Estatísticas',
-        'pane-prazos': 'Prazos e Produtividade',
         'pane-reuniao': 'Processos',
         'pane-orcamentos': 'Orçamentos',
         'pane-composicoes': 'Composições',
@@ -2099,9 +2097,6 @@ function showPane(paneId) {
         } catch (e) { console.warn('Erro ao resetar filtros de reunião', e); }
         if (typeof updateReuniao === 'function') updateReuniao();
     }
-    if (paneId === 'pane-prazos') {
-        if (typeof updatePrazos === 'function') updatePrazos();
-    }
     if (paneId === 'pane-gerencial') {
         if (typeof updateGerencial === 'function') updateGerencial();
     }
@@ -2125,7 +2120,6 @@ function updateDashboard() {
     if (typeof updateReuniao === 'function') updateReuniao();
     if (typeof updateFinanceiro === 'function') updateFinanceiro();
     if (typeof updateGerencial === 'function') updateGerencial();
-    if (typeof updatePrazos === 'function') updatePrazos();
 }
 
 // --- 6. EVENT LISTENERS E MÁSCARAS ---
@@ -2193,11 +2187,6 @@ function applyRBACToPainels() {
             ger.fiscal.parentElement.parentElement.style.display = 'none';
         }
 
-        // Ocultar filtro de Fiscal para Fiscal (Painel Prazos)
-        if (pr.fiscal && pr.fiscal.parentElement) {
-            pr.fiscal.parentElement.parentElement.style.display = 'none';
-        }
-
         // Desabilitar botão Limpar para Fiscal (Painel Financeiro)
         if (fin.clear) {
             fin.clear.disabled = true;
@@ -2210,11 +2199,6 @@ function applyRBACToPainels() {
             ger.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
         }
 
-        // Desabilitar botão Limpar para Fiscal (Painel Prazos)
-        if (pr.clear) {
-            pr.clear.disabled = true;
-            pr.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
-        }
     }
 }
 
@@ -2289,15 +2273,7 @@ function switchProcessTab(tab) {
     tabIds.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
-        if (id === 'btn-tab-' + tab) {
-            el.style.color = 'var(--sop-green)';
-            el.style.borderBottom = '3px solid var(--sop-green)';
-            el.style.fontWeight = '700';
-        } else {
-            el.style.color = '#64748b';
-            el.style.borderBottom = '3px solid transparent';
-            el.style.fontWeight = '500';
-        }
+        el.classList.toggle('active', id === 'btn-tab-' + tab);
     });
     // Ao trocar de aba, garantir que os filtros de reunião estejam em "Todos"
     try {
@@ -2552,9 +2528,8 @@ function updateReuniao() {
     // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
     if (!window.currentProcessesTab) window.currentProcessesTab = 'ativos';
 
-    // Filtro Global: Ignorar paginação (aba atual) se ativado
-    const elGlobalToggle = document.getElementById('searchGlobalToggle');
-    const isGlobalSearch = elGlobalToggle && elGlobalToggle.checked;
+    // Com busca textual ativa, ignora a paginação por aba e busca em todas as páginas
+    const isGlobalSearch = mt.search.value.trim().length > 0;
 
     if (!isGlobalSearch) {
         rows = rows.filter(d => {
@@ -2665,16 +2640,15 @@ function updateReuniao() {
     window.currentVisibleRows = rows; // Armazena globalmente para exportação
 
     const columns = [
-        { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prioritário", width: "80px", key: "prioritario", align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "100px", key: "meta", align: "start" },
-        { title: "Status", width: "146px", key: "status", align: "start" }, { title: "Suite", width: "146px", key: null, align: "start" }, { title: "Analista", width: "100px", key: "analista", align: "center" }, { title: "Abertura", width: "100px", key: "abertura", align: "center" },
+        { title: "Ações", width: "50px", key: null, align: "center" }, { title: "Prior.", width: "80px", key: "prioritario", align: "center" }, { title: "Processo", width: "200px", key: "processo", align: "start" }, { title: "Meta", width: "110px", key: "meta", align: "center" },
+        { title: "Status", width: "146px", key: "status", align: "center" }, { title: "Suíte", width: "146px", key: null, align: "center" }, { title: "Analista", width: "100px", key: "analista", align: "center" }, { title: "Abertura", width: "100px", key: "abertura", align: "center" },
         { title: "Contratada", width: "100px", key: "contratada", align: "start" }, { title: "Descrição", width: "auto", key: "descricao", align: "start" }
     ];
     const thead = document.querySelector("#pane-reuniao table thead");
     let headerHTML = "<tr>";
     columns.forEach(col => {
-        const stickyStyle = "position: sticky; top: -1px; z-index: 1030; background-color: #f8f9fa !important;";
-        if (col.key) { headerHTML += `<th style="width: ${col.width}; cursor: pointer; user-select: none; ${stickyStyle}" onclick="changeSort('${col.key}')" class="text-${col.align}"><div class="d-flex align-items-center justify-content-${col.align === 'center' ? 'center' : 'start'}">${col.title} ${getSortIcon(col.key)}</div></th>`; }
-        else { headerHTML += `<th class="text-${col.align}" style="width: ${col.width}; ${stickyStyle}">${col.title}</th>`; }
+        if (col.key) { headerHTML += `<th style="width: ${col.width}; cursor: pointer; user-select: none;" onclick="changeSort('${col.key}')" class="text-${col.align}"><div class="d-flex align-items-center justify-content-${col.align === 'center' ? 'center' : 'start'}">${col.title} ${getSortIcon(col.key)}</div></th>`; }
+        else { headerHTML += `<th class="text-${col.align}" style="width: ${col.width};">${col.title}</th>`; }
     });
     headerHTML += "</tr>";
     thead.innerHTML = headerHTML;
@@ -2758,7 +2732,7 @@ function updateReuniao() {
         const stTxt = (d.status || "").toString().toUpperCase().trim();
         let stCls = "text-bg-light";
         if (stTxt.includes("DEVOLVIDO")) { stCls = "badge-status-devolvido"; }
-        else if (stTxt.includes("DILIGEN")) { stCls = "badge-status-diligencia"; }
+        else if (stTxt.includes("DILIG")) { stCls = "badge-status-diligencia"; }
         else if (stTxt.includes("CONTRATANTE")) { stCls = "badge-status-contratante"; }
         else if (stTxt.includes("APROVAÇÃO")) { stCls = "badge-status-dark-blue"; }
         else if (stTxt.includes("FISCAL") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-fiscal"; }
@@ -2769,6 +2743,7 @@ function updateReuniao() {
         else if (stTxt.startsWith("EM") && stTxt.includes("REANÁLISE")) { stCls = "badge-status-em-reanalise"; }
         else if (stTxt.startsWith("EM") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-em-analise"; }
         else if (stTxt.includes("APROVADO") || stTxt === "SEDUC") { stCls = "badge-status-aprovado"; }
+        else if (stTxt.includes("ARQUIVADO")) { stCls = "badge-status-arquivado"; }
 
         const abert = dateParaInput(d.dataAbertura);
         const dias = (d.dataAbertura instanceof Date) ? Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)) : "";
@@ -2789,6 +2764,9 @@ function updateReuniao() {
         const metaOnclick = `window.abrirModalMeta('${escapeHTML(d.processo)}', '${mIso}')`;
         const metaStyle = 'cursor: pointer;';
 
+        // Iniciais do Analista para o avatar circular
+        const analistaIniciais = (d.analista || "").trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || "-";
+
         return `
         <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row">
             <td class="text-center">
@@ -2797,29 +2775,29 @@ function updateReuniao() {
                     ${btnSuite}
                 </div>
             </td>
-            <td class="text-center"><input type="checkbox" class="checkbox-prioritario ${uRole !== 'admin' ? 'readonly-checkbox' : ''}" data-proc="${escapeHTML(d.processo)}" ${isPrioritario(d) ? 'checked' : ''} title="${uRole === 'admin' ? 'Marcar como prioritário' : 'Você não tem permissão'}" ${uRole !== 'admin' ? 'onclick=\"return false;\" tabindex=\"-1\"' : ''} /></td>
-            <td><div style="font-weight: 700; font-size: 0.95rem; color: #000; white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1 text-muted" style="font-size: 0.75rem; font-weight: 500;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
-            <td>
-                <div class="mb-1"><span class="badge rounded-pill ${mCls}" style="font-size: 0.75rem;">${mSt}</span></div>
-                <div style="font-size: 0.75rem; color: var(--sop-blue); white-space: nowrap; padding: 2px 4px; border: 1px solid #ced4da; border-radius: 4px; text-align: center; background-color: #fff; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
+            <td class="text-center"><i class="bi ${isPrioritario(d) ? 'bi-star-fill' : 'bi-star'} proc-star-prioritario" data-proc="${escapeHTML(d.processo)}" style="color: ${isPrioritario(d) ? 'var(--sop-orange)' : 'var(--sop-slate-200)'}; font-size: 1.1rem; cursor: ${uRole === 'admin' ? 'pointer' : 'not-allowed'};" title="${uRole === 'admin' ? (isPrioritario(d) ? 'Remover prioridade' : 'Marcar como prioritário') : 'Você não tem permissão'}"></i></td>
+            <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
+            <td class="text-center">
+                <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
+                <div style="font-size: 0.74rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
                     <i class="bi bi-calendar-event me-1"></i>${mIso ? mIso.split('-').reverse().join('/') : "Definir"}
                 </div>
             </td>
-            <td>
+            <td class="text-center">
                 <div><span class="badge rounded-pill ${stCls} badge-custom-size">${formatStatusDisplay(d.status)}</span><span class="alerta-icone" style="display:none;"></span></div>
                 <div class=\"mt-1 text-muted px-1\" style=\"font-size: 0.7rem; font-weight: 500; height: 1.1rem;\"></div>
             </td>
-            <td class="suite-cell">
+            <td class="suite-cell text-center">
                 <div class="suite-badge-container"><span class="badge rounded-pill bg-light text-dark border badge-custom-size"><i class="spinner-border spinner-border-sm me-1" style="width: 0.7rem; height: 0.7rem;"></i>Consultando</span></div>
-                <div class="mt-1 text-muted px-1 suite-time-container" style="font-size: 0.7rem; font-weight: 500; display: none;"><i class="bi bi-clock-history me-1"></i><span class="suite-time-text"></span></div>
+                <div class="mt-1 text-muted px-1 suite-time-container" style="font-size: 0.74rem; font-weight: 500; display: none;"><i class="bi bi-clock-history me-1"></i><span class="suite-time-text"></span></div>
             </td>
-            <td class="text-center fw-bold text-secondary" style="font-size: 0.8rem;">${d.analista || "-"}</td>
+            <td class="text-center"><div class="proc-avatar" title="${escapeHTML(d.analista || "Não atribuído")}">${analistaIniciais}</div></td>
             <td class="text-center">
-                <div style="font-size: 0.8rem; color: #555;">${abert}</div>
-                <div class="mt-1 text-muted" style="font-size: 0.7rem; font-weight: 500;"><i class="bi bi-calendar3 me-1"></i>${dias} dias</div>
+                <div style="font-weight: 400; font-size: 0.85rem; color: var(--text-heading);">${abert}</div>
+                <div class="mt-1 text-muted" style="font-size: 0.74rem; font-weight: 500;"><i class="bi bi-calendar3 me-1"></i>${dias} dias</div>
             </td>
-            <td style="font-size: 0.80rem; color: #333; line-height: 1.3;">${escapeHTML(d.contratada)}</td>
-            <td style="font-size: 0.80rem; color: #333; line-height: 1.3; text-align: justify;">${escapeHTML(d.descricao)}</td>
+            <td style="max-width: 200px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4;">${escapeHTML(d.contratada)}</td>
+            <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: justify;">${escapeHTML(d.descricao)}</td>
         </tr>`;
     }).join("");
 
@@ -3005,12 +2983,16 @@ function updateReuniao() {
         }
     };
 
-    // Event listener para checkboxes de prioritário
-    mt.body.querySelectorAll('.checkbox-prioritario').forEach(checkbox => checkbox.addEventListener('change', (e) => {
-        const processo = e.target.dataset.proc;
-        setPrioritario(processo, e.target.checked);
-        updateReuniao();
-    }));
+    // Event listener para o ícone de estrela (prioritário) — somente admin pode alterar
+    if (uRole === 'admin') {
+        mt.body.querySelectorAll('.proc-star-prioritario').forEach(star => star.addEventListener('click', (e) => {
+            const target = e.currentTarget;
+            const processo = target.dataset.proc;
+            const novoValor = !target.classList.contains('bi-star-fill');
+            setPrioritario(processo, novoValor);
+            updateReuniao();
+        }));
+    }
 
     // Buscar status do SUITE e atualizar UI
     atualizarTabelaSuite(rows);
@@ -3066,7 +3048,7 @@ async function atualizarTabelaSuite(rows) {
                     suiteTime.innerHTML += ` <span class="badge-tramitado-pulse">Tramitado</span>`;
                 }
             } else {
-                suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-muted border" style="font-size: 0.70rem;">Não enc.</span>`;
+                suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-muted border badge-custom-size">Não enc.</span>`;
             }
         };
 
@@ -3114,7 +3096,7 @@ async function atualizarTabelaSuite(rows) {
                                 newCls = stUpper.includes("REAN") ? 'badge-status-aguar-reanalise' : 'badge-status-light-blue';
                             } else if (stUpper.includes("ARQUIVADO")) {
                                 newCls = 'badge-status-aprovado';
-                            } else if (stUpper.includes("DILIGEN")) {
+                            } else if (stUpper.includes("DILIG")) {
                                 newCls = 'badge-status-diligencia';
                             }
                             statusBadge.className = `badge rounded-pill badge-custom-size ${newCls}`;
@@ -3127,7 +3109,7 @@ async function atualizarTabelaSuite(rows) {
             }
         } catch (e) {
             console.error("Erro na integração SUITE:", e);
-            suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-danger border" style="font-size: 0.60rem;">Erro Cloud</span>`;
+            suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-danger border badge-custom-size">Erro Cloud</span>`;
         }
     });
 
@@ -3158,7 +3140,6 @@ function fillCommonStatusFilters() {
         const statuses = Array.from(new Set((window.allData || []).map(d => d.status))).filter(v => v);
         if (typeof fillSelect === 'function') {
             if (ger && ger.status) fillSelect(ger.status, statuses);
-            if (pr && pr.status) fillSelect(pr.status, statuses);
             if (mt && mt.status) fillSelect(mt.status, statuses);
         }
     } catch (e) { console.warn('fillCommonStatusFilters error', e); }
@@ -3169,14 +3150,19 @@ function populateAllTabFilters() {
     fillCommonStatusFilters();
 
     // Força os filtros estáticos da aba Reunião a iniciarem como "Todos"
+    // (são <select> simples, não multiple — marcar todas as options como selected
+    // faz o navegador manter apenas a última, ex: "Sem meta"/"Não Prioritário")
     [mt.meta, mt.prioritario].forEach(el => {
-        if (el) {
+        if (!el) return;
+        if (el.multiple) {
             Array.from(el.options).forEach(o => o.selected = true);
             renderMultiSelectUI(el);
+        } else {
+            el.value = "";
         }
     });
 
-    updateGerencialFilters(window.allData); updatePrazosFilters(window.allData); updateReuniaoFilters(window.allData);
+    updateGerencialFilters(window.allData); updateReuniaoFilters(window.allData);
 
     // Verifica notificações de atraso (apenas admins ou autorizados)
     if (getCurrentUserRole() === 'admin') {
@@ -3190,18 +3176,13 @@ function wireEvents() {
     fin.diffMetric.addEventListener("change", updateFinanceiro);
     ger.fiscal.addEventListener("change", updateGerencial); ger.status.addEventListener("change", updateGerencial);
     ger.clear.addEventListener("click", (e) => { e.preventDefault(); clearGerencial(); });
-    pr.fiscal.addEventListener("change", updatePrazos); pr.status.addEventListener("change", updatePrazos);
-    pr.clear.addEventListener("click", (e) => { e.preventDefault(); clearPrazos(); });
     mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
     // Debounce no search de reunião
     mt.search.addEventListener("input", debounce(updateReuniao, 300));
-    const globalSearchToggle = document.getElementById("searchGlobalToggle");
-    if (globalSearchToggle) globalSearchToggle.addEventListener("change", updateReuniao);
 
     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
         e.preventDefault();
         if (mt && mt.search) mt.search.value = "";
-        if (globalSearchToggle) globalSearchToggle.checked = false;
         [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => {
             if (!el) return;
             if (el.multiple) {
@@ -3436,6 +3417,13 @@ function applyRoleToUI(rawRole) {
             el.style.setProperty('display', 'none', 'important');
         }
     });
+
+    // 2b. Deep-link: permite abrir uma aba específica via ?pane=pane-xxx
+    // (usado pelo botão "Processos" do módulo Atividades, em cronograma.html)
+    const deepLinkPane = new URLSearchParams(window.location.search).get('pane');
+    if (deepLinkPane && deepLinkPane !== 'pane-home' && document.getElementById(deepLinkPane)) {
+        showPane(deepLinkPane);
+    }
 
     // Caso especial: Selecionar a primeira aba visível se a atual sumir
     const activeTab = document.querySelector('.nav-link.active');
@@ -3746,7 +3734,6 @@ document.addEventListener('DOMContentLoaded', () => {
 const modules = [
     { id: '#pane-financeiro', name: 'Painel Financeiro' },
     { id: '#pane-gerencial', name: 'Painel Gerencial' },
-    { id: '#pane-prazos', name: 'Prazos e Produtividade' },
     { id: '#pane-reuniao', name: 'Processos' },
     { id: '#pane-orcamentos', name: 'Orçamentos' },
     { id: '#pane-composicoes', name: 'Composições' },

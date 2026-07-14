@@ -217,7 +217,7 @@
                                     <div class="text-white p-2 rounded me-3 fw-bold fs-5" style="background-color: #008F3D !important; min-width: 80px; text-align: center;">SOP-CE</div>
                                     <div>
                                         <div class="fw-bold fs-6" style="color: #008F3D; line-height: 1.2;">ESTADO DO CEARÁ</div>
-                                        <div class="text-dark fw-bold" style="font-size: 0.75rem;">SUPERINTENDNCIA DE OBRAS PBLICAS</div>
+                                        <div class="text-dark fw-bold" style="font-size: 0.75rem;">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
                                     </div>
                                 </div>
                                 <div class="text-end">
@@ -228,7 +228,7 @@
 
                             <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
                                 <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CDIGO</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
                                 <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
@@ -344,7 +344,7 @@
                                                             }),
                                                             new Paragraph({
                                                                 children: [
-                                                                    new TextRun({ text: "SUPERINTENDNCIA DE OBRAS PBLICAS", bold: true, color: "343A40", size: 16 })
+                                                                    new TextRun({ text: "SUPERINTENDÊNCIA DE OBRAS PÚBLICAS", bold: true, color: "343A40", size: 16 })
                                                                 ]
                                                             })
                                                         ]
@@ -382,7 +382,7 @@
                                                     new TableCell({
                                                         shading: { fill: "F8F9FA" },
                                                         children: [
-                                                            new Paragraph({ children: [new TextRun({ text: "CDIGO", bold: true, size: 12, color: "6C757D" })] }),
+                                                            new Paragraph({ children: [new TextRun({ text: "CÓDIGO", bold: true, size: 12, color: "6C757D" })] }),
                                                             new Paragraph({ children: [new TextRun({ text: dados.codigo || '-', bold: true, size: 18 })] })
                                                         ]
                                                     }),
@@ -631,7 +631,7 @@
 
                                         ws.mergeCells(2, 3, 2, 6);
                                         const instCell2 = ws.getCell('C2');
-                                        instCell2.value = 'SUPERINTENDNCIA DE OBRAS PBLICAS';
+                                        instCell2.value = 'SUPERINTENDÊNCIA DE OBRAS PÚBLICAS';
                                         instCell2.font = { name: 'Montserrat', bold: true, size: 11, color: { argb: 'FF' + COR_VERDE_DARK } };
                                         instCell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + COR_VERDE_CLARO } };
                                         instCell2.alignment = { vertical: 'middle', horizontal: 'left' };

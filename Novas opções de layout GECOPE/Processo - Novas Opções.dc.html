@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/gecope-design-system-c84e870a-6b05-4f68-858b-645029689ebb/tokens/colors.css">
+<link rel="stylesheet" href="_ds/gecope-design-system-c84e870a-6b05-4f68-858b-645029689ebb/tokens/typography.css">
+<link rel="stylesheet" href="_ds/gecope-design-system-c84e870a-6b05-4f68-858b-645029689ebb/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/gecope-design-system-c84e870a-6b05-4f68-858b-645029689ebb/styles.css">
+<script src="_ds/gecope-design-system-c84e870a-6b05-4f68-858b-645029689ebb/_ds_bundle.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  body{margin:0;background:#eef0ec;font-family:var(--font-sans,system-ui,sans-serif);color:var(--text-body,#444)}
+  a{color:var(--sop-green);}
+  a:hover{color:var(--sop-green-dark);}
+  .dv-turn{padding:40px 44px 60px}
+  .dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 22px}
+  .dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+  .dv-tname{font:600 14px/1.2 system-ui,sans-serif;color:#1a1a1a}
+  .dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+  .dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}
+  .dv-oid{font:600 11px ui-monospace,Menlo,monospace;padding:3px 8px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+  .dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.4 system-ui,sans-serif;color:rgba(0,0,0,.55);max-width:640px}
+  .dv-card{max-width:100%;background:var(--surface-page);border:1px solid rgba(0,0,0,.08);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
+  .dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+  .dv-next{margin:28px 0 0;font:12px/1.6 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+  .gp-panel{padding:26px 30px 34px;font-family:var(--font-sans,system-ui,sans-serif)}
+  .gp-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+  .gp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .gp-th{text-align:left;padding:13px 14px;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--sop-slate-600);font-weight:700;font-family:var(--font-sans,system-ui,sans-serif)}
+  .gp-td{padding:13px 14px;vertical-align:middle;font-family:var(--font-sans,system-ui,sans-serif)}
+  .gp-tr{border-bottom:1px solid var(--sop-slate-100)}
+  .gp-tr:nth-child(even){background:var(--sop-slate-50)}
+  .gp-badge-lg span{font-size:0.76rem !important;padding:4px 12px !important}
+  .gp-filterbar-btn button{height:38px !important;box-sizing:border-box !important}
+</style>
+</helmet>
+<section class="dv-turn" id="t2">
+  <div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Seguindo o layout que você indicou</span></div>
+  <div class="dv-opts">
+    <div class="dv-opt" id="2a">
+      <div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Fiel ao layout enviado: cartões de KPI com barra de destaque, abas segmentadas, filtros e tabela completa com Suíte, Analista, Abertura, Contratada e Descrição.</div>
+      <div class="dv-card" style="width:1820px;background:#fff;border-radius:24px">
+        <div class="gp-panel" style="padding:28px 32px 32px">
+          <div class="gp-head">
+            <div>
+              <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px">Painel de Processos</div>
+              <div style="color:var(--text-muted);font-size:0.98rem">Gerencie a pauta, visualize prazos e edite informações.</div>
+            </div>
+            <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,40px" variant="success" icon="{{ plusIcon }}">Novo Processo</x-import>
+          </div>
+
+          <div class="gp-kpis">
+            <sc-for list="{{ kpis2 }}" as="k" hint-placeholder-count="4">
+              <div style="background:#fff;border-radius:16px;box-shadow:var(--shadow-card-subtle);border:1px solid var(--sop-slate-100);border-left:4px solid {{ k.accent }};padding:18px 20px;display:flex;align-items:center;gap:16px;transition:var(--transition-fast)" style-hover="box-shadow:var(--shadow-md);transform:translateY(-3px)">
+                <div style="width:48px;height:48px;border-radius:14px;background:{{ k.accent }};box-shadow:0 4px 10px -2px {{ k.accent }};display:flex;align-items:center;justify-content:center;flex:none">
+                  <i class="bi {{ k.icon }}" style="color:#fff;font-size:1.2rem"></i>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted)">{{ k.label }}</span>
+                  <div style="font-size:2.1rem;font-weight:800;color:var(--text-heading);line-height:1">{{ k.value }}</div>
+                  <div style="font-size:0.78rem;color:var(--text-muted)">{{ k.sub }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:inline-flex;gap:4px;background:var(--sop-slate-100);border-radius:999px;padding:5px;margin:6px 0 18px">
+            <sc-for list="{{ tabs2 }}" as="t" hint-placeholder-count="3">
+              <div style="{{ t.pillStyle }}" onClick="{{ t.onClick }}">{{ t.label }}</div>
+            </sc-for>
+          </div>
+
+          <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Panel" hint-size="100%,90px" style="display:block;box-shadow:0 16px 32px -10px rgba(0,0,0,0.22);border-radius:var(--radius-lg)" variant="filters" accent="green" title="Filtros de Pesquisa">
+            <div style="display:flex;gap:16px;margin-top:8px;align-items:flex-end;width:100%">
+              <div style="flex:1.3;min-width:0">
+                <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px">Metas</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,38px" size="md" options="{{ metaOptions }}"></x-import>
+              </div>
+              <div style="flex:1.3;min-width:0">
+                <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px">Prioritário</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,38px" size="md" options="{{ priorityOptions }}"></x-import>
+              </div>
+              <div style="flex:1.3;min-width:0">
+                <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px">Fiscal</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,38px" size="md" options="{{ fiscalOptions }}"></x-import>
+              </div>
+              <div style="flex:1.3;min-width:0">
+                <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px">Status</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,38px" size="md" options="{{ metaOptions }}"></x-import>
+              </div>
+              <div style="flex:3.2;min-width:0">
+                <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px">Buscar</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Input" hint-size="100%,38px" size="md" placeholder="Processo, descrição, analista, fiscal, status..."></x-import>
+              </div>
+              <div style="flex:0 0 auto;display:flex;gap:6px" class="gp-filterbar-btn">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,38px" variant="success" size="sm">Limpar</x-import>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,38px" variant="outline" size="sm" icon="{{ xlsIcon }}">Excel</x-import>
+                <div style="display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;padding:0 15px;height:38px;box-sizing:border-box;border-radius:var(--radius-sm);border:1px solid var(--filetype-pdf-fg);color:var(--filetype-pdf-fg);background:#fff;cursor:pointer;white-space:nowrap"><i class="bi bi-file-earmark-pdf"></i>PDF</div>
+              </div>
+            </div>
+          </x-import>
+
+          <div style="background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-card-subtle);overflow:hidden;margin-top:18px;border:1px solid var(--sop-slate-100)">
+            <table style="width:100%;border-collapse:collapse;font-size:1.02rem">
+              <thead><tr style="background:var(--sop-slate-50)">
+                <th class="gp-th">AÇÕES</th>
+                <th class="gp-th" style="text-align:center">PRIOR. <i class="bi bi-arrow-down-up" style="font-size:0.6rem;opacity:0.6"></i></th>
+                <th class="gp-th">PROCESSO <i class="bi bi-arrow-down-up" style="font-size:0.6rem;opacity:0.6"></i></th>
+                <th class="gp-th" style="text-align:center">META <i class="bi bi-arrow-down-up" style="font-size:0.6rem;opacity:0.6"></i></th>
+                <th class="gp-th">STATUS</th>
+                <th class="gp-th" style="text-align:center">SUÍTE</th>
+                <th class="gp-th">ANALISTA</th>
+                <th class="gp-th" style="text-align:center">ABERTURA <i class="bi bi-arrow-down-up" style="font-size:0.6rem;opacity:0.6"></i></th>
+                <th class="gp-th">CONTRATADA</th>
+                <th class="gp-th">DESCRIÇÃO</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ rows2 }}" as="r" hint-placeholder-count="6">
+                  <tr class="gp-tr" style-hover="background:var(--sop-slate-100)">
+                    <td class="gp-td" style="white-space:nowrap">
+                      <i class="bi bi-eye-fill" style="color:var(--sop-blue);margin-right:8px;cursor:pointer" title="Detalhes"></i>
+                      <i class="bi bi-box-arrow-up-right" style="color:var(--sop-green);cursor:pointer" title="Abrir no SUITE"></i>
+                    </td>
+                    <td class="gp-td" style="text-align:center"><i class="bi {{ r.starIcon }}" style="color:{{ r.starColor }}"></i></td>
+                    <td class="gp-td" style="white-space:nowrap">
+                      <div style="font-weight:700;color:var(--text-heading)">{{ r.nup }}</div>
+                      <div style="font-size:0.88rem;color:var(--text-muted);margin-top:3px"><i class="bi bi-person-fill" style="margin-right:4px"></i>{{ r.fiscal }}</div>
+                    </td>
+                    <td class="gp-td" style="text-align:center;vertical-align:top">
+                      <span class="gp-badge-lg"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,28px" tone="{{ r.metaTone }}">{{ r.metaLabel }}</x-import></span>
+                      <div style="font-size:0.88rem;color:var(--text-muted);margin-top:5px">{{ r.metaSub }}</div>
+                    </td>
+                    <td class="gp-td" style="vertical-align:top"><span class="gp-badge-lg"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,28px" tone="{{ r.statusTone }}">{{ r.statusLabel }}</x-import></span></td>
+                    <td class="gp-td" style="text-align:center">
+                      <div style="font-weight:700;font-size:1rem;color:var(--text-heading)">{{ r.suite }}</div>
+                      <div style="font-size:0.86rem;color:var(--text-muted);margin-top:3px">{{ r.suiteDias }}</div>
+                    </td>
+                    <td class="gp-td" style="text-align:center"><div style="width:34px;height:34px;border-radius:50%;background:var(--icon-bg-slate);color:var(--icon-fg-slate);display:flex;margin:0 auto;align-items:center;justify-content:center;font-size:0.92rem;font-weight:700">{{ r.analista }}</div></td>
+                    <td class="gp-td" style="white-space:nowrap;text-align:center">
+                      <div style="font-weight:700;color:var(--text-heading);font-size:1rem">{{ r.abertura }}</div>
+                      <div style="font-size:0.86rem;color:var(--text-muted);margin-top:3px">{{ r.aberturaDias }}</div>
+                    </td>
+                    <td class="gp-td" style="max-width:200px;line-height:1.45;font-size:0.96rem">{{ r.contratada }}</td>
+                    <td class="gp-td" style="max-width:280px;color:var(--text-muted);font-size:0.96rem;line-height:1.45">{{ r.descricao }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+            <span style="background:#fff;border:1px solid var(--sop-slate-200);border-radius:999px;padding:6px 16px;font-size:0.78rem;color:var(--text-muted)">Exibindo {{ rows2Count }} processos</span>
+            <small style="color:var(--text-muted);font-style:italic">Utilize os filtros acima para refinar a busca.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="dv-next">Testar a seguir: "aumentar densidade das linhas em <a class="dv-oid" href="#2a">2a</a>" · "adicionar coluna de ações extras" · "aplicar essa mesma tabela nas abas Aprovados/Arquivados com colunas diferentes"</p>
+</section>
+<section class="dv-turn" id="t1">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Painel de Processos — novas opções de layout</span></div>
+  <div class="dv-opts">
+
+    <!-- ===================== 1a — Tabela refinada ===================== -->
+    <div class="dv-opt" id="1a">
+      <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Tabela refinada — mesma estrutura de hoje (abas por página), com tipografia, espaçamento e badges mais limpos.</div>
+      <div class="dv-card" style="width:1360px">
+        <div class="gp-panel">
+          <div class="gp-head">
+            <div>
+              <div style="font-weight:700;color:var(--text-heading);font-size:1.2rem;margin-bottom:4px">Painel de Processos</div>
+              <div style="color:var(--text-muted);font-size:0.85rem">Gerencie a pauta, visualize prazos e edite informações.</div>
+            </div>
+            <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,40px" variant="success" icon="{{ plusIcon }}">Novo Processo</x-import>
+          </div>
+
+          <div class="gp-kpis">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.KpiCard" hint-size="auto,90px" label="{{ k.label }}" value="{{ k.value }}" sub="{{ k.sub }}" tone="{{ k.tone }}"></x-import>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;gap:30px;margin:4px 0 18px;border-bottom:1px solid var(--sop-slate-100)">
+            <sc-for list="{{ pageTabs }}" as="t" hint-placeholder-count="3">
+              <div style="{{ t.tabStyle }}" onClick="{{ t.onClick }}">
+                {{ t.label }}
+                <span style="{{ t.countStyle }}">{{ t.count }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Panel" hint-size="100%,90px" variant="filters" accent="green" title="Filtros de Pesquisa">
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+              <div style="width:140px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Metas</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ metaOptions }}"></x-import>
+              </div>
+              <div style="width:140px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Fiscal</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ fiscalOptions }}"></x-import>
+              </div>
+              <div style="width:140px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Prioritário</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ priorityOptions }}"></x-import>
+              </div>
+              <div style="flex:1;min-width:220px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Buscar</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Input" hint-size="100%,31px" size="sm" placeholder="Processo, Descrição, Analista, Fiscal, Status..."></x-import>
+              </div>
+              <div style="display:flex;gap:8px">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ xlsIcon }}">Excel</x-import>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ pdfIcon }}">PDF</x-import>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="success" size="sm">Limpar</x-import>
+              </div>
+            </div>
+          </x-import>
+
+          <div style="background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-card-subtle);overflow:hidden;margin-top:18px;border:1px solid var(--sop-slate-100)">
+            <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+              <thead><tr style="background:var(--sop-slate-50)">
+                <th class="gp-th" style="width:36px"></th>
+                <th class="gp-th">NUP</th>
+                <th class="gp-th">Obra</th>
+                <th class="gp-th">Fiscal</th>
+                <th class="gp-th">Status</th>
+                <th class="gp-th">Meta</th>
+                <th class="gp-th">Dias</th>
+                <th class="gp-th">Ações</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ tab1aRows }}" as="r" hint-placeholder-count="4">
+                  <tr class="gp-tr" style-hover="background:var(--sop-slate-50)">
+                    <td class="gp-td"><i class="bi {{ r.starIcon }}" style="color:{{ r.starColor }}"></i></td>
+                    <td class="gp-td" style="font-family:monospace;font-weight:700;color:var(--text-muted);white-space:nowrap">{{ r.nup }}</td>
+                    <td class="gp-td">
+                      <div style="font-weight:600;color:var(--text-heading)">{{ r.obra }}</div>
+                      <sc-if value="{{ r.alerta }}">
+                        <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="danger-solid" size="sm">Tramitado</x-import>
+                      </sc-if>
+                    </td>
+                    <td class="gp-td">{{ r.fiscal }}</td>
+                    <td class="gp-td"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="{{ r.statusTone }}" size="sm">{{ r.statusLabel }}</x-import></td>
+                    <td class="gp-td"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="{{ r.metaTone }}" size="sm">{{ r.metaLabel }}</x-import></td>
+                    <td class="gp-td">{{ r.diasLabel }}</td>
+                    <td class="gp-td" style="white-space:nowrap">
+                      <i class="bi bi-clock-history" style="color:var(--sop-slate-500);margin-right:10px;cursor:pointer" title="Histórico"></i>
+                      <i class="bi bi-eye-fill" style="color:var(--sop-blue);margin-right:10px;cursor:pointer" title="Detalhes"></i>
+                      <i class="bi bi-pencil" style="color:var(--sop-slate-500);margin-right:10px;cursor:pointer" title="Editar"></i>
+                      <i class="bi bi-box-arrow-up-right" style="color:var(--sop-green);cursor:pointer" title="Abrir no SUITE"></i>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+            <span style="background:#fff;border:1px solid var(--sop-slate-200);border-radius:999px;padding:5px 14px;font-size:0.78rem;color:var(--text-muted)">{{ tab1aCount }} processos encontrados</span>
+            <div style="display:flex;gap:8px">
+              <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm">Anterior</x-import>
+              <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm">Próxima</x-import>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== 1b — Kanban por status ===================== -->
+    <div class="dv-opt" id="1b">
+      <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Kanban por status — colunas por etapa da tramitação, foco em prioridade e carga de trabalho por analista.</div>
+      <div class="dv-card" style="width:1500px">
+        <div class="gp-panel">
+          <div class="gp-head">
+            <div>
+              <div style="font-weight:700;color:var(--text-heading);font-size:1.2rem;margin-bottom:4px">Painel de Processos</div>
+              <div style="color:var(--text-muted);font-size:0.85rem">Acompanhe a tramitação por etapa, de Aguardando Análise até Aprovado.</div>
+            </div>
+            <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,40px" variant="success" icon="{{ plusIcon }}">Novo Processo</x-import>
+          </div>
+
+          <div class="gp-kpis">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.KpiCard" hint-size="auto,90px" label="{{ k.label }}" value="{{ k.value }}" sub="{{ k.sub }}" tone="{{ k.tone }}"></x-import>
+            </sc-for>
+          </div>
+
+          <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Panel" hint-size="100%,60px" variant="filters" accent="green" title="Filtros de Pesquisa">
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;align-items:center">
+              <div style="flex:1;min-width:240px">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Input" hint-size="100%,31px" size="sm" placeholder="Processo, Descrição, Analista, Fiscal, Status..."></x-import>
+              </div>
+              <div style="width:170px">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ fiscalOptions }}"></x-import>
+              </div>
+              <div onClick="{{ toggleKanbanPriority }}" style="{{ priorityToggleStyle }}">
+                <i class="bi bi-star-fill" style="font-size:0.8rem"></i> Somente prioritários
+              </div>
+              <div style="display:flex;gap:8px;margin-left:auto">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ xlsIcon }}">Excel</x-import>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ pdfIcon }}">PDF</x-import>
+              </div>
+            </div>
+          </x-import>
+
+          <div style="display:flex;gap:14px;margin-top:18px;overflow-x:auto;padding-bottom:6px">
+            <sc-for list="{{ kanbanColumns }}" as="col" hint-placeholder-count="5">
+              <div style="flex:0 0 268px;background:var(--sop-slate-50);border-radius:var(--radius-lg);padding:12px;border:1px solid var(--sop-slate-100)">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:0 2px">
+                  <span style="width:9px;height:9px;border-radius:50%;background:{{ col.dot }};display:inline-block"></span>
+                  <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--sop-slate-700);flex:1">{{ col.label }}</span>
+                  <span style="background:#fff;border:1px solid var(--sop-slate-200);border-radius:999px;padding:1px 8px;font-size:0.68rem;font-weight:700;color:var(--sop-slate-600)">{{ col.count }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ col.items }}" as="r" hint-placeholder-count="2">
+                    <div style="background:#fff;border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:11px 12px;border:1px solid var(--sop-slate-100)" style-hover="box-shadow:var(--shadow-md);transform:translateY(-2px)">
+                      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px">
+                        <span style="font-family:monospace;font-size:0.68rem;font-weight:700;color:var(--text-muted)">{{ r.nup }}</span>
+                        <i class="bi {{ r.starIcon }}" style="color:{{ r.starColor }};font-size:0.8rem"></i>
+                      </div>
+                      <div style="font-weight:600;font-size:0.82rem;color:var(--text-heading);margin-bottom:8px;line-height:1.3">{{ r.obra }}</div>
+                      <sc-if value="{{ r.alerta }}">
+                        <div style="margin-bottom:8px"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,18px" tone="danger-solid" size="sm">Tramitado</x-import></div>
+                      </sc-if>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--text-muted);margin-bottom:8px"><i class="bi bi-person-fill"></i>{{ r.fiscal }}</div>
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,18px" tone="{{ r.metaTone }}" size="sm">{{ r.metaLabel }}</x-import>
+                        <span style="font-size:0.7rem;color:var(--text-muted);font-weight:600">{{ r.diasLabel }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== 1c — Lista em cards ===================== -->
+    <div class="dv-opt" id="1c">
+      <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Lista em cards — um card por processo, com chips de status para filtrar; boa leitura quando há poucas colunas de dados por olhar.</div>
+      <div class="dv-card" style="width:1360px">
+        <div class="gp-panel">
+          <div class="gp-head">
+            <div>
+              <div style="font-weight:700;color:var(--text-heading);font-size:1.2rem;margin-bottom:4px">Painel de Processos</div>
+              <div style="color:var(--text-muted);font-size:0.85rem">Gerencie a pauta, visualize prazos e edite informações.</div>
+            </div>
+            <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,40px" variant="success" icon="{{ plusIcon }}">Novo Processo</x-import>
+          </div>
+
+          <div class="gp-kpis">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.KpiCard" hint-size="auto,90px" label="{{ k.label }}" value="{{ k.value }}" sub="{{ k.sub }}" tone="{{ k.tone }}"></x-import>
+            </sc-for>
+          </div>
+
+          <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Panel" hint-size="100%,90px" variant="filters" accent="green" title="Filtros de Pesquisa">
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+              <div style="width:150px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Fiscal</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ fiscalOptions }}"></x-import>
+              </div>
+              <div style="width:150px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Metas</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ metaOptions }}"></x-import>
+              </div>
+              <div style="flex:1;min-width:220px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Buscar</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Input" hint-size="100%,31px" size="sm" placeholder="Processo, Descrição, Analista, Fiscal, Status..."></x-import>
+              </div>
+              <div style="display:flex;gap:8px">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ xlsIcon }}">Excel</x-import>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ pdfIcon }}">PDF</x-import>
+              </div>
+            </div>
+          </x-import>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
+            <sc-for list="{{ cardFilters }}" as="c" hint-placeholder-count="7">
+              <div style="{{ c.chipStyle }}" onClick="{{ c.onClick }}">{{ c.label }} <span style="opacity:0.75">({{ c.count }})</span></div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+            <sc-for list="{{ cardRows }}" as="r" hint-placeholder-count="6">
+              <div style="background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-card-subtle);border:1px solid var(--sop-slate-100);padding:16px" style-hover="box-shadow:var(--shadow-md);transform:translateY(-3px)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <span style="font-family:monospace;font-size:0.72rem;font-weight:700;color:var(--text-muted)">{{ r.nup }}</span>
+                  <i class="bi {{ r.starIcon }}" style="color:{{ r.starColor }}"></i>
+                </div>
+                <div style="font-weight:700;font-size:0.95rem;color:var(--text-heading);margin-bottom:8px;line-height:1.3">{{ r.obra }}</div>
+                <sc-if value="{{ r.alerta }}">
+                  <div style="margin-bottom:8px"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="danger-solid" size="sm">Tramitado</x-import></div>
+                </sc-if>
+                <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-muted);margin-bottom:12px"><i class="bi bi-person-fill"></i>{{ r.fiscal }}</div>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+                  <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="{{ r.statusTone }}" size="sm">{{ r.statusLabel }}</x-import>
+                  <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="{{ r.metaTone }}" size="sm">{{ r.metaLabel }}</x-import>
+                  <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600;margin-left:auto">{{ r.diasLabel }}</span>
+                </div>
+                <div style="display:flex;gap:12px;padding-top:10px;border-top:1px solid var(--sop-slate-100)">
+                  <i class="bi bi-clock-history" style="color:var(--sop-slate-500);cursor:pointer" title="Histórico"></i>
+                  <i class="bi bi-eye-fill" style="color:var(--sop-blue);cursor:pointer" title="Detalhes"></i>
+                  <i class="bi bi-pencil" style="color:var(--sop-slate-500);cursor:pointer" title="Editar"></i>
+                  <i class="bi bi-box-arrow-up-right" style="color:var(--sop-green);cursor:pointer" title="Abrir no SUITE"></i>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== 1d — Abas por status ===================== -->
+    <div class="dv-opt" id="1d">
+      <div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Abas por status — substitui as abas de "página" por abas segmentadas de status real; tabela mais compacta e direta.</div>
+      <div class="dv-card" style="width:1360px">
+        <div class="gp-panel">
+          <div class="gp-head">
+            <div>
+              <div style="font-weight:700;color:var(--text-heading);font-size:1.2rem;margin-bottom:4px">Painel de Processos</div>
+              <div style="color:var(--text-muted);font-size:0.85rem">Gerencie a pauta, visualize prazos e edite informações.</div>
+            </div>
+            <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,40px" variant="success" icon="{{ plusIcon }}">Novo Processo</x-import>
+          </div>
+
+          <div class="gp-kpis">
+            <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+              <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.KpiCard" hint-size="auto,90px" label="{{ k.label }}" value="{{ k.value }}" sub="{{ k.sub }}" tone="{{ k.tone }}"></x-import>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;background:var(--sop-slate-50);border-radius:999px;padding:5px;margin:16px 0">
+            <sc-for list="{{ statusTabs }}" as="t" hint-placeholder-count="7">
+              <div style="{{ t.pillStyle }}" onClick="{{ t.onClick }}">
+                {{ t.label }}
+                <span style="{{ t.badgeStyle }}">{{ t.count }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Panel" hint-size="100%,90px" variant="filters" accent="green" title="Filtros de Pesquisa">
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;align-items:flex-end">
+              <div style="width:150px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Fiscal</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ fiscalOptions }}"></x-import>
+              </div>
+              <div style="width:150px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Prioritário</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Select" hint-size="100%,31px" size="sm" options="{{ priorityOptions }}"></x-import>
+              </div>
+              <div style="flex:1;min-width:220px">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Buscar</div>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Input" hint-size="100%,31px" size="sm" placeholder="Processo, Descrição, Analista, Fiscal, Status..."></x-import>
+              </div>
+              <div style="display:flex;gap:8px">
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ xlsIcon }}">Excel</x-import>
+                <x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Button" hint-size="auto,31px" variant="outline" size="sm" icon="{{ pdfIcon }}">PDF</x-import>
+              </div>
+            </div>
+          </x-import>
+
+          <div style="background:#fff;border-radius:var(--radius-lg);overflow:hidden;margin-top:16px">
+            <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+              <thead><tr>
+                <th class="gp-th" style="width:36px;border-bottom:2px solid var(--sop-slate-100)"></th>
+                <th class="gp-th" style="border-bottom:2px solid var(--sop-slate-100)">NUP / Obra</th>
+                <th class="gp-th" style="border-bottom:2px solid var(--sop-slate-100)">Fiscal</th>
+                <th class="gp-th" style="border-bottom:2px solid var(--sop-slate-100)">Meta</th>
+                <th class="gp-th" style="border-bottom:2px solid var(--sop-slate-100)">Dias</th>
+                <th class="gp-th" style="border-bottom:2px solid var(--sop-slate-100)">Ações</th>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ tab1dRows }}" as="r" hint-placeholder-count="5">
+                  <tr style="border-bottom:1px solid var(--sop-slate-50)" style-hover="background:var(--sop-slate-50)">
+                    <td class="gp-td"><i class="bi {{ r.starIcon }}" style="color:{{ r.starColor }}"></i></td>
+                    <td class="gp-td">
+                      <div style="font-family:monospace;font-size:0.72rem;font-weight:700;color:var(--text-muted)">{{ r.nup }}</div>
+                      <div style="font-weight:600;color:var(--text-heading);margin-top:2px">{{ r.obra }}</div>
+                      <sc-if value="{{ r.alerta }}">
+                        <span style="display:inline-block;margin-top:4px"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,18px" tone="danger-solid" size="sm">Tramitado</x-import></span>
+                      </sc-if>
+                    </td>
+                    <td class="gp-td">{{ r.fiscal }}</td>
+                    <td class="gp-td"><x-import component-from-global-scope="GECOPEDesignSystem_c84e87.Badge" hint-size="auto,20px" tone="{{ r.metaTone }}" size="sm">{{ r.metaLabel }}</x-import></td>
+                    <td class="gp-td">{{ r.diasLabel }}</td>
+                    <td class="gp-td" style="white-space:nowrap">
+                      <i class="bi bi-clock-history" style="color:var(--sop-slate-500);margin-right:10px;cursor:pointer" title="Histórico"></i>
+                      <i class="bi bi-eye-fill" style="color:var(--sop-blue);margin-right:10px;cursor:pointer" title="Detalhes"></i>
+                      <i class="bi bi-pencil" style="color:var(--sop-slate-500);margin-right:10px;cursor:pointer" title="Editar"></i>
+                      <i class="bi bi-box-arrow-up-right" style="color:var(--sop-green);cursor:pointer" title="Abrir no SUITE"></i>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+            <span style="background:var(--sop-slate-50);border:1px solid var(--sop-slate-200);border-radius:999px;padding:5px 14px;font-size:0.78rem;color:var(--text-muted)">{{ tab1dCount }} processos encontrados</span>
+            <small style="color:var(--text-muted);font-style:italic">* Utilize as abas de status ou os filtros para refinar a busca.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <p class="dv-next">Testar a seguir: "prefiro <a class="dv-oid" href="#1a">1a</a> mas com os chips de status de <a class="dv-oid" href="#1c">1c</a>" · "deixar <a class="dv-oid" href="#1b">1b</a> com colunas colapsáveis" · "combinar <a class="dv-oid" href="#1d">1d</a> com cards em vez de tabela"</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const STATUS_META = {
+  aguardando:     { label: "Aguar. Análise",   tone: "info",     pageGroup: "tramitacao", dot: "#018ABD" },
+  analise_fiscal: { label: "Análise Fiscal",   tone: "success",  pageGroup: "tramitacao", dot: "#008F3D" },
+  reanalise:      { label: "Reanálise Fiscal", tone: "warning",  pageGroup: "tramitacao", dot: "#F28C00" },
+  devolvido:      { label: "Devolvido",        tone: "danger",   pageGroup: "tramitacao", dot: "#dc3545" },
+  aprovado:       { label: "Aprovado",         tone: "brand",    pageGroup: "aprovados",  dot: "#007233" },
+  arquivado:      { label: "Arquivado",        tone: "neutral",  pageGroup: "arquivados", dot: "#94a3b8" },
+};
+
+const ROWS_BASE = [
+  ["08128.000421/2026-11", "Anel Viário Metropolitano — Trecho 4",        "F. Torres", "aguardando",     "No prazo",  "warning-solid", 4,  true,  true],
+  ["08128.000398/2026-02", "BR-116 — Duplicação Trecho Sul",              "M. Rocha",  "aguardando",     "Cumprido",  "brand",         1,  false, false],
+  ["08128.000355/2026-07", "Ponte Rio Cocó — Reforço Estrutural",         "J. Prado",  "analise_fiscal", "Atrasado",  "danger-solid",  11, true,  false],
+  ["08128.000312/2026-05", "Complexo Hospitalar Regional — Bloco B",      "F. Torres", "devolvido",      "Sem meta",  "neutral",       2,  false, false],
+  ["08128.000287/2026-09", "Terminal Rodoviário Sul — Ampliação",         "M. Rocha",  "analise_fiscal", "No prazo",  "warning-solid", 6,  false, false],
+  ["08128.000260/2026-01", "Adutora Metropolitana — Trecho 2",            "J. Prado",  "reanalise",      "Cumprido",  "brand",         3,  true,  false],
+  ["08128.000241/2026-08", "Escola Técnica Estadual — Bloco Novo",        "F. Torres", "aguardando",     "Sem meta",  "neutral",       8,  false, false],
+  ["08128.000229/2026-03", "Viaduto Av. Raul Barbosa",                    "M. Rocha",  "analise_fiscal", "Cumprido",  "brand",         5,  false, false],
+  ["08128.000203/2026-06", "UPA Regional — Reforma Geral",                "J. Prado",  "reanalise",      "Atrasado",  "danger-solid",  14, true,  true],
+  ["08128.000188/2026-04", "Barragem Jaburu — Reforço de Talude",         "F. Torres", "analise_fiscal", "No prazo",  "warning-solid", 7,  false, false],
+  ["08128.000155/2026-12", "Praça da Cidadania — Requalificação",         "M. Rocha",  "devolvido",      "Sem meta",  "neutral",       1,  false, false],
+  ["08128.000120/2026-10", "Ceará Arena — Manutenção Estrutural",         "J. Prado",  "aprovado",       "Cumprido",  "brand",         0,  false, false],
+  ["08128.000098/2026-02", "Rodovia CE-060 — Recapeamento",               "F. Torres", "aprovado",       "Cumprido",  "brand",         0,  false, false],
+  ["08128.000042/2026-07", "Centro Administrativo — Retrofit",            "M. Rocha",  "arquivado",      "Sem meta",  "neutral",       0,  false, false],
+];
+
+const ROWS = ROWS_BASE.map(([nup, obra, fiscal, statusKey, metaLabel, metaTone, dias, prioritario, alerta]) => {
+  const meta = STATUS_META[statusKey];
+  return {
+    nup, obra, fiscal, statusKey,
+    statusLabel: meta.label, statusTone: meta.tone, pageGroup: meta.pageGroup,
+    metaLabel, metaTone, dias, diasLabel: dias + "d",
+    prioritario, alerta,
+    starIcon: prioritario ? "bi-star-fill" : "bi-star",
+    starColor: prioritario ? "var(--sop-orange)" : "var(--sop-slate-200)",
+  };
+});
+
+const PAGE_TABS = [
+  { key: "tramitacao", label: "Em Tramitação" },
+  { key: "aprovados", label: "Aprovados" },
+  { key: "arquivados", label: "Arquivados" },
+];
+
+const STATUS_TABS = [
+  { key: "todos", label: "Todos" },
+  { key: "aguardando", label: "Aguar. Análise" },
+  { key: "analise_fiscal", label: "Análise Fiscal" },
+  { key: "reanalise", label: "Reanálise Fiscal" },
+  { key: "devolvido", label: "Devolvido" },
+  { key: "aprovado", label: "Aprovado" },
+  { key: "arquivado", label: "Arquivado" },
+];
+
+const KANBAN_KEYS = ["aguardando", "analise_fiscal", "reanalise", "devolvido", "aprovado"];
+
+const KPI_DEFS = [
+  { label: "Processos", sub: "Filtrado na tela", tone: "green", statusKey: null },
+  { label: "Aguardando Análise", sub: "Status = AGUAR. ANÁLISE", tone: "orange", statusKey: "aguardando" },
+  { label: "Análise Fiscal", sub: "Status = ANÁLISE FISCAL", tone: "blue", statusKey: "analise_fiscal" },
+  { label: "Reanálise Fiscal", sub: "Status = REANÁLISE FISCAL", tone: "purple", statusKey: "reanalise" },
+];
+
+const STATUS2_META = {
+  diligencia:       { label: "Diligência",         tone: "attention",    pageGroup: "tramitacao" },
+  em_analise:       { label: "Em Análise",          tone: "warning",      pageGroup: "tramitacao" },
+  analise_fiscal2:  { label: "Análise Fiscal",      tone: "danger-solid", pageGroup: "tramitacao" },
+  reanalise2:       { label: "Reanálise Fiscal",    tone: "info",         pageGroup: "tramitacao" },
+  aguar_aprovacao:  { label: "Aguar. Aprovação",    tone: "info-solid",   pageGroup: "tramitacao" },
+  devolvido2:       { label: "Devolvido",           tone: "danger",       pageGroup: "tramitacao" },
+  aprovado2:        { label: "Aprovado",            tone: "brand",        pageGroup: "aprovados" },
+  arquivado2:       { label: "Arquivado",           tone: "neutral",      pageGroup: "arquivados" },
+};
+
+const ROWS2_BASE = [
+  ["06000123456/2025-31", "Carlos E. Silva", "diligencia",      "Atrasado", "danger-solid",  "12/03/2025", "GECOPE", "180 dias", "R", "14/01/2025", "183 dias", "Construtora Alfa Ltda", "Aditivo de prazo e valor — obra de pavimentação asfáltica", true],
+  ["06000198231/2025-04", "Maria Paula",    "em_analise",       "No prazo", "warning-solid", "28/07/2026", "DIFOR",  "32 dias",  "J", "02/06/2026", "37 dias",  "Engenharia Ceará S.A.", "Revisão de quantitativos de terraplanagem", false],
+  ["06000287410/2025-19", "André Lucas",    "analise_fiscal2",  "Cumprido", "brand",         "Definir",    "GEFOE",  "6 dias",   "P", "30/06/2026", "9 dias",   "Via Norte Construções", "Aditivo de prazo — atraso por chuvas", false],
+  ["06000305522/2024-77", "Fernanda",       "aguar_aprovacao",  "Sem meta", "neutral",       "Definir",    "GECOPE", "55 dias",  "F", "19/05/2024", "417 dias", "SOP Infraestrutura Ltda", "Ampliação de escopo — drenagem pluvial", false],
+  ["06000311987/2025-33", "Carlos E. Silva","reanalise2",       "Atrasado", "danger-solid",  "02/02/2025", "GECOPE", "14 dias",  "R", "10/12/2024", "211 dias", "Terraplan Engenharia Ltda", "Reanálise de planilha orçamentária — insumos SINAPI", true],
+  ["06000276654/2025-08", "Maria Paula",    "devolvido2",       "Sem meta", "neutral",       "Definir",    "DIFOR",  "3 dias",   "J", "22/08/2025", "62 dias",  "Ceará Pavimentos S.A.", "Aditivo devolvido — pendência de documentação", false],
+  ["06000254321/2024-52", "André Lucas",    "aprovado2",        "Cumprido", "brand",         "05/01/2025", "GEFOE",  "0 dias",   "P", "15/09/2024", "279 dias", "Rodovias do Ceará Ltda", "Aditivo de valor aprovado sem ressalvas", false],
+  ["06000199887/2023-71", "Fernanda",       "arquivado2",       "Sem meta", "neutral",       "Definir",    "GECOPE", "0 dias",   "F", "03/03/2023", "1219 dias","Contec Obras e Serviços", "Processo arquivado após conclusão da obra", false],
+];
+
+const ROWS2 = ROWS2_BASE.map(([nup, fiscal, statusKey, metaLabel, metaTone, metaSub, suite, suiteDias, analista, abertura, aberturaDias, contratada, descricao, prioritario]) => {
+  const meta = STATUS2_META[statusKey];
+  return {
+    nup, fiscal, statusKey, statusLabel: meta.label, statusTone: meta.tone, pageGroup: meta.pageGroup,
+    metaLabel, metaTone, metaSub, suite, suiteDias, analista, abertura, aberturaDias, contratada, descricao,
+    prioritario, starIcon: prioritario ? "bi-star-fill" : "bi-star", starColor: prioritario ? "var(--sop-orange)" : "var(--sop-slate-200)",
+  };
+});
+
+const PAGE_TABS2 = [
+  { key: "tramitacao", label: "Em Tramitação" },
+  { key: "aprovados", label: "Aprovados" },
+  { key: "arquivados", label: "Arquivados" },
+];
+
+const KPI2_DEFS = [
+  { label: "Processos", sub: "Filtrado na tela", accent: "var(--sop-green)", icon: "bi-pin-angle-fill", statusKey: null, tint: "#f1f9f4", borderTint: "#d8ede0", iconBg: "#dcf0e3" },
+  { label: "Aguardando Análise", sub: "Status = AGUAR. ANÁLISE", accent: "var(--sop-orange)", icon: "bi-hourglass-split", statusKey: "em_analise", tint: "#fef6ec", borderTint: "#f5e3c8", iconBg: "#fbe6c8" },
+  { label: "Análise Fiscal", sub: "Status = ANÁLISE FISCAL", accent: "var(--sop-green)", icon: "bi-check2-circle", statusKey: "analise_fiscal2", tint: "#f1f9f4", borderTint: "#d8ede0", iconBg: "#dcf0e3" },
+  { label: "Reanálise Fiscal", sub: "Status = REANÁLISE FISCAL", accent: "#6f42c1", icon: "bi-calendar-event", statusKey: "reanalise2", tint: "#f7f3fb", borderTint: "#e5d8f0", iconBg: "#e7d9f5" },
+];
+
+class Component extends DCLogic {
+  state = {
+    tab1a: "tramitacao",
+    tab1d: "todos",
+    cardFilter: "todos",
+    kanbanPriorityOnly: false,
+    tab2: "tramitacao",
+  };
+
+  setTab2 = (key) => this.setState({ tab2: key });
+
+  setTab1a = (key) => this.setState({ tab1a: key });
+  setTab1d = (key) => this.setState({ tab1d: key });
+  setCardFilter = (key) => this.setState({ cardFilter: key });
+  toggleKanbanPriorityFn = () => this.setState((s) => ({ kanbanPriorityOnly: !s.kanbanPriorityOnly }));
+
+  renderVals() {
+    const s = this.state;
+
+    const kpis = KPI_DEFS.map((k) => ({
+      label: k.label,
+      sub: k.sub,
+      tone: k.tone,
+      value: k.statusKey ? ROWS.filter((r) => r.statusKey === k.statusKey).length : ROWS.length,
+    }));
+
+    const pageTabs = PAGE_TABS.map((t) => {
+      const active = s.tab1a === t.key;
+      return {
+        key: t.key,
+        label: t.label,
+        count: ROWS.filter((r) => r.pageGroup === t.key).length,
+        onClick: () => this.setTab1a(t.key),
+        tabStyle: `cursor:pointer;font-weight:${active ? 700 : 500};font-size:0.85rem;color:${active ? "var(--sop-green)" : "var(--sop-slate-500)"};border-bottom:${active ? "3px solid var(--sop-green)" : "3px solid transparent"};padding:0 0 10px 0;transition:var(--transition-fast);display:flex;align-items:center;gap:8px;`,
+        countStyle: `background:${active ? "var(--sop-green)" : "var(--sop-slate-100)"};color:${active ? "#fff" : "var(--sop-slate-500)"};font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:999px;`,
+      };
+    });
+
+    const statusTabs = STATUS_TABS.map((t) => {
+      const active = s.tab1d === t.key;
+      const count = t.key === "todos" ? ROWS.length : ROWS.filter((r) => r.statusKey === t.key).length;
+      return {
+        key: t.key,
+        label: t.label,
+        count,
+        onClick: () => this.setTab1d(t.key),
+        pillStyle: `cursor:pointer;font-weight:600;font-size:0.78rem;padding:8px 16px;border-radius:999px;white-space:nowrap;background:${active ? "var(--sop-green)" : "transparent"};color:${active ? "#fff" : "var(--sop-slate-600)"};transition:var(--transition-fast);display:flex;align-items:center;gap:6px;`,
+        badgeStyle: `background:${active ? "rgba(255,255,255,0.25)" : "var(--sop-slate-100)"};color:${active ? "#fff" : "var(--sop-slate-500)"};font-size:0.65rem;font-weight:700;padding:1px 7px;border-radius:999px;`,
+      };
+    });
+
+    const cardFilters = STATUS_TABS.map((t) => {
+      const active = s.cardFilter === t.key;
+      const count = t.key === "todos" ? ROWS.length : ROWS.filter((r) => r.statusKey === t.key).length;
+      return {
+        key: t.key,
+        label: t.label,
+        count,
+        onClick: () => this.setCardFilter(t.key),
+        chipStyle: `cursor:pointer;font-weight:600;font-size:0.78rem;padding:7px 14px;border-radius:999px;border:1px solid ${active ? "var(--sop-green)" : "var(--sop-slate-200)"};background:${active ? "var(--sop-green)" : "#fff"};color:${active ? "#fff" : "var(--sop-slate-600)"};transition:var(--transition-fast);`,
+      };
+    });
+
+    const kanbanColumns = KANBAN_KEYS.map((key) => {
+      const meta = STATUS_META[key];
+      const items = ROWS.filter((r) => r.statusKey === key && (!s.kanbanPriorityOnly || r.prioritario));
+      return { key, label: meta.label, dot: meta.dot, items, count: items.length };
+    });
+
+    const priorityToggleStyle = `cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;padding:6px 14px;border-radius:999px;border:1px solid ${s.kanbanPriorityOnly ? "var(--sop-orange)" : "var(--sop-slate-200)"};background:${s.kanbanPriorityOnly ? "#fff3e0" : "#fff"};color:${s.kanbanPriorityOnly ? "var(--sop-orange)" : "var(--sop-slate-600)"};`;
+
+    const tab1aRows = ROWS.filter((r) => r.pageGroup === s.tab1a);
+    const tab1dRows = s.tab1d === "todos" ? ROWS : ROWS.filter((r) => r.statusKey === s.tab1d);
+    const cardRows = s.cardFilter === "todos" ? ROWS : ROWS.filter((r) => r.statusKey === s.cardFilter);
+
+    const kpis2 = KPI2_DEFS.map((k) => ({
+      label: k.label, sub: k.sub, accent: k.accent, icon: k.icon,
+      tint: k.tint, borderTint: k.borderTint, iconBg: k.iconBg,
+      value: k.statusKey ? ROWS2.filter((r) => r.statusKey === k.statusKey).length : ROWS2.length,
+    }));
+
+    const tabs2 = PAGE_TABS2.map((t) => {
+      const active = s.tab2 === t.key;
+      return {
+        key: t.key, label: t.label,
+        onClick: () => this.setTab2(t.key),
+        pillStyle: `cursor:pointer;font-weight:600;font-size:0.95rem;padding:9px 20px;border-radius:999px;transition:var(--transition-fast);background:${active ? "#fff" : "transparent"};color:${active ? "var(--sop-green)" : "var(--sop-slate-500)"};box-shadow:${active ? "var(--shadow-sm)" : "none"};`,
+      };
+    });
+
+    const rows2 = ROWS2.filter((r) => r.pageGroup === s.tab2);
+
+    const plusIcon = React.createElement("i", { className: "bi bi-plus-lg" });
+    const xlsIcon = React.createElement("i", { className: "bi bi-file-earmark-excel" });
+    const pdfIcon = React.createElement("i", { className: "bi bi-file-earmark-pdf" });
+
+    const fiscalOptions = [{ value: "", label: "Todos" }, { value: "torres", label: "F. Torres" }, { value: "rocha", label: "M. Rocha" }, { value: "prado", label: "J. Prado" }];
+    const metaOptions = [{ value: "", label: "Todos" }, { value: "cumprido", label: "Cumprido" }, { value: "no-prazo", label: "No prazo" }, { value: "atrasado", label: "Atrasado" }, { value: "sem-meta", label: "Sem meta" }];
+    const priorityOptions = [{ value: "", label: "Todos" }, { value: "sim", label: "Prioritário" }, { value: "nao", label: "Não Prioritário" }];
+
+    return {
+      kpis, pageTabs, statusTabs, cardFilters, kanbanColumns, priorityToggleStyle,
+      toggleKanbanPriority: this.toggleKanbanPriorityFn,
+      tab1aRows, tab1dRows, cardRows,
+      tab1aCount: tab1aRows.length, tab1dCount: tab1dRows.length,
+      plusIcon, xlsIcon, pdfIcon,
+      fiscalOptions, metaOptions, priorityOptions,
+      kpis2, tabs2, rows2, rows2Count: rows2.length,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
