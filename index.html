@@ -1397,36 +1397,69 @@
                 <div class="tab-pane fade" id="pane-orcamentos">
                     <div class="page-wrapper pt-0">
 
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <h5 class="fw-bold mb-0 text-uppercase"
-                                        style="color: var(--sop-gray-dark); font-size: 1.0rem;">Painel de Orçamentos
-                                    </h5>
-                                </div>
+                                <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px;">
+                                    Painel de Orçamentos</div>
+                                <div style="color:var(--text-muted);font-size:0.98rem;">Biblioteca de orçamentos por
+                                    categoria, com histórico de revisões e versões.</div>
                             </div>
-                            <button class="btn btn-sm btn-success fw-bold shadow-sm admin-only" data-bs-toggle="modal"
+                            <button class="btn btn-success fw-bold shadow-sm admin-only"
+                                style="font-size: 0.85rem; height: 40px;" data-bs-toggle="modal"
                                 data-bs-target="#modalNovoOrcamento">
-                                <i class="bi bi-plus-lg me-1"></i> NOVO ORAMENTO
+                                <i class="bi bi-plus-lg me-1"></i> Novo Orçamento
                             </button>
                         </div>
 
-                        <section class="filters-card">
-                            <div class="filters-title">FILTROS DE CONSULTA (ORAMENTOS)</div>
-                            <div class="row g-2">
-                                <div class="col">
-                                    <div class="input-group input-group-sm">
-                                        <input type="text" id="orcamento-search" class="form-control"
+                        <div class="proc-kpi-grid mb-2">
+                            <div class="proc-kpi-card accent-green">
+                                <div class="proc-kpi-icon bg-green"><i class="bi bi-folder2-open"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Orçamentos</span>
+                                    <div class="proc-kpi-value" id="orc-kpi-total">0</div>
+                                    <div class="proc-kpi-sub">Filtrado na tela</div>
+                                </div>
+                            </div>
+                            <div class="proc-kpi-card accent-blue">
+                                <div class="proc-kpi-icon bg-blue"><i class="bi bi-check2-circle"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Disponíveis</span>
+                                    <div class="proc-kpi-value" id="orc-kpi-disponivel">0</div>
+                                    <div class="proc-kpi-sub">Status = Disponível</div>
+                                </div>
+                            </div>
+                            <div class="proc-kpi-card accent-orange">
+                                <div class="proc-kpi-icon bg-orange"><i class="bi bi-chat-left-text-fill"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Em Revisão</span>
+                                    <div class="proc-kpi-value" id="orc-kpi-revisao">0</div>
+                                    <div class="proc-kpi-sub">Com solicitação pendente</div>
+                                </div>
+                            </div>
+                            <div class="proc-kpi-card accent-purple">
+                                <div class="proc-kpi-icon bg-purple"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Atualizados</span>
+                                    <div class="proc-kpi-value" id="orc-kpi-atualizado">0</div>
+                                    <div class="proc-kpi-sub">Com nova versão enviada</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <section class="filters-card mb-2">
+                            <div class="filters-title">FILTROS DE CONSULTA (ORÇAMENTOS)</div>
+                            <div class="proc-filter-row">
+                                <div class="proc-filter-col-search">
+                                    <label class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
+                                    <div class="proc-search-wrap">
+                                        <input type="text" class="form-control form-control-sm border-secondary-subtle"
+                                            id="orcamento-search"
                                             placeholder="Digite o nome da obra, categoria ou tipo de arquivo...">
-                                        <span class="input-group-text bg-white text-muted"><i
-                                                class="bi bi-search"></i></span>
+                                        <i class="bi bi-search proc-search-icon"></i>
                                     </div>
                                 </div>
-                                <div class="col-auto">
-                                    <button id="btn-orc-clear" class="btn btn-sm btn-grid-clear px-3"
-                                        style="height: 31px; line-height: 1;">
-                                        Limpar
-                                    </button>
+                                <div class="proc-filter-actions">
+                                    <button class="btn btn-success fw-bold" id="btn-orc-clear">Limpar</button>
                                 </div>
                             </div>
                         </section>
@@ -1718,12 +1751,18 @@
                                 </div>
                             </form>
                         </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="salvarNovoOrcamento()">
+                                <i class="bi bi-cloud-upload-fill me-1"></i> Salvar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Modal Comentar Orçamento -->
-            <div class="modal fade" id="modalComentarOrcamento" tabindex="-1">
+            <div class="modal fade" id="modalComentarioOrcamento" tabindex="-1">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-warning-subtle">
@@ -1769,6 +1808,12 @@
                                     <em class="text-muted">Nenhum comentário ainda.</em>
                                 </div>
                             </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-warning btn-sm fw-bold" onclick="enviarComentarioOrcamento()">
+                                <i class="bi bi-send-fill me-1"></i> Enviar Solicitação
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2125,16 +2170,15 @@
                                         </div>
                                     </form>
                                 </div>
-                            </div>
-                            <div class="modal-footer justify-content-center">
-                                <button type="button" class="btn btn-primary w-100 fw-bold"
-                                    onclick="enviarNovaVersao()">
-                                    <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
-                                </button>
+                                <div class="modal-footer justify-content-center">
+                                    <button type="button" class="btn btn-primary w-100 fw-bold"
+                                        onclick="enviarNovaVersao()">
+                                        <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 <!-- MODAL CRIAR COMPOSIÇÃO ANALÍTICA -->
                 <div class="modal fade" id="modalCriarComposicaoAnalitica" tabindex="-1" aria-hidden="true"
                     data-bs-backdrop="static">
@@ -2862,6 +2906,11 @@
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="modalRecusarRevisao" tabindex="-1">
+                                <div class="modal-dialog">
                                     <div class="modal-content">
                                         <div class="modal-header bg-danger text-white">
                                             <h5 class="modal-title fs-6 fw-bold"><i
@@ -2899,9 +2948,12 @@
                                             </button>
                                         </div>
                                     </div>
-                                    NOVOS MODAIS - ABA COMPOSIES (RPLICA DE ORAMENTOS)
-                                    =========================================================================================
-                                    -->
+                                </div>
+                            </div>
+
+                            <!-- =========================================================================================
+                                 NOVOS MODAIS - ABA COMPOSIÇÕES (RÉPLICA DE ORÇAMENTOS)
+                                 ========================================================================================= -->
 
                                     <!-- 1. CADASTRAR NOVA COMPOSIÇÃO -->
                                     <div class="modal fade" id="modalCadastrarComposicao" tabindex="-1">
