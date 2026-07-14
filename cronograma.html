@@ -1,0 +1,3719 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GECOPE – Painel de Distribuição de Tarefas</title>
+<!-- Preconnect para carregar Montserrat mais rápido -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<!-- Supabase: mesmo cliente/sessão do restante do GECOPE (config.js define a URL/chave,
+     database.js inicializa window.sbClient reaproveitando a sessão já autenticada) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="database.js"></script>
+<style>
+:root {
+  /* Unificado com os tokens de style.css (--sop-*) do app principal.
+     Os nomes de variável aqui são mantidos (usados em centenas de regras
+     abaixo) — só os valores passam a apontar para o mesmo design system. */
+  --verde:        var(--sop-green);
+  --verde-escuro: var(--sop-green-dark);
+  --verde-medio:  var(--sop-green-light);
+  --verde-claro:  #e6f4ed;
+  --verde-borda:  #a8d5b8;
+  --cinza-bg:     var(--sop-slate-50);
+  --branco:       #ffffff;
+  --ativa:        var(--sop-green);
+  --ativa-bg:     #dcfce7;
+  --fila:         var(--sop-orange);
+  --fila-bg:      #fef3c7;
+  --bloqueada:    #2563eb;
+  --bloqueada-bg: #dbeafe;
+  --paralisada:   #dc2626;
+  --paralisada-bg:#fee2e2;
+  --concluida:    var(--sop-slate-500);
+  --concluida-bg: var(--sop-slate-100);
+  --atrasado:     #b45309;
+  --atrasado-bg:  #fef3c7;
+  --atrasado-borda: #d97706;
+  --borda:        var(--sop-slate-200);
+  --slate-900:    var(--sop-slate-900);
+  --slate-800:    var(--sop-slate-800);
+  --slate-600:    var(--sop-slate-600);
+  --slate-500:    var(--sop-slate-500);
+  --slate-200:    var(--sop-slate-200);
+  --slate-100:    var(--sop-slate-100);
+  --slate-50:     var(--sop-slate-50);
+  --sombra-card:  var(--shadow-card-subtle);
+  --sombra-hover: var(--shadow-md);
+  --rotina-diaria:   #2563ab;
+  --rotina-semanal:  #7c3aed;
+  --rotina-mensal:   #0891b2;
+  --rotina-eventual: #92400e;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  background: var(--cinza-bg);
+  color: #1f2937;
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── CABEÇALHO ──
+   O topo (faixa verde, header branco/verde e barra de título) agora usa
+   as classes compartilhadas do app (.top-bar, .sop-header, .panel-subheader
+   etc.), definidas em style.css — mantém o mesmo visual do restante do GECOPE. */
+.sop-header-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sop-header-right strong { display: block; line-height: 1.2; }
+.sop-header-right div { line-height: 1.2; }
+.sop-header .sop-title-main,
+.sop-header .sop-title-sub {
+  line-height: 1.25;
+}
+
+/* ── NAV ── (abas em pílula, igual à navegação por página do Processos) */
+.nav-wrapper {
+  background: transparent;
+  padding: 0 0 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+nav {
+  display: flex;
+  gap: 4px;
+  background: var(--slate-100);
+  border-radius: 999px;
+  padding: 5px;
+}
+nav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--slate-500);
+  padding: 9px 20px;
+  font-size: .95rem;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: all .2s ease;
+}
+nav button:hover {
+  color: var(--verde-escuro);
+}
+nav button.ativo {
+  background: #fff;
+  color: var(--verde);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── MAIN ── */
+main {
+  padding: 24px 28px 40px;
+  background:
+    radial-gradient(ellipse at top left, rgba(0,143,61,.05) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(0,114,51,.03) 0%, transparent 50%);
+  min-height: calc(100vh - 120px);
+}
+
+/* ── RESUMO ── (cards de KPI no padrão do Processos: fundo branco, borda
+   esquerda de destaque, ícone em chip sólido) */
+.resumo {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.card-resumo {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--sombra-card);
+  border: 1px solid var(--slate-100);
+  border-left: 4px solid var(--sop-blue);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: var(--transition-fast, all .2s ease);
+}
+.card-resumo:hover {
+  box-shadow: var(--sombra-hover);
+  transform: translateY(-3px);
+}
+.card-resumo .ico-bg {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--sop-blue);
+  box-shadow: 0 4px 10px -2px var(--sop-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  font-size: 1.1rem;
+  color: #fff;
+}
+.card-resumo .cr-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.card-resumo .num   { font-size: 1.6rem; font-weight: 800; line-height: 1; color: var(--slate-900); }
+.card-resumo .label { font-size: .7rem; color: var(--slate-500); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+
+.card-resumo.ativa      { border-left-color: var(--verde); }
+.card-resumo.ativa .ico-bg      { background: var(--verde); box-shadow: 0 4px 10px -2px var(--verde); }
+.card-resumo.standby    { border-left-color: var(--fila); }
+.card-resumo.standby .ico-bg    { background: var(--fila); box-shadow: 0 4px 10px -2px var(--fila); }
+.card-resumo.bloqueada  { border-left-color: var(--bloqueada); }
+.card-resumo.bloqueada .ico-bg  { background: var(--bloqueada); box-shadow: 0 4px 10px -2px var(--bloqueada); }
+.card-resumo.paralisada { border-left-color: var(--paralisada); }
+.card-resumo.paralisada .ico-bg { background: var(--paralisada); box-shadow: 0 4px 10px -2px var(--paralisada); }
+.card-resumo.concluida  { border-left-color: var(--slate-500); }
+.card-resumo.concluida .ico-bg  { background: var(--slate-500); box-shadow: 0 4px 10px -2px var(--slate-500); }
+
+/* ── BARRA AÇÕES ── */
+.barra-acoes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+.filtro-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: white;
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  height: 38px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.filtro-wrap:focus-within {
+  border-color: var(--verde);
+  box-shadow: 0 4px 12px rgba(0,143,61,.12);
+}
+.filtro-wrap i {
+  color: var(--slate-500);
+  font-size: 1rem;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.filtro-wrap select {
+  border: none;
+  background: transparent;
+  font-size: .8rem;
+  font-family: 'Montserrat', sans-serif;
+  color: #374151;
+  outline: none;
+  cursor: pointer;
+  padding: 0;
+  min-width: 130px;
+}
+.filtro-wrap input {
+  border: none;
+  background: transparent;
+  font-size: .8rem;
+  font-family: 'Montserrat', sans-serif;
+  outline: none;
+  min-width: 210px;
+  color: #374151;
+}
+.filtro-wrap input::placeholder { color: #9ca3af; }
+.btn {
+  padding: 9px 22px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: .84rem;
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: .3px;
+  transition: transform .2s cubic-bezier(0.4,0,0.2,1), box-shadow .2s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.16);
+}
+.btn:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.btn-primario { background: var(--verde); color: white; box-shadow: 0 2px 10px rgba(0,143,61,.3); }
+.btn-primario:hover { background: var(--verde-escuro); box-shadow: 0 6px 20px rgba(0,143,61,.4); }
+.btn-verde    { border: 1.5px solid #198754; color: #198754; background: #fff; box-shadow: none; }
+.btn-verde:hover { background: #198754; color: #fff; box-shadow: 0 4px 12px rgba(25,135,84,.25); }
+.btn-cinza    { background: #f8fafc; color: var(--slate-600); border: 1px solid var(--slate-200); box-shadow: none; }
+.btn-cinza:hover { background: #e2e8f0; box-shadow: none; }
+.btn-vermelho { border: 1.5px solid var(--filetype-pdf-fg); color: var(--filetype-pdf-fg); background: #fff; box-shadow: none; }
+.btn-vermelho:hover { background: var(--filetype-pdf-fg); color: #fff; box-shadow: 0 4px 12px rgba(220,53,69,.25); }
+.btn-roxo     { background: #6d28d9; color: white; }
+.btn-roxo:hover { background: #5b21b6; }
+.btn-pequeno  { padding: 5px 14px; font-size: .78rem; border-radius: var(--radius-sm); }
+
+/* ── GRID ANALISTAS ── */
+.grid-analistas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.card-analista {
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--sombra-card);
+  overflow: hidden;
+  transition: transform .25s cubic-bezier(0.4,0,0.2,1), box-shadow .25s cubic-bezier(0.4,0,0.2,1);
+  border: 1px solid var(--slate-200);
+}
+.card-analista:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--sombra-hover);
+}
+.card-analista-header {
+  background: var(--verde);
+  color: white;
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+.card-analista-header h3 {
+  font-size: .92rem;
+  font-weight: 800;
+  position: relative;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.analista-sub-inline {
+  font-size: .72rem;
+  font-weight: 500;
+  opacity: .72;
+  white-space: nowrap;
+}
+.badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.badge { font-size: .72rem; padding: 4px 10px; border-radius: 99px; font-weight: 700; }
+.badge.ativa      { background: rgba(220,252,231,.9); color: #15803d; }
+.badge.fila       { background: rgba(254,243,199,.9); color: #b45309; }
+.badge.bloqueada  { background: rgba(219,234,254,.9); color: #1d4ed8; }
+.badge.paralisada { background: rgba(254,226,226,.9); color: #b91c1c; }
+.badge.rotina     { background: rgba(237,233,254,.9); color: #5b21b6; }
+
+.card-analista-body { padding: 14px 16px; min-height: 60px; }
+.card-analista-footer {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--slate-100);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: var(--slate-50);
+}
+
+/* ── TAREFAS ── */
+.tarefa {
+  border: 1px solid var(--slate-200);
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin-bottom: 10px;
+  border-left: 3px solid var(--concluida);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.tarefa:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateX(2px); }
+.tarefa.ativa      { border-left-color: var(--ativa); background: #f4fdf7; box-shadow: 0 1px 4px rgba(0,143,61,.1); }
+.tarefa.ativa:hover { box-shadow: 0 4px 12px rgba(0,143,61,.18); }
+.tarefa.fila       { border-left-color: var(--fila); }
+.tarefa.bloqueada  { border-left-color: var(--bloqueada); }
+.tarefa.atrasado   { border-left-color: var(--atrasado-borda); }
+.tarefa.paralisada { border-left-color: var(--paralisada); }
+.tarefa.concluida  { opacity: .55; }
+
+.tarefa-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+.tarefa-titulo { font-size: .92rem; font-weight: 700; line-height: 1.5; flex: 1; }
+.tarefa-status { font-size: .72rem; padding: 4px 10px; border-radius: 99px; font-weight: 800; white-space: nowrap; letter-spacing: .3px; }
+.tarefa-status.ativa      { background: var(--ativa-bg);      color: #166534; }
+.tarefa-status.fila       { background: var(--fila-bg);       color: #92400e; }
+.tarefa-status.bloqueada  { background: var(--bloqueada-bg);  color: #1d4ed8; }
+.tarefa-status.atrasado   { background: #fde68a; color: #78350f; border: 1px solid #f59e0b; }
+.tarefa-status.paralisada { background: var(--paralisada-bg); color: #991b1b; }
+.tarefa-status.concluida  { background: var(--concluida-bg);  color: var(--concluida); }
+
+.tarefa-meta { font-size: .8rem; color: #6b7280; display: flex; gap: 12px; flex-wrap: wrap; margin-top: 7px; line-height: 1.5; }
+.tarefa-meta .vencido { color: var(--paralisada); font-weight: 700; }
+.tarefa-obs { font-size: .8rem; color: #4b5563; margin-top: 8px; font-style: italic; padding: 5px 10px; border-left: 3px solid #d1d5db; background: #f9f9f9; border-radius: 0 6px 6px 0; line-height: 1.6; display: flex; align-items: flex-start; gap: 6px; }
+.obs-icone { flex-shrink: 0; line-height: 1.6; font-style: normal; }
+.obs-conteudo { flex: 1; min-width: 0; }
+.obs-conteudo p { margin: 0; }
+.tarefa-acoes { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* ── ORDEM DE EXECUÇÃO ── */
+.tarefa-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--verde);
+  color: white;
+  font-size: .68rem;
+  font-weight: 900;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,100,50,.4);
+  margin-right: 2px;
+  letter-spacing: 0;
+}
+.tarefa-num.urgente { background: #dc2626; box-shadow: 0 2px 6px rgba(220,38,38,.4); }
+.tarefa-num.alta    { background: #d97706; box-shadow: 0 2px 6px rgba(217,119,6,.4); }
+.btn-fila {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: background .12s, border-color .12s;
+  flex-shrink: 0;
+}
+.btn-fila:hover:not(:disabled) { background: var(--verde-claro); border-color: var(--verde); color: var(--verde-escuro); }
+.btn-fila:disabled { opacity: .25; cursor: default; }
+
+.vazio { color: #9ca3af; font-size: .88rem; padding: 22px 16px; text-align: center; font-weight: 500; }
+
+/* ── ROTINAS ── */
+.rotina-item {
+  border: 1px solid #e5e9e7;
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fafafa;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  transition: box-shadow .15s;
+}
+.rotina-item:hover { box-shadow: 0 3px 8px rgba(0,0,0,.08); }
+.rotina-freq { font-size: .72rem; font-weight: 800; padding: 4px 11px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; letter-spacing: .3px; }
+.rotina-freq.diaria   { background: #dbeafe; color: var(--rotina-diaria); }
+.rotina-freq.semanal  { background: #ede9fe; color: var(--rotina-semanal); }
+.rotina-freq.mensal   { background: #cffafe; color: var(--rotina-mensal); }
+.rotina-freq.eventual { background: #fef3c7; color: var(--rotina-eventual); }
+.rotina-desc { font-size: .88rem; flex: 1; line-height: 1.6; font-weight: 500; }
+.rotina-acoes { display: flex; gap: 4px; }
+
+/* ── SECÇÃO RECOLHIDA (tarefas não-ativas) ── */
+.tarefas-recolhidas {
+  margin: 6px 0 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e9e7;
+}
+.tarefas-recolhidas-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  background: #f4f7f5;
+  cursor: pointer;
+  user-select: none;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #4b5563;
+  gap: 8px;
+  transition: background .15s;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: 'Montserrat', sans-serif;
+}
+.tarefas-recolhidas-toggle:hover { background: #e8f0eb; }
+.tarefas-recolhidas-toggle .toggle-contagem {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+.toggle-chip {
+  font-size: .68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.toggle-chip.fila       { background: var(--fila-bg);         color: #92400e; }
+.toggle-chip.bloqueada  { background: var(--bloqueada-bg);    color: #1d4ed8; }
+.toggle-chip.atrasado   { background: #fde68a;                color: #78350f; border: 1px solid #f59e0b; }
+.toggle-chip.paralisada { background: var(--paralisada-bg);   color: #991b1b; }
+.toggle-chip.concluida  { background: var(--concluida-bg);    color: #4b5563; }
+.toggle-arrow {
+  font-size: .7rem;
+  transition: transform .2s ease;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.toggle-arrow.aberto { transform: rotate(180deg); }
+.tarefas-recolhidas-corpo {
+  display: none;
+  padding: 8px 0 0;
+  background: #fafcfb;
+  border-top: 1px solid #e5e9e7;
+}
+.tarefas-recolhidas-corpo.aberto { display: block; }
+.tarefas-recolhidas-corpo .tarefa {
+  margin: 0 8px 8px;
+  opacity: .85;
+}
+
+/* ── MODAL ── */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,30,15,.5);
+  backdrop-filter: blur(3px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.overlay.aberto { display: flex; }
+/* Prefixo "cron-" para não colidir com as classes .modal/.modal-header/.modal-body
+   do Bootstrap (carregado nesta página) — sem o prefixo, o "display:none" padrão
+   do Bootstrap para .modal vencia e a caixa ficava sempre invisível. */
+.cron-modal {
+  background: white;
+  border-radius: 18px;
+  padding: 26px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.15);
+  border: 1px solid rgba(255,255,255,.6);
+}
+.cron-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -26px -26px 20px -26px;
+  padding: 16px 26px;
+  background: var(--verde);
+  color: #fff;
+  border-radius: 18px 18px 0 0;
+}
+.cron-modal-header h2 { font-size: 1rem; font-weight: 800; color: #fff; }
+.campo { margin-bottom: 14px; }
+.campo label { display: block; font-size: .75rem; font-weight: 700; margin-bottom: 5px; color: #374151; text-transform: uppercase; letter-spacing: .4px; }
+.campo input, .campo select, .campo textarea {
+  width: 100%;
+  border: 1px solid var(--borda);
+  border-radius: 9px;
+  padding: 9px 13px;
+  font-size: .85rem;
+  font-family: 'Montserrat', sans-serif;
+  transition: border-color .15s, box-shadow .15s;
+  background: #fafafa;
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus {
+  outline: none;
+  border-color: var(--verde);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0,143,61,.12);
+}
+.campo textarea { resize: vertical; min-height: 70px; }
+.modal-rodape { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f4f2; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── EDITOR RICH TEXT ── */
+.fmt-barra {
+  display: flex;
+  gap: 3px;
+  padding: 5px 8px;
+  background: #f4f7f5;
+  border: 1px solid var(--borda);
+  border-bottom: none;
+  border-radius: 9px 9px 0 0;
+}
+.fmt-btn {
+  width: 30px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: .82rem;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .12s, border-color .12s;
+  flex-shrink: 0;
+}
+.fmt-btn:hover { background: #e5e7eb; border-color: #d1d5db; }
+.fmt-btn.ativo  { background: var(--verde-claro); border-color: var(--verde); color: var(--verde-escuro); }
+.fmt-sep { width: 1px; background: #d1d5db; margin: 4px 3px; }
+.campo-rich {
+  width: 100%;
+  border: 1px solid var(--borda);
+  border-radius: 0 0 9px 9px;
+  padding: 9px 13px;
+  font-size: .85rem;
+  font-family: 'Montserrat', sans-serif;
+  min-height: 80px;
+  background: #fafafa;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  line-height: 1.6;
+  color: #1f2937;
+}
+.campo-rich:focus {
+  border-color: var(--verde);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0,143,61,.12);
+}
+.campo-rich[data-alerta="true"] { border-color: #dc2626; background: #fff7f7; }
+.campo-rich:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+/* Render no card */
+.tarefa-obs { font-size: .82rem; color: #4b5563; margin-top: 8px; padding: 6px 10px; border-left: 3px solid #d1d5db; background: #f9f9f9; border-radius: 0 6px 6px 0; line-height: 1.65; display: flex; align-items: flex-start; gap: 6px; }
+.tarefa-obs b, .tarefa-obs strong { font-weight: 700; color: #1f2937; }
+
+/* ── HISTÓRICO DA TAREFA ── */
+/* Botão ? de histórico inline no título da tarefa */
+.btn-hist-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+  border: none;
+  font-size: .65rem;
+  font-weight: 800;
+  cursor: pointer;
+  margin-left: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+  font-family: 'Montserrat', sans-serif;
+  line-height: 1;
+}
+.btn-hist-info:hover { background: var(--verde); color: #fff; }
+
+/* Modal de histórico (popup flutuante) */
+/* ── POPUP HISTÓRICO ── */
+#modal-historico {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.22);
+  width: 500px;
+  max-height: 560px;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid #d1d5db;
+}
+#modal-historico.aberto { display: flex; }
+
+/* Cabeçalho verde */
+.mh-cabecalho {
+  background: var(--verde);
+  color: #fff;
+  padding: 14px 18px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 10px;
+}
+.mh-titulo-wrap { flex: 1; }
+.mh-label { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; opacity: .75; margin-bottom: 3px; }
+.mh-titulo { font-size: .88rem; font-weight: 700; line-height: 1.35; }
+.mh-fechar {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.25);
+  color: #fff;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-size: .85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: background .15s;
+}
+.mh-fechar:hover { background: rgba(255,255,255,.3); }
+
+/* Bloco resumo (parte superior) */
+.mh-resumo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 2px solid #e5e7eb;
+  flex-shrink: 0;
+  background: #f9fafb;
+}
+.mh-resumo-item {
+  padding: 10px 18px;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.mh-resumo-item:nth-child(even) { border-right: none; }
+.mh-resumo-item:nth-last-child(-n+2) { border-bottom: none; }
+.mh-ri-label {
+  font-size: .63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: #9ca3af;
+  margin-bottom: 3px;
+}
+.mh-ri-valor {
+  font-size: .83rem;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Linha do tempo (parte inferior) */
+.mh-corpo {
+  overflow-y: auto;
+  padding: 16px 20px 18px;
+  flex: 1;
+}
+.mh-vazio {
+  color: #9ca3af;
+  font-size: .82rem;
+  text-align: center;
+  padding: 28px 0;
+  line-height: 1.7;
+}
+.mh-linha-tempo {
+  display: flex;
+  gap: 0;
+  position: relative;
+  padding-bottom: 20px;
+}
+.mh-linha-tempo:last-child { padding-bottom: 0; }
+/* Linha vertical conectando entradas */
+.mh-linha-tempo::before {
+  content: '';
+  position: absolute;
+  left: 34px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: #e5e7eb;
+}
+.mh-linha-tempo:last-child::before { display: none; }
+.mh-lt-data {
+  width: 70px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 12px;
+  padding-top: 3px;
+}
+.mh-lt-dia { font-size: .72rem; font-weight: 700; color: #374151; line-height: 1.3; }
+.mh-lt-hora { font-size: .67rem; color: #9ca3af; font-weight: 600; }
+.mh-lt-bolinha {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px currentColor;
+}
+.mh-lt-bolinha.criada    { color: #16a34a; background: #16a34a; }
+.mh-lt-bolinha.paralisada{ color: #dc2626; background: #dc2626; }
+.mh-lt-bolinha.retomada  { color: #16a34a; background: #16a34a; }
+.mh-lt-bolinha.concluida { color: #6b7280; background: #6b7280; }
+.mh-lt-bolinha.prazo     { color: #2563eb; background: #2563eb; }
+.mh-lt-bolinha.editada   { color: #9ca3af; background: #9ca3af; }
+.mh-lt-conteudo {
+  flex: 1;
+  padding-left: 12px;
+  padding-top: 1px;
+}
+.mh-lt-evento {
+  font-size: .77rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
+}
+.mh-lt-detalhe {
+  font-size: .76rem;
+  color: #4b5563;
+  line-height: 1.65;
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 7px 10px;
+  border-left: 3px solid #e5e7eb;
+}
+.mh-lt-detalhe.paralisada { border-left-color: #fca5a5; background: #fff7f7; }
+.mh-lt-detalhe.prazo      { border-left-color: #93c5fd; background: #eff6ff; }
+.mh-lt-detalhe.retomada   { border-left-color: #86efac; background: #f0fdf4; }
+.mh-lt-detalhe strong { color: #111827; }
+
+.hist-wrap { margin-top: 4px; }
+.hist-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: .72rem;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-family: 'Montserrat', sans-serif;
+  transition: background .12s, color .12s;
+}
+.hist-toggle:hover { background: #f3f4f6; color: #374151; }
+.hist-toggle.aberto { background: #f3f4f6; color: #374151; }
+.hist-toggle .hist-arrow { font-size: .6rem; transition: transform .2s; }
+.hist-toggle .hist-arrow.aberto { transform: rotate(180deg); }
+.hist-corpo { display: none; margin-top: 6px; }
+.hist-corpo.aberto { display: block; }
+.hist-linha {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: .78rem;
+}
+.hist-linha:last-child { border-bottom: none; }
+.hist-linha-esq { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; width: 80px; }
+.hist-data { font-size: .67rem; color: #9ca3af; font-weight: 600; text-align: center; }
+.hist-tipo {
+  font-size: .66rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  text-align: center;
+}
+.hist-tipo.criada      { background: #dcfce7; color: #166534; }
+.hist-tipo.paralisada  { background: #fee2e2; color: #991b1b; }
+.hist-tipo.retomada    { background: #dcfce7; color: #166534; }
+.hist-tipo.prazo       { background: #dbeafe; color: #1e40af; }
+.hist-tipo.editada     { background: #f3f4f6; color: #4b5563; }
+.hist-tipo.concluida   { background: #f3f4f6; color: #374151; }
+.hist-nota { color: #374151; line-height: 1.5; flex: 1; }
+.hist-nota em { color: #6b7280; font-style: italic; }
+
+/* Modal revisão de datas ao ativar */
+.rev-aviso {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #f59e0b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: .82rem;
+  color: #78350f;
+  line-height: 1.6;
+}
+.rev-aviso strong { color: #92400e; }
+.rev-item-vencido { color: #dc2626; font-weight: 700; }
+.rev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Campo justificativa no modal */
+.campo-justificativa-box {
+  background: #fff7f7;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+.campo-justificativa-box label { color: #991b1b !important; }
+.campo-justificativa-box textarea {
+  border-color: #fca5a5 !important;
+  background: white !important;
+  min-height: 70px;
+  resize: vertical;
+}
+
+/* ── ABAS OCULTAS ── */
+#aba-relatorio  { display: none; }
+#aba-analistas  { display: none; }
+#aba-rotinas    { display: none; }
+#aba-concluidas { display: none; }
+
+/* ── ABA CONCLUÍDAS ── */
+.conc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.conc-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--sombra-card);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.8);
+}
+.conc-card-header {
+  background: var(--slate-600);
+  color: white;
+  padding: 13px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+.conc-card-header h3 { font-size: .95rem; font-weight: 800; position: relative; }
+.conc-card-header .conc-count {
+  background: rgba(255,255,255,.18);
+  font-size: .72rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 99px;
+  position: relative;
+}
+.conc-card-body { padding: 12px 14px; min-height: 60px; }
+.tarefa-conc {
+  border: 1px solid #e5e9e7;
+  border-radius: 10px;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+  background: #f9fafb;
+  border-left: 4px solid #9ca3af;
+  opacity: .8;
+}
+.tarefa-conc:hover { opacity: 1; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.tarefa-conc-titulo { font-size: .88rem; font-weight: 700; color: #374151; line-height: 1.4; }
+.tarefa-conc-meta { font-size: .76rem; color: #9ca3af; margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap; }
+.tarefa-conc-data { font-size: .7rem; color: #6b7280; margin-top: 4px; font-style: italic; }
+.tarefa-conc-acoes { margin-top: 8px; display: flex; gap: 5px; }
+.conc-barra {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 18px;
+  box-shadow: var(--sombra-card);
+  border-left: 5px solid var(--concluida);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ── RELATÓRIO ── */
+/* ── TOGGLE LISTA / CALENDÁRIO ── */
+.rel-view-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.rel-view-btn {
+  padding: 7px 16px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  transition: all .15s;
+}
+.rel-view-btn.ativo { background: var(--verde); color: white; border-color: var(--verde); }
+
+/* ── CALENDÁRIO ── */
+.cal-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  background: white;
+  border-radius: 12px;
+  padding: 14px 22px;
+  margin-bottom: 16px;
+  box-shadow: var(--sombra-card);
+}
+.cal-nav-esquerda { display: flex; align-items: center; gap: 8px; }
+.cal-nav-direita  { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.cal-nav-centro   { text-align: center; }
+.cal-nav-btn {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #374151;
+  transition: background .12s;
+}
+.cal-nav-btn:hover { background: var(--verde); color: white; }
+.cal-mes-titulo { font-size: 1.15rem; font-weight: 800; color: var(--verde-escuro); text-transform: capitalize; letter-spacing: .3px; }
+.cal-filtro-label { font-size: .72rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+.cal-periodo-btn {
+  padding: 5px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 20px;
+  background: white;
+  font-size: .75rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.cal-periodo-btn:hover { border-color: var(--verde); color: var(--verde); }
+.cal-periodo-btn.ativo { background: var(--verde); color: white; border-color: var(--verde); }
+.cal-periodo-limpar { border-color: #fca5a5; color: #dc2626; background: #fff1f2; }
+.cal-periodo-limpar:hover { border-color: #dc2626; background: #fee2e2; color: #dc2626; }
+.cal-periodo-input {
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: .78rem;
+  font-family: 'Montserrat', sans-serif;
+  color: #374151;
+  background: white;
+  transition: border-color .15s;
+}
+.cal-periodo-input:focus { outline: none; border-color: var(--verde); }
+.cal-filtro-select {
+  border: 1.5px solid var(--borda);
+  border-radius: 8px;
+  padding: 7px 32px 7px 12px;
+  font-size: .83rem;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  color: #374151;
+  background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .15s;
+  min-width: 190px;
+}
+.cal-filtro-select:focus { outline: none; border-color: var(--verde); }
+.cal-filtro-select:hover { border-color: var(--verde); }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.cal-dow {
+  text-align: center;
+  font-size: .65rem;
+  font-weight: 800;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 6px 0 4px;
+}
+.cal-dia.feriado {
+  background: #fef9f0;
+  border-color: #fde68a;
+  cursor: default;
+  opacity: .85;
+}
+.cal-feriado-nome {
+  font-size: .58rem;
+  color: #b45309;
+  font-weight: 700;
+  margin-top: 2px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.cal-dia {
+  background: white;
+  border-radius: 10px;
+  min-height: 80px;
+  padding: 7px 8px 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  border: 1.5px solid #f0f0f0;
+  cursor: default;
+  transition: border-color .12s;
+  position: relative;
+}
+.cal-dia:hover { border-color: #86efac; }
+.cal-dia.hoje { border-color: var(--verde); border-width: 2px; }
+.cal-dia.outro-mes { background: #fafafa; opacity: .55; }
+.cal-dia-num {
+  font-size: .75rem;
+  font-weight: 800;
+  color: #374151;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cal-hoje-badge {
+  background: var(--verde);
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .7rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.cal-evento {
+  border-radius: 6px;
+  padding: 5px 7px;
+  cursor: default;
+  transition: transform .18s ease, box-shadow .18s ease;
+  margin-bottom: 4px;
+  line-height: 1.45;
+  cursor: default;
+  border-left: 3px solid transparent;
+}
+.cal-evento-nome {
+  font-size: .71rem;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 2px;
+  line-height: 1.35;
+}
+.cal-evento-obs {
+  font-size: .65rem;
+  font-weight: 500;
+  display: block;
+  margin: 2px 0 3px;
+  opacity: .75;
+  line-height: 1.4;
+  font-style: italic;
+}
+.cal-evento-meta {
+  font-size: .65rem;
+  font-weight: 600;
+  opacity: .85;
+  display: block;
+  margin-top: 2px;
+}
+.cal-evento.inicio   { background: #f0fdf4; border-left-color: #16a34a; color: #14532d; }
+.cal-evento.execucao { background: #eff6ff; border-left-color: #2563eb; color: #1e3a8a; }
+.cal-evento.fim      { background: #fff1f2; border-left-color: #e11d48; color: #881337; }
+.cal-evento:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 14px rgba(0,0,0,.12), 0 2px 4px rgba(0,0,0,.08);
+}
+.cal-evento.inicio:hover   { box-shadow: 0 6px 14px rgba(22,163,74,.18),  0 2px 4px rgba(22,163,74,.1); }
+.cal-evento.execucao:hover { box-shadow: 0 6px 14px rgba(37,99,235,.18),  0 2px 4px rgba(37,99,235,.1); }
+.cal-evento.fim:hover      { box-shadow: 0 6px 14px rgba(225,29,72,.18),  0 2px 4px rgba(225,29,72,.1); }
+.cal-evento-badge {
+  display: inline-block;
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.cal-evento-badge.badge-inicio   { background: #16a34a; color: #fff; }
+.cal-evento-badge.badge-execucao { background: #2563eb; color: #fff; }
+.cal-evento-badge.badge-fim      { background: #e11d48; color: #fff; }
+
+/* Popup detalhe do dia */
+#cal-popup {
+  display: none;
+  position: fixed;
+  z-index: 9998;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  width: 340px;
+  max-height: 480px;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+}
+#cal-popup.aberto { display: flex; }
+.cp-header {
+  background: var(--verde-escuro);
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.cp-header-titulo { font-size: .85rem; font-weight: 800; }
+.cp-fechar { background: none; border: none; color: white; font-size: 1rem; cursor: pointer; }
+.cp-corpo { overflow-y: auto; padding: 12px 16px 16px; }
+.cp-secao-titulo {
+  font-size: .65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin: 10px 0 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.cp-secao-titulo.inicio   { background: #dcfce7; color: #166534; }
+.cp-secao-titulo.execucao { background: #dbeafe; color: #1e40af; }
+.cp-secao-titulo.fim      { background: #fee2e2; color: #991b1b; }
+.cp-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: .77rem;
+}
+.cp-item:last-child { border-bottom: none; }
+.cp-item-nome { font-weight: 600; color: #111827; flex: 1; line-height: 1.4; }
+.cp-item-analista { font-size: .67rem; color: #9ca3af; }
+.cp-vazio { color: #9ca3af; font-size: .8rem; text-align: center; padding: 16px 0; }
+
+.rel-card-resumo {
+  background: white;
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: var(--sombra-card);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-left: 5px solid var(--verde);
+}
+.rel-card-resumo.exec    { border-left-color: var(--ativa); }
+.rel-card-resumo.aguard  { border-left-color: var(--fila); }
+.rel-card-resumo.par     { border-left-color: var(--paralisada); }
+.rel-card-resumo .rc-num { font-size: 2rem; font-weight: 900; line-height: 1; }
+.rel-card-resumo .rc-label { font-size: .7rem; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
+.rel-analista-bloco { margin-bottom: 28px; }
+.rel-analista-header {
+  background: linear-gradient(135deg, var(--verde-escuro), var(--verde));
+  color: white;
+  padding: 12px 18px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rel-analista-header strong { font-size: .95rem; font-weight: 800; }
+.rel-analista-header .rel-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.rel-badge {
+  font-size: .68rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: rgba(255,255,255,.2);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--sombra-card);
+  font-size: .8rem;
+  margin-bottom: 20px;
+}
+thead { background: linear-gradient(135deg, var(--verde-escuro), var(--verde)); color: white; }
+thead th { padding: 11px 15px; text-align: left; font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .4px; }
+tbody tr { border-bottom: 1px solid #f0f0f0; }
+tbody tr:hover { background: #f5fdf8; }
+tbody td { padding: 10px 15px; vertical-align: top; }
+
+.status-pill {
+  display: inline-block; padding: 3px 10px;
+  border-radius: 99px; font-size: .68rem; font-weight: 800;
+}
+.status-pill.ativa      { background: var(--ativa-bg);      color: #166534; }
+.status-pill.fila       { background: var(--fila-bg);       color: #92400e; }
+.status-pill.bloqueada  { background: var(--bloqueada-bg);  color: #1d4ed8; }
+.status-pill.atrasado   { background: #fde68a;              color: #78350f; border: 1px solid #f59e0b; }
+.status-pill.paralisada { background: var(--paralisada-bg); color: #991b1b; }
+.status-pill.concluida  { background: var(--concluida-bg);  color: var(--concluida); }
+
+/* ── ABA ANALISTAS ── */
+.lista-analistas { display: grid; gap: 12px; }
+.card-cfg {
+  background: white;
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: var(--sombra-card);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid rgba(255,255,255,.8);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.card-cfg:hover { transform: translateY(-2px); box-shadow: var(--sombra-hover); }
+.avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--verde);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; font-weight: 900; flex-shrink: 0;
+  box-shadow: 0 3px 8px rgba(0,100,50,.3);
+}
+.card-cfg .info { flex: 1; }
+.card-cfg .info strong { font-size: .9rem; display: block; font-weight: 800; }
+.card-cfg .info small  { color: #6b7280; font-size: .76rem; font-weight: 500; margin-top: 2px; display: block; }
+
+/* ── ABA ROTINAS GLOBAL ── */
+.rotinas-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+.rotinas-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--sombra-card);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.8);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.rotinas-card:hover { transform: translateY(-3px); box-shadow: var(--sombra-hover); }
+.rotinas-card-header {
+  background: var(--verde);
+  color: white;
+  padding: 14px 20px;
+  position: relative;
+}
+.rotinas-card-header-nome {
+  font-size: 1rem;
+  font-weight: 800;
+  position: relative;
+}
+.rotinas-card-header-cargo {
+  font-size: .76rem;
+  opacity: .78;
+  margin-top: 2px;
+  font-weight: 500;
+  position: relative;
+}
+.rotinas-card-body { padding: 0; }
+
+/* Linha de rotina */
+.rotina-linha {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0f4f2;
+  transition: background .12s;
+}
+.rotina-linha:last-child { border-bottom: none; }
+.rotina-linha:hover { background: #f8fdf9; }
+.rotina-linha-freq {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.rotina-linha-corpo { flex: 1; min-width: 0; }
+.rotina-linha-desc {
+  font-size: .88rem;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.55;
+}
+.rotina-linha-extra {
+  font-size: .75rem;
+  color: #9ca3af;
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rotina-linha-acoes {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  padding-top: 2px;
+}
+.rotinas-card-vazio {
+  padding: 28px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: .86rem;
+  font-weight: 500;
+}
+
+@media print {
+  .nav-wrapper, .barra-acoes, .tarefa-acoes, .btn,
+  .rotina-acoes, .card-analista-footer { display: none !important; }
+  body { background: white; }
+  .card-analista, table, .rotinas-card { box-shadow: none !important; border: 1px solid #ccc !important; transform: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">PORTAL SOP-CE GOVERNO DO ESTADO DO CEARÁ SISTEMA DE ADITIVOS DE OBRAS</div>
+
+<header class="sop-header">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="sop-logo"><span>SOP-CE</span></div>
+    <div>
+      <div class="sop-title-main">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
+      <div class="sop-title-sub">Governo do Estado do Ceará - Secretaria das Cidades</div>
+    </div>
+  </div>
+  <div class="sop-header-right">
+    <strong>GECOPE - Gerência de Controle de Aditivos</strong>
+    <div class="sop-title-sub">Painel de Distribuição de Tarefas . Análise de Dados</div>
+    <div class="sop-title-sub" id="data-hora"></div>
+  </div>
+</header>
+
+<section class="panel-subheader">
+  <div>
+    <div class="panel-subheader-title">Painel de Distribuição de Tarefas</div>
+    <div class="panel-subheader-subtitle">Gerencie tarefas, rotinas e o cronograma da equipe.</div>
+  </div>
+  <div class="panel-tag"><span class="panel-tag-dot"></span><span>Dados consolidados uso interno SOP / GECOPE</span>
+  </div>
+</section>
+
+<main>
+
+<div class="nav-wrapper">
+  <button class="btn-back-minimal" onclick="window.location.href='index.html'">
+    <i class="bi bi-arrow-left"></i>
+    <span>Painel Principal</span>
+  </button>
+  <nav>
+    <button onclick="mostrarAba('analistas',this)"><i class="bi bi-people-fill"></i> Analistas</button>
+    <button onclick="mostrarAba('concluidas',this)" id="btn-aba-concluidas"><i class="bi bi-check2-circle"></i> Concluídas</button>
+    <button onclick="mostrarAba('relatorio',this)"><i class="bi bi-calendar3"></i> Cronograma</button>
+    <button class="ativo" onclick="mostrarAba('painel',this)"><i class="bi bi-clipboard-data"></i> Painel Geral</button>
+    <button onclick="window.location.href='index.html?pane=pane-reuniao'"><i class="bi bi-file-earmark-text"></i> Processos</button>
+    <button onclick="mostrarAba('rotinas',this)"><i class="bi bi-arrow-repeat"></i> Rotinas</button>
+  </nav>
+</div>
+
+<!-- ══════════════════ ABA PAINEL ══════════════════ -->
+<div id="aba-painel">
+  <div class="resumo" id="cards-resumo"></div>
+  <div class="barra-acoes">
+    <div class="filtro-wrap">
+      <i class="bi bi-person-fill" aria-hidden="true"></i>
+      <select id="filtro-analista" onchange="renderPainel()">
+        <option value="">Todos os analistas</option>
+      </select>
+    </div>
+    <div class="filtro-wrap">
+      <i class="bi bi-funnel-fill" aria-hidden="true"></i>
+      <select id="filtro-status" onchange="renderPainel()">
+        <option value="">Todos os status</option>
+        <option value="ativa">EM EXECUÇÃO</option>
+        <option value="fila">EM FILA</option>
+        <option value="bloqueada">AGUARDANDO</option>
+        <option value="paralisada">PARALISADA</option>
+        <option value="concluida">CONCLUÍDA</option>
+      </select>
+    </div>
+    <div class="filtro-wrap">
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="text" id="filtro-busca" placeholder="Buscar processo ou descrição…" oninput="renderPainel()">
+    </div>
+    <button class="btn btn-primario" onclick="abrirModalTarefa()">
+      <i class="bi bi-plus-lg" aria-hidden="true"></i> Nova Tarefa
+    </button>
+  </div>
+  <div class="grid-analistas" id="grid-analistas"></div>
+</div>
+
+<!-- ══════════════════ ABA ROTINAS ══════════════════ -->
+<div id="aba-rotinas">
+  <div class="barra-acoes">
+    <button class="btn btn-roxo" onclick="abrirModalRotina()"><i class="bi bi-plus-lg"></i> Nova Rotina</button>
+    <div class="filtro-wrap">
+      <i class="bi bi-person-fill"></i>
+      <select id="filtro-rotina-analista" onchange="renderRotinasGlobal()">
+        <option value="">Todos os analistas</option>
+      </select>
+    </div>
+    <div class="filtro-wrap">
+      <i class="bi bi-funnel-fill"></i>
+      <select id="filtro-rotina-freq" onchange="renderRotinasGlobal()">
+        <option value="">Todas as frequências</option>
+        <option value="diaria">Diária</option>
+        <option value="semanal">Semanal</option>
+        <option value="mensal">Mensal</option>
+        <option value="eventual">Eventual</option>
+      </select>
+    </div>
+    <button class="btn btn-cinza" onclick="window.print()"><i class="bi bi-printer-fill"></i> Imprimir</button>
+  </div>
+
+  <div style="background:white;border-radius:10px;padding:14px 20px;margin-bottom:16px;box-shadow:var(--sombra-card);border-left:5px solid #7c3aed">
+    <strong style="color:#5b21b6;font-size:.9rem"><i class="bi bi-info-circle-fill"></i> O que são as Rotinas?</strong>
+    <p style="font-size:.8rem;color:#6b7280;margin-top:4px">
+      Registro das atividades <em>regulares</em> que cada servidor executa — independente dos processos em tramitação.
+    </p>
+  </div>
+
+  <div class="rotinas-grid" id="rotinas-global"></div>
+</div>
+
+<!-- ══════════════════ ABA CONCLUÍDAS ══════════════════ -->
+<div id="aba-concluidas">
+  <div class="conc-barra">
+    <i class="bi bi-check2-circle" style="font-size:1.4rem;color:var(--slate-500)"></i>
+    <div style="flex:1">
+      <strong style="font-size:.95rem;color:#374151">Histórico de Tarefas Concluídas</strong>
+      <p style="font-size:.78rem;color:#6b7280;margin-top:2px">Tarefas finalizadas ficam aqui, fora do painel principal.</p>
+    </div>
+    <select id="filtro-conc-analista" onchange="renderConcluidas()" style="border:1px solid var(--borda);border-radius:var(--radius-sm);padding:7px 12px;font-size:.8rem;font-family:'Montserrat',sans-serif;background:white">
+      <option value="">Todos os analistas</option>
+    </select>
+    <input type="text" id="filtro-conc-busca" placeholder="Buscar…" oninput="renderConcluidas()"
+      style="border:1px solid var(--borda);border-radius:var(--radius-sm);padding:7px 12px;font-size:.8rem;font-family:'Montserrat',sans-serif;min-width:180px">
+    <span id="conc-total" style="font-size:.82rem;color:#6b7280;font-weight:700;white-space:nowrap"></span>
+  </div>
+  <div class="conc-grid" id="conc-grid"></div>
+</div>
+
+<!-- ══════════════════ ABA RELATÓRIO ══════════════════ -->
+<div id="aba-relatorio">
+
+  <!-- Inputs ocultos para compatibilidade com renderRelatorio() -->
+  <input type="hidden" id="rel-data-inicio">
+  <input type="hidden" id="rel-data-fim">
+  <select id="rel-filtro-status" style="display:none">
+    <option value="">Todos os status</option>
+    <option value="ativa">EM EXECUÇÃO</option>
+    <option value="fila">EM FILA</option>
+    <option value="bloqueada">AGUARDANDO</option>
+  </select>
+
+  <!-- Vista Lista (oculta, mantida para compatibilidade) -->
+  <div id="rel-view-lista" style="display:none">
+    <div id="rel-cabecalho-emissao"></div>
+    <div id="rel-cards-resumo" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px"></div>
+    <div id="tabela-relatorio"></div>
+  </div>
+
+  <!-- Vista Calendário -->
+  <div id="rel-view-calendario">
+    <div class="cal-nav">
+      <!-- Esquerda: seta anterior -->
+      <div class="cal-nav-esquerda">
+        <button class="cal-nav-btn" onclick="calNavMes(-1)">‹</button>
+      </div>
+      <!-- Centro: título do mês -->
+      <div class="cal-nav-centro">
+        <div class="cal-mes-titulo" id="cal-titulo-mes"></div>
+      </div>
+      <!-- Direita: seta próximo + filtro analista -->
+      <div class="cal-nav-direita">
+        <button class="cal-nav-btn" onclick="calNavMes(+1)">›</button>
+        <div style="width:1px;height:28px;background:#e5e7eb;margin:0 4px"></div>
+        <span class="cal-filtro-label"><i class="bi bi-person-fill"></i> Analista</span>
+        <select id="rel-filtro-analista" class="cal-filtro-select" onchange="renderCalendario()">
+          <option value="">Todos os analistas</option>
+        </select>
+      </div>
+    </div>
+    <!-- Barra de filtro de período -->
+    <div id="cal-filtro-periodo" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;background:#f8f9fb;border-bottom:1px solid #e5e7eb;border-top:1px solid #e5e7eb;">
+      <span style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap"><i class="bi bi-calendar3"></i> Período</span>
+      <button class="cal-periodo-btn" onclick="calPeriodoPreset('semana')">Esta semana</button>
+      <button class="cal-periodo-btn" onclick="calPeriodoPreset('proxima')">Próx. semana</button>
+      <button class="cal-periodo-btn" onclick="calPeriodoPreset('15d')">Próx. 15 dias</button>
+      <button class="cal-periodo-btn" onclick="calPeriodoPreset('mes')">Mês completo</button>
+      <div style="width:1px;height:22px;background:#d1d5db;margin:0 4px"></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:.72rem;font-weight:600;color:#6b7280;white-space:nowrap">De</label>
+        <input type="date" id="cal-p-ini" class="cal-periodo-input" oninput="calPeriodoCustom()">
+        <label style="font-size:.72rem;font-weight:600;color:#6b7280;white-space:nowrap">até</label>
+        <input type="date" id="cal-p-fim" class="cal-periodo-input" oninput="calPeriodoCustom()">
+      </div>
+      <button class="cal-periodo-btn cal-periodo-limpar" onclick="calPeriodoLimpar()" id="cal-limpar-btn" style="display:none"><i class="bi bi-x-lg"></i> Limpar filtro</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+</div>
+
+<!-- Popup detalhe do dia -->
+<div id="cal-popup">
+  <div class="cp-header">
+    <span class="cp-header-titulo" id="cp-titulo"></span>
+    <button class="cp-fechar" onclick="fecharCalPopup()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="cp-corpo" id="cp-corpo"></div>
+</div>
+
+<!-- ══════════════════ ABA ANALISTAS ══════════════════ -->
+<div id="aba-analistas">
+  <div class="barra-acoes">
+    <button class="btn btn-primario" onclick="abrirModalAnalista()"><i class="bi bi-plus-lg"></i> Adicionar Analista</button>
+  </div>
+  <div class="lista-analistas" id="lista-analistas"></div>
+</div>
+
+</main>
+
+<!-- ══════ MODAL TAREFA ══════ -->
+<div class="overlay" id="overlay-tarefa">
+  <div class="cron-modal">
+    <div class="cron-modal-header">
+      <i class="bi bi-file-earmark-text" style="font-size:1.3rem"></i>
+      <h2 id="modal-titulo-tarefa">Nova Tarefa</h2>
+    </div>
+    <input type="hidden" id="tarefa-id">
+
+    <div class="campo">
+      <label>Analista Responsável *</label>
+      <select id="t-analista"></select>
+    </div>
+    <div class="campo">
+      <label>Tipo de Tarefa *</label>
+      <select id="t-setor" onchange="toggleProcesso()">
+        <option value="GECOPE">GECOPE – Análise de Aditivo / Replanilhamento</option>
+        <option value="EXTERNO">Outro Setor (requisição DIFOR / externo)</option>
+      </select>
+    </div>
+    <div class="campo" id="campo-processo">
+      <label>Nº do Processo (SUITE)</label>
+      <input type="text" id="t-processo" placeholder="43022.000000/2026-00" maxlength="25" oninput="mascaraProcesso(this)">
+    </div>
+    <div class="campo" id="campo-setor-ext" style="display:none">
+      <label>Setor Requisitante</label>
+      <input type="text" id="t-setor-nome" placeholder="Ex.: DIFOR, GCONT, Jurídico…">
+    </div>
+    <div class="campo">
+      <label>Descrição da Tarefa *</label>
+      <input type="text" id="t-descricao" placeholder="Ex.: Análise replanilhamento – Contrato nº 001/2024">
+    </div>
+    <div class="grid-2">
+      <div class="campo">
+        <label>Data de Início</label>
+        <input type="date" id="t-inicio">
+      </div>
+      <div class="campo">
+        <label>Prazo / Data Limite</label>
+        <input type="date" id="t-prazo" onchange="onPrazoChange()">
+      </div>
+    </div>
+    <!-- Campo de justificativa de aditamento de prazo (visível só ao alterar prazo em edição) -->
+    <div class="campo" id="campo-aditamento" style="display:none">
+      <div class="campo-justificativa-box" style="border-color:#93c5fd;background:#eff6ff">
+        <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#1e40af;text-transform:uppercase;letter-spacing:.4px">
+          <i class="bi bi-calendar3"></i> Motivo do Aditamento de Prazo *
+        </label>
+        <textarea id="t-aditamento"
+                  placeholder="Descreva o motivo da alteração do prazo. Ex.: Aguardando documentação complementar do contratado."
+                  style="width:100%;border:1px solid #93c5fd;border-radius:8px;padding:9px 12px;font-size:.84rem;font-family:'Montserrat',sans-serif;background:white;resize:vertical;min-height:60px;transition:border-color .15s"
+        ></textarea>
+        <div style="font-size:.72rem;color:#1e40af;margin-top:4px;font-weight:600"><i class="bi bi-exclamation-triangle-fill"></i> A justificativa do aditamento será registrada no histórico com data e hora.</div>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Status *</label>
+      <select id="t-status" onchange="onStatusChange()">
+        <option value="ativa">EM EXECUÇÃO – Em andamento</option>
+        <option value="fila">EM FILA – Ainda não iniciada</option>
+        <option value="bloqueada">AGUARDANDO – Retornou ao fiscal</option>
+        <option value="paralisada">PARALISADA – Iniciada, mas suspensa por algum motivo</option>
+        <option value="concluida">CONCLUÍDA</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Prioridade</label>
+      <select id="t-prioridade">
+        <option value="normal">Normal</option>
+        <option value="alta">Alta</option>
+        <option value="urgente">Urgente</option>
+      </select>
+    </div>
+    <div class="campo" id="campo-obs">
+      <label id="label-obs">Observações</label>
+      <div class="fmt-barra" id="fmt-barra-obs">
+        <button type="button" class="fmt-btn" id="fmt-bold"    onclick="fmtObs('bold')"          title="Negrito"><b>N</b></button>
+        <button type="button" class="fmt-btn" id="fmt-italic"  onclick="fmtObs('italic')"        title="Itálico"><i style="font-style:italic">I</i></button>
+        <div class="fmt-sep"></div>
+        <button type="button" class="fmt-btn" id="fmt-left"    onclick="fmtObs('justifyLeft')"   title="Esquerda"   style="font-size:.7rem;width:36px">Esq</button>
+        <button type="button" class="fmt-btn" id="fmt-center"  onclick="fmtObs('justifyCenter')" title="Centralizar" style="font-size:.7rem;width:36px">Cen</button>
+        <button type="button" class="fmt-btn" id="fmt-right"   onclick="fmtObs('justifyRight')"  title="Direita"    style="font-size:.7rem;width:36px">Dir</button>
+        <button type="button" class="fmt-btn" id="fmt-justify" onclick="fmtObs('justifyFull')"   title="Justificar" style="font-size:.7rem;width:36px">Just</button>
+      </div>
+      <div id="t-obs"
+           class="campo-rich"
+           contenteditable="true"
+           data-placeholder="Informações adicionais sobre a tarefa."
+           oninput="atualizarFmtBtns()"
+           onkeyup="atualizarFmtBtns()"
+           onmouseup="atualizarFmtBtns()">
+      </div>
+    </div>
+
+    <!-- Campo separado: justificativa de paralisação (visível só quando paralisada) -->
+    <div class="campo" id="campo-justificativa" style="display:none">
+      <div class="campo-justificativa-box">
+        <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#991b1b;text-transform:uppercase;letter-spacing:.4px">
+          <i class="bi bi-pause-fill"></i> Justificativa da Paralisação *
+        </label>
+        <textarea id="t-justificativa"
+                  placeholder="Descreva o motivo da paralisação. Ex.: Analista requisitado pela DIFOR para levantamento de quantitativos até 18/07/2026."
+                  style="width:100%;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;font-size:.84rem;font-family:'Montserrat',sans-serif;background:white;resize:vertical;min-height:70px;transition:border-color .15s"
+        ></textarea>
+        <div style="font-size:.72rem;color:#991b1b;margin-top:4px;font-weight:600"><i class="bi bi-exclamation-triangle-fill"></i> Esta justificativa será registrada no histórico da tarefa com data e hora.</div>
+      </div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn btn-cinza" onclick="fecharModal('overlay-tarefa')">Cancelar</button>
+      <button class="btn btn-primario" onclick="salvarTarefa()"><i class="bi bi-floppy-fill"></i> Salvar Tarefa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ POPUP HISTÓRICO ══════ -->
+<div id="modal-historico">
+  <div class="mh-cabecalho">
+    <div class="mh-titulo-wrap">
+      <div class="mh-label">Histórico da Atividade</div>
+      <div class="mh-titulo" id="mh-titulo-tarefa"></div>
+    </div>
+    <button class="mh-fechar" onclick="fecharHistorico()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mh-resumo" id="mh-resumo"></div>
+  <div class="mh-corpo" id="mh-corpo"></div>
+</div>
+
+<!-- ══════ MODAL REVISÃO DE DATAS ══════ -->
+<div class="overlay" id="overlay-revisar-datas">
+  <div class="cron-modal" style="max-width:460px">
+    <div class="cron-modal-header" style="background:var(--sop-orange)">
+      <i class="bi bi-exclamation-triangle-fill" style="font-size:1.2rem"></i> Revisão de Datas — Colocar em Execução
+    </div>
+    <div class="cron-modal-body">
+      <div class="rev-aviso" id="rev-aviso-texto"></div>
+      <div class="rev-grid">
+        <div class="campo">
+          <label>Início</label>
+          <input type="date" id="rev-inicio">
+          <div id="rev-aviso-inicio" style="font-size:.72rem;margin-top:3px;color:#dc2626;display:none"><i class="bi bi-exclamation-triangle-fill"></i> Data já passou</div>
+        </div>
+        <div class="campo">
+          <label>Prazo / Fim *</label>
+          <input type="date" id="rev-prazo">
+          <div id="rev-aviso-prazo" style="font-size:.72rem;margin-top:3px;color:#dc2626;display:none"><i class="bi bi-exclamation-triangle-fill"></i> Data já passou</div>
+        </div>
+      </div>
+      <div class="campo" id="rev-campo-motivo" style="display:none">
+        <div class="campo-justificativa-box" style="border-color:#93c5fd;background:#eff6ff">
+          <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#1e40af;text-transform:uppercase;letter-spacing:.4px">
+            <i class="bi bi-calendar3"></i> Motivo do Novo Prazo *
+          </label>
+          <textarea id="rev-motivo" placeholder="Ex.: Atraso em outras atividades prioritárias atrasou o início desta."
+            style="width:100%;border:1px solid #93c5fd;border-radius:8px;padding:9px 12px;font-size:.84rem;font-family:'Montserrat',sans-serif;background:white;resize:vertical;min-height:60px"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-rodape" style="gap:8px">
+      <button class="btn btn-cinza" onclick="fecharModal('overlay-revisar-datas')">Cancelar</button>
+      <button class="btn" style="background:#f59e0b;color:#fff;font-weight:700" onclick="ativarSemAlterarDatas()"><i class="bi bi-play-fill"></i> Ativar sem alterar datas</button>
+      <button class="btn btn-primario" onclick="ativarComNovasDatas()"><i class="bi bi-check-lg"></i> Confirmar e Ativar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL ROTINA ══════ -->
+<div class="overlay" id="overlay-rotina">
+  <div class="cron-modal">
+    <div class="cron-modal-header">
+      <i class="bi bi-arrow-repeat" style="font-size:1.3rem"></i>
+      <h2 id="modal-titulo-rotina">Nova Rotina</h2>
+    </div>
+    <input type="hidden" id="rotina-id">
+
+    <div class="campo">
+      <label>Analista *</label>
+      <select id="r-analista"></select>
+    </div>
+    <div class="campo">
+      <label>Frequência *</label>
+      <select id="r-freq">
+        <option value="diaria">Diária</option>
+        <option value="semanal">Semanal</option>
+        <option value="mensal">Mensal</option>
+        <option value="eventual">Eventual / Demanda</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Descrição da Atividade Rotineira *</label>
+      <textarea id="r-desc" placeholder="Ex.: Verificar novos processos cadastrados no SUITE e distribuir para análise." style="min-height:90px"></textarea>
+    </div>
+    <div class="campo">
+      <label>Setor / Contexto</label>
+      <select id="r-setor">
+        <option value="GECOPE">GECOPE – Atividade interna</option>
+        <option value="EXTERNO">Atividade externa / intersetorial</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Observação adicional</label>
+      <input type="text" id="r-obs" placeholder="Ex.: Prazo toda sexta-feira às 17h">
+    </div>
+    <div class="modal-rodape">
+      <button class="btn btn-cinza" onclick="fecharModal('overlay-rotina')">Cancelar</button>
+      <button class="btn btn-roxo" onclick="salvarRotina()"><i class="bi bi-floppy-fill"></i> Salvar Rotina</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL ANALISTA ══════ -->
+<div class="overlay" id="overlay-analista">
+  <div class="cron-modal">
+    <div class="cron-modal-header">
+      <i class="bi bi-person-fill" style="font-size:1.3rem"></i>
+      <h2>Cadastro de Analista</h2>
+    </div>
+    <input type="hidden" id="analista-id">
+    <div class="campo">
+      <label>Nome *</label>
+      <input type="text" id="a-nome">
+    </div>
+    <div class="grid-2">
+      <div class="campo">
+        <label>Matrícula</label>
+        <input type="text" id="a-matricula">
+      </div>
+      <div class="campo">
+        <label>Cargo / Função</label>
+        <input type="text" id="a-cargo" placeholder="Ex.: Engenheiro Civil">
+      </div>
+    </div>
+    <div class="modal-rodape">
+      <button class="btn btn-cinza" onclick="fecharModal('overlay-analista')">Cancelar</button>
+      <button class="btn btn-primario" onclick="salvarAnalista()"><i class="bi bi-floppy-fill"></i> Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// ESTADO
+// ══════════════════════════════════════════════════════════
+// Os dados vivem no Supabase (tabelas cronograma_analistas/tarefas/rotinas).
+// Os arrays abaixo começam vazios e são preenchidos por iniciarApp() — ver
+// bloco INIT no fim do arquivo. O localStorage (gecope_*_v2) só é lido uma
+// única vez, como origem de migração, se o banco ainda estiver vazio.
+let analistas = [];
+let tarefas   = [];
+let rotinas   = [];
+let editandoTarefa = null;
+let editandoRotina = null;
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+// ── Conversão entre o formato usado no app (camelCase) e as colunas do Supabase (snake_case) ──
+function analistaFromRow(row) { return { id: row.id, nome: row.nome, matricula: row.matricula || '', cargo: row.cargo || '' }; }
+function analistaToRow(a)     { return { id: a.id, nome: a.nome, matricula: a.matricula || '', cargo: a.cargo || '' }; }
+
+function tarefaFromRow(row) {
+  return {
+    id: row.id, analistaId: row.analista_id, setor: row.setor, processo: row.processo,
+    descricao: row.descricao, setorNome: row.setor_nome, inicio: row.inicio || '', prazo: row.prazo || '',
+    status: row.status, obs: row.obs || '', prioridade: row.prioridade, ordem: row.ordem,
+    historico: row.historico || [], criadoEm: row.criado_em, atualizadoEm: row.atualizado_em,
+    origemSync: !!row.origem_sync, statusProcesso: row.status_processo || '',
+  };
+}
+function tarefaToRow(t) {
+  return {
+    id: t.id, analista_id: t.analistaId, setor: t.setor, processo: t.processo,
+    descricao: t.descricao, setor_nome: t.setorNome, inicio: t.inicio || null, prazo: t.prazo || null,
+    status: t.status, obs: t.obs || '', prioridade: t.prioridade, ordem: t.ordem,
+    historico: t.historico || [], criado_em: t.criadoEm, atualizado_em: t.atualizadoEm,
+    origem_sync: !!t.origemSync, status_processo: t.statusProcesso || null,
+  };
+}
+function rotinaFromRow(row) { return { id: row.id, analistaId: row.analista_id, freq: row.freq, desc: row.descricao, setor: row.setor, obs: row.obs || '' }; }
+function rotinaToRow(r)     { return { id: r.id, analista_id: r.analistaId, freq: r.freq, descricao: r.desc, setor: r.setor, obs: r.obs || '' }; }
+
+// ── Persistência no Supabase ──
+// Estratégia: sincronização completa (apaga tudo e reinsere o estado atual em
+// memória) a cada salvarDados(). Simples e segura para o volume de dados desta
+// ferramenta (uso interno de uma equipe pequena). As chamadas a salvarDados()
+// continuam disparadas do mesmo jeito em todo o app (sem esperar o resultado);
+// a fila abaixo garante que as gravações não se sobreponham.
+let _salvarDadosChain = Promise.resolve();
+function salvarDados() {
+  _salvarDadosChain = _salvarDadosChain
+    .then(() => _persistirNoSupabase())
+    .catch(err => console.error('[Cronograma/Supabase] Erro ao salvar:', err));
+  return _salvarDadosChain;
+}
+
+async function _persistirNoSupabase() {
+  if (!window.sbClient) { console.warn('[Cronograma] Supabase indisponível — alteração não foi salva no banco.'); return; }
+  await sbClient.from('cronograma_tarefas').delete().not('id', 'is', null);
+  await sbClient.from('cronograma_rotinas').delete().not('id', 'is', null);
+  await sbClient.from('cronograma_analistas').delete().not('id', 'is', null);
+  if (analistas.length) {
+    const { error } = await sbClient.from('cronograma_analistas').insert(analistas.map(analistaToRow));
+    if (error) console.error('[Cronograma/Supabase] Erro ao salvar analistas:', error);
+  }
+  if (tarefas.length) {
+    const { error } = await sbClient.from('cronograma_tarefas').insert(tarefas.map(tarefaToRow));
+    if (error) console.error('[Cronograma/Supabase] Erro ao salvar tarefas:', error);
+  }
+  if (rotinas.length) {
+    const { error } = await sbClient.from('cronograma_rotinas').insert(rotinas.map(rotinaToRow));
+    if (error) console.error('[Cronograma/Supabase] Erro ao salvar rotinas:', error);
+  }
+}
+
+async function carregarDadosSupabase() {
+  const [an, tf, rt] = await Promise.all([
+    sbClient.from('cronograma_analistas').select('*').order('created_at', { ascending: true }),
+    sbClient.from('cronograma_tarefas').select('*'),
+    sbClient.from('cronograma_rotinas').select('*'),
+  ]);
+  if (an.error || tf.error || rt.error) {
+    console.error('[Cronograma/Supabase] Erro ao carregar dados:', an.error || tf.error || rt.error);
+    return null;
+  }
+  return {
+    analistas: (an.data || []).map(analistaFromRow),
+    tarefas:   (tf.data || []).map(tarefaFromRow),
+    rotinas:   (rt.data || []).map(rotinaFromRow),
+  };
+}
+
+async function aguardarSupabase(tentativas = 20) {
+  for (let i = 0; i < tentativas; i++) {
+    if (window.sbClient) return true;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════
+// RELÓGIO
+// ══════════════════════════════════════════════════════════
+function atualizarHora() {
+  const n = new Date();
+  const diaSemana = n.toLocaleDateString('pt-BR', {weekday:'long'}).split('-')[0];
+  const diaSemanaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+  const dataFmt = n.toLocaleDateString('pt-BR', {day:'2-digit', month:'long', year:'numeric'});
+  const horaFmt = n.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('data-hora').textContent = `${diaSemanaCap}, ${dataFmt} . ${horaFmt}`;
+}
+setInterval(atualizarHora, 10000);
+atualizarHora();
+
+// ══════════════════════════════════════════════════════════
+// ABAS
+// ══════════════════════════════════════════════════════════
+function mostrarAba(aba, btn) {
+  document.querySelectorAll('.nav-wrapper nav button').forEach(b => b.classList.remove('ativo'));
+  btn.classList.add('ativo');
+  ['painel','rotinas','relatorio','analistas','concluidas'].forEach(a => {
+    document.getElementById('aba-' + a).style.display = a === aba ? (a === 'painel' ? '' : 'block') : 'none';
+  });
+  if (aba === 'painel')     renderPainel();
+  if (aba === 'rotinas')    renderRotinasGlobal();
+  if (aba === 'relatorio')  { renderCalendario(); }
+  if (aba === 'analistas')  renderAnalistas();
+  if (aba === 'concluidas') renderConcluidas();
+}
+
+// ══════════════════════════════════════════════════════════
+// PAINEL
+// ══════════════════════════════════════════════════════════
+function atualizarViews() {
+  renderPainel();
+  if (_relView === 'calendario') renderCalendario();
+}
+
+function renderPainel() {
+  // Preservar acordeões abertos antes de reconstruir o DOM
+  const abertos = new Set(
+    [...document.querySelectorAll('.tarefas-recolhidas-corpo.aberto')].map(el => el.id)
+  );
+
+  popularFiltros('filtro-analista');
+  renderResumo();
+
+  const filtroAn = document.getElementById('filtro-analista').value;
+  const filtroSt = document.getElementById('filtro-status').value;
+  const filtroBu = (document.getElementById('filtro-busca').value || '').toLowerCase();
+
+  const listaAn = filtroAn ? analistas.filter(a => a.id === filtroAn) : analistas;
+  const grid = document.getElementById('grid-analistas');
+  grid.innerHTML = '';
+
+  // (restauração feita no final)
+
+  listaAn.forEach(an => {
+    let tf = tarefas.filter(t => t.analistaId === an.id);
+    if (filtroSt) tf = tf.filter(t => t.status === filtroSt);
+    if (filtroBu) tf = tf.filter(t =>
+      (t.descricao||'').toLowerCase().includes(filtroBu) ||
+      (t.processo||'').toLowerCase().includes(filtroBu)
+    );
+
+    tf.sort((a,b) => {
+      const oa = a.ordem != null ? a.ordem : 9999;
+      const ob = b.ordem != null ? b.ordem : 9999;
+      if (oa !== ob) return oa - ob;
+      const p = {urgente:0,alta:1,normal:2};
+      return (p[a.prioridade]||2) - (p[b.prioridade]||2);
+    });
+
+    const ativas     = tarefas.filter(t=>t.analistaId===an.id&&t.status==='ativa').length;
+    const standby    = tarefas.filter(t=>t.analistaId===an.id&&t.status==='fila').length;
+    const bloqueadas = tarefas.filter(t=>t.analistaId===an.id&&t.status==='bloqueada').length;
+    const paralisada = tarefas.filter(t=>t.analistaId===an.id&&t.status==='paralisada').length;
+    // concluídas vão para a aba própria; rotinas vão para a aba Rotinas
+
+    // Separar ativas das demais (concluídas ficam na aba própria)
+    const tfAtivas  = tf.filter(t => t.status === 'ativa');
+    const tfOutras  = tf.filter(t => t.status !== 'ativa' && t.status !== 'concluida');
+    // Dentro de "Outras tarefas": fila primeiro (ordem de chegada/manual), bloqueada+paralisada no fim
+    const tierOutras = { fila: 0, bloqueada: 1, paralisada: 1 };
+    tfOutras.sort((a, b) => {
+      const ta = tierOutras[a.status] ?? 2, tb = tierOutras[b.status] ?? 2;
+      if (ta !== tb) return ta - tb;
+      const oa = a.ordem != null ? a.ordem : 9999;
+      const ob = b.ordem != null ? b.ordem : 9999;
+      return oa - ob;
+    });
+    const hoje0 = new Date(); hoje0.setHours(0,0,0,0);
+    const nAtrasado = tfOutras.filter(t => t.status==='fila' && t.inicio && new Date(t.inicio+'T00:00:00') < hoje0).length;
+    const nSb  = tfOutras.filter(t => t.status==='fila').length - nAtrasado;
+    const nBlo = tfOutras.filter(t => t.status==='bloqueada').length;
+    const nPar = tfOutras.filter(t => t.status==='paralisada').length;
+
+    // Chips de contagem para o botão recolhido
+    const chipsOutras = [
+      nAtrasado ? `<span class="toggle-chip atrasado">${nAtrasado} atrasada${nAtrasado>1?'s':''}</span>` : '',
+      nSb       ? `<span class="toggle-chip fila">${nSb} em fila</span>` : '',
+      nBlo      ? `<span class="toggle-chip bloqueada">${nBlo} aguardando</span>` : '',
+      nPar      ? `<span class="toggle-chip paralisada">${nPar} paralisada${nPar>1?'s':''}</span>` : '',
+    ].join('');
+
+    const idRecolhido = `recolhido-${an.id}`;
+
+    const card = document.createElement('div');
+    card.className = 'card-analista';
+    card.innerHTML = `
+      <div class="card-analista-header">
+        <div>
+          <h3><i class="bi bi-person-fill"></i> ${an.nome}<span class="analista-sub-inline">· ${an.cargo||'Analista'}${an.matricula?' · Matr. '+an.matricula:''}</span></h3>
+        </div>
+        <div class="badges">
+          ${ativas     ? `<span class="badge ativa">${ativas} em execução</span>` : ''}
+          ${standby    ? `<span class="badge fila">${standby} em fila</span>` : ''}
+          ${bloqueadas ? `<span class="badge bloqueada">${bloqueadas} aguardando</span>` : ''}
+          ${paralisada ? `<span class="badge paralisada">${paralisada} paralisada${paralisada>1?'s':''}</span>` : ''}
+        </div>
+      </div>
+      <div class="card-analista-body">
+        ${tf.length === 0
+          ? '<div class="vazio">Nenhuma tarefa registrada</div>'
+          : tfAtivas.length === 0
+            ? '<div class="vazio" style="font-size:.82rem;padding:12px">Nenhuma tarefa ativa no momento</div>'
+            : tfAtivas.map((t, i) => htmlTarefa(t, i, tfAtivas.length)).join('')
+        }
+        ${tfOutras.length > 0 ? `
+        <div class="tarefas-recolhidas">
+          <button class="tarefas-recolhidas-toggle" onclick="toggleRecolhido('${idRecolhido}', this)">
+            <span style="font-size:.8rem"><i class="bi bi-archive-fill"></i> Outras tarefas</span>
+            <span class="toggle-contagem">${chipsOutras}</span>
+            <span class="toggle-arrow" id="arrow-${idRecolhido}">▼</span>
+          </button>
+          <div class="tarefas-recolhidas-corpo" id="${idRecolhido}">
+            ${tfOutras.map((t, i) => htmlTarefa(t, i, tfOutras.length)).join('')}
+          </div>
+        </div>` : ''}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Restaurar acordeões que estavam abertos antes da re-renderização
+  abertos.forEach(id => {
+    const corpo = document.getElementById(id);
+    const arrow = document.getElementById('arrow-' + id);
+    if (corpo) corpo.classList.add('aberto');
+    if (arrow) arrow.classList.add('aberto');
+  });
+}
+
+function htmlRotinaCompacto(r) {
+  const labels = {diaria:'Diária',semanal:'Semanal',mensal:'Mensal',eventual:'Eventual'};
+  return `
+    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:5px">
+      <span class="rotina-freq ${r.freq}" style="font-size:.62rem">${labels[r.freq]||r.freq}</span>
+      <span style="font-size:.78rem;color:#374151;flex:1">${r.desc}</span>
+    </div>`;
+}
+
+function htmlTarefa(t, pos, total) {
+  const hoje  = new Date(); hoje.setHours(0,0,0,0);
+  const prazo = t.prazo ? new Date(t.prazo+'T00:00:00') : null;
+  const vencido = prazo && prazo < hoje && t.status !== 'concluida';
+  const dias  = prazo ? Math.ceil((prazo - hoje) / 86400000) : null;
+  const prio  = t.prioridade==='urgente'?'<i class="bi bi-fire" style="color:#dc2626"></i> ':t.prioridade==='alta'?'<i class="bi bi-lightning-fill" style="color:#d97706"></i> ':'';
+  const setorLabel = t.setor==='EXTERNO' ? `<i class="bi bi-building"></i> ${t.setorNome||'Ext.'}` : '<i class="bi bi-folder-fill"></i> GECOPE';
+  const posicao = typeof pos === 'number' ? pos + 1 : '–';
+  const prioClasse = t.prioridade==='urgente'?'urgente':t.prioridade==='alta'?'alta':'';
+  const isFirst = pos === 0;
+  const isLast  = typeof total === 'number' && pos === total - 1;
+
+  // Atrasado: aguardando cuja data de início já passou
+  const inicioDate = t.inicio ? new Date(t.inicio+'T00:00:00') : null;
+  const atrasado = t.status === 'fila' && inicioDate && inicioDate < hoje;
+  const statusVisual = atrasado ? 'atrasado' : t.status;
+
+  let prazoHtml = '';
+  if (prazo) {
+    const inicioFmt = inicioDate ? inicioDate.toLocaleDateString('pt-BR') : null;
+    const fimFmt    = prazo.toLocaleDateString('pt-BR');
+    const partes    = [inicioFmt, fimFmt].filter(Boolean).join(' · ');
+    if (t.status==='concluida') {
+      prazoHtml = `<i class="bi bi-check-circle-fill" style="color:#16a34a"></i> ${partes}`;
+    } else if (vencido) {
+      prazoHtml = `<span class="vencido"><i class="bi bi-exclamation-triangle-fill"></i> ${partes} · Vencido</span>`;
+    } else if (dias===0) {
+      prazoHtml = `<span class="vencido"><i class="bi bi-alarm-fill"></i> ${partes} · Vence hoje</span>`;
+    } else if (dias<=3) {
+      prazoHtml = `<span class="vencido"><i class="bi bi-clock-fill"></i> ${partes} · ${dias} dia${dias!==1?'s':''}</span>`;
+    } else {
+      prazoHtml = `<i class="bi bi-calendar3"></i> ${partes} · ${dias} dias`;
+    }
+  }
+
+  // Tarefas sincronizadas com Processos e ativas mostram o status real vindo de lá
+  // (ex.: "EM REANÁLISE") em vez do rótulo genérico "Em Execução".
+  const labelStatusExibido = (t.origemSync && t.status === 'ativa' && t.statusProcesso)
+    ? t.statusProcesso
+    : labelStatus(statusVisual);
+  const tituloSync = t.origemSync ? `Sincronizado automaticamente com o processo ${t.processo}` : '';
+
+  return `
+  <div class="tarefa ${statusVisual}">
+    <div class="tarefa-topo">
+      <span class="tarefa-num ${prioClasse}" title="Posição na fila de execução">${posicao}º</span>
+      <div class="tarefa-titulo">${prio}${t.origemSync?'<i class="bi bi-link-45deg" title="'+tituloSync+'"></i> ':''}${t.descricao||'(sem descrição)'}<button class="btn-hist-info" onclick="abrirHistorico('${t.id}',event)" title="Ver histórico da atividade">?</button></div>
+      <span class="tarefa-status ${statusVisual}" title="${tituloSync}">${labelStatusExibido}${atrasado?' <i class="bi bi-exclamation-triangle-fill"></i>':''}</span>
+    </div>
+    <div class="tarefa-meta">
+      ${t.processo?`<span><i class="bi bi-hash"></i> ${t.processo}</span>`:''}
+      <span>${setorLabel}</span>
+      ${prazoHtml?`<span>${prazoHtml}</span>`:''}
+    </div>
+    ${t.obs?`<div class="tarefa-obs"><span class="obs-icone"><i class="bi bi-chat-left-text-fill"></i></span><span class="obs-conteudo">${t.obs}</span></div>`:''}
+    <div class="tarefa-acoes">
+      <button class="btn-fila" onclick="moverOrdem('${t.id}','up')" ${isFirst?'disabled':''} title="Subir na fila"><i class="bi bi-chevron-up"></i></button>
+      <button class="btn-fila" onclick="moverOrdem('${t.id}','down')" ${isLast?'disabled':''} title="Descer na fila"><i class="bi bi-chevron-down"></i></button>
+      <button class="btn btn-cinza btn-pequeno" onclick="editarTarefa('${t.id}')"><i class="bi bi-pencil-fill"></i></button>
+      ${t.status!=='concluida'&&t.status!=='fila'?`<button class="btn btn-verde btn-pequeno" onclick="concluirTarefa('${t.id}')"><i class="bi bi-check-lg"></i> Concluir</button>`:''}
+      ${t.status==='ativa'?`<button class="btn btn-pequeno" style="border:1.5px solid #d97706;color:#b45309;background:#fff" onclick="mudarStatus('${t.id}','paralisada')"><i class="bi bi-pause-fill"></i> Paralisar</button>`:''}
+      ${t.status==='fila'?`<button class="btn btn-pequeno" style="background:#dcfce7;color:#166534" onclick="ativarTarefa('${t.id}')"><i class="bi bi-play-fill"></i> Iniciar</button>`:''}
+      ${t.status==='paralisada'?`<button class="btn btn-pequeno" style="background:#dcfce7;color:#166534" onclick="ativarTarefa('${t.id}')"><i class="bi bi-play-fill"></i> Retomar</button>`:''}
+      <button class="btn btn-vermelho btn-pequeno" onclick="excluirTarefa('${t.id}')"><i class="bi bi-trash-fill"></i></button>
+    </div>
+  </div>`;
+}
+
+// ── POPUP HISTÓRICO ──
+function abrirHistorico(id, evt) {
+  evt.stopPropagation();
+  const t = tarefas.find(x => x.id === id); if (!t) return;
+  const hist = t.historico || [];
+
+  const tipoEvento = {
+    criada:    'Atividade Criada',
+    paralisada:'Atividade Paralisada',
+    retomada:  'Atividade Retomada',
+    concluida: 'Atividade Concluída',
+    prazo:     'Alteração de Prazo',
+    editada:   'Edição de Dados',
+  };
+
+  document.getElementById('mh-titulo-tarefa').textContent = t.descricao || '(sem descrição)';
+
+  // ── Resumo (parte superior: 4 cells em grid 2x2) ──
+  const analista  = analistas.find(a => a.id === t.analistaId);
+  const inicioFmt = t.inicio ? new Date(t.inicio+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  const prazoFmt  = t.prazo  ? new Date(t.prazo+'T00:00:00').toLocaleDateString('pt-BR')  : '—';
+
+  // Badge de status inline
+  const corStatus = {ativa:'#16a34a', fila:'#d97706', bloqueada:'#2563eb', paralisada:'#dc2626', concluida:'#6b7280', atrasado:'#b45309'};
+  const cor = corStatus[t.status] || '#6b7280';
+  const statusBadge = `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${cor};margin-right:4px;flex-shrink:0"></span>${labelStatus(t.status)}`;
+
+  document.getElementById('mh-resumo').innerHTML = `
+    <div class="mh-resumo-item">
+      <div class="mh-ri-label"><i class="bi bi-person-fill"></i> Analista</div>
+      <div class="mh-ri-valor">${analista ? analista.nome : '—'}</div>
+    </div>
+    <div class="mh-resumo-item">
+      <div class="mh-ri-label"><i class="bi bi-bar-chart-fill"></i> Status</div>
+      <div class="mh-ri-valor">${statusBadge}</div>
+    </div>
+    <div class="mh-resumo-item">
+      <div class="mh-ri-label"><i class="bi bi-play-fill"></i> Início</div>
+      <div class="mh-ri-valor">${inicioFmt}</div>
+    </div>
+    <div class="mh-resumo-item">
+      <div class="mh-ri-label"><i class="bi bi-flag-fill"></i> Prazo / Fim</div>
+      <div class="mh-ri-valor">${prazoFmt}</div>
+    </div>`;
+
+  // ── Linha do tempo (parte inferior) ──
+  const corpo = document.getElementById('mh-corpo');
+  if (!hist.length) {
+    corpo.innerHTML = '<div class="mh-vazio">Nenhum registro no histórico ainda.<br><small>Paralisações, aditamentos e outras ações aparecerão aqui.</small></div>';
+  } else {
+    corpo.innerHTML = hist.map(h => {
+      const dt   = new Date(h.data);
+      const dia  = dt.toLocaleDateString('pt-BR');
+      const hora = dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+      const evento = tipoEvento[h.tipo] || h.tipo;
+
+      // Montar detalhe conforme tipo
+      let detalhe = '';
+      if (h.tipo === 'paralisada' && h.nota) {
+        detalhe = `<div class="mh-lt-detalhe paralisada"><strong>Motivo:</strong> ${h.nota}</div>`;
+      } else if (h.tipo === 'prazo' && h.nota) {
+        // nota: "De X para Y — motivo" ou "De X para Y"
+        const partes = h.nota.split(' — ');
+        const datas  = partes[0]; // "De DD/MM/AAAA para DD/MM/AAAA"
+        const motivo = partes[1] || '';
+        // Extrair prazo final da string "De X para Y"
+        const match = datas.match(/para (.+)$/);
+        const prazoNovo = match ? match[1] : datas;
+        detalhe = `<div class="mh-lt-detalhe prazo">
+          <strong>Fim:</strong> ${prazoNovo}<br>
+          ${motivo ? `<strong>Motivo:</strong> ${motivo}` : `<span style="color:#9ca3af;font-style:italic">Sem justificativa registrada</span>`}
+        </div>`;
+      } else if (h.tipo === 'retomada') {
+        detalhe = `<div class="mh-lt-detalhe retomada">Atividade retomada.</div>`;
+      } else if (h.tipo === 'concluida') {
+        detalhe = `<div class="mh-lt-detalhe" style="border-left-color:#9ca3af">Atividade marcada como concluída.</div>`;
+      } else if (h.nota) {
+        detalhe = `<div class="mh-lt-detalhe">${h.nota}</div>`;
+      }
+
+      return `<div class="mh-linha-tempo">
+        <div class="mh-lt-data">
+          <div class="mh-lt-dia">${dia}</div>
+          <div class="mh-lt-hora">${hora}</div>
+        </div>
+        <div class="mh-lt-bolinha ${h.tipo}"></div>
+        <div class="mh-lt-conteudo">
+          <div class="mh-lt-evento">${evento}</div>
+          ${detalhe}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  // Centralizar na tela
+  const popup = document.getElementById('modal-historico');
+  popup.style.top       = '50%';
+  popup.style.left      = '50%';
+  popup.style.transform = 'translate(-50%, -50%)';
+  popup.classList.add('aberto');
+}
+function fecharHistorico() {
+  document.getElementById('modal-historico').classList.remove('aberto');
+}
+// Fechar ao clicar fora
+document.addEventListener('click', e => {
+  const popup = document.getElementById('modal-historico');
+  if (popup && popup.classList.contains('aberto') && !popup.contains(e.target)) {
+    fecharHistorico();
+  }
+});
+
+function labelStatus(s) {
+  return {ativa:'EM EXECUÇÃO', fila:'EM FILA', bloqueada:'AGUARDANDO', atrasado:'ATRASADO', paralisada:'PARALISADA', concluida:'CONCLUÍDA'}[s]||s;
+}
+
+// ── FORMATAÇÃO RICH TEXT ──
+function fmtObs(cmd) {
+  const el = document.getElementById('t-obs');
+  el.focus();
+  document.execCommand(cmd, false, null);
+  atualizarFmtBtns();
+}
+
+function atualizarFmtBtns() {
+  const map = {
+    'fmt-bold':    'bold',
+    'fmt-italic':  'italic',
+    'fmt-left':    'justifyLeft',
+    'fmt-center':  'justifyCenter',
+    'fmt-right':   'justifyRight',
+    'fmt-justify': 'justifyFull',
+  };
+  Object.entries(map).forEach(([id, cmd]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('ativo', document.queryCommandState(cmd));
+  });
+}
+
+function toggleRecolhido(id, btn) {
+  // Fechar todas as outras seções abertas antes de abrir esta
+  document.querySelectorAll('.tarefas-recolhidas-corpo').forEach(el => {
+    if (el.id !== id && el.classList.contains('aberto')) {
+      el.classList.remove('aberto');
+      const a = document.getElementById('arrow-' + el.id);
+      if (a) a.classList.remove('aberto');
+    }
+  });
+  const corpo = document.getElementById(id);
+  const arrow = document.getElementById('arrow-' + id);
+  const aberto = corpo.classList.toggle('aberto');
+  arrow.classList.toggle('aberto', aberto);
+}
+
+function moverOrdem(id, dir) {
+  const t = tarefas.find(x => x.id === id);
+  if (!t) return;
+  // Todas as tarefas do analista, ordenadas pela ordem atual
+  const anTarefas = tarefas
+    .filter(x => x.analistaId === t.analistaId)
+    .sort((a, b) => (a.ordem != null ? a.ordem : 9999) - (b.ordem != null ? b.ordem : 9999));
+  // Normalizar para sequência 1,2,3... antes de trocar
+  anTarefas.forEach((task, i) => { task.ordem = i + 1; });
+  const idx = anTarefas.findIndex(x => x.id === id);
+  const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= anTarefas.length) return;
+  const swap = anTarefas[swapIdx];
+  [t.ordem, swap.ordem] = [swap.ordem, t.ordem];
+  salvarDados();
+  renderPainel();
+}
+
+// Reage à mudança de status no modal
+function onStatusChange() {
+  const status = document.getElementById('t-status').value;
+  const campoJust = document.getElementById('campo-justificativa');
+  const justEl    = document.getElementById('t-justificativa');
+  const statusAnterior = editandoTarefa ? tarefas.find(x=>x.id===editandoTarefa)?.status : null;
+  const mudando = status === 'paralisada' && statusAnterior !== 'paralisada';
+
+  if (mudando) {
+    campoJust.style.display = '';
+    justEl.focus();
+  } else {
+    campoJust.style.display = 'none';
+    justEl.value = '';
+  }
+
+  // Aviso de datas defasadas ao mudar para Em Execução no modal
+  let avisoEl = document.getElementById('aviso-datas-modal');
+  if (!avisoEl) {
+    avisoEl = document.createElement('div');
+    avisoEl.id = 'aviso-datas-modal';
+    avisoEl.className = 'rev-aviso';
+    avisoEl.style.marginBottom = '10px';
+    campoJust.parentNode.insertBefore(avisoEl, campoJust);
+  }
+  if (status === 'ativa' && statusAnterior && statusAnterior !== 'ativa') {
+    const hoje  = new Date(); hoje.setHours(0,0,0,0);
+    const prazo = document.getElementById('t-prazo').value;
+    const ini   = document.getElementById('t-inicio').value;
+    const prazoVencido  = prazo && new Date(prazo+'T00:00:00') < hoje;
+    const inicioPassado = ini   && new Date(ini+'T00:00:00')   < hoje;
+    if (prazoVencido || inicioPassado) {
+      let msg = '<i class="bi bi-exclamation-triangle-fill"></i> <strong>Atenção:</strong> ';
+      if (prazoVencido  && inicioPassado) msg += 'O início e o prazo desta atividade já passaram.';
+      else if (prazoVencido)              msg += 'O prazo/fim desta atividade já passou.';
+      else                                msg += 'A data de início desta atividade já passou.';
+      msg += ' Revise as datas abaixo antes de ativar.';
+      avisoEl.innerHTML = msg;
+      avisoEl.style.display = '';
+      return;
+    }
+  }
+  avisoEl.style.display = 'none';
+}
+
+// Reage à mudança de prazo (só mostra campo aditamento em modo edição)
+function onPrazoChange() {
+  if (!editandoTarefa) return; // criação: sem aditamento
+  const campoAdit = document.getElementById('campo-aditamento');
+  const prazoAtual = tarefas.find(x=>x.id===editandoTarefa)?.prazo || '';
+  const prazoNovo  = document.getElementById('t-prazo').value;
+  if (prazoAtual && prazoNovo && prazoNovo !== prazoAtual) {
+    campoAdit.style.display = '';
+    document.getElementById('t-aditamento').focus();
+  } else {
+    campoAdit.style.display = 'none';
+    document.getElementById('t-aditamento').value = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// RESUMO
+// ══════════════════════════════════════════════════════════
+function renderResumo() {
+  const total=tarefas.length, a=tarefas.filter(t=>t.status==='ativa').length,
+        s=tarefas.filter(t=>t.status==='fila').length,
+        b=tarefas.filter(t=>t.status==='bloqueada').length,
+        p=tarefas.filter(t=>t.status==='paralisada').length,
+        c=tarefas.filter(t=>t.status==='concluida').length;
+  document.getElementById('cards-resumo').innerHTML = `
+    <div class="card-resumo">
+      <i class="bi bi-clipboard-data ico-bg" aria-hidden="true"></i>
+      <div class="cr-texto"><div class="num">${total}</div><div class="label">Total de tarefas</div></div>
+    </div>
+    <div class="card-resumo ativa">
+      <i class="bi bi-play-circle-fill ico-bg" aria-hidden="true"></i>
+      <div class="cr-texto"><div class="num">${a}</div><div class="label">EM EXECUÇÃO</div></div>
+    </div>
+    <div class="card-resumo standby">
+      <i class="bi bi-hourglass-split ico-bg" aria-hidden="true"></i>
+      <div class="cr-texto"><div class="num">${s}</div><div class="label">EM FILA</div></div>
+    </div>
+    <div class="card-resumo bloqueada">
+      <i class="bi bi-pause-circle-fill ico-bg" aria-hidden="true"></i>
+      <div class="cr-texto"><div class="num">${b}</div><div class="label">AGUARDANDO</div></div>
+    </div>
+    <div class="card-resumo paralisada">
+      <i class="bi bi-slash-circle ico-bg" aria-hidden="true"></i>
+      <div class="cr-texto"><div class="num">${p}</div><div class="label">PARALISADAS</div></div>
+    </div>
+    <div class="card-resumo concluida">
+      <i class="bi bi-check2-circle ico-bg" aria-hidden="true"></i>
+      <div class="cr-texto"><div class="num">${c}</div><div class="label">CONCLUÍDAS</div></div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// ROTINAS GLOBAL
+// ══════════════════════════════════════════════════════════
+function renderRotinasGlobal() {
+  popularFiltros('filtro-rotina-analista');
+  const filtroAn   = document.getElementById('filtro-rotina-analista').value;
+  const filtroFreq = document.getElementById('filtro-rotina-freq').value;
+  const listaAn    = filtroAn ? analistas.filter(a=>a.id===filtroAn) : analistas;
+  const labels = {diaria:'<i class="bi bi-calendar3"></i> Diária',semanal:'<i class="bi bi-calendar-week"></i> Semanal',mensal:'<i class="bi bi-calendar-month"></i> Mensal',eventual:'<i class="bi bi-bullseye"></i> Eventual'};
+  const grid = document.getElementById('rotinas-global');
+  grid.innerHTML = '';
+
+  listaAn.forEach(an => {
+    let rots = rotinas.filter(r=>r.analistaId===an.id);
+    if (filtroFreq) rots = rots.filter(r=>r.freq===filtroFreq);
+    if (rots.length===0 && filtroFreq) return;
+
+    // Ordenar: diária → semanal → mensal → eventual
+    const ordemFreq = {diaria:0,semanal:1,mensal:2,eventual:3};
+    rots.sort((a,b)=>(ordemFreq[a.freq]??9)-(ordemFreq[b.freq]??9));
+
+    const card = document.createElement('div');
+    card.className = 'rotinas-card';
+    card.innerHTML = `
+      <div class="rotinas-card-header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="rotinas-card-header-nome"><i class="bi bi-person-fill"></i> ${an.nome}</div>
+            <div class="rotinas-card-header-cargo">${an.cargo||'Analista'} · ${rots.length} rotina${rots.length!==1?'s':''} cadastrada${rots.length!==1?'s':''}</div>
+          </div>
+          <button class="btn btn-pequeno" style="background:rgba(255,255,255,.2);color:white;flex-shrink:0" onclick="abrirModalRotina('${an.id}')"><i class="bi bi-plus-lg"></i> Rotina</button>
+        </div>
+      </div>
+      <div class="rotinas-card-body">
+        ${rots.length===0
+          ? `<div class="rotinas-card-vazio">Nenhuma rotina cadastrada</div>`
+          : rots.map(r=>`
+            <div class="rotina-linha">
+              <div class="rotina-linha-freq">
+                <span class="rotina-freq ${r.freq}">${labels[r.freq]||r.freq}</span>
+              </div>
+              <div class="rotina-linha-corpo">
+                <div class="rotina-linha-desc">${r.desc}</div>
+                <div class="rotina-linha-extra">
+                  ${r.setor==='EXTERNO'?'<span><i class="bi bi-building"></i> Intersetorial</span>':'<span><i class="bi bi-folder-fill"></i> GECOPE</span>'}
+                  ${r.obs?`<span><i class="bi bi-pin-angle-fill"></i> ${r.obs}</span>`:''}
+                </div>
+              </div>
+              <div class="rotina-linha-acoes">
+                <button class="btn btn-cinza btn-pequeno" onclick="editarRotina('${r.id}')" title="Editar"><i class="bi bi-pencil-fill"></i></button>
+                <button class="btn btn-vermelho btn-pequeno" onclick="excluirRotina('${r.id}')" title="Excluir"><i class="bi bi-trash-fill"></i></button>
+              </div>
+            </div>`).join('')}
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  if (!grid.innerHTML) grid.innerHTML = '<div class="vazio" style="padding:24px">Nenhuma rotina registrada.</div>';
+}
+
+// ══════════════════════════════════════════════════════════
+// MODAL TAREFA
+// ══════════════════════════════════════════════════════════
+function abrirModalTarefa(analistaId) {
+  editandoTarefa = null;
+  document.getElementById('modal-titulo-tarefa').textContent = 'Nova Tarefa';
+  document.getElementById('tarefa-id').value = '';
+  ['t-processo','t-descricao','t-prazo','t-setor-nome','t-justificativa','t-aditamento'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('t-obs').innerHTML = '';
+  document.getElementById('campo-justificativa').style.display = 'none';
+  document.getElementById('campo-aditamento').style.display = 'none';
+  document.getElementById('t-inicio').value = hoje();
+  document.getElementById('t-status').value = 'ativa';
+  document.getElementById('t-setor').value  = 'GECOPE';
+  document.getElementById('t-prioridade').value = 'normal';
+  toggleProcesso();
+  onStatusChange();
+  popularSelectAnalista('t-analista', analistaId||'');
+  document.getElementById('overlay-tarefa').classList.add('aberto');
+}
+
+function editarTarefa(id) {
+  const t = tarefas.find(x=>x.id===id); if(!t) return;
+  editandoTarefa = id;
+  document.getElementById('modal-titulo-tarefa').textContent = 'Editar Tarefa';
+  document.getElementById('tarefa-id').value = t.id;
+  popularSelectAnalista('t-analista', t.analistaId);
+  document.getElementById('t-setor').value      = t.setor||'GECOPE';
+  document.getElementById('t-processo').value   = t.processo||'';
+  document.getElementById('t-descricao').value  = t.descricao||'';
+  document.getElementById('t-setor-nome').value = t.setorNome||'';
+  document.getElementById('t-inicio').value     = t.inicio||'';
+  document.getElementById('t-prazo').value      = t.prazo||'';
+  document.getElementById('t-status').value     = t.status||'ativa';
+  document.getElementById('t-obs').innerHTML    = t.obs||'';
+  document.getElementById('t-prioridade').value = t.prioridade||'normal';
+  document.getElementById('t-justificativa').value = '';
+  document.getElementById('campo-justificativa').style.display = 'none'; // só abre ao MUDAR status para paralisada
+  document.getElementById('t-aditamento').value = '';
+  document.getElementById('campo-aditamento').style.display = 'none';
+  toggleProcesso();
+  onStatusChange();
+  document.getElementById('overlay-tarefa').classList.add('aberto');
+}
+
+function toggleProcesso() {
+  const ext = document.getElementById('t-setor').value==='EXTERNO';
+  document.getElementById('campo-processo').style.display  = ext?'none':'';
+  document.getElementById('campo-setor-ext').style.display = ext?'':'none';
+}
+
+function salvarTarefa() {
+  const desc      = document.getElementById('t-descricao').value.trim();
+  const status    = document.getElementById('t-status').value;
+  const obsEl     = document.getElementById('t-obs');
+  const obsHtml   = obsEl.innerHTML.trim();
+  const justEl    = document.getElementById('t-justificativa');
+  const justText  = justEl.value.trim();
+  const aditEl    = document.getElementById('t-aditamento');
+  const aditText  = aditEl.value.trim();
+
+  if (!desc) { alert('Informe a descrição da tarefa.'); return; }
+  // Exige justificativa apenas quando o status MUDA para paralisada
+  const statusAnterior = editandoTarefa ? tarefas.find(x=>x.id===editandoTarefa)?.status : null;
+  const mudandoParaParalisada = status === 'paralisada' && statusAnterior !== 'paralisada';
+  if (mudandoParaParalisada && !justText) {
+    document.getElementById('campo-justificativa').style.display = '';
+    justEl.style.borderColor = '#dc2626';
+    justEl.focus();
+    alert('A justificativa é obrigatória para paralisar a tarefa.\nDescreva o motivo da paralisação.');
+    return;
+  }
+  justEl.style.borderColor = '';
+  // Verificar aditamento de prazo sem justificativa
+  if (editandoTarefa && document.getElementById('campo-aditamento').style.display !== 'none' && !aditText) {
+    aditEl.style.borderColor = '#2563eb';
+    aditEl.focus();
+    alert('Informe o motivo do aditamento de prazo.');
+    return;
+  }
+  aditEl.style.borderColor = '';
+  const analistaId = document.getElementById('t-analista').value;
+  // Calcular ordem: manter a existente na edição, ou atribuir a próxima na criação
+  let ordemVal;
+  if (editandoTarefa) {
+    ordemVal = tarefas.find(x => x.id === editandoTarefa)?.ordem;
+  }
+  if (ordemVal == null) {
+    const maxO = tarefas
+      .filter(x => x.analistaId === analistaId && x.id !== editandoTarefa)
+      .reduce((m, x) => Math.max(m, x.ordem || 0), 0);
+    ordemVal = maxO + 1;
+  }
+
+  const agora = new Date().toISOString();
+  const tAnterior = editandoTarefa ? tarefas.find(x=>x.id===editandoTarefa) : null;
+  const novoStatus = document.getElementById('t-status').value;
+  const novoPrazo  = document.getElementById('t-prazo').value;
+
+  // Herdar ou iniciar histórico
+  const historico = tAnterior ? [...(tAnterior.historico||[])] : [];
+
+  if (!editandoTarefa) {
+    // Nova tarefa: registrar criação
+    historico.push({ id: uid(), data: agora, tipo: 'criada', nota: '' });
+    // Se já criada como paralisada, registrar também a paralisação
+    if (novoStatus === 'paralisada' && justText) {
+      historico.push({ id: uid(), data: agora, tipo: 'paralisada', nota: justText });
+    }
+  } else {
+    // Mudança de status
+    if (tAnterior.status !== novoStatus) {
+      if (novoStatus === 'paralisada') {
+        historico.push({ id: uid(), data: agora, tipo: 'paralisada', nota: justText });
+      } else if ((tAnterior.status === 'paralisada' || tAnterior.status === 'fila' || tAnterior.status === 'bloqueada') && novoStatus === 'ativa') {
+        historico.push({ id: uid(), data: agora, tipo: 'retomada', nota: '' });
+      } else if (novoStatus === 'concluida') {
+        historico.push({ id: uid(), data: agora, tipo: 'concluida', nota: '' });
+      } else {
+        historico.push({ id: uid(), data: agora, tipo: 'editada', nota: `Status alterado para: ${labelStatus(novoStatus)}` });
+      }
+    }
+    // Mudança de prazo
+    if (tAnterior.prazo !== novoPrazo && novoPrazo) {
+      const prazoAntes  = tAnterior.prazo  ? new Date(tAnterior.prazo+'T00:00:00').toLocaleDateString('pt-BR')  : '(sem prazo)';
+      const prazoDepois = new Date(novoPrazo+'T00:00:00').toLocaleDateString('pt-BR');
+      const motivo = aditText ? ` — ${aditText}` : '';
+      historico.push({ id: uid(), data: agora, tipo: 'prazo', nota: `De ${prazoAntes} para ${prazoDepois}${motivo}` });
+    }
+  }
+
+  const t = {
+    id: editandoTarefa || uid(),
+    analistaId,
+    setor:        document.getElementById('t-setor').value,
+    processo:     document.getElementById('t-processo').value.trim(),
+    descricao:    desc,
+    setorNome:    document.getElementById('t-setor-nome').value.trim(),
+    inicio:       document.getElementById('t-inicio').value,
+    prazo:        novoPrazo,
+    status:       novoStatus,
+    obs:          obsHtml,
+    prioridade:   document.getElementById('t-prioridade').value,
+    ordem:        ordemVal,
+    historico,
+    criadoEm:     tAnterior ? tAnterior.criadoEm : agora,
+    atualizadoEm: agora,
+    // Preserva o vínculo com o processo de origem ao editar manualmente
+    // (ex.: só ajustando prioridade/observações) — sem isso, a sincronização
+    // perderia a referência e criaria uma tarefa duplicada no próximo sync.
+    origemSync:     tAnterior ? !!tAnterior.origemSync : false,
+    statusProcesso: tAnterior ? (tAnterior.statusProcesso || '') : '',
+  };
+  if (editandoTarefa) { tarefas[tarefas.findIndex(x=>x.id===editandoTarefa)] = t; }
+  else tarefas.push(t);
+  salvarDados();
+  fecharModal('overlay-tarefa');
+  atualizarViews();
+}
+
+function concluirTarefa(id) {
+  const t = tarefas.find(x=>x.id===id); if(!t) return;
+  const agora = new Date().toISOString();
+  if (!t.historico) t.historico = [];
+  t.historico.push({ id: uid(), data: agora, tipo: 'concluida', nota: '' });
+  t.status = 'concluida'; t.atualizadoEm = agora;
+  salvarDados(); atualizarViews(); atualizarBadgeConcluidas();
+}
+
+// ── ATIVAR COM REVISÃO DE DATAS ──
+let _ativarId = null; // tarefa aguardando confirmação
+let _prazoOriginal = null;
+
+function ativarTarefa(id) {
+  const t = tarefas.find(x=>x.id===id); if(!t) return;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const prazo  = t.prazo  ? new Date(t.prazo+'T00:00:00')  : null;
+  const inicio = t.inicio ? new Date(t.inicio+'T00:00:00') : null;
+  const prazoVencido  = prazo  && prazo  < hoje;
+  const inicioPassado = inicio && inicio < hoje;
+
+  if (!prazoVencido && !inicioPassado) {
+    // Datas ok — ativar direto
+    mudarStatus(id, 'ativa');
+    return;
+  }
+
+  // Abrir modal de revisão
+  _ativarId = id;
+  _prazoOriginal = t.prazo;
+
+  const avisos = [];
+  if (inicioPassado) avisos.push(`<i class="bi bi-exclamation-circle-fill" style="color:#dc2626"></i> <strong>Início:</strong> <span class="rev-item-vencido">${inicio.toLocaleDateString('pt-BR')}</span> — esta data já passou.`);
+  if (prazoVencido)  avisos.push(`<i class="bi bi-exclamation-circle-fill" style="color:#dc2626"></i> <strong>Prazo/Fim:</strong> <span class="rev-item-vencido">${prazo.toLocaleDateString('pt-BR')}</span> — esta data já passou.`);
+
+  document.getElementById('rev-aviso-texto').innerHTML =
+    `<strong><i class="bi bi-exclamation-triangle-fill"></i> Atenção:</strong> Antes de colocar esta atividade em execução, as seguintes datas precisam ser revisadas:<br><br>${avisos.join('<br>')}`;
+
+  const inicioEl  = document.getElementById('rev-inicio');
+  const prazoEl   = document.getElementById('rev-prazo');
+  inicioEl.value  = t.inicio || '';
+  prazoEl.value   = t.prazo  || '';
+  document.getElementById('rev-aviso-inicio').style.display = inicioPassado ? '' : 'none';
+  document.getElementById('rev-aviso-prazo').style.display  = prazoVencido  ? '' : 'none';
+  document.getElementById('rev-campo-motivo').style.display = prazoVencido  ? '' : 'none';
+  document.getElementById('rev-motivo').value = '';
+
+  // Monitorar mudança de prazo para exigir motivo
+  prazoEl.onchange = () => {
+    const novo = prazoEl.value;
+    const novoDate = novo ? new Date(novo+'T00:00:00') : null;
+    const aindaVencido = novoDate && novoDate < hoje;
+    document.getElementById('rev-aviso-prazo').style.display = aindaVencido ? '' : 'none';
+    document.getElementById('rev-campo-motivo').style.display = (novo && novo !== _prazoOriginal) ? '' : 'none';
+  };
+
+  document.getElementById('overlay-revisar-datas').classList.add('aberto');
+}
+
+function ativarSemAlterarDatas() {
+  fecharModal('overlay-revisar-datas');
+  if (_ativarId) mudarStatus(_ativarId, 'ativa');
+  _ativarId = null;
+}
+
+function ativarComNovasDatas() {
+  const t = tarefas.find(x=>x.id===_ativarId); if(!t) return;
+  const novoInicio = document.getElementById('rev-inicio').value;
+  const novoPrazo  = document.getElementById('rev-prazo').value;
+  const motivo     = document.getElementById('rev-motivo').value.trim();
+  const agora      = new Date().toISOString();
+  const hoje       = new Date(); hoje.setHours(0,0,0,0);
+
+  // Validar: prazo novo não pode estar no passado
+  if (novoPrazo) {
+    const novoDate = new Date(novoPrazo+'T00:00:00');
+    if (novoDate < hoje) {
+      alert('O novo prazo não pode ser uma data que já passou. Por favor, informe uma data futura.');
+      return;
+    }
+  }
+  // Exigir motivo se prazo mudou
+  if (novoPrazo && novoPrazo !== _prazoOriginal && !motivo) {
+    document.getElementById('rev-motivo').style.borderColor = '#2563eb';
+    document.getElementById('rev-motivo').focus();
+    alert('Informe o motivo do novo prazo.');
+    return;
+  }
+
+  if (!t.historico) t.historico = [];
+
+  // Registrar mudança de prazo se houver
+  if (novoPrazo && novoPrazo !== _prazoOriginal) {
+    const prazoAntes  = _prazoOriginal ? new Date(_prazoOriginal+'T00:00:00').toLocaleDateString('pt-BR') : '(sem prazo)';
+    const prazoDepois = new Date(novoPrazo+'T00:00:00').toLocaleDateString('pt-BR');
+    t.historico.push({ id: uid(), data: agora, tipo: 'prazo', nota: `De ${prazoAntes} para ${prazoDepois} — ${motivo}` });
+  }
+
+  // Atualizar datas e ativar
+  if (novoInicio) t.inicio = novoInicio;
+  if (novoPrazo)  t.prazo  = novoPrazo;
+  t.historico.push({ id: uid(), data: agora, tipo: 'retomada', nota: '' });
+  t.status = 'ativa';
+  t.atualizadoEm = agora;
+
+  fecharModal('overlay-revisar-datas');
+  salvarDados();
+  atualizarViews();
+  _ativarId = null;
+  _prazoOriginal = null;
+}
+
+function mudarStatus(id, novo) {
+  const t = tarefas.find(x=>x.id===id); if(!t) return;
+  const agora = new Date().toISOString();
+  if (!t.historico) t.historico = [];
+  if (novo === 'paralisada') {
+    const m = prompt('Justificativa obrigatória – Descreva o motivo da paralisação:');
+    if (!m || !m.trim()) {
+      alert('A justificativa é obrigatória para paralisar uma tarefa.');
+      return;
+    }
+    t.historico.push({ id: uid(), data: agora, tipo: 'paralisada', nota: m.trim() });
+  } else if (novo === 'ativa' && t.status === 'paralisada') {
+    t.historico.push({ id: uid(), data: agora, tipo: 'retomada', nota: '' });
+  } else if (novo === 'concluida') {
+    t.historico.push({ id: uid(), data: agora, tipo: 'concluida', nota: '' });
+  }
+  t.status = novo; t.atualizadoEm = agora;
+  salvarDados(); atualizarViews();
+}
+
+function excluirTarefa(id) {
+  if (!confirm('Excluir esta tarefa?')) return;
+  tarefas = tarefas.filter(x=>x.id!==id);
+  salvarDados();
+  // Re-renderizar a aba que está visível
+  if (document.getElementById('aba-concluidas').style.display !== 'none') {
+    renderConcluidas();
+  } else {
+    atualizarViews();
+  }
+  atualizarBadgeConcluidas();
+}
+
+// ══════════════════════════════════════════════════════════
+// MODAL ROTINA
+// ══════════════════════════════════════════════════════════
+function abrirModalRotina(analistaId) {
+  editandoRotina = null;
+  document.getElementById('modal-titulo-rotina').textContent = 'Nova Rotina';
+  document.getElementById('rotina-id').value = '';
+  document.getElementById('r-desc').value = '';
+  document.getElementById('r-obs').value  = '';
+  document.getElementById('r-freq').value  = 'semanal';
+  document.getElementById('r-setor').value = 'GECOPE';
+  popularSelectAnalista('r-analista', analistaId||'');
+  document.getElementById('overlay-rotina').classList.add('aberto');
+}
+
+function editarRotina(id) {
+  const r = rotinas.find(x=>x.id===id); if(!r) return;
+  editandoRotina = id;
+  document.getElementById('modal-titulo-rotina').textContent = 'Editar Rotina';
+  document.getElementById('rotina-id').value = r.id;
+  popularSelectAnalista('r-analista', r.analistaId);
+  document.getElementById('r-freq').value  = r.freq;
+  document.getElementById('r-desc').value  = r.desc;
+  document.getElementById('r-setor').value = r.setor||'GECOPE';
+  document.getElementById('r-obs').value   = r.obs||'';
+  document.getElementById('overlay-rotina').classList.add('aberto');
+}
+
+function salvarRotina() {
+  const desc = document.getElementById('r-desc').value.trim();
+  if (!desc) { alert('Informe a descrição da rotina.'); return; }
+  const r = {
+    id:         editandoRotina || uid(),
+    analistaId: document.getElementById('r-analista').value,
+    freq:       document.getElementById('r-freq').value,
+    desc,
+    setor:      document.getElementById('r-setor').value,
+    obs:        document.getElementById('r-obs').value.trim(),
+  };
+  if (editandoRotina) { rotinas[rotinas.findIndex(x=>x.id===editandoRotina)] = r; }
+  else rotinas.push(r);
+  salvarDados();
+  fecharModal('overlay-rotina');
+  // re-render whichever aba is visible
+  const abaAtiva = document.getElementById('aba-rotinas').style.display !== 'none' ? 'rotinas' : 'painel';
+  if (abaAtiva==='rotinas') renderRotinasGlobal(); else renderPainel();
+}
+
+function excluirRotina(id) {
+  if (!confirm('Excluir esta rotina?')) return;
+  rotinas = rotinas.filter(x=>x.id!==id);
+  salvarDados(); renderRotinasGlobal();
+}
+
+// ══════════════════════════════════════════════════════════
+// RELATÓRIO
+// ══════════════════════════════════════════════════════════
+function periodoPreset(tipo) {
+  const hoje = new Date();
+  let ini, fim;
+  if (tipo === 'semana') {
+    const dow = hoje.getDay();
+    ini = new Date(hoje); ini.setDate(hoje.getDate() - (dow===0?6:dow-1));
+    fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+  } else if (tipo === 'mes') {
+    ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    fim = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0);
+  } else if (tipo === '30d') {
+    ini = new Date(hoje);
+    fim = new Date(hoje); fim.setDate(hoje.getDate() + 30);
+  } else if (tipo === '90d') {
+    ini = new Date(hoje);
+    fim = new Date(hoje); fim.setDate(hoje.getDate() + 90);
+  } else {
+    document.getElementById('rel-data-inicio').value = '';
+    document.getElementById('rel-data-fim').value = '';
+    renderRelatorio(); return;
+  }
+  document.getElementById('rel-data-inicio').value = ini.toISOString().slice(0,10);
+  document.getElementById('rel-data-fim').value    = fim.toISOString().slice(0,10);
+  renderRelatorio();
+}
+
+// ══════════════════════════════════════════════════════════
+// RELATÓRIO — TOGGLE LISTA / CALENDÁRIO
+// ══════════════════════════════════════════════════════════
+let _relView = 'calendario';
+let _calAno  = new Date().getFullYear();
+let _calMes  = new Date().getMonth(); // 0-based
+let _calFiltroIni = null; // string YYYY-MM-DD ou null
+let _calFiltroFim = null; // string YYYY-MM-DD ou null
+
+function setRelView(view) {
+  _relView = view;
+  document.getElementById('rel-view-lista').style.display      = view === 'lista'      ? '' : 'none';
+  document.getElementById('rel-view-calendario').style.display = view === 'calendario' ? '' : 'none';
+  document.getElementById('btn-view-lista').classList.toggle('ativo', view === 'lista');
+  document.getElementById('btn-view-cal').classList.toggle('ativo', view === 'calendario');
+  if (view === 'calendario') renderCalendario();
+  else renderRelatorio();
+}
+
+function calPeriodoPreset(tipo) {
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  // Achar segunda-feira da semana atual
+  const dow = hoje.getDay(); // 0=dom,1=seg...
+  const diasAteSegunda = (dow === 0) ? -6 : 1 - dow;
+  const seg = new Date(hoje); seg.setDate(hoje.getDate() + diasAteSegunda);
+  const sex = new Date(seg); sex.setDate(seg.getDate() + 4);
+
+  if (tipo === 'semana') {
+    _calFiltroIni = fmtD(seg);
+    _calFiltroFim = fmtD(sex);
+  } else if (tipo === 'proxima') {
+    const segP = new Date(seg); segP.setDate(seg.getDate() + 7);
+    const sexP = new Date(sex); sexP.setDate(sex.getDate() + 7);
+    _calFiltroIni = fmtD(segP);
+    _calFiltroFim = fmtD(sexP);
+  } else if (tipo === '15d') {
+    _calFiltroIni = fmtD(hoje);
+    const fim15 = new Date(hoje); fim15.setDate(hoje.getDate() + 14);
+    _calFiltroFim = fmtD(fim15);
+  } else if (tipo === 'mes') {
+    _calFiltroIni = null;
+    _calFiltroFim = null;
+  }
+  // Sincronizar inputs visuais
+  const inpIni = document.getElementById('cal-p-ini');
+  const inpFim = document.getElementById('cal-p-fim');
+  if (inpIni) inpIni.value = _calFiltroIni || '';
+  if (inpFim) inpFim.value = _calFiltroFim || '';
+  // Marcar botão ativo
+  document.querySelectorAll('.cal-periodo-btn').forEach(b => b.classList.remove('ativo'));
+  event.target.classList.add('ativo');
+  // Navegar para o mês do início do filtro se necessário
+  if (_calFiltroIni) {
+    const d = new Date(_calFiltroIni + 'T00:00:00');
+    _calAno = d.getFullYear(); _calMes = d.getMonth();
+  }
+  document.getElementById('cal-limpar-btn').style.display = (_calFiltroIni || _calFiltroFim) ? '' : 'none';
+  renderCalendario();
+}
+
+function calPeriodoCustom() {
+  const ini = document.getElementById('cal-p-ini').value;
+  const fim = document.getElementById('cal-p-fim').value;
+  if (!ini && !fim) { calPeriodoLimpar(); return; }
+  _calFiltroIni = ini || null;
+  _calFiltroFim = fim || null;
+  document.querySelectorAll('.cal-periodo-btn:not(.cal-periodo-limpar)').forEach(b => b.classList.remove('ativo'));
+  document.getElementById('cal-limpar-btn').style.display = '';
+  if (_calFiltroIni) {
+    const d = new Date(_calFiltroIni + 'T00:00:00');
+    _calAno = d.getFullYear(); _calMes = d.getMonth();
+  }
+  renderCalendario();
+}
+
+function calPeriodoLimpar() {
+  _calFiltroIni = null; _calFiltroFim = null;
+  const inpIni = document.getElementById('cal-p-ini');
+  const inpFim = document.getElementById('cal-p-fim');
+  if (inpIni) inpIni.value = '';
+  if (inpFim) inpFim.value = '';
+  document.querySelectorAll('.cal-periodo-btn').forEach(b => b.classList.remove('ativo'));
+  document.getElementById('cal-limpar-btn').style.display = 'none';
+  renderCalendario();
+}
+
+function calNavMes(dir) {
+  _calMes += dir;
+  if (_calMes > 11) { _calMes = 0; _calAno++; }
+  if (_calMes < 0)  { _calMes = 11; _calAno--; }
+  renderCalendario();
+}
+
+// ── FERIADOS ──
+function calcularPascoa(ano) {
+  const a=ano%19, b=Math.floor(ano/100), c=ano%100, d=Math.floor(b/4),
+        e=b%4, f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3),
+        h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4,
+        l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451),
+        mes=Math.floor((h+l-7*m+114)/31), dia=((h+l-7*m+114)%31)+1;
+  return new Date(ano, mes-1, dia);
+}
+function addDias(date, n) { const d=new Date(date); d.setDate(d.getDate()+n); return d; }
+function fmtD(date) { return date.toISOString().slice(0,10); }
+
+function getFeriados(ano) {
+  const pascoa = calcularPascoa(ano);
+  const f = [
+    // Nacionais fixos
+    { data: `${ano}-01-01`, nome: 'Ano Novo' },
+    { data: `${ano}-04-21`, nome: 'Tiradentes' },
+    { data: `${ano}-05-01`, nome: 'Dia do Trabalho' },
+    { data: `${ano}-09-07`, nome: 'Independência' },
+    { data: `${ano}-10-12`, nome: 'N. Sra. Aparecida' },
+    { data: `${ano}-11-02`, nome: 'Finados' },
+    { data: `${ano}-11-15`, nome: 'Rep. da República' },
+    { data: `${ano}-11-20`, nome: 'Consciência Negra' },
+    { data: `${ano}-12-25`, nome: 'Natal' },
+    // Ceará
+    { data: `${ano}-03-25`, nome: 'Data Magna CE' },
+    // Móveis
+    { data: fmtD(addDias(pascoa,-48)), nome: 'Carnaval (2ª)' },
+    { data: fmtD(addDias(pascoa,-47)), nome: 'Carnaval (3ª)' },
+    { data: fmtD(addDias(pascoa,-2)),  nome: 'Sexta Santa' },
+    { data: fmtD(pascoa),              nome: 'Páscoa' },
+    { data: fmtD(addDias(pascoa,60)),  nome: 'Corpus Christi' },
+  ];
+  // Remover feriados que caem no fim de semana (já não aparecem no calendário)
+  return f;
+}
+
+function renderCalendario() {
+  const selAn = document.getElementById('rel-filtro-analista');
+  // Preencher opções de analista mantendo seleção atual
+  if (selAn) {
+    const valAtual = selAn.value;
+    selAn.innerHTML = '<option value="">Todos os analistas</option>' +
+      analistas.map(a => `<option value="${a.id}"${a.id === valAtual ? ' selected' : ''}>${a.nome}</option>`).join('');
+  }
+  const filtroAn = selAn ? selAn.value : '';
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+
+  // Feriados do ano atual do calendário
+  const feriados = getFeriados(_calAno);
+  const feriadoMap = {};
+  feriados.forEach(f => { feriadoMap[f.data] = f.nome; });
+
+  // Título do mês
+  const tituloMes = new Date(_calAno, _calMes, 1)
+    .toLocaleDateString('pt-BR', {month:'long', year:'numeric'});
+  document.getElementById('cal-titulo-mes').textContent =
+    tituloMes.charAt(0).toUpperCase() + tituloMes.slice(1);
+
+  // Tarefas filtradas — apenas ativas e em fila (excluir bloqueadas, paralisadas e concluídas)
+  let tfAll = tarefas.filter(t =>
+    (t.status === 'ativa' || t.status === 'fila') && (t.inicio || t.prazo)
+  );
+  if (filtroAn) tfAll = tfAll.filter(t => t.analistaId === filtroAn);
+
+  // Determinar intervalo de datas a exibir
+  const modoFiltro = _calFiltroIni || _calFiltroFim;
+  let dataIniRange, dataFimRange;
+
+  if (modoFiltro) {
+    dataIniRange = _calFiltroIni ? new Date(_calFiltroIni + 'T00:00:00') : new Date(_calAno, _calMes, 1);
+    dataFimRange = _calFiltroFim ? new Date(_calFiltroFim + 'T00:00:00') : new Date(_calAno, _calMes + 1, 0);
+  } else {
+    dataIniRange = new Date(_calAno, _calMes, 1);
+    dataFimRange = new Date(_calAno, _calMes + 1, 0);
+  }
+
+  // Gerar dias úteis do intervalo (Seg–Sex, sem feriados)
+  // Coletar feriados de todos os anos do intervalo
+  const anosRange = new Set();
+  for (let d = new Date(dataIniRange); d <= dataFimRange; d.setDate(d.getDate()+1)) anosRange.add(d.getFullYear());
+  let feriadoMapTotal = Object.assign({}, feriadoMap);
+  anosRange.forEach(a => { if (a !== _calAno) getFeriados(a).forEach(f => { feriadoMapTotal[f.data] = f.nome; }); });
+
+  // Montar lista de dias úteis no intervalo
+  const diasUteis = [];
+  for (let d = new Date(dataIniRange); d <= dataFimRange; d.setDate(d.getDate()+1)) {
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) continue;
+    const dStr = fmtD(d);
+    const nomeFeriado = feriadoMapTotal[dStr];
+    diasUteis.push({ tipo: nomeFeriado ? 'feriado' : 'dia', data: new Date(d), dStr, feriado: nomeFeriado || null });
+  }
+
+  // Montar células com padding para alinhar no grid Seg–Sex
+  const celulas = [];
+  const dowParaCol = { 1:0, 2:1, 3:2, 4:3, 5:4 };
+
+  if (modoFiltro && diasUteis.length > 0) {
+    // No modo filtro: padding só se o primeiro dia não for segunda
+    const colPrimeiro = dowParaCol[diasUteis[0].data.getDay()] || 0;
+    for (let p = 0; p < colPrimeiro; p++) celulas.push({ tipo: 'vazio' });
+    diasUteis.forEach(d => celulas.push(d));
+  } else {
+    // Modo mês completo: padding baseado no 1º dia útil do mês
+    let primeiroDiaUtil = new Date(dataIniRange);
+    while (primeiroDiaUtil.getDay() === 0 || primeiroDiaUtil.getDay() === 6) {
+      primeiroDiaUtil.setDate(primeiroDiaUtil.getDate() + 1);
+    }
+    const colInicio = dowParaCol[primeiroDiaUtil.getDay()] || 0;
+    for (let p = 0; p < colInicio; p++) celulas.push({ tipo: 'vazio' });
+    diasUteis.forEach(d => celulas.push(d));
+  }
+
+  // Atualizar título: mês ou período filtrado
+  if (modoFiltro && diasUteis.length > 0) {
+    const ini = diasUteis[0].data;
+    const fim = diasUteis[diasUteis.length-1].data;
+    const fmtOpt = { day: '2-digit', month: 'short' };
+    const fmtOptAno = { day: '2-digit', month: 'short', year: 'numeric' };
+    const iniLabel = ini.toLocaleDateString('pt-BR', ini.getFullYear() === fim.getFullYear() ? fmtOpt : fmtOptAno);
+    const fimLabel = fim.toLocaleDateString('pt-BR', fmtOptAno);
+    document.getElementById('cal-titulo-mes').textContent = `${iniLabel} → ${fimLabel}`;
+  }
+
+  // Header Seg–Sex
+  const dowLabels = ['Segunda','Terça','Quarta','Quinta','Sexta'];
+  let html = dowLabels.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  // Células
+  celulas.forEach(cel => {
+    if (cel.tipo === 'vazio') {
+      html += '<div class="cal-dia outro-mes"></div>';
+      return;
+    }
+
+    const ehHoje = cel.data.getTime() === hoje.getTime();
+    const dStr   = cel.dStr;
+
+    if (cel.tipo === 'feriado') {
+      html += `
+        <div class="cal-dia feriado" title="Feriado: ${cel.feriado}">
+          <div class="cal-dia-num">${cel.data.getDate()}</div>
+          <div class="cal-feriado-nome"><i class="bi bi-sun-fill"></i> ${cel.feriado}</div>
+        </div>`;
+      return;
+    }
+
+    // Dia útil normal
+    const tInicio   = tfAll.filter(t => t.inicio === dStr);
+    const tFim      = tfAll.filter(t => t.prazo  === dStr);
+    const tExecucao = tfAll.filter(t => {
+      if (!t.inicio || !t.prazo) return false;
+      const ini = new Date(t.inicio+'T00:00:00');
+      const fim = new Date(t.prazo+'T00:00:00');
+      return cel.data > ini && cel.data < fim;
+    });
+
+    const chipTarefa = (t, tipos) => {
+      const an = analistas.find(a => a.id === t.analistaId);
+      const tiposArr = Array.isArray(tipos) ? tipos : [tipos];
+      // Classe visual: prioridade inicio > fim > execucao
+      const classeVisual = tiposArr.includes('inicio') ? 'inicio' : tiposArr.includes('fim') ? 'fim' : 'execucao';
+      const badgeMap = { inicio: 'Em Início', execucao: 'Em Execução', fim: 'Em Conclusão' };
+      const badges = tiposArr.map(tp => `<span class="cal-evento-badge badge-${tp}">${badgeMap[tp]}</span>`).join(' ');
+      const metaParts = [];
+      if (an) metaParts.push(`<i class="bi bi-person-fill"></i> ${an.nome}`);
+      if (t.processo) metaParts.push(`<i class="bi bi-hash"></i> ${t.processo}`);
+      let obsTexto = '';
+      if (t.obs) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = t.obs;
+        obsTexto = (tmp.textContent || tmp.innerText || '').trim();
+      }
+      if (t.setor === 'EXTERNO' && t.setorNome) metaParts.push(`<i class="bi bi-building"></i> ${t.setorNome}`);
+      return `<div class="cal-evento ${classeVisual}">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:2px;">${badges}</div>
+        <span class="cal-evento-nome">${t.descricao||'(sem descrição)'}</span>
+        ${obsTexto ? `<span class="cal-evento-obs">${obsTexto.slice(0,120)}${obsTexto.length>120?'…':''}</span>` : ''}
+        ${metaParts.length ? `<span class="cal-evento-meta">${metaParts.join(' · ')}</span>` : ''}
+      </div>`;
+    };
+
+    // Ordem: início/conclusão mesmo dia (1 chip duplo) → só início → execução → só fim
+    // IDs já renderizados para evitar duplicatas
+    const renderizados = new Set();
+    const chipsArr = [];
+    // Tarefas que iniciam E concluem no mesmo dia
+    tInicio.filter(t => tFim.find(x => x.id === t.id)).forEach(t => {
+      chipsArr.push(chipTarefa(t, ['inicio', 'fim']));
+      renderizados.add(t.id);
+    });
+    tInicio.filter(t => !renderizados.has(t.id)).forEach(t => { chipsArr.push(chipTarefa(t, 'inicio')); renderizados.add(t.id); });
+    tExecucao.filter(t => !renderizados.has(t.id)).forEach(t => { chipsArr.push(chipTarefa(t, 'execucao')); renderizados.add(t.id); });
+    tFim.filter(t => !renderizados.has(t.id)).forEach(t => { chipsArr.push(chipTarefa(t, 'fim')); renderizados.add(t.id); });
+    const chipsHtml = chipsArr.join('');
+
+    html += `
+      <div class="cal-dia${ehHoje?' hoje':''}" data-data="${dStr}">
+        <div class="cal-dia-num">
+          ${ehHoje ? `<div class="cal-hoje-badge">${cel.data.getDate()}</div>` : cel.data.getDate()}
+        </div>
+        ${chipsHtml}
+      </div>`;
+  });
+
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function abrirCalPopup(dStr, evt) {
+  evt.stopPropagation();
+  const data    = new Date(dStr+'T00:00:00');
+  const dtLabel = data.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const filtroAn = document.getElementById('rel-filtro-analista') ? document.getElementById('rel-filtro-analista').value : '';
+
+  let tfAll = tarefas.filter(t => t.status !== 'concluida' && (t.inicio || t.prazo));
+  if (filtroAn) tfAll = tfAll.filter(t => t.analistaId === filtroAn);
+
+  const tInicio   = tfAll.filter(t => t.inicio === dStr);
+  const tFim      = tfAll.filter(t => t.prazo  === dStr);
+  const tExecucao = tfAll.filter(t => {
+    if (!t.inicio || !t.prazo) return false;
+    const ini = new Date(t.inicio+'T00:00:00');
+    const fim = new Date(t.prazo+'T00:00:00');
+    return data > ini && data < fim && t.status === 'ativa';
+  });
+
+  const itemHtml = (t) => {
+    const an = analistas.find(a => a.id === t.analistaId);
+    return `<div class="cp-item">
+      <div>
+        <div class="cp-item-nome">${t.descricao||'(sem descrição)'}</div>
+        <div class="cp-item-analista"><i class="bi bi-person-fill"></i> ${an?an.nome:'—'}${t.processo?' · <i class="bi bi-hash"></i> '+t.processo:''}</div>
+      </div>
+    </div>`;
+  };
+
+  let corpo = '';
+  if (tInicio.length)   corpo += `<div class="cp-secao-titulo inicio"><i class="bi bi-play-fill"></i> Início neste dia (${tInicio.length})</div>${tInicio.map(itemHtml).join('')}`;
+  if (tExecucao.length) corpo += `<div class="cp-secao-titulo execucao"><i class="bi bi-gear-fill"></i> Em Execução (${tExecucao.length})</div>${tExecucao.map(itemHtml).join('')}`;
+  if (tFim.length)      corpo += `<div class="cp-secao-titulo fim"><i class="bi bi-flag-fill"></i> Prazo / Fim neste dia (${tFim.length})</div>${tFim.map(itemHtml).join('')}`;
+  if (!corpo)           corpo  = '<div class="cp-vazio">Nenhuma atividade neste dia.</div>';
+
+  document.getElementById('cp-titulo').textContent = dtLabel.charAt(0).toUpperCase() + dtLabel.slice(1);
+  document.getElementById('cp-corpo').innerHTML = corpo;
+
+  const popup = document.getElementById('cal-popup');
+  popup.style.top       = '50%';
+  popup.style.left      = '50%';
+  popup.style.transform = 'translate(-50%, -50%)';
+  popup.classList.add('aberto');
+}
+
+function fecharCalPopup() {
+  document.getElementById('cal-popup').classList.remove('aberto');
+}
+document.addEventListener('click', e => {
+  const p = document.getElementById('cal-popup');
+  if (p && p.classList.contains('aberto') && !p.contains(e.target)) fecharCalPopup();
+});
+
+function renderRelatorio() {
+  const selAn = document.getElementById('rel-filtro-analista');
+  const selAnVal = selAn ? selAn.value : '';
+  if (selAn) {
+    selAn.innerHTML = '<option value="">Todos os analistas</option>' +
+      analistas.map(a=>`<option value="${a.id}"${a.id===selAnVal?' selected':''}>${a.nome}</option>`).join('');
+  }
+
+  const dataIni  = document.getElementById('rel-data-inicio') ? document.getElementById('rel-data-inicio').value : '';
+  const dataFim  = document.getElementById('rel-data-fim')    ? document.getElementById('rel-data-fim').value    : '';
+  const filtroAn = selAnVal;
+  const filtroSt = document.getElementById('rel-filtro-status') ? document.getElementById('rel-filtro-status').value : '';
+
+  const dIni = dataIni ? new Date(dataIni+'T00:00:00') : null;
+  const dFim = dataFim ? new Date(dataFim+'T23:59:59') : null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+
+  function noperiodo(t) {
+    if (!dIni && !dFim) return true;
+    const tIni = t.inicio ? new Date(t.inicio+'T00:00:00') : null;
+    const tFim = t.prazo  ? new Date(t.prazo+'T23:59:59')  : null;
+    if (!tIni && !tFim) return true; // sem datas: sempre inclui
+    const comecoOk = !dIni || !tFim || tFim >= dIni;
+    const fimOk    = !dFim || !tIni || tIni <= dFim;
+    return comecoOk && fimOk;
+  }
+
+  const listaAn = filtroAn ? analistas.filter(a=>a.id===filtroAn) : analistas;
+  const periodoTexto = (dIni && dFim)
+    ? `${dIni.toLocaleDateString('pt-BR')} a ${dFim.toLocaleDateString('pt-BR')}`
+    : (dIni ? `A partir de ${dIni.toLocaleDateString('pt-BR')}` : (dFim ? `Até ${dFim.toLocaleDateString('pt-BR')}` : 'Todas as datas'));
+
+  const cab = document.getElementById('rel-cabecalho-emissao');
+  if (cab) cab.innerHTML = `
+    <div style="background:white;border-radius:12px;padding:16px 22px;margin-bottom:16px;box-shadow:var(--sombra-card);border-left:6px solid var(--verde);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:1rem;font-weight:800;color:var(--verde-escuro)"><i class="bi bi-bar-chart-fill"></i> Relatório de Situação das Tarefas – GECOPE / SOP-CE</div>
+        <div style="font-size:.78rem;color:#6b7280;margin-top:3px;font-weight:500">
+          Período: <strong>${periodoTexto}</strong> · Emitido em ${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}
+        </div>
+      </div>
+    </div>`;
+
+  let totExec=0, totAguard=0, totPar=0, totAnCom=0;
+  listaAn.forEach(an => {
+    let tf = tarefas.filter(t=>t.analistaId===an.id && t.status!=='concluida' && noperiodo(t));
+    if (filtroSt) tf = tf.filter(t=>t.status===filtroSt);
+    if (!tf.length) return;
+    totAnCom++;
+    totExec   += tf.filter(t=>t.status==='ativa').length;
+    totAguard += tf.filter(t=>t.status==='fila').length;
+    totPar    += tf.filter(t=>t.status==='paralisada').length;
+  });
+
+  const rc = document.getElementById('rel-cards-resumo');
+  if (rc) rc.innerHTML = `
+    <div class="rel-card-resumo">
+      <i class="bi bi-people-fill" style="font-size:1.6rem"></i>
+      <div><div class="rc-num" style="color:var(--verde)">${totAnCom}</div><div class="rc-label">Analistas com tarefas</div></div>
+    </div>
+    <div class="rel-card-resumo exec">
+      <i class="bi bi-play-circle-fill" style="font-size:1.6rem"></i>
+      <div><div class="rc-num" style="color:var(--ativa)">${totExec}</div><div class="rc-label">EM EXECUÇÃO</div></div>
+    </div>
+    <div class="rel-card-resumo aguard">
+      <i class="bi bi-hourglass-split" style="font-size:1.6rem"></i>
+      <div><div class="rc-num" style="color:var(--fila)">${totAguard}</div><div class="rc-label">EM FILA</div></div>
+    </div>
+    <div class="rel-card-resumo par">
+      <i class="bi bi-slash-circle" style="font-size:1.6rem"></i>
+      <div><div class="rc-num" style="color:var(--paralisada)">${totPar}</div><div class="rc-label">PARALISADAS</div></div>
+    </div>`;
+
+  let html = '';
+  listaAn.forEach(an => {
+    let tf = tarefas.filter(t=>t.analistaId===an.id && t.status!=='concluida' && noperiodo(t));
+    if (filtroSt) tf = tf.filter(t=>t.status===filtroSt);
+    if (!tf.length) return;
+    tf.sort((a,b)=>(a.ordem??9999)-(b.ordem??9999));
+
+    const exec = tf.filter(t=>t.status==='ativa').length;
+    const agu  = tf.filter(t=>t.status==='fila').length;
+    const par  = tf.filter(t=>t.status==='paralisada').length;
+
+    html += `
+    <div class="rel-analista-bloco">
+      <div class="rel-analista-header">
+        <strong><i class="bi bi-person-fill"></i> ${an.nome}${an.cargo?' · '+an.cargo:''}</strong>
+        <div class="rel-badges">
+          ${exec?`<span class="rel-badge"><i class="bi bi-circle-fill" style="font-size:.5rem;color:#16a34a"></i> ${exec} em execução</span>`:''}
+          ${agu ?`<span class="rel-badge"><i class="bi bi-circle-fill" style="font-size:.5rem;color:#d97706"></i> ${agu} em fila</span>`:''}
+          ${par ?`<span class="rel-badge"><i class="bi bi-circle-fill" style="font-size:.5rem;color:#dc2626"></i> ${par} paralisada${par>1?'s':''}</span>`:''}
+        </div>
+      </div>
+      <table style="border-radius:0 0 10px 10px;margin-bottom:0">
+        <thead><tr>
+          <th style="width:30px">#</th>
+          <th>Tarefa / Processo</th>
+          <th>Setor</th>
+          <th>Prioridade</th>
+          <th>Início</th>
+          <th>Prazo</th>
+          <th>Status</th>
+          <th>Observação</th>
+        </tr></thead>
+        <tbody>
+        ${tf.map((t,i) => {
+          const pDate = t.prazo  ? new Date(t.prazo+'T00:00:00')  : null;
+          const iDate = t.inicio ? new Date(t.inicio+'T00:00:00') : null;
+          const vencido  = pDate && pDate < hoje && t.status!=='concluida';
+          const atrasado = t.status==='fila' && iDate && iDate < hoje;
+          const sv = atrasado ? 'atrasado' : t.status;
+          return `<tr>
+            <td style="text-align:center;font-weight:800;color:var(--verde);font-size:.82rem">${i+1}</td>
+            <td><strong style="font-size:.84rem">${t.descricao||''}</strong>${t.processo?`<br><small style="color:#6b7280"><i class="bi bi-hash"></i> ${t.processo}</small>`:''}</td>
+            <td style="font-size:.8rem">${t.setor==='EXTERNO'?`<i class="bi bi-building"></i> ${t.setorNome||'Ext.'}`:'<i class="bi bi-folder-fill"></i> GECOPE'}</td>
+            <td style="font-size:.8rem">${{urgente:'Urgente',alta:'Alta',normal:'Normal'}[t.prioridade]||'Normal'}</td>
+            <td style="font-size:.8rem">${iDate?iDate.toLocaleDateString('pt-BR'):'—'}</td>
+            <td style="font-size:.8rem;${vencido?'color:var(--paralisada);font-weight:700':''}">${pDate?pDate.toLocaleDateString('pt-BR')+(vencido?' <i class="bi bi-exclamation-triangle-fill"></i>':''):'—'}</td>
+            <td><span class="status-pill ${sv}">${labelStatus(sv)}</span></td>
+            <td style="max-width:160px;font-size:.76rem;color:#4b5563">${t.obs||'—'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  });
+
+  if (!html) html = `<div class="vazio" style="padding:32px;text-align:center;background:white;border-radius:12px;box-shadow:var(--sombra-card)">Nenhuma tarefa encontrada para o período e filtros selecionados.</div>`;
+  document.getElementById('tabela-relatorio').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════
+// CONCLUÍDAS
+// ══════════════════════════════════════════════════════════
+function renderConcluidas() {
+  popularFiltros('filtro-conc-analista');
+  const filtroAn  = document.getElementById('filtro-conc-analista').value;
+  const filtroBu  = (document.getElementById('filtro-conc-busca').value || '').toLowerCase();
+  const listaAn   = filtroAn ? analistas.filter(a => a.id === filtroAn) : analistas;
+  const grid      = document.getElementById('conc-grid');
+  grid.innerHTML  = '';
+
+  let totalConc = 0;
+
+  listaAn.forEach(an => {
+    let concl = tarefas.filter(t => t.analistaId === an.id && t.status === 'concluida');
+    if (filtroBu) concl = concl.filter(t =>
+      (t.descricao||'').toLowerCase().includes(filtroBu) ||
+      (t.processo||'').toLowerCase().includes(filtroBu)
+    );
+    if (concl.length === 0) return;
+    totalConc += concl.length;
+
+    // Ordenar por data de conclusão (mais recente primeiro)
+    concl.sort((a,b) => (b.atualizadoEm||'').localeCompare(a.atualizadoEm||''));
+
+    const card = document.createElement('div');
+    card.className = 'conc-card';
+    card.innerHTML = `
+      <div class="conc-card-header">
+        <h3><i class="bi bi-person-fill"></i> ${an.nome}</h3>
+        <span class="conc-count"><i class="bi bi-check2-circle"></i> ${concl.length} concluída${concl.length!==1?'s':''}</span>
+      </div>
+      <div class="conc-card-body">
+        ${concl.map(t => {
+          const setorLabel = t.setor==='EXTERNO' ? `<i class="bi bi-building"></i> ${t.setorNome||'Ext.'}` : '<i class="bi bi-folder-fill"></i> GECOPE';
+          const prio = t.prioridade==='urgente'?'<i class="bi bi-fire" style="color:#dc2626"></i> ':t.prioridade==='alta'?'<i class="bi bi-lightning-fill" style="color:#d97706"></i> ':'';
+          const dataConc = t.atualizadoEm
+            ? new Date(t.atualizadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})
+            : '—';
+          return `
+          <div class="tarefa-conc">
+            <div class="tarefa-conc-titulo">${prio}${t.descricao||'(sem descrição)'}</div>
+            <div class="tarefa-conc-meta">
+              ${t.processo?`<span><i class="bi bi-hash"></i> ${t.processo}</span>`:''}
+              <span>${setorLabel}</span>
+            </div>
+            <div class="tarefa-conc-data"><i class="bi bi-check2-circle"></i> Concluída em ${dataConc}</div>
+            <div class="tarefa-conc-acoes">
+              <button class="btn btn-pequeno" style="background:#dcfce7;color:#166534;font-size:.74rem" onclick="reabrirTarefa('${t.id}')"><i class="bi bi-arrow-counterclockwise"></i> Reabrir</button>
+              <button class="btn btn-vermelho btn-pequeno" style="font-size:.74rem" onclick="excluirTarefa('${t.id}')"><i class="bi bi-trash-fill"></i></button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  document.getElementById('conc-total').textContent =
+    totalConc > 0 ? `${totalConc} tarefa${totalConc!==1?'s':''} concluída${totalConc!==1?'s':''}` : '';
+
+  if (!grid.innerHTML) {
+    grid.innerHTML = '<div style="grid-column:1/-1"><div class="vazio" style="background:white;border-radius:14px;padding:32px;text-align:center;box-shadow:var(--sombra-card)">Nenhuma tarefa concluída ainda.</div></div>';
+  }
+
+  // Atualizar contador na aba nav
+  atualizarBadgeConcluidas();
+}
+
+function reabrirTarefa(id) {
+  const t = tarefas.find(x => x.id === id); if (!t) return;
+  t.status = 'fila';
+  t.atualizadoEm = new Date().toISOString();
+  salvarDados();
+  renderConcluidas();
+  atualizarBadgeConcluidas();
+}
+
+function atualizarBadgeConcluidas() {
+  const total = tarefas.filter(t => t.status === 'concluida').length;
+  const btn = document.getElementById('btn-aba-concluidas');
+  if (btn) btn.innerHTML = total > 0 ? `<i class="bi bi-check2-circle"></i> Concluídas (${total})` : '<i class="bi bi-check2-circle"></i> Concluídas';
+}
+
+// ══════════════════════════════════════════════════════════
+// ANALISTAS
+// ══════════════════════════════════════════════════════════
+function renderAnalistas() {
+  document.getElementById('lista-analistas').innerHTML = analistas.map(an => {
+    const em = tarefas.filter(t=>t.analistaId===an.id&&t.status!=='concluida').length;
+    const rot = rotinas.filter(r=>r.analistaId===an.id).length;
+    return `
+    <div class="card-cfg">
+      <div class="avatar">${an.nome.charAt(0).toUpperCase()}</div>
+      <div class="info">
+        <strong>${an.nome}</strong>
+        <small>${an.cargo||'Analista'}${an.matricula?' · Matr. '+an.matricula:''} · ${em} tarefa${em!==1?'s':''} em aberto · ${rot} rotina${rot!==1?'s':''}</small>
+      </div>
+      <button class="btn btn-cinza btn-pequeno" onclick="editarAnalista('${an.id}')"><i class="bi bi-pencil-fill"></i> Editar</button>
+      <button class="btn btn-vermelho btn-pequeno" onclick="excluirAnalista('${an.id}')"><i class="bi bi-trash-fill"></i></button>
+    </div>`;
+  }).join('') || '<div class="vazio">Nenhum analista cadastrado.</div>';
+}
+
+function abrirModalAnalista(id) {
+  const a = id ? analistas.find(x=>x.id===id) : {};
+  document.getElementById('analista-id').value  = id||'';
+  document.getElementById('a-nome').value       = a?.nome||'';
+  document.getElementById('a-matricula').value  = a?.matricula||'';
+  document.getElementById('a-cargo').value      = a?.cargo||'';
+  document.getElementById('overlay-analista').classList.add('aberto');
+}
+function editarAnalista(id) { abrirModalAnalista(id); }
+
+function salvarAnalista() {
+  const nome = document.getElementById('a-nome').value.trim();
+  if (!nome) { alert('Informe o nome.'); return; }
+  const id = document.getElementById('analista-id').value || uid();
+  const obj = { id, nome, matricula: document.getElementById('a-matricula').value.trim(), cargo: document.getElementById('a-cargo').value.trim() };
+  const idx = analistas.findIndex(a=>a.id===id);
+  if (idx>=0) analistas[idx]=obj; else analistas.push(obj);
+  salvarDados();
+  fecharModal('overlay-analista');
+  renderAnalistas();
+}
+
+function excluirAnalista(id) {
+  if (!confirm('Excluir analista e todas as suas tarefas/rotinas?')) return;
+  analistas = analistas.filter(a=>a.id!==id);
+  tarefas   = tarefas.filter(t=>t.analistaId!==id);
+  rotinas   = rotinas.filter(r=>r.analistaId!==id);
+  salvarDados(); renderAnalistas();
+}
+
+// ══════════════════════════════════════════════════════════
+// UTILITÁRIOS
+// ══════════════════════════════════════════════════════════
+function popularFiltros(id) {
+  const sel = document.getElementById(id);
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Todos os analistas</option>' +
+    analistas.map(a=>`<option value="${a.id}"${a.id===val?' selected':''}>${a.nome}</option>`).join('');
+}
+
+function popularSelectAnalista(id, selecionado) {
+  document.getElementById(id).innerHTML =
+    analistas.map(a=>`<option value="${a.id}"${a.id===selecionado?' selected':''}>${a.nome}</option>`).join('');
+}
+
+function fecharModal(id) { document.getElementById(id).classList.remove('aberto'); }
+
+document.querySelectorAll('.overlay').forEach(o =>
+  o.addEventListener('click', e => { if(e.target===o) fecharModal(o.id); })
+);
+
+function hoje() { return new Date().toISOString().slice(0,10); }
+
+function mascaraProcesso(el) {
+  // formato: 43022.000000/2026-00
+  let v = el.value.replace(/\D/g,'');
+  if (v.length > 5)  v = v.slice(0,5)  + '.' + v.slice(5);
+  if (v.length > 12) v = v.slice(0,12) + '/' + v.slice(12);
+  if (v.length > 17) v = v.slice(0,17) + '-' + v.slice(17);
+  el.value = v.slice(0,21);
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// SINCRONIZAÇÃO AUTOMÁTICA COM A ABA PROCESSOS
+// ══════════════════════════════════════════════════════════
+// Processos com os status abaixo alimentam automaticamente o Painel Geral
+// de Atividades. Cada linha da tabela "processos" vira (ou atualiza) uma
+// tarefa marcada com origemSync=true, vinculada pelo número do processo.
+//
+// - DILIGÊNCIA / AGUAR. REANÁLISE            → tarefa em "fila"
+// - EM ANÁLISE / EM REANÁLISE                → tarefa "ativa" (mostrando o
+//   status real do processo, ex. "EM REANÁLISE", em vez de "Em Execução")
+// - status contendo REANÁLISE + FISCAL       → tarefa "bloqueada" (voltou
+//   para o fiscal, aguardando retorno)
+// - qualquer outro status (aprovado, arquivado, devolvido...)  → se a
+//   tarefa já existia sincronizada, é concluída automaticamente.
+//
+// Mapeamento letra→analista: o campo "analista" em Processos hoje é só uma
+// letra (N, W, P, H, A, F). Como as 6 pessoas cadastradas em Atividades têm
+// iniciais distintas, usamos uma tabela fixa. Se um novo analista for
+// cadastrado com uma letra já usada, o mapeamento precisa ser atualizado
+// aqui manualmente.
+const LETRA_PARA_ANALISTA = { N: 'Nildeno', W: 'Walace', P: 'Pedro', H: 'Helder', A: 'Ada', F: 'Felipe' };
+
+function classificarStatusProcesso(statusRaw) {
+  const s = (statusRaw || '').toString().toUpperCase().trim();
+  if (!s) return null;
+  if (s.includes('DILIG')) return 'fila';
+  if (s.includes('REANÁLISE') && s.includes('FISCAL')) return 'bloqueada';
+  if (s.startsWith('EM') && s.includes('REAN')) return 'ativa';
+  if (s.startsWith('EM') && (s.includes('ANÁLISE') || s.includes('ANALISE'))) return 'ativa';
+  if (s.includes('AGUAR') && s.includes('REAN')) return 'fila';
+  return null; // fora do escopo da sincronização — não mexe na tarefa
+}
+
+async function sincronizarComProcessos() {
+  if (!window.sbClient) return;
+  const { data: procs, error } = await sbClient.from('processos').select('processo, status, analista, descricao');
+  if (error) {
+    console.error('[Sync Processos] Erro ao buscar processos:', error);
+    return;
+  }
+
+  let mudou = false;
+  const encontrados = new Set();
+  const agora = new Date().toISOString();
+
+  (procs || []).forEach(p => {
+    if (!p.processo) return;
+    const statusInterno = classificarStatusProcesso(p.status);
+    if (!statusInterno) return;
+
+    encontrados.add(p.processo);
+    const letra = (p.analista || '').toString().trim().toUpperCase();
+    const nomeAnalista = LETRA_PARA_ANALISTA[letra] || null;
+    const analistaObj = nomeAnalista ? analistas.find(a => a.nome === nomeAnalista) : null;
+
+    let t = tarefas.find(x => x.origemSync && x.processo === p.processo);
+
+    if (!t) {
+      // Sem analista mapeável, não cria tarefa órfã — fica só no radar do próximo sync
+      if (!analistaObj) return;
+      const maxO = tarefas.filter(x => x.analistaId === analistaObj.id).reduce((m, x) => Math.max(m, x.ordem || 0), 0);
+      tarefas.push({
+        id: uid(),
+        analistaId: analistaObj.id,
+        setor: 'GECOPE',
+        processo: p.processo,
+        descricao: p.descricao || '',
+        setorNome: '',
+        inicio: hoje(),
+        prazo: '',
+        status: statusInterno,
+        obs: '',
+        prioridade: 'normal',
+        ordem: maxO + 1,
+        historico: [{ id: uid(), data: agora, tipo: 'criada', nota: `Criada automaticamente a partir do processo ${p.processo} (status: ${p.status}).` }],
+        criadoEm: agora,
+        atualizadoEm: agora,
+        origemSync: true,
+        statusProcesso: p.status || '',
+      });
+      mudou = true;
+    } else {
+      let alterou = false;
+      if (t.status !== statusInterno) {
+        t.historico = t.historico || [];
+        t.historico.push({ id: uid(), data: agora, tipo: 'editada', nota: `Status do processo atualizado para: ${p.status}` });
+        t.status = statusInterno;
+        alterou = true;
+      }
+      if (t.statusProcesso !== (p.status || '')) { t.statusProcesso = p.status || ''; alterou = true; }
+      if (p.descricao && t.descricao !== p.descricao) { t.descricao = p.descricao; alterou = true; }
+      if (analistaObj && t.analistaId !== analistaObj.id) { t.analistaId = analistaObj.id; alterou = true; }
+      if (alterou) { t.atualizadoEm = agora; mudou = true; }
+    }
+  });
+
+  // Processos que saíram dos status acompanhados (aprovado, arquivado, devolvido...)
+  // concluem automaticamente a tarefa vinculada.
+  tarefas.forEach(t => {
+    if (t.origemSync && t.status !== 'concluida' && !encontrados.has(t.processo)) {
+      t.status = 'concluida';
+      t.atualizadoEm = agora;
+      t.historico = t.historico || [];
+      t.historico.push({ id: uid(), data: agora, tipo: 'concluida', nota: 'Concluída automaticamente — processo saiu dos status acompanhados em Processos.' });
+      mudou = true;
+    }
+  });
+
+  if (mudou) await salvarDados();
+}
+
+async function iniciarApp() {
+  const pronto = await aguardarSupabase();
+  if (!pronto) {
+    alert('Não foi possível conectar ao banco de dados (Supabase). Recarregue a página.');
+    return;
+  }
+
+  const remoto = await carregarDadosSupabase();
+  if (!remoto) {
+    alert('Erro ao carregar os dados do módulo Atividades. Recarregue a página.');
+    return;
+  }
+
+  if (remoto.analistas.length === 0 && remoto.tarefas.length === 0 && remoto.rotinas.length === 0) {
+    // Banco ainda vazio: migra o que existir no localStorage deste navegador
+    // (dados de uma versão anterior, antes da integração com o Supabase) ou,
+    // se também não houver nada, semeia a equipe padrão.
+    const lsAnalistas = JSON.parse(localStorage.getItem('gecope_analistas_v2') || 'null');
+    const lsTarefas   = JSON.parse(localStorage.getItem('gecope_tarefas_v2')   || '[]');
+    const lsRotinas   = JSON.parse(localStorage.getItem('gecope_rotinas_v2')   || '[]');
+
+    if (lsAnalistas && lsAnalistas.length) {
+      console.log('[Cronograma] Migrando dados do localStorage para o Supabase (primeira carga)...');
+      analistas = lsAnalistas;
+      tarefas   = lsTarefas;
+      rotinas   = lsRotinas;
+    } else {
+      analistas = [
+        { id: uid(), nome: 'Nildeno',  matricula: '', cargo: 'Gerente GECOPE' },
+        { id: uid(), nome: 'Walace',   matricula: '', cargo: 'Analista' },
+        { id: uid(), nome: 'Pedro',    matricula: '', cargo: 'Analista' },
+        { id: uid(), nome: 'Helder',   matricula: '', cargo: 'Analista' },
+        { id: uid(), nome: 'Ada',      matricula: '', cargo: 'Analista' },
+        { id: uid(), nome: 'Felipe',   matricula: '', cargo: 'Analista' },
+      ];
+    }
+    await salvarDados();
+  } else {
+    analistas = remoto.analistas;
+    tarefas   = remoto.tarefas;
+    rotinas   = remoto.rotinas;
+  }
+
+  // Migrações de compatibilidade (dados de versões antigas do módulo)
+  // 'standby' (bem antigo) e 'aguardando' (nome antigo de "fila", antes de "Aguardando"
+  // passar a significar "retornou ao fiscal") migram para o novo status 'fila'.
+  tarefas.forEach(t => { if (t.status === 'standby' || t.status === 'aguardando') t.status = 'fila'; });
+  tarefas.forEach(t => { if (!t.historico) t.historico = []; });
+  analistas.forEach(an => {
+    const semOrdem = tarefas
+      .filter(t => t.analistaId === an.id && t.ordem == null)
+      .sort((a,b) => (a.criadoEm||'').localeCompare(b.criadoEm||''));
+    if (semOrdem.length > 0) {
+      const maxExist = tarefas
+        .filter(t => t.analistaId === an.id && t.ordem != null)
+        .reduce((m,t) => Math.max(m, t.ordem), 0);
+      semOrdem.forEach((t,i) => { t.ordem = maxExist + i + 1; });
+    }
+  });
+
+  // Puxa/atualiza tarefas a partir dos processos em tramitação antes da primeira renderização
+  try { await sincronizarComProcessos(); } catch (e) { console.error('[Sync Processos] Falha inesperada:', e); }
+
+  renderPainel();
+  atualizarBadgeConcluidas();
+}
+
+iniciarApp();
+</script>
+</body>
+</html>

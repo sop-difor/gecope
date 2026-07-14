@@ -110,6 +110,23 @@
 
     </div>
 
+    <script>
+        // Evita o "flash" da tela de login ao voltar para o GECOPE a partir de outra
+        // página do site (ex.: botão "Processos" no módulo Atividades) quando já existe
+        // uma sessão válida. Roda de forma síncrona, antes de qualquer script pesado
+        // (Bootstrap, Supabase, main.js) carregar — por isso fica logo aqui no HTML.
+        (function () {
+            try {
+                var role = sessionStorage.getItem('sop_role');
+                if (role && role !== 'guest') {
+                    var landing = document.getElementById('landingOverlay');
+                    if (landing) landing.style.display = 'none';
+                    document.body.classList.remove('login-active');
+                }
+            } catch (e) { /* noop */ }
+        })();
+    </script>
+
     <div id="app-content" style="display: none;">
         <div class="top-bar">PORTAL SOP-CE GOVERNO DO ESTADO DO CEARÁ SISTEMA DE ADITIVOS DE OBRAS</div>
 
@@ -117,7 +134,7 @@
             <div style="display:flex;align-items:center;gap:16px;">
                 <div class="sop-logo"><span>SOP-CE</span></div>
                 <div>
-                    <div class="sop-title-main">SUPERINTENDNCIA DE OBRAS PBLICAS</div>
+                    <div class="sop-title-main">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
                     <div class="sop-title-sub">Governo do Estado do Ceará Secretaria das Cidades</div>
                 </div>
 
@@ -257,8 +274,6 @@
                         data-bs-target="#pane-financeiro" data-bs-toggle="tab">Financeiro</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
                         data-bs-target="#pane-gerencial" data-bs-toggle="tab">Gerencial</button></li>
-                <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
-                        data-bs-target="#pane-prazos" data-bs-toggle="tab">Prazos</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo"><button class="nav-link"
                         data-bs-target="#pane-reuniao" data-bs-toggle="tab">Processos</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
@@ -334,7 +349,16 @@
                                 <p>Gerenciar Usuários e Permissões do Sistema</p>
                             </div>
                         </div>
-                        <!-- 2. Composições -->
+                        <!-- 2. Atividades (módulo externo: cronograma.html) -->
+                        <div class="home-action-card" data-roles="admin,gerente,fiscal"
+                            onclick="window.location.href='cronograma.html'">
+                            <div class="home-action-icon"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
+                            <div class="home-action-text">
+                                <h3>Atividades</h3>
+                                <p>Painel de Distribuição de Tarefas da Equipe</p>
+                            </div>
+                        </div>
+                        <!-- 3. Composições -->
                         <div class="home-action-card" data-pane="pane-composicoes"
                             onclick="showPane('pane-composicoes')">
                             <div class="home-action-icon"><i class="bi bi-journal-text"></i></div>
@@ -343,7 +367,7 @@
                                 <p>Consultar e Elaborar Composições</p>
                             </div>
                         </div>
-                        <!-- 3. Orçamentos -->
+                        <!-- 4. Orçamentos -->
                         <div class="home-action-card" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
                             <div class="home-action-icon"><i class="bi bi-folder-check"></i></div>
                             <div class="home-action-text">
@@ -351,7 +375,7 @@
                                 <p>Orçamentos Revisados pela GEROA</p>
                             </div>
                         </div>
-                        <!-- 4. Painel Financeiro -->
+                        <!-- 5. Painel Financeiro -->
                         <div class="home-action-card" data-pane="pane-financeiro" data-roles="admin,gerente,fiscal"
                             onclick="showPane('pane-financeiro')">
                             <div class="home-action-icon"><i class="bi bi-currency-dollar"></i></div>
@@ -360,22 +384,13 @@
                                 <p>Fluxo de Valores de Aditivos</p>
                             </div>
                         </div>
-                        <!-- 5. Painel Gerencial -->
+                        <!-- 6. Painel Gerencial -->
                         <div class="home-action-card" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
                             onclick="showPane('pane-gerencial')">
                             <div class="home-action-icon"><i class="bi bi-pie-chart"></i></div>
                             <div class="home-action-text">
                                 <h3>Painel Gerencial</h3>
                                 <p>Indicadores de Desempenho e Estatísticas</p>
-                            </div>
-                        </div>
-                        <!-- 6. Prazos -->
-                        <div class="home-action-card" data-pane="pane-prazos" data-roles="admin,gerente,fiscal"
-                            onclick="showPane('pane-prazos')">
-                            <div class="home-action-icon"><i class="bi bi-clock-history"></i></div>
-                            <div class="home-action-text">
-                                <h3>Prazos</h3>
-                                <p>Controle de Produtividade</p>
                             </div>
                         </div>
                         <!-- 7. Processos -->
@@ -1315,182 +1330,81 @@
                 </div> <!-- FIM PANE-GERENCIAL -->
 
                 <!-- PAINEL DE PRAZOS E PRODUTIVIDADE -->
-                <div class="tab-pane fade" id="pane-prazos">
-                    <section class="filters-card">
-                        <div class="filters-title">Filtros Prazos</div>
-                        <div class="row g-2">
-                            <div class="col-12 col-md-4"><label class="form-label">Fiscal</label><select
-                                    class="form-select form-select-sm" id="prazos-filter-fiscal"></select></div>
-                            <div class="col-12 col-md-4"><label class="form-label">Status</label><select
-                                    class="form-select form-select-sm" id="prazos-filter-status"></select></div>
-                            <div class="col-12 col-md-4 d-flex align-items-end"><button
-                                    class="btn btn-sm w-30 btn-grid-clear" id="btn-prazos-clear">Limpar</button></div>
-                        </div>
-                    </section>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-12 col-md-3">
-                            <div class="kpi-card kpi-acresc-gecope">
-                                <div class="kpi-header">
-                                    <div class="kpi-icon"
-                                        style="background:rgba(0,114,51,0.12);color:var(--sop-green-dark);">
-                                    </div>
-                                    <div class="kpi-label">Aprovados</div>
-                                </div>
-                                <div class="kpi-value" id="kpi-aprovados_qtd">0</div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <div class="kpi-card kpi-reperc-gecope">
-                                <div class="kpi-header">
-                                    <div class="kpi-icon" style="background:rgba(0,95,138,0.12);color:#005f8a;">⏱️</div>
-                                    <div class="kpi-label">Média (dias)</div>
-                                </div>
-                                <div class="kpi-value" id="kpi-tempo_medio"></div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <div class="kpi-card kpi-supress-fiscal">
-                                <div class="kpi-header">
-                                    <div class="kpi-icon"
-                                        style="background:rgba(242,140,0,0.12);color:var(--sop-orange);">
-                                    </div>
-                                    <div class="kpi-label">Mediana</div>
-                                </div>
-                                <div class="kpi-value" id="kpi-tempo_mediana"></div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <div class="kpi-card kpi-diff-abs">
-                                <div class="kpi-header">
-                                    <div class="kpi-icon" style="background:rgba(142,68,173,0.12);color:#8e44ad;"></div>
-                                    <div class="kpi-label">P90</div>
-                                </div>
-                                <div class="kpi-value" id="kpi-tempo_p90"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-12 col-lg-6">
-                            <div class="chart-card">
-                                <div class="chart-header">
-                                    <div class="chart-title">Tempo Médio por Fiscal</div>
-                                </div>
-                                <div class="chart-placeholder" id="chart_tempo_por_fiscal"></div>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6">
-                            <div class="chart-card">
-                                <div class="chart-header">
-                                    <div class="chart-title">Tempo Médio por Tipo</div>
-                                </div>
-                                <div class="chart-placeholder" id="chart_tempo_por_tipo"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div> <!-- FIM PANE-PRAZOS -->
-
                 <!-- PAINEL DE PROCESSOS -->
                 <div class="tab-pane fade" id="pane-reuniao" role="tabpanel">
 
                     <div class="pt-3 pb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <h5 class="fw-bold mb-0" style="color: var(--sop-gray-dark);">Painel de Processos
-                                    </h5>
-                                </div>
-                                <small class="text-muted">Gerencie a pauta, visualize prazos e edite
-                                    informações.</small>
+                                <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px;">
+                                    Painel de Processos</div>
+                                <div style="color:var(--text-muted);font-size:0.98rem;">Gerencie a pauta, visualize
+                                    prazos e edite informações.</div>
                             </div>
-                            <button type="button" class="btn btn-success fw-bold shadow-sm admin-only"
-                                style="background-color: var(--sop-green); border: none; font-size: 0.85rem;"
-                                data-bs-toggle="modal" data-bs-target="#modalCadastro">
-                                <i class="bi bi-plus-lg me-1"></i> Novo Processo
-                            </button>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-success fw-bold"
+                                    style="font-size: 0.85rem; height: 40px;"
+                                    onclick="window.location.href='cronograma.html'">
+                                    <i class="bi bi-kanban me-1" style="display:inline-block; transform: scaleY(-1);"></i> Atividades
+                                </button>
+                                <button type="button" class="btn btn-success fw-bold shadow-sm admin-only"
+                                    style="background-color: var(--sop-green); border: none; font-size: 0.85rem; height: 40px;"
+                                    data-bs-toggle="modal" data-bs-target="#modalCadastro">
+                                    <i class="bi bi-plus-lg me-1"></i> Novo Processo
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="row g-2 mb-2">
-                            <div class="col-12 col-md-4 col-lg">
-                                <div class="card border-0 shadow-sm h-150"
-                                    style="border-bottom: 4px solid var(--sop-green-light) !important;">
-                                    <div class="card-body p-3 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center mb-1">
-                                            <i class="bi bi-pin-angle-fill me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Processos</span>
-                                        </div>
-                                        <h3 class="fw-bold mb-0" id="card_proc_total">0</h3>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Filtrado na tela</small>
-                                    </div>
+                        <div class="proc-kpi-grid mb-2">
+                            <div class="proc-kpi-card accent-green">
+                                <div class="proc-kpi-icon bg-green"><i class="bi bi-pin-angle-fill"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Processos</span>
+                                    <div class="proc-kpi-value" id="card_proc_total">0</div>
+                                    <div class="proc-kpi-sub">Filtrado na tela</div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4 col-lg">
-                                <div class="card border-0 shadow-sm h-150"
-                                    style="border-bottom: 4px solid var(--sop-orange) !important;">
-                                    <div class="card-body p-3 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center mb-1">
-                                            <i class="bi bi-hourglass-split me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Aguardando
-                                                Análise</span>
-                                        </div>
-                                        <h3 class="fw-bold mb-0" id="card_proc_andamento">0</h3>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Status = AGUAR.
-                                            ANÁLISE</small>
-                                    </div>
+                            <div class="proc-kpi-card accent-orange">
+                                <div class="proc-kpi-icon bg-orange"><i class="bi bi-hourglass-split"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Aguardando Análise</span>
+                                    <div class="proc-kpi-value" id="card_proc_andamento">0</div>
+                                    <div class="proc-kpi-sub">Status = AGUAR. ANÁLISE</div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4 col-lg">
-                                <div class="card border-0 shadow-sm h-150"
-                                    style="border-bottom: 4px solid var(--sop-green) !important;">
-                                    <div class="card-body p-3 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center mb-1">
-                                            <i class="bi bi-check-square-fill me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Análise Fiscal</span>
-                                        </div>
-                                        <h3 class="fw-bold mb-0" id="card_proc_aprovados">0</h3>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Status = ANÁLISE
-                                            FISCAL</small>
-                                    </div>
+                            <div class="proc-kpi-card accent-green">
+                                <div class="proc-kpi-icon bg-green"><i class="bi bi-check2-circle"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Análise Fiscal</span>
+                                    <div class="proc-kpi-value" id="card_proc_aprovados">0</div>
+                                    <div class="proc-kpi-sub">Status = ANÁLISE FISCAL</div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4 col-lg">
-                                <div class="card border-0 shadow-sm h-150"
-                                    style="border-bottom: 4px solid #6f42c1 !important;">
-                                    <div class="card-body p-3 d-flex flex-column justify-content-between">
-                                        <div class="d-flex align-items-center mb-1">
-                                            <i class="bi bi-calendar-event me-2 text-muted"></i>
-                                            <span class="small text-muted fw-bold text-uppercase">Reanálise
-                                                Fiscal</span>
-                                        </div>
-                                        <h3 class="fw-bold mb-0" id="card_proc_dias">0</h3>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Status = REANÁLISE
-                                            FISCAL</small>
-                                    </div>
+                            <div class="proc-kpi-card accent-purple">
+                                <div class="proc-kpi-icon bg-purple"><i class="bi bi-calendar-event"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Reanálise Fiscal</span>
+                                    <div class="proc-kpi-value" id="card_proc_dias">0</div>
+                                    <div class="proc-kpi-sub">Status = REANÁLISE FISCAL</div>
                                 </div>
                             </div>
                             <!-- Card 'NOVO NO SUITE' removido -->
                         </div>
 
-                        <!-- [NOVO] NAVEGAÇÃO MINIMALISTA POR ABAS (3 PÁGINAS) -->
-                        <div class="d-flex my-3" id="process-tab-nav" style="gap: 32px;">
-                            <div class="pb-1 active-tab" id="btn-tab-ativos" onclick="switchProcessTab('ativos')"
-                                style="cursor: pointer; font-weight: 700; font-size: 0.9rem; color: var(--sop-green); border-bottom: 3px solid var(--sop-green); transition: all 0.2s;">
-                                PÁGINA 1: EM TRAMITAÇÃO
-                            </div>
-                            <div class="pb-1" id="btn-tab-aprovados" onclick="switchProcessTab('aprovados')"
-                                style="cursor: pointer; font-weight: 500; font-size: 0.9rem; color: #64748b; border-bottom: 3px solid transparent; transition: all 0.2s;">
-                                PÁGINA 2: APROVADOS
-                            </div>
-                            <div class="pb-1" id="btn-tab-arquivados" onclick="switchProcessTab('arquivados')"
-                                style="cursor: pointer; font-weight: 500; font-size: 0.9rem; color: #64748b; border-bottom: 3px solid transparent; transition: all 0.2s;">
-                                PÁGINA 3: ARQUIVADOS
-                            </div>
+                        <!-- NAVEGAÇÃO POR ABAS (3 PÁGINAS) — pill segmentado -->
+                        <div class="proc-tabs" id="process-tab-nav">
+                            <button type="button" class="proc-tab active" id="btn-tab-ativos"
+                                onclick="switchProcessTab('ativos')">Em Tramitação</button>
+                            <button type="button" class="proc-tab" id="btn-tab-aprovados"
+                                onclick="switchProcessTab('aprovados')">Aprovados</button>
+                            <button type="button" class="proc-tab" id="btn-tab-arquivados"
+                                onclick="switchProcessTab('arquivados')">Arquivados</button>
                         </div>
 
                         <section class="filters-card mb-2">
                             <div class="filters-title">Filtros de Pesquisa</div>
-                            <div class="row g-3">
-                                <div class="col-12 col-md-2">
+                            <div class="proc-filter-row">
+                                <div class="proc-filter-col">
                                     <label class="form-label small text-muted fw-bold text-uppercase mb-1">Metas</label>
                                     <select class="form-select form-select-sm border-secondary-subtle"
                                         id="meetingMetaSelect">
@@ -1501,7 +1415,7 @@
                                         <option value="Sem meta">Sem meta</option>
                                     </select>
                                 </div>
-                                <div class="col-12 col-md-2">
+                                <div class="proc-filter-col">
                                     <label
                                         class="form-label small text-muted fw-bold text-uppercase mb-1">Prioritário</label>
                                     <select class="form-select form-select-sm border-secondary-subtle"
@@ -1511,69 +1425,53 @@
                                         <option value="Não">Não Prioritário</option>
                                     </select>
                                 </div>
-                                <div class="col-12 col-md-2">
+                                <div class="proc-filter-col">
                                     <label
                                         class="form-label small text-muted fw-bold text-uppercase mb-1">Fiscal</label>
                                     <select
                                         class="form-select form-select-sm border-secondary-subtle fw-bold text-primary"
                                         id="meetingFiscalSelect"></select>
                                 </div>
-                                <div class="col-12 col-md-2">
+                                <div class="proc-filter-col">
                                     <label
                                         class="form-label small text-muted fw-bold text-uppercase mb-1">Status</label>
                                     <select class="form-select form-select-sm border-secondary-subtle"
                                         id="meetingStatusSelect"></select>
                                 </div>
-                                <div class="col">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label
-                                            class="form-label small text-muted fw-bold text-uppercase mb-0">Buscar</label>
-                                        <div class="form-check form-switch mb-0 d-flex align-items-center"
-                                            style="min-height: auto; padding-left: 2.5em;">
-                                            <input class="form-check-input mt-0" type="checkbox" role="switch"
-                                                id="searchGlobalToggle" title="Buscar em todas as abas"
-                                                style="cursor: pointer;">
-                                            <label class="form-check-label small text-muted ms-1"
-                                                for="searchGlobalToggle"
-                                                style="font-size: 0.65rem; cursor: pointer; user-select: none;"
-                                                title="Buscar em todas as abas">Global</label>
-                                        </div>
-                                    </div>
-                                    <div class="input-group input-group-sm">
-                                        <input type="text" class="form-control border-secondary-subtle"
+                                <div class="proc-filter-col-search">
+                                    <label class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
+                                    <div class="proc-search-wrap">
+                                        <input type="text" class="form-control form-control-sm border-secondary-subtle"
                                             id="meetingSearch"
                                             placeholder="Processo, Descrição, Analista, Fiscal, Status...">
-                                        <span class="input-group-text bg-light text-muted border-secondary-subtle"><i
-                                                class="bi bi-search"></i></span>
+                                        <i class="bi bi-search proc-search-icon"></i>
                                     </div>
                                 </div>
-                                <div class="col-auto d-flex align-items-end gap-2">
-                                    <button class="btn btn-sm btn-outline-success fw-bold" id="btn-reuniao-export"
-                                        style="height: 31px;" onclick="exportarProcessos()"
-                                        title="Exportar resultado filtrado para Excel">
+                                <div class="proc-filter-actions">
+                                    <button class="btn btn-success fw-bold" id="btn-reuniao-clear">Limpar</button>
+                                    <button class="btn btn-outline-success fw-bold" id="btn-reuniao-export"
+                                        onclick="exportarProcessos()" title="Exportar resultado filtrado para Excel">
                                         <i class="bi bi-file-earmark-excel"></i> Excel
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger fw-bold" id="btn-reuniao-pdf"
-                                        style="height: 31px;" onclick="exportarProcessosPDF()"
-                                        title="Exportar resultado filtrado para PDF">
+                                    <button class="btn fw-bold proc-btn-pdf" id="btn-reuniao-pdf"
+                                        onclick="exportarProcessosPDF()" title="Exportar resultado filtrado para PDF">
                                         <i class="bi bi-file-earmark-pdf"></i> PDF
                                     </button>
-                                    <button class="btn btn-sm btn-grid-clear" id="btn-reuniao-clear"
-                                        style="height: 31px;">Limpar</button>
                                 </div>
                             </div>
                         </section>
 
-                        <table class="table table-hover table-striped align-middle mb-0 w-100"
-                            style="font-size: 0.9rem;">
-                            <thead class="table-light"></thead>
-                            <tbody id="meetingTableBody" class="border-top-0"></tbody>
-                        </table>
+                        <div class="proc-table-wrap">
+                            <table class="table align-middle mb-0 w-100">
+                                <thead></thead>
+                                <tbody id="meetingTableBody" class="border-top-0"></tbody>
+                            </table>
+                        </div>
 
                         <div class="footer-note mt-3 d-flex justify-content-between align-items-center">
-                            <span id="meetingFooterNote" class="badge bg-light text-dark border fw-normal">Carregando
+                            <span id="meetingFooterNote" class="proc-table-footer-pill">Carregando
                                 dados...</span>
-                            <small class="text-muted fst-italic">* Utilize os filtros acima para refinar a
+                            <small class="text-muted fst-italic">Utilize os filtros acima para refinar a
                                 busca.</small>
                         </div>
 
