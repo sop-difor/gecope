@@ -1033,6 +1033,8 @@ async function carregarAtividadesResumoHome() {
             const hora = dt.getHours().toString().padStart(2, '0') + ':' + dt.getMinutes().toString().padStart(2, '0');
             const timeLabel = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + hora;
             const iconClass = getAtividadeIcon(at.tipo);
+            const badgeClass = getAtividadeBadgeClass(at.tipo);
+            const badgeLabel = getAtividadeLabel(at.tipo);
 
             return `
                                 <div class="activity-item">
@@ -1040,7 +1042,10 @@ async function carregarAtividadesResumoHome() {
                                         <i class="bi ${iconClass} fs-5"></i>
                                     </div>
                                     <div class="activity-content">
-                                        <span class="activity-time">${timeLabel}</span>
+                                        <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                            <span class="activity-time mb-0">${timeLabel}</span>
+                                            <span class="activity-badge ${badgeClass}">${badgeLabel}</span>
+                                        </div>
                                         <div class="activity-desc"><strong>${at.usuario}</strong> ${at.descricao}</div>
                                     </div>
                                 </div>
@@ -1060,6 +1065,26 @@ function getAtividadeIcon(tipo) {
         case 'COMPOSICAO': return 'bi-journal-text text-warning';
         case 'TABELA': return 'bi-search text-info';
         default: return 'bi-clock-history';
+    }
+}
+
+function getAtividadeLabel(tipo) {
+    switch (tipo) {
+        case 'PROCESSO': return 'Processo';
+        case 'ORCAMENTO': return 'Orçamento';
+        case 'COMPOSICAO': return 'Composição';
+        case 'TABELA': return 'Tabela';
+        default: return tipo || 'Outro';
+    }
+}
+
+function getAtividadeBadgeClass(tipo) {
+    switch (tipo) {
+        case 'PROCESSO': return 'badge-processo';
+        case 'ORCAMENTO': return 'badge-orcamento';
+        case 'COMPOSICAO': return 'badge-composicao';
+        case 'TABELA': return 'badge-tabela';
+        default: return 'badge-outro';
     }
 }
 

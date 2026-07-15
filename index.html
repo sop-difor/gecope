@@ -300,6 +300,7 @@
                 <!-- PAINEL INICIAL (HOME) -->
                 <div class="tab-pane fade" id="pane-home">
                     <div class="home-welcome-section">
+                        <i class="bi bi-buildings home-welcome-watermark"></i>
                         <h1 class="home-welcome-title">Olá, <span id="home-user-name">usuário</span>.</h1>
                         <div class="home-welcome-subtitle">Bem-vindo ao GECOPE. Hoje é <span
                                 id="home-current-date">Sexta-feira,
@@ -307,103 +308,104 @@
                     </div>
 
                     <!-- Stats Cards Row -->
+                    <div class="home-section-eyebrow">Panorama Geral</div>
                     <div class="home-stats-grid">
-                        <div class="home-stat-card">
+                        <div class="home-stat-card accent-green">
+                            <i class="bi bi-graph-up-arrow home-stat-watermark"></i>
+                            <div class="home-stat-icon bg-green"><i class="bi bi-graph-up-arrow"></i></div>
                             <div class="home-stat-info">
-                                <h4>Processos em Andamento</h4>
+                                <span class="home-stat-label">Processos em Andamento</span>
                                 <div class="home-stat-value" id="stat-proc-andamento">0</div>
-                            </div>
-                            <div class="home-stat-icon bg-light-green">
-                                <i class="bi bi-graph-up-arrow"></i>
+                                <div class="home-stat-sub">Total ativo no sistema</div>
                             </div>
                         </div>
 
-                        <!-- diagnóstico removido para retornar layout anterior -->
-                        <div class="home-stat-card">
+                        <div class="home-stat-card accent-blue">
+                            <i class="bi bi-search home-stat-watermark"></i>
+                            <div class="home-stat-icon bg-blue"><i class="bi bi-search"></i></div>
                             <div class="home-stat-info">
-                                <h4>Processos Em Análise</h4>
+                                <span class="home-stat-label">Processos Em Análise</span>
                                 <div class="home-stat-value" id="stat-proc-analise">0</div>
-                            </div>
-                            <div class="home-stat-icon bg-light-blue">
-                                <i class="bi bi-search"></i>
+                                <div class="home-stat-sub">Aguardando parecer técnico</div>
                             </div>
                         </div>
-                        <div class="home-stat-card">
+                        <div class="home-stat-card accent-orange">
+                            <i class="bi bi-check2-circle home-stat-watermark"></i>
+                            <div class="home-stat-icon bg-orange"><i class="bi bi-check2-circle"></i></div>
                             <div class="home-stat-info">
-                                <h4>Aditivos Aprovados no Mês</h4>
+                                <span class="home-stat-label">Aditivos Aprovados no Mês</span>
                                 <div class="home-stat-value" id="stat-proc-aprovados">0</div>
-                            </div>
-                            <div class="home-stat-icon bg-light-orange">
-                                <i class="bi bi-check2-circle"></i>
+                                <div class="home-stat-sub">Referente ao mês corrente</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Hub de Navegação (Tiles) -->
+                    <div class="home-section-eyebrow">Módulos do Sistema</div>
                     <div class="home-quick-actions-grid">
                         <!-- 1. Administração -->
-                        <div class="home-action-card" data-pane="pane-admin" onclick="showPane('pane-admin')">
-                            <div class="home-action-icon" style="color: #666;"><i class="bi bi-shield-lock"></i></div>
+                        <div class="home-action-card accent-slate" data-pane="pane-admin" onclick="showPane('pane-admin')">
+                            <div class="home-action-icon bg-slate"><i class="bi bi-shield-lock"></i></div>
                             <div class="home-action-text">
                                 <h3>Administração</h3>
                                 <p>Gerenciar Usuários e Permissões do Sistema</p>
                             </div>
                         </div>
                         <!-- 2. Atividades (módulo externo: cronograma.html) -->
-                        <div class="home-action-card" data-roles="admin,gerente,fiscal"
+                        <div class="home-action-card accent-indigo" data-roles="admin,gerente,fiscal"
                             onclick="window.location.href='cronograma.html'">
-                            <div class="home-action-icon"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
+                            <div class="home-action-icon bg-indigo"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
                             <div class="home-action-text">
                                 <h3>Atividades</h3>
                                 <p>Painel de Distribuição de Tarefas da Equipe</p>
                             </div>
                         </div>
                         <!-- 3. Composições -->
-                        <div class="home-action-card" data-pane="pane-composicoes"
+                        <div class="home-action-card accent-blue" data-pane="pane-composicoes"
                             onclick="showPane('pane-composicoes')">
-                            <div class="home-action-icon"><i class="bi bi-journal-text"></i></div>
+                            <div class="home-action-icon bg-blue"><i class="bi bi-journal-text"></i></div>
                             <div class="home-action-text">
                                 <h3>Composições</h3>
                                 <p>Consultar e Elaborar Composições</p>
                             </div>
                         </div>
                         <!-- 4. Orçamentos -->
-                        <div class="home-action-card" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
-                            <div class="home-action-icon"><i class="bi bi-folder-check"></i></div>
+                        <div class="home-action-card accent-orange" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
+                            <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
                             <div class="home-action-text">
                                 <h3>Orçamentos</h3>
                                 <p>Orçamentos Revisados pela GEROA</p>
                             </div>
                         </div>
                         <!-- 5. Painel Financeiro -->
-                        <div class="home-action-card" data-pane="pane-financeiro" data-roles="admin,gerente,fiscal"
+                        <div class="home-action-card accent-teal" data-pane="pane-financeiro" data-roles="admin,gerente,fiscal"
                             onclick="showPane('pane-financeiro')">
-                            <div class="home-action-icon"><i class="bi bi-currency-dollar"></i></div>
+                            <div class="home-action-icon bg-teal"><i class="bi bi-currency-dollar"></i></div>
                             <div class="home-action-text">
                                 <h3>Painel Financeiro</h3>
                                 <p>Fluxo de Valores de Aditivos</p>
                             </div>
                         </div>
                         <!-- 6. Painel Gerencial -->
-                        <div class="home-action-card" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
+                        <div class="home-action-card accent-purple" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
                             onclick="showPane('pane-gerencial')">
-                            <div class="home-action-icon"><i class="bi bi-pie-chart"></i></div>
+                            <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
                             <div class="home-action-text">
                                 <h3>Painel Gerencial</h3>
                                 <p>Indicadores de Desempenho e Estatísticas</p>
                             </div>
                         </div>
                         <!-- 7. Processos -->
-                        <div class="home-action-card" data-pane="pane-reuniao" onclick="showPane('pane-reuniao')">
-                            <div class="home-action-icon"><i class="bi bi-file-earmark-text"></i></div>
+                        <div class="home-action-card accent-green" data-pane="pane-reuniao" onclick="showPane('pane-reuniao')">
+                            <div class="home-action-icon bg-green"><i class="bi bi-file-earmark-text"></i></div>
                             <div class="home-action-text">
                                 <h3>Processos</h3>
                                 <p>Gerenciar Processos de Aditivos</p>
                             </div>
                         </div>
                         <!-- 8. Tabelas -->
-                        <div class="home-action-card" data-pane="pane-tabelas" onclick="showPane('pane-tabelas')">
-                            <div class="home-action-icon"><i class="bi bi-search"></i></div>
+                        <div class="home-action-card accent-slate" data-pane="pane-tabelas" onclick="showPane('pane-tabelas')">
+                            <div class="home-action-icon bg-slate"><i class="bi bi-search"></i></div>
                             <div class="home-action-text">
                                 <h3>Tabelas</h3>
                                 <p>Consultar Bases de Preços (SEINFRA/SINAPI/ORSE)</p>
