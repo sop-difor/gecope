@@ -3227,6 +3227,11 @@ if (typeof verificarAdminSalvo === 'function') verificarAdminSalvo();
 // Cadastro reformulado: NOME, SOBRENOME, MATRICULA, SENHA
 async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email) {
     try {
+        // Normaliza (trim/lowercase) antes de qualquer uso: o Supabase Auth sempre grava o
+        // e-mail em minúsculas, então usar a mesma normalização aqui garante que auth.users
+        // e app_users fiquem com o mesmo valor e possam ser correlacionados pelo e-mail.
+        email = (email || '').trim().toLowerCase();
+
         // 1. Criar usuário no Auth
         const options = {
             email: email,
@@ -3299,6 +3304,10 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
 
 async function signInWithEmail(email, password, opts = {}) {
     try {
+        // Normaliza aqui também: garante que a busca do perfil em app_users (feita mais abaixo
+        // por igualdade exata de string) bata mesmo que o usuário digite o e-mail com maiúsculas.
+        email = (email || '').trim().toLowerCase();
+
         // Garantia: aguarda inicialização do cliente Supabase (se necessário)
         if (!sbClient) {
             const waitInit = new Promise(res => {

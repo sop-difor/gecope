@@ -313,7 +313,7 @@
         const sobrenome = document.getElementById('edit-user-sobrenome').value.trim();
         const matricula = document.getElementById('edit-user-matricula').value.trim();
         const gedop = document.getElementById('edit-user-gedop').value.trim();
-        const emailNovo = document.getElementById('edit-user-email').value.trim();
+        const emailNovo = document.getElementById('edit-user-email').value.trim().toLowerCase();
         const whatsapp = document.getElementById('edit-user-whatsapp').value.trim().replace(/\D/g, '');
         const role = document.getElementById('edit-user-role').value;
 
@@ -451,8 +451,11 @@
         if (!confirm(`Confirmar aprovação de ${matricula || nome} como ${role.toUpperCase()}?`)) return;
         try {
             // 1. Tentativa prioritária: atualizar registro pendente existente diretamente no banco
-            // Isso cobre o caso mais comum: usuário se cadastrou e ficou com role='pending'
-            const emailReal = emailCadastro || (matricula ? `${matricula}@gecope.app` : null);
+            // Isso cobre o caso mais comum: usuário se cadastrou e ficou com role='pending'.
+            // Normalizado (trim/lowercase) para bater com o e-mail salvo pelo Supabase Auth,
+            // que sempre grava em minúsculas — evita divergência entre app_users e auth.users.
+            const emailCadastroNormalizado = (emailCadastro || '').trim().toLowerCase();
+            const emailReal = emailCadastroNormalizado || (matricula ? `${matricula}@gecope.app` : null);
             let updatedExisting = false;
 
             if (emailReal) {
@@ -483,7 +486,7 @@
 
             try {
                 const { data: invokeData, error: invokeErr } = await sbClient.functions.invoke('approve-user', {
-                    body: { notifId, role, matricula, nome }
+                    body: { notifId, role, matricula, nome, email: emailReal }
                 });
 
                 if (!invokeErr) {
@@ -507,7 +510,7 @@
                                 'Content-Type': 'application/json',
                                 ...(token ? { Authorization: `Bearer ${token}` } : {})
                             },
-                            body: JSON.stringify({ notifId, role, matricula, nome })
+                            body: JSON.stringify({ notifId, role, matricula, nome, email: emailReal })
                         });
 
                         if (resp.ok) {

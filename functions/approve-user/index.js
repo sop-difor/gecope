@@ -36,8 +36,12 @@ export default async function handler(req, res) {
 
     // perform creation
     const body = await req.json()
-    const { notifId, role, matricula, nome } = body || {}
-    const emailToCreate = matricula ? `${matricula}@gecope.app` : `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`
+    const { notifId, role, matricula, nome, email } = body || {}
+    // Prioriza sempre o e-mail real informado no cadastro (o mesmo usado no auth.signUp).
+    // Só recorre ao e-mail fabricado (matricula@gecope.app) quando não há e-mail real disponível,
+    // evitando criar em app_users um perfil desconectado da conta de autenticação existente.
+    const emailNormalizado = (email || '').trim().toLowerCase();
+    const emailToCreate = emailNormalizado || (matricula ? `${matricula}@gecope.app` : `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`)
 
     const payload = {
       email: emailToCreate,

@@ -1706,11 +1706,54 @@
         .proc-kpi-card.accent-orange { border-left: 4px solid var(--sop-orange); }
         .proc-kpi-card.accent-purple { border-left: 4px solid #6f42c1; }
         .proc-kpi-card.accent-blue { border-left: 4px solid #0d6efd; }
+        .proc-kpi-card.accent-red { border-left: 4px solid var(--filetype-pdf-fg); }
 
         .proc-kpi-icon.bg-green { background: var(--sop-green); box-shadow: 0 4px 10px -2px var(--sop-green); }
         .proc-kpi-icon.bg-orange { background: var(--sop-orange); box-shadow: 0 4px 10px -2px var(--sop-orange); }
         .proc-kpi-icon.bg-purple { background: #6f42c1; box-shadow: 0 4px 10px -2px #6f42c1; }
         .proc-kpi-icon.bg-blue { background: #0d6efd; box-shadow: 0 4px 10px -2px #0d6efd; }
+        .proc-kpi-icon.bg-red { background: var(--filetype-pdf-fg); box-shadow: 0 4px 10px -2px var(--filetype-pdf-fg); }
+
+        /* Cabeçalho de seção — mesmo espírito dos cards de KPI (ícone colorido + título),
+           usado para substituir os headers de acordeão antigos na aba Administração */
+        .admin-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: #fff;
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+
+        .admin-section-header:hover {
+            background: var(--sop-slate-50, #f8fafc);
+        }
+
+        .admin-section-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .admin-section-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+            color: #fff;
+            font-size: 1.05rem;
+        }
+
+        .admin-section-title {
+            font-weight: 700;
+            font-size: 0.98rem;
+            color: var(--text-heading);
+        }
 
         /* Abas por página (pill segmentado) */
         .proc-tabs {
