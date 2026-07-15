@@ -429,52 +429,44 @@
                 </div>
                 <!-- PAINEL ADMINISTRAÇÃO -->
                 <div class="tab-pane fade" id="pane-admin">
-                    <div class="container-fluid py-4">
+                    <div class="page-wrapper pt-0">
+
+                        <div class="mb-3">
+                            <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px;">
+                                Painel de Administração</div>
+                            <div style="color:var(--text-muted);font-size:0.98rem;">Gerencie usuários, permissões de
+                                acesso e notificações do sistema.</div>
+                        </div>
+
                         <!-- Dashboard Indicators -->
-                        <div class="row g-4 mb-5">
-                            <div class="col-6 col-md-3">
-                                <div class="admin-stat-card shadow-sm">
-                                    <div class="admin-stat-icon-wrapper icon-bg-slate">
-                                        <i class="bi bi-people fs-4"></i>
-                                    </div>
-                                    <div>
-                                        <div class="admin-stat-label">Total de Usuários</div>
-                                        <div class="admin-stat-value" id="admin-stat-total">0</div>
-                                    </div>
+                        <div class="proc-kpi-grid mb-4">
+                            <div class="proc-kpi-card accent-green">
+                                <div class="proc-kpi-icon bg-green"><i class="bi bi-people"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Total de Usuários</span>
+                                    <div class="proc-kpi-value" id="admin-stat-total">0</div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="admin-stat-card shadow-sm" id="admin-stat-card-pendentes"
-                                    style="cursor:pointer;" onclick="openAdminPendings()">
-                                    <div class="admin-stat-icon-wrapper icon-bg-orange">
-                                        <i class="bi bi-person-plus fs-4"></i>
-                                    </div>
-                                    <div>
-                                        <div class="admin-stat-label">Pendentes</div>
-                                        <div class="admin-stat-value" id="admin-stat-pending">0</div>
-                                    </div>
+                            <div class="proc-kpi-card accent-orange" id="admin-stat-card-pendentes"
+                                style="cursor:pointer;" onclick="openAdminPendings()">
+                                <div class="proc-kpi-icon bg-orange"><i class="bi bi-person-plus"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Pendentes</span>
+                                    <div class="proc-kpi-value" id="admin-stat-pending">0</div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="admin-stat-card shadow-sm">
-                                    <div class="admin-stat-icon-wrapper icon-bg-red">
-                                        <i class="bi bi-shield-check fs-4"></i>
-                                    </div>
-                                    <div>
-                                        <div class="admin-stat-label">Administradores</div>
-                                        <div class="admin-stat-value" id="admin-stat-admins">0</div>
-                                    </div>
+                            <div class="proc-kpi-card accent-red">
+                                <div class="proc-kpi-icon bg-red"><i class="bi bi-shield-check"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Administradores</span>
+                                    <div class="proc-kpi-value" id="admin-stat-admins">0</div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-3">
-                                <div class="admin-stat-card shadow-sm">
-                                    <div class="admin-stat-icon-wrapper icon-bg-green">
-                                        <i class="bi bi-person-badge fs-4"></i>
-                                    </div>
-                                    <div>
-                                        <div class="admin-stat-label">Analistas / Fiscais</div>
-                                        <div class="admin-stat-value" id="admin-stat-others">0</div>
-                                    </div>
+                            <div class="proc-kpi-card accent-blue">
+                                <div class="proc-kpi-icon bg-blue"><i class="bi bi-person-badge"></i></div>
+                                <div class="proc-kpi-text">
+                                    <span class="proc-kpi-label">Analistas / Fiscais</span>
+                                    <div class="proc-kpi-value" id="admin-stat-others">0</div>
                                 </div>
                             </div>
                         </div>
@@ -516,12 +508,14 @@
 
                         <!-- User Management -->
                         <div class="card admin-accordion-card">
-                            <div class="card-header admin-accordion-header header-soft-green d-flex justify-content-between align-items-center"
-                                role="button" data-bs-toggle="collapse" data-bs-target="#collapseUserMgmt"
-                                aria-expanded="false">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-people-fill me-2"></i>Banco de Usuários Ativos
-                                </h6>
-                                <i class="bi bi-chevron-down"></i>
+                            <div class="admin-section-header" role="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseUserMgmt" aria-expanded="false">
+                                <div class="admin-section-header-left">
+                                    <div class="admin-section-icon" style="background:var(--sop-green);"><i
+                                            class="bi bi-people-fill"></i></div>
+                                    <span class="admin-section-title">Banco de Usuários Ativos</span>
+                                </div>
+                                <i class="bi bi-chevron-down text-muted"></i>
                             </div>
 
                             <div id="collapseUserMgmt" class="collapse">
@@ -540,7 +534,7 @@
                                                     class="form-control border-0 bg-light"
                                                     placeholder="Filtrar por nome..." onkeyup="filterAdminUsers()">
                                             </div>
-                                            <button class="btn btn-sm btn-primary fw-bold"
+                                            <button class="btn btn-sm btn-success fw-bold"
                                                 onclick="abrirModalNovoUsuario()">
                                                 <i class="bi bi-plus-lg me-1"></i> Novo Usuário
                                             </button>
@@ -579,18 +573,20 @@
 
                         <!-- GESTÃO INTEGRADA DE NOTIFICAÇÕES (UNIFICADO) -->
                         <div class="card admin-accordion-card">
-                            <div class="card-header admin-accordion-header header-soft-blue d-flex justify-content-between align-items-center"
-                                role="button" data-bs-toggle="collapse" data-bs-target="#collapseUnifiedNotifications"
-                                aria-expanded="false" onclick="WhatsAppConfigManager.loadAll()">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-whatsapp me-2"></i>Gestão Integrada de
-                                    Notificações
-                                </h6>
+                            <div class="admin-section-header" role="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseUnifiedNotifications" aria-expanded="false"
+                                onclick="WhatsAppConfigManager.loadAll()">
+                                <div class="admin-section-header-left">
+                                    <div class="admin-section-icon" style="background:#25D366;"><i
+                                            class="bi bi-whatsapp"></i></div>
+                                    <span class="admin-section-title">Gestão Integrada de Notificações</span>
+                                </div>
                                 <div class="d-flex gap-2 align-items-center">
                                     <button type="button" class="btn btn-sm btn-light py-0 fw-bold border"
                                         style="font-size: 0.7rem;" onclick="testarConexaoWhatsApp(event)">
                                         <i class="bi bi-broadcast me-1"></i> TESTAR API
                                     </button>
-                                    <i class="bi bi-chevron-down"></i>
+                                    <i class="bi bi-chevron-down text-muted"></i>
                                 </div>
                             </div>
 
