@@ -224,44 +224,51 @@
                 tbodyPending.appendChild(tr);
             });
 
+            // Contas "fantasma" (cadastradas só para disparo de WhatsApp, sem login real).
+            // O disparo automático está paralisado, então essas contas não têm mais utilidade
+            // aqui — ficam ocultas da lista (continuam contadas nos KPIs do topo).
+            const activesVisiveis = actives.filter(u => !(u.email && u.email.includes('@sop-ghost.internal')));
+
             tbodyActive.innerHTML = '';
-            if (actives.length === 0) {
-                tbodyActive.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nenhum usuário ativo.</td></tr>';
+            if (activesVisiveis.length === 0) {
+                tbodyActive.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Nenhum usuário ativo.</td></tr>';
             }
 
-            actives.forEach(u => {
+            const roleBadgeClass = {
+                admin: 'badge-role-admin',
+                gerente: 'badge-role-gerente',
+                fiscal: 'badge-role-fiscal',
+                externo: 'badge-role-externo'
+            };
+
+            activesVisiveis.forEach(u => {
                 const fullNome = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'Não informado').toUpperCase();
-                let roleColor = 'bg-secondary';
-                if (u.role === 'admin') roleColor = 'bg-danger';
-                else if (u.role === 'gerente') roleColor = 'bg-primary';
-                else if (u.role === 'fiscal') roleColor = 'bg-success';
-                else if (u.role === 'externo') roleColor = 'bg-dark';
+                const iniciais = fullNome.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('') || '?';
+                const roleClass = roleBadgeClass[u.role] || 'badge-role-externo';
 
                 const tr = document.createElement('tr');
+                tr.className = 'tr-processo-row';
                 tr.setAttribute('data-search', `${fullNome.toLowerCase()} ${u.matricula || ''} ${u.email.toLowerCase()} ${u.gedop || ''}`);
-                
-                // Tratar exibição do nome e ghost
-                let isGhost = u.email && u.email.includes('@sop-ghost.internal');
-                let displayEmail = isGhost ? '<span class="badge bg-light text-secondary border">FANTASMA (S/ LOGIN)</span>' : u.email;
-                let ghostBadge = isGhost ? '<span class="badge bg-warning text-dark ms-2" title="Fiscal sem login">Somente WhatsApp</span>' : '';
 
                 tr.innerHTML = `
-                    <td class="ps-4"><div class="fw-bold text-dark">${fullNome}</div></td>
-                    <td><div class="small text-muted">${displayEmail}</div></td>
+                    <td class="ps-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="admin-user-avatar">${iniciais}</div>
+                            <div class="fw-bold text-dark">${fullNome}</div>
+                        </div>
+                    </td>
+                    <td><div class="small text-muted">${u.email}</div></td>
                     <td><div class="small fw-bold text-secondary">${u.telefone_whatsapp || '-'}</div></td>
                     <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
                     <td><span class="badge bg-light text-dark border fw-normal">${u.gedop || '-'}</span></td>
-                    <td>
-                        <span class="badge ${roleColor} rounded-pill px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span>
-                        ${ghostBadge}
-                    </td>
+                    <td><span class="badge rounded-pill ${roleClass} px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
-                            <button class="btn btn-sm btn-outline-primary border-0" onclick="abrirModalEdicaoUsuario('${u.email}')" title="Editar Usuário">
-                                <i class="bi bi-pencil"></i>
+                            <button class="btn-action-icon" onclick="abrirModalEdicaoUsuario('${u.email}')" title="Editar Usuário">
+                                <i class="bi bi-pencil icon-cloud"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger border-0" onclick="excluirUsuario('${u.email}')" title="Excluir Usuário">
-                                <i class="bi bi-trash"></i>
+                            <button class="btn-action-icon" onclick="excluirUsuario('${u.email}')" title="Excluir Usuário">
+                                <i class="bi bi-trash-fill icon-trash"></i>
                             </button>
                         </div>
                     </td>

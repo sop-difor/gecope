@@ -1749,10 +1749,17 @@
             font-size: 1.05rem;
         }
 
-        .admin-section-title {
+        /* Badges de função/perfil na lista de usuários da aba Administração */
+        .badge-role-admin { background: var(--filetype-pdf-fg); color: #fff; }
+        .badge-role-gerente { background: var(--sop-blue); color: #fff; }
+        .badge-role-fiscal { background: var(--sop-green); color: #fff; }
+        .badge-role-externo { background: var(--sop-slate-600); color: #fff; }
+
+        .admin-section-name {
             font-weight: 700;
             font-size: 0.98rem;
             color: var(--text-heading);
+            line-height: 1;
         }
 
         /* Abas por página (pill segmentado) */
@@ -1944,6 +1951,25 @@
             font-size: 0.92rem;
             font-weight: 700;
             margin: 0 auto;
+        }
+
+        /* Avatar ao lado do nome (lista de usuários da Administração) — mesmo visual do
+           .proc-avatar, mas sem margin:auto, pois aqui fica lado a lado com o texto dentro
+           de um flex-row (o margin:auto do .proc-avatar "flutua" nesse contexto e quebra
+           o alinhamento da coluna). */
+        .admin-user-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--icon-bg-slate);
+            color: var(--icon-fg-slate);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            font-weight: 700;
+            flex: none;
+            margin: 0;
         }
 
         /* Rodapé da tabela */
