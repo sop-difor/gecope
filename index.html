@@ -3042,6 +3042,56 @@
                                 </div>
                             </div>
 
+                            <!-- MODAL ALERTA DE RETORNO - JUSTIFICATIVA -->
+                            <div class="modal fade" id="modalAlertaRetorno" tabindex="-1" aria-hidden="true"
+                                data-bs-backdrop="static">
+                                <div class="modal-dialog modal-dialog-scrollable">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-dark text-white">
+                                            <h5 class="modal-title"><i
+                                                    class="bi bi-exclamation-triangle me-2"></i>ALERTA DE RETORNO —
+                                                JUSTIFICATIVA
+                                                <span id="alerta_processo_label" class="ms-2 badge bg-primary"></span>
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white"
+                                                data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-3">
+                                            <input type="hidden" id="alerta_processo_id">
+                                            <input type="hidden" id="alerta_processo_nup">
+
+                                            <div class="small text-muted mb-3">Situação atual: processo tramitando em
+                                                <span id="alerta_sigla_atual" class="fw-bold text-dark"></span>
+                                            </div>
+
+                                            <label class="form-label small fw-bold text-uppercase"
+                                                style="font-size: 0.7rem;">Histórico de Comentários</label>
+                                            <div id="alerta_historico" class="bg-light rounded p-2 mb-3"
+                                                style="max-height: 220px; overflow-y: auto; font-size: 0.8rem;">
+                                                <em class="text-muted">Carregando histórico...</em>
+                                            </div>
+
+                                            <div id="alerta_form_novo_comentario" class="border-top pt-3">
+                                                <label class="form-label small fw-bold">Registrar novo
+                                                    comentário</label>
+                                                <textarea class="form-control form-control-sm"
+                                                    id="alerta_novo_comentario" rows="3"
+                                                    placeholder="Ex: Solicitação de Cronograma"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary btn-sm"
+                                                data-bs-dismiss="modal">Fechar</button>
+                                            <button type="button" class="btn btn-success btn-sm fw-bold"
+                                                id="btn-salvar-alerta-retorno"
+                                                onclick="salvarAlertaRetornoComentario()">
+                                                <i class="bi bi-check-circle me-1"></i> Registrar Comentário
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Modal de Cadastro de Processo (layout consistente com GERENCIAR PROCESSO) -->
                             <div class="modal fade" id="modalCadastro" tabindex="-1" aria-hidden="true"
                                 data-bs-backdrop="static">

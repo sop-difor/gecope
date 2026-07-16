@@ -302,6 +302,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('[INIT] modalChecklistAditivo movido para document.body');
         }
     } catch (e) { console.warn('[INIT] Falha ao mover modalChecklistAditivo:', e); }
+
+    // Idem para o modal de justificativa do alerta de retorno
+    try {
+        const modalAlertaEl = document.getElementById('modalAlertaRetorno');
+        if (modalAlertaEl && modalAlertaEl.parentElement !== document.body) {
+            document.body.appendChild(modalAlertaEl);
+            console.log('[INIT] modalAlertaRetorno movido para document.body');
+        }
+    } catch (e) { console.warn('[INIT] Falha ao mover modalAlertaRetorno:', e); }
 });
 
 
@@ -557,32 +566,76 @@ function isSetorRiscoDiligencia(sigla) {
     return SETORES_RISCO_DILIGENCIA.some(setor => s.startsWith(setor));
 }
 
-function montarAlertaIconeHTML(sigla) {
-    const siglaTxt = sigla ? escapeHTML(sigla) : 'setor de risco';
-    return ` <i class="bi bi-exclamation-triangle-fill text-alerta-diligencia ms-1" title="Atenção: processo aprovado tramitando em ${siglaTxt} — risco de retornar para diligência antes de chegar à GECOPE"></i>`;
+// Busca, em lote, o comentário mais recente de justificativa do alerta de retorno
+// para cada processo de window.allData, e anexa em d.alertaRetornoUltimo.
+async function carregarAlertasRetornoComentarios() {
+    if (!sbClient || !window.allData || !window.allData.length) return;
+    try {
+        const ids = window.allData.filter(d => d.id).map(d => String(d.id));
+        if (!ids.length) return;
+
+        const { data, error } = await sbClient
+            .from('alerta_retorno_comentarios')
+            .select('*')
+            .in('processo_id', ids)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const ultimoPorProcesso = {};
+        (data || []).forEach(reg => {
+            if (!ultimoPorProcesso[reg.processo_id]) ultimoPorProcesso[reg.processo_id] = reg;
+        });
+
+        window.allData.forEach(d => {
+            d.alertaRetornoUltimo = ultimoPorProcesso[String(d.id)] || null;
+        });
+    } catch (e) {
+        console.error('[ERRO] Falha ao carregar comentários de alerta de retorno:', e);
+    }
+}
+
+function montarAlertaIconeHTML(d) {
+    if (d.alerta_pre_diligencia) {
+        const siglaTxt = d.suite_sigla_risco ? escapeHTML(d.suite_sigla_risco) : 'setor de risco';
+        return ` <i class="bi bi-exclamation-triangle-fill text-alerta-diligencia ms-1" style="cursor:pointer;" onclick="abrirModalAlertaRetorno('${escapeHTML(d.processo)}')" title="Atenção: processo aprovado tramitando em ${siglaTxt} — risco de retornar para diligência antes de chegar à GECOPE. Clique para registrar o motivo."></i>`;
+    }
+    if (d.alerta_retorno_resolvido && d.alertaRetornoUltimo) {
+        const comentarioTxt = escapeHTML(d.alertaRetornoUltimo.comentario);
+        return ` <i class="bi bi-check-circle-fill text-success ms-1" style="cursor:pointer;" onclick="abrirModalAlertaRetorno('${escapeHTML(d.processo)}')" title="${comentarioTxt}"></i>`;
+    }
+    return '';
 }
 
 // Atualiza o flag de risco de um processo (na linha em tela, se houver, e no window.allData)
-// e mantém o contador da aba "Aprovados" sincronizado.
+// e mantém o contador da aba "Aprovados" sincronizado. Um processo já comentado para a
+// sigla atual conta como resolvido (ícone check); se a sigla mudar para outro setor de
+// risco diferente do último comentário, o alerta reabre (ícone exclamação de novo).
 function aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxtParam) {
     const stTxt = (stTxtParam || d.status || '').toString().toUpperCase();
-    const emRisco = stTxt.includes('APROVADO') && isSetorRiscoDiligencia(sigla);
+    const emRiscoBruto = stTxt.includes('APROVADO') && isSetorRiscoDiligencia(sigla);
 
-    d.alerta_pre_diligencia = emRisco;
-    d.suite_sigla_risco = emRisco ? sigla : null;
+    const ultimo = d.alertaRetornoUltimo;
+    const resolvidoParaEstaSigla = !!(emRiscoBruto && ultimo && ultimo.sigla === sigla);
+
+    d.alerta_pre_diligencia = emRiscoBruto && !resolvidoParaEstaSigla;
+    d.alerta_retorno_resolvido = resolvidoParaEstaSigla;
+    d.suite_sigla_risco = emRiscoBruto ? sigla : null;
 
     if (window.allData) {
         const globalRow = window.allData.find(x => x.processo === d.processo);
         if (globalRow) {
-            globalRow.alerta_pre_diligencia = emRisco;
-            globalRow.suite_sigla_risco = emRisco ? sigla : null;
+            globalRow.alerta_pre_diligencia = d.alerta_pre_diligencia;
+            globalRow.alerta_retorno_resolvido = d.alerta_retorno_resolvido;
+            globalRow.suite_sigla_risco = d.suite_sigla_risco;
         }
     }
 
     if (tr && alertaIcone) {
-        alertaIcone.innerHTML = emRisco ? montarAlertaIconeHTML(sigla) : '';
-        alertaIcone.style.display = emRisco ? 'inline' : 'none';
-        tr.classList.toggle('tr-alerta-pre-diligencia', emRisco);
+        const html = montarAlertaIconeHTML(d);
+        alertaIcone.innerHTML = html;
+        alertaIcone.style.display = html ? 'inline' : 'none';
+        tr.classList.toggle('tr-alerta-pre-diligencia', d.alerta_pre_diligencia);
     }
 
     atualizarBadgeAbaAprovados();
@@ -625,6 +678,119 @@ function atualizarVisibilidadeBtnFiltroAlerta() {
     const qtd = (window.allData || []).filter(d => d.alerta_pre_diligencia).length;
     const deveMostrar = window.currentProcessesTab === 'aprovados' && qtd > 0;
     btnFiltroAlerta.style.display = deveMostrar ? 'flex' : 'none';
+}
+
+function montarHistoricoAlertaRetornoHTML(lista) {
+    if (!lista || lista.length === 0) {
+        return '<em class="text-muted">Nenhum comentário registrado ainda.</em>';
+    }
+    return lista.map(reg => {
+        const dt = new Date(reg.created_at).toLocaleString('pt-BR');
+        return `
+            <div class="mb-2 pb-2 border-bottom border-light">
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold text-dark">${escapeHTML(reg.sigla)}</span>
+                    <span class="text-muted" style="font-size: 0.7rem;">${dt}</span>
+                </div>
+                <div>${escapeHTML(reg.comentario)}</div>
+                <div class="text-muted" style="font-size: 0.7rem;">${escapeHTML(reg.autor_nome || '')}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function abrirModalAlertaRetorno(processoStr) {
+    const d = (window.allData || []).find(x => x.processo === processoStr);
+    if (!d) { alert('Erro: processo não localizado.'); return; }
+
+    document.getElementById('alerta_processo_id').value = d.id || '';
+    document.getElementById('alerta_processo_nup').value = d.processo || '';
+    document.getElementById('alerta_processo_label').textContent = d.processo || '';
+    document.getElementById('alerta_sigla_atual').textContent = d.suite_sigla_risco || 'setor de risco';
+    document.getElementById('alerta_novo_comentario').value = '';
+
+    const podeEscrever = typeof canSeeProcessActions === 'function' && canSeeProcessActions();
+    document.getElementById('alerta_form_novo_comentario').style.display = podeEscrever ? '' : 'none';
+    document.getElementById('btn-salvar-alerta-retorno').style.display = podeEscrever ? '' : 'none';
+
+    const elHistorico = document.getElementById('alerta_historico');
+    elHistorico.innerHTML = '<em class="text-muted">Carregando histórico...</em>';
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalAlertaRetorno')).show();
+
+    try {
+        const { data, error } = await sbClient
+            .from('alerta_retorno_comentarios')
+            .select('*')
+            .eq('processo_id', String(d.id))
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        elHistorico.innerHTML = montarHistoricoAlertaRetornoHTML(data);
+    } catch (err) {
+        console.error('Erro ao carregar histórico do alerta de retorno:', err);
+        elHistorico.innerHTML = '<em class="text-danger">Erro ao carregar histórico.</em>';
+    }
+}
+
+async function salvarAlertaRetornoComentario() {
+    const processoNup = document.getElementById('alerta_processo_nup').value;
+    const processoId = document.getElementById('alerta_processo_id').value;
+    const textarea = document.getElementById('alerta_novo_comentario');
+    const comentario = textarea.value.trim();
+
+    if (!comentario) {
+        alert('Escreva um comentário antes de salvar.');
+        textarea.focus();
+        return;
+    }
+
+    const d = (window.allData || []).find(x => x.processo === processoNup);
+    if (!d) { alert('Erro: processo não localizado.'); return; }
+
+    const payload = {
+        processo_id: String(processoId),
+        processo_nup: processoNup,
+        sigla: d.suite_sigla_risco || 'DESCONHECIDA',
+        comentario: comentario,
+        autor_nome: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido',
+        autor_email: getCurrentUserEmail()
+    };
+
+    const btn = document.getElementById('btn-salvar-alerta-retorno');
+    btn.disabled = true;
+    btn.innerHTML = 'SALVANDO...';
+
+    const { data, error } = await sbClient.from('alerta_retorno_comentarios').insert([payload]).select().single();
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Registrar Comentário';
+
+    if (error) {
+        alert('Erro ao salvar comentário: ' + error.message);
+        return;
+    }
+
+    d.alertaRetornoUltimo = data;
+    textarea.value = '';
+
+    const tr = document.querySelector(`tr[data-numero="${escapeHTML(processoNup)}"]`);
+    const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
+    aplicarAlertaPreDiligencia(d, tr, alertaIcone, d.suite_sigla_risco, d.status);
+
+    const elHistorico = document.getElementById('alerta_historico');
+    try {
+        const { data: historico, error: errHist } = await sbClient
+            .from('alerta_retorno_comentarios')
+            .select('*')
+            .eq('processo_id', String(processoId))
+            .order('created_at', { ascending: false });
+        if (errHist) throw errHist;
+        elHistorico.innerHTML = montarHistoricoAlertaRetornoHTML(historico);
+    } catch (err) {
+        console.error('Erro ao recarregar histórico do alerta de retorno:', err);
+    }
+
+    alert('Comentário registrado com sucesso!');
 }
 
 // Varredura em segundo plano: verifica TODOS os processos APROVADO no SUITE, mesmo que a
@@ -1423,6 +1589,11 @@ async function carregarDadosSupabase() {
 
     // window.allData já foi atualizado acima; não é necessário reatribuir
     /* window.allData já foi atualizado acima */
+
+    // Carrega o último comentário de justificativa do alerta de retorno de cada processo,
+    // ANTES de qualquer polling do SUITE, para que aplicarAlertaPreDiligencia já saiba
+    // se a situação atual já foi comentada ou não.
+    await carregarAlertasRetornoComentarios();
 
     try {
         // Auto-estabelecer metas para processos em 'ANÁLISE FISCAL' sem meta
@@ -3302,11 +3473,11 @@ function updateReuniao() {
 
         // Alerta de pré-diligência: aprovado, mas já sinalizado (varredura anterior) tramitando
         // em setor de risco (DIFOR/GEFOE/DIRED/GEDOP) — ver isSetorRiscoDiligencia()
-        const temAlertaDiligencia = !!d.alerta_pre_diligencia;
-        const alertaIconeHTML = temAlertaDiligencia ? montarAlertaIconeHTML(d.suite_sigla_risco) : '';
+        const temAlertaDiligencia = !!(d.alerta_pre_diligencia || d.alerta_retorno_resolvido);
+        const alertaIconeHTML = temAlertaDiligencia ? montarAlertaIconeHTML(d) : '';
 
         return `
-        <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${temAlertaDiligencia ? ' tr-alerta-pre-diligencia' : ''}">
+        <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${d.alerta_pre_diligencia ? ' tr-alerta-pre-diligencia' : ''}">
             <td class="text-center">
                 <div class="d-flex flex-column gap-1 align-items-center">
                     ${btnDetalhes}
