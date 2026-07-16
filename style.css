@@ -1141,6 +1141,20 @@
             color: #64748b;
         }
 
+        /* O Chrome força um fundo claro/amarelo em campos autopreenchidos e
+           ignora "background-color" normal; só o truque do box-shadow inset
+           consegue sobrepor essa cor, mantendo o visual escuro do formulário. */
+        .landing-input:-webkit-autofill,
+        .landing-input:-webkit-autofill:hover,
+        .landing-input:-webkit-autofill:focus,
+        .landing-input:-webkit-autofill:active {
+            -webkit-text-fill-color: #ffffff;
+            caret-color: #ffffff;
+            -webkit-box-shadow: 0 0 0 1000px #1b2532 inset !important;
+            box-shadow: 0 0 0 1000px #1b2532 inset !important;
+            transition: background-color 9999s ease-in-out 0s;
+        }
+
         .landing-input:focus {
             background: rgba(255, 255, 255, 0.09) !important;
             border-color: var(--sop-green-light, #4CC17C) !important;
