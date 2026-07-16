@@ -1353,13 +1353,24 @@
                         </div>
 
                         <!-- NAVEGAÇÃO POR ABAS (3 PÁGINAS) — pill segmentado -->
-                        <div class="proc-tabs" id="process-tab-nav">
-                            <button type="button" class="proc-tab active" id="btn-tab-ativos"
-                                onclick="switchProcessTab('ativos')">Em Tramitação</button>
-                            <button type="button" class="proc-tab" id="btn-tab-aprovados"
-                                onclick="switchProcessTab('aprovados')">Aprovados</button>
-                            <button type="button" class="proc-tab" id="btn-tab-arquivados"
-                                onclick="switchProcessTab('arquivados')">Arquivados</button>
+                        <div class="proc-tabs-row">
+                            <div class="proc-tabs" id="process-tab-nav">
+                                <button type="button" class="proc-tab active" id="btn-tab-ativos"
+                                    onclick="switchProcessTab('ativos')">Em Tramitação</button>
+                                <button type="button" class="proc-tab" id="btn-tab-aprovados"
+                                    onclick="switchProcessTab('aprovados')">Aprovados<span
+                                        id="badge-alerta-aprovados" class="badge-alerta-aba" style="display:none;"
+                                        title=""><i class="bi bi-exclamation-triangle-fill"></i> <span></span></span>
+                                </button>
+                                <button type="button" class="proc-tab" id="btn-tab-arquivados"
+                                    onclick="switchProcessTab('arquivados')">Arquivados</button>
+                            </div>
+
+                            <button type="button" id="btn-filtro-alerta-diligencia" class="btn-filtro-alerta"
+                                style="display:none;" onclick="toggleFiltroAlertaDiligencia()">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Somente com alerta de retorno
+                                (<span id="contador-filtro-alerta">0</span>)
+                            </button>
                         </div>
 
                         <section class="filters-card mb-2">

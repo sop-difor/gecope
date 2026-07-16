@@ -1993,6 +1993,57 @@
             border: 1px solid #DC3545;
         }
 
+        /* ALERTA DE PRÉ-DILIGÊNCIA (processo aprovado tramitando em setor de risco) */
+        .text-alerta-diligencia {
+            color: #E67700;
+        }
+
+        .tr-alerta-pre-diligencia {
+            --bs-table-bg: #fffaf0 !important;
+            border-left: 5px solid #E67700 !important;
+        }
+
+        .btn-filtro-alerta {
+            display: flex;
+            width: fit-content;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #E67700;
+            background: #fff;
+            border: 1.5px solid #E67700;
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+
+        .btn-filtro-alerta:hover {
+            background: #fff7ec;
+        }
+
+        .btn-filtro-alerta.active {
+            background: #E67700;
+            color: #fff;
+        }
+
+        .badge-alerta-aba {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: linear-gradient(135deg, #E67700 0%, #ffa733 100%);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.65rem;
+            line-height: 1;
+            padding: 3px 7px;
+            border-radius: 999px;
+            margin-left: 6px;
+            vertical-align: middle;
+            animation: pulse-red-soft 2s infinite;
+        }
+
         /* CORES METAS */
         .badge-meta-sem {
             background-color: #FFFFFF;
@@ -2146,6 +2197,16 @@
         }
 
         /* Abas por página (pill segmentado) */
+        .proc-tabs-row {
+            display: flex;
+            width: fit-content;
+            align-items: center;
+            gap: 14px;
+            margin: 6px auto 18px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
         .proc-tabs {
             display: flex;
             width: fit-content;
@@ -2153,7 +2214,6 @@
             background: var(--sop-slate-100);
             border-radius: 999px;
             padding: 5px;
-            margin: 6px auto 18px;
         }
 
         .proc-tab {

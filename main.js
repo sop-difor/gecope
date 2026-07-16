@@ -535,6 +535,151 @@ window.StatusSync = {
     }
 };
 
+// --- ALERTA DE PRÉ-DILIGÊNCIA ---
+// Setores da SOP por onde um processo já APROVADO pode voltar a tramitar antes de
+// retornar formalmente à GECOPE (o que hoje só é detectado quando o SUITE marca sigla = GECOPE,
+// gerando o status DILIGÊNCIA). Avisar aqui permite intervir antes de o processo chegar.
+const SETORES_RISCO_DILIGENCIA = ['DIFOR', 'GEFOE', 'DIRED', 'GEDOP'];
+
+function isSetorRiscoDiligencia(sigla) {
+    const s = String(sigla || '').toUpperCase().trim();
+    if (!s || s === 'GECOPE') return false;
+    return SETORES_RISCO_DILIGENCIA.some(setor => s.startsWith(setor));
+}
+
+function montarAlertaIconeHTML(sigla) {
+    const siglaTxt = sigla ? escapeHTML(sigla) : 'setor de risco';
+    return ` <i class="bi bi-exclamation-triangle-fill text-alerta-diligencia ms-1" title="Atenção: processo aprovado tramitando em ${siglaTxt} — risco de retornar para diligência antes de chegar à GECOPE"></i>`;
+}
+
+// Atualiza o flag de risco de um processo (na linha em tela, se houver, e no window.allData)
+// e mantém o contador da aba "Aprovados" sincronizado.
+function aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxtParam) {
+    const stTxt = (stTxtParam || d.status || '').toString().toUpperCase();
+    const emRisco = stTxt.includes('APROVADO') && isSetorRiscoDiligencia(sigla);
+
+    d.alerta_pre_diligencia = emRisco;
+    d.suite_sigla_risco = emRisco ? sigla : null;
+
+    if (window.allData) {
+        const globalRow = window.allData.find(x => x.processo === d.processo);
+        if (globalRow) {
+            globalRow.alerta_pre_diligencia = emRisco;
+            globalRow.suite_sigla_risco = emRisco ? sigla : null;
+        }
+    }
+
+    if (tr && alertaIcone) {
+        alertaIcone.innerHTML = emRisco ? montarAlertaIconeHTML(sigla) : '';
+        alertaIcone.style.display = emRisco ? 'inline' : 'none';
+        tr.classList.toggle('tr-alerta-pre-diligencia', emRisco);
+    }
+
+    atualizarBadgeAbaAprovados();
+}
+
+// Contador de alerta exibido no botão da aba "Aprovados"
+function atualizarBadgeAbaAprovados() {
+    const qtd = (window.allData || []).filter(d => d.alerta_pre_diligencia).length;
+
+    const badge = document.getElementById('badge-alerta-aprovados');
+    if (badge) {
+        const contador = badge.querySelector('span');
+        if (qtd > 0) {
+            if (contador) contador.textContent = qtd > 9 ? '9+' : String(qtd);
+            badge.title = `${qtd} processo(s) aprovado(s) já tramitando em setor de risco (DIFOR/GEFOE/DIRED/GEDOP) — provável retorno para diligência`;
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    const contadorFiltro = document.getElementById('contador-filtro-alerta');
+    if (contadorFiltro) contadorFiltro.textContent = String(qtd);
+
+    // Se o filtro estava ativo e o alerta zerou (ex.: processo saiu do setor de risco), desliga sozinho
+    if (qtd === 0 && window.filtroSomenteAlertaDiligencia) {
+        window.filtroSomenteAlertaDiligencia = false;
+        const btnFiltroAlerta = document.getElementById('btn-filtro-alerta-diligencia');
+        if (btnFiltroAlerta) btnFiltroAlerta.classList.remove('active');
+        if (window.currentProcessesTab === 'aprovados' && typeof updateReuniao === 'function') updateReuniao();
+    }
+
+    atualizarVisibilidadeBtnFiltroAlerta();
+}
+
+// O botão só aparece na aba Aprovados e apenas quando existe ao menos 1 processo com alerta
+function atualizarVisibilidadeBtnFiltroAlerta() {
+    const btnFiltroAlerta = document.getElementById('btn-filtro-alerta-diligencia');
+    if (!btnFiltroAlerta) return;
+    const qtd = (window.allData || []).filter(d => d.alerta_pre_diligencia).length;
+    const deveMostrar = window.currentProcessesTab === 'aprovados' && qtd > 0;
+    btnFiltroAlerta.style.display = deveMostrar ? 'flex' : 'none';
+}
+
+// Varredura em segundo plano: verifica TODOS os processos APROVADO no SUITE, mesmo que a
+// aba "Aprovados" não esteja aberta na tela, para que o alerta apareça antes de o usuário
+// precisar navegar até lá. Respeita o mesmo cache de 5 min usado pela tabela (window.suiteCache)
+// e escalona as chamadas para não sobrecarregar a função consultar-suite.
+let varreduraDiligenciaEmAndamento = false;
+async function varrerRiscoDiligenciaSegundoPlano() {
+    if (varreduraDiligenciaEmAndamento || !sbClient) return;
+    varreduraDiligenciaEmAndamento = true;
+    try {
+        const candidatos = (window.allData || []).filter(d => (d.status || '').toString().toUpperCase().trim() === 'APROVADO');
+        if (!candidatos.length) return;
+
+        // Mesma estratégia de atualizarTabelaSuite: dispara as consultas em paralelo (respeitando
+        // cache de 5 min), escalonando só as novas requisições reais, em vez de aguardar uma por
+        // vez — sequencial faria o alerta demorar dezenas de segundos para aparecer fora da aba Aprovados.
+        const naoCacheados = candidatos.filter(d => {
+            const cached = window.suiteCache[d.processo];
+            return !(cached && (Date.now() - cached.timestamp < 5 * 60 * 1000));
+        });
+
+        const promises = candidatos.map(async (d) => {
+            const num = d.processo;
+            const cached = window.suiteCache[num];
+            const cacheValido = cached && (Date.now() - cached.timestamp < 5 * 60 * 1000);
+            let data;
+
+            try {
+                if (cacheValido) {
+                    data = cached.data;
+                } else {
+                    const idx = naoCacheados.findIndex(r => r.processo === num);
+                    if (idx !== -1) await new Promise(r => setTimeout(r, idx * 150));
+                    const { data: res, error } = await sbClient.functions.invoke('consultar-suite', { body: { numero: num } });
+                    if (error) return;
+                    data = res;
+                    window.suiteCache[num] = { data, timestamp: Date.now() };
+                }
+            } catch (e) {
+                return;
+            }
+
+            if (data && data.sucesso) {
+                const tr = document.querySelector(`tr[data-numero="${escapeHTML(num)}"]`);
+                const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
+                aplicarAlertaPreDiligencia(d, tr, alertaIcone, data.sigla, d.status);
+            }
+        });
+
+        await Promise.all(promises);
+    } catch (e) {
+        console.error('[Alerta Pré-Diligência] erro na varredura em segundo plano:', e);
+    } finally {
+        varreduraDiligenciaEmAndamento = false;
+    }
+}
+
+let varreduraDiligenciaIntervalId = null;
+function iniciarVarreduraRiscoDiligencia() {
+    varrerRiscoDiligenciaSegundoPlano();
+    if (varreduraDiligenciaIntervalId) return;
+    varreduraDiligenciaIntervalId = setInterval(varrerRiscoDiligenciaSegundoPlano, 5 * 60 * 1000);
+}
+
 // NOTE: Supabase client initialization moved to database.js (loaded before main.js)
 
 window.dynamicUsers = [];
@@ -1362,6 +1507,7 @@ async function carregarDadosSupabase() {
         clearGerencial();
         updateFinanceiro();
         if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
+        iniciarVarreduraRiscoDiligencia();
     } catch (e) {
         console.error('Erro ao atualizar UI:', e);
     }
@@ -2302,6 +2448,15 @@ const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: do
 let mtBase = [];
 window.currentProcessesTab = 'ativos';
 
+window.filtroSomenteAlertaDiligencia = false;
+
+function toggleFiltroAlertaDiligencia() {
+    window.filtroSomenteAlertaDiligencia = !window.filtroSomenteAlertaDiligencia;
+    const btn = document.getElementById('btn-filtro-alerta-diligencia');
+    if (btn) btn.classList.toggle('active', window.filtroSomenteAlertaDiligencia);
+    updateReuniao();
+}
+
 function switchProcessTab(tab) {
     window.currentProcessesTab = tab;
     const tabIds = ['btn-tab-ativos', 'btn-tab-aprovados', 'btn-tab-arquivados'];
@@ -2310,6 +2465,14 @@ function switchProcessTab(tab) {
         if (!el) return;
         el.classList.toggle('active', id === 'btn-tab-' + tab);
     });
+
+    // Botão de filtro "somente com alerta de retorno" só faz sentido na aba Aprovados
+    if (tab !== 'aprovados') {
+        window.filtroSomenteAlertaDiligencia = false;
+        const btnFiltroAlerta = document.getElementById('btn-filtro-alerta-diligencia');
+        if (btnFiltroAlerta) btnFiltroAlerta.classList.remove('active');
+    }
+    atualizarVisibilidadeBtnFiltroAlerta();
     // Ao trocar de aba, garantir que os filtros de reunião estejam em "Todos"
     try {
         if (typeof mt !== 'undefined' && mt) {
@@ -2573,7 +2736,10 @@ function updateReuniao() {
             const isArquivado = st.includes("ARQUIVADO");
 
             if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
-            if (window.currentProcessesTab === 'aprovados') return isAprovado;
+            if (window.currentProcessesTab === 'aprovados') {
+                if (window.filtroSomenteAlertaDiligencia) return isAprovado && !!d.alerta_pre_diligencia;
+                return isAprovado;
+            }
             if (window.currentProcessesTab === 'arquivados') return isArquivado;
             return true;
         });
@@ -2802,8 +2968,13 @@ function updateReuniao() {
         // Iniciais do Analista para o avatar circular
         const analistaIniciais = (d.analista || "").trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || "-";
 
+        // Alerta de pré-diligência: aprovado, mas já sinalizado (varredura anterior) tramitando
+        // em setor de risco (DIFOR/GEFOE/DIRED/GEDOP) — ver isSetorRiscoDiligencia()
+        const temAlertaDiligencia = !!d.alerta_pre_diligencia;
+        const alertaIconeHTML = temAlertaDiligencia ? montarAlertaIconeHTML(d.suite_sigla_risco) : '';
+
         return `
-        <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row">
+        <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${temAlertaDiligencia ? ' tr-alerta-pre-diligencia' : ''}">
             <td class="text-center">
                 <div class="d-flex flex-column gap-1 align-items-center">
                     ${btnDetalhes}
@@ -2819,7 +2990,7 @@ function updateReuniao() {
                 </div>
             </td>
             <td class="text-center">
-                <div><span class="badge rounded-pill ${stCls} badge-custom-size">${formatStatusDisplay(d.status)}</span><span class="alerta-icone" style="display:none;"></span></div>
+                <div style="white-space: nowrap;"><span class="badge rounded-pill ${stCls} badge-custom-size">${formatStatusDisplay(d.status)}</span><span class="alerta-icone" style="${temAlertaDiligencia ? '' : 'display:none;'}">${alertaIconeHTML}</span></div>
                 <div class=\"mt-1 text-muted px-1\" style=\"font-size: 0.7rem; font-weight: 500; height: 1.1rem;\"></div>
             </td>
             <td class="suite-cell text-center">
@@ -3082,6 +3253,9 @@ async function atualizarTabelaSuite(rows) {
                     tr.classList.add('tr-alerta-fiscal');
                     suiteTime.innerHTML += ` <span class="badge-tramitado-pulse">Tramitado</span>`;
                 }
+
+                // Alerta de pré-diligência: processo já APROVADO tramitando em setor de risco
+                aplicarAlertaPreDiligencia(d, tr, alertaIcone, data.sigla, stTxt);
             } else {
                 suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-muted border badge-custom-size">Não enc.</span>`;
             }
