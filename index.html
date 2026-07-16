@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <!-- Preload da imagem de fundo (foto da sede da SOP-CE) -->
-    <link rel="preload" as="image" href="SOP.jpg" type="image/jpeg">
+    <link rel="preload" as="image" href="fachada.jpg" type="image/jpeg">
 
     <!-- NOSSO NOVO ARQUIVO DE ESTILOS MODULARIZADO (A Mágica acontece aqui!) -->
     <link rel="stylesheet" href="style.css">
@@ -37,6 +37,7 @@
 
     <!-- OVERLAY DE LOGIN (Renderizado diretamente no HTML para aparecer imediatamente) -->
     <div id="landingOverlay" class="landing-overlay">
+        <div id="landingBg" class="landing-bg" aria-hidden="true"></div>
         <div class="landing-split">
 
             <!-- COLUNA ESQUERDA: MARCA + FORMULÁRIO -->
@@ -153,6 +154,21 @@
                     document.body.classList.remove('login-active');
                 }
             } catch (e) { /* noop */ }
+        })();
+    </script>
+
+    <script>
+        // Faz a foto de fundo aparecer com um fade suave assim que ela realmente
+        // terminar de carregar, em vez de "estourar" na tela sem sincronia com o
+        // resto do layout (que já está pronto e visível).
+        (function () {
+            var bg = document.getElementById('landingBg');
+            if (!bg) return;
+            var img = new Image();
+            img.onload = function () { bg.classList.add('is-loaded'); };
+            img.onerror = function () { bg.classList.add('is-loaded'); };
+            img.src = 'fachada.jpg';
+            if (img.complete && img.naturalWidth > 0) bg.classList.add('is-loaded');
         })();
     </script>
 
