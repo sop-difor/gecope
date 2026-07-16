@@ -1913,7 +1913,8 @@
                                                                 class="text-danger">*</span></label>
                                                         <select
                                                             class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
-                                                            name="STATUS" id="det_status">
+                                                            name="STATUS" id="det_status"
+                                                            onchange="onChangeStatusDetalhes(this)">
                                                             <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
                                                             <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
                                                             <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
@@ -2133,6 +2134,33 @@
                                                                 dias</span>
                                                         </div>
                                                     </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Checklist de Documentação (Aditivo) -->
+                                        <div class="card border-0 shadow-sm mb-4">
+                                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                        class="bi bi-clipboard-check me-2 text-danger"></i>CHECKLIST
+                                                    ADITIVO</h6>
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-primary admin-only"
+                                                    id="btn-preencher-checklist"
+                                                    onclick="abrirModalChecklistAditivo()">Preencher/Atualizar</button>
+                                            </div>
+                                            <div class="card-body">
+                                                <div id="det_checklist_status" style="font-size: 0.8rem;">
+                                                    <em class="text-muted">Carregando...</em>
+                                                </div>
+                                                <div class="mt-2 pt-2 border-top" id="det_checklist_historico_wrap"
+                                                    style="display:none;">
+                                                    <button type="button" class="btn btn-link btn-sm p-0"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#det_checklist_historico">Ver histórico
+                                                        anterior</button>
+                                                    <div class="collapse mt-2" id="det_checklist_historico"
+                                                        style="font-size: 0.75rem;"></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2687,6 +2715,328 @@
                                         </form>
                                         <div class="modal-footer small text-muted">
                                             <div>Entre com credenciais válidas para ativar o modo administrador.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- MODAL CHECKLIST DE DOCUMENTAÇÃO (ADITIVO) -->
+                            <div class="modal fade" id="modalChecklistAditivo" tabindex="-1" aria-hidden="true"
+                                data-bs-backdrop="static">
+                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-dark text-white">
+                                            <h5 class="modal-title"><i class="bi bi-clipboard-check me-2"></i>CHECKLIST
+                                                — DOCUMENTAÇÃO MÍNIMA PARA ADITIVO
+                                                <span id="chk_processo_label" class="ms-2 badge bg-primary"></span>
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white"
+                                                data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div id="chk_msg_readonly" class="alert alert-secondary small"
+                                                style="display:none;">
+                                                <i class="bi bi-eye me-1"></i> Visualização de um checklist já
+                                                finalizado (somente leitura).
+                                            </div>
+                                            <div class="alert alert-warning small" id="chk_msg_obrigatorio">
+                                                <i class="bi bi-exclamation-triangle me-1"></i> Preencha a
+                                                documentação mínima antes de aprovar o aditivo.
+                                            </div>
+                                            <form id="formChecklistAditivo">
+                                                <input type="hidden" id="chk_processo_id">
+                                                <input type="hidden" id="chk_processo_nup">
+
+                                                <div class="mb-3 p-3 bg-light rounded border">
+                                                    <label class="form-label small fw-bold d-block">É o 1º Aditivo
+                                                        deste processo?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_primeiro_aditivo"
+                                                            id="chk_primeiro_aditivo_sim" value="sim"
+                                                            onchange="toggleChecklistCondicional('chk_primeiro_aditivo','chk_grupo_primeiro_aditivo')">
+                                                        <label class="form-check-label"
+                                                            for="chk_primeiro_aditivo_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_primeiro_aditivo"
+                                                            id="chk_primeiro_aditivo_nao" value="nao"
+                                                            onchange="toggleChecklistCondicional('chk_primeiro_aditivo','chk_grupo_primeiro_aditivo')">
+                                                        <label class="form-check-label"
+                                                            for="chk_primeiro_aditivo_nao">Não</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">1. Planilha
+                                                        Orçamentária Validada?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_planilha" id="chk_planilha_sim" value="sim"
+                                                            onchange="toggleJustificativaChecklist('chk_planilha')">
+                                                        <label class="form-check-label"
+                                                            for="chk_planilha_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_planilha" id="chk_planilha_nao" value="nao"
+                                                            onchange="toggleJustificativaChecklist('chk_planilha')">
+                                                        <label class="form-check-label"
+                                                            for="chk_planilha_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_planilha_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_planilha_obs" rows="2"
+                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">2. Memória de
+                                                        Cálculo?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_memoria" id="chk_memoria_sim" value="sim"
+                                                            onchange="toggleJustificativaChecklist('chk_memoria')">
+                                                        <label class="form-check-label"
+                                                            for="chk_memoria_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_memoria" id="chk_memoria_nao" value="nao"
+                                                            onchange="toggleJustificativaChecklist('chk_memoria')">
+                                                        <label class="form-check-label"
+                                                            for="chk_memoria_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_memoria_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_memoria_obs" rows="2"
+                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">3. Parecer
+                                                        Técnico?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_parecer" id="chk_parecer_sim" value="sim"
+                                                            onchange="toggleJustificativaChecklist('chk_parecer')">
+                                                        <label class="form-check-label"
+                                                            for="chk_parecer_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_parecer" id="chk_parecer_nao" value="nao"
+                                                            onchange="toggleJustificativaChecklist('chk_parecer')">
+                                                        <label class="form-check-label"
+                                                            for="chk_parecer_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_parecer_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_parecer_obs" rows="2"
+                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div id="chk_grupo_primeiro_aditivo" class="d-none">
+                                                    <div class="mb-3 pb-3 border-bottom">
+                                                        <label class="form-label small fw-bold d-block">4. ART de
+                                                            Fiscalização?</label>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_art_fiscalizacao"
+                                                                id="chk_art_fiscalizacao_sim" value="sim"
+                                                                onchange="toggleJustificativaChecklist('chk_art_fiscalizacao')">
+                                                            <label class="form-check-label"
+                                                                for="chk_art_fiscalizacao_sim">Sim</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_art_fiscalizacao"
+                                                                id="chk_art_fiscalizacao_nao" value="nao"
+                                                                onchange="toggleJustificativaChecklist('chk_art_fiscalizacao')">
+                                                            <label class="form-check-label"
+                                                                for="chk_art_fiscalizacao_nao">Não</label>
+                                                        </div>
+                                                        <div id="chk_art_fiscalizacao_obs_wrap" class="mt-2 d-none">
+                                                            <textarea class="form-control form-control-sm"
+                                                                id="chk_art_fiscalizacao_obs" rows="2"
+                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 pb-3 border-bottom">
+                                                        <label class="form-label small fw-bold d-block">5. ART de
+                                                            Execução?</label>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_art_execucao" id="chk_art_execucao_sim"
+                                                                value="sim"
+                                                                onchange="toggleJustificativaChecklist('chk_art_execucao')">
+                                                            <label class="form-check-label"
+                                                                for="chk_art_execucao_sim">Sim</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_art_execucao" id="chk_art_execucao_nao"
+                                                                value="nao"
+                                                                onchange="toggleJustificativaChecklist('chk_art_execucao')">
+                                                            <label class="form-check-label"
+                                                                for="chk_art_execucao_nao">Não</label>
+                                                        </div>
+                                                        <div id="chk_art_execucao_obs_wrap" class="mt-2 d-none">
+                                                            <textarea class="form-control form-control-sm"
+                                                                id="chk_art_execucao_obs" rows="2"
+                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 pb-3 border-bottom">
+                                                        <label class="form-label small fw-bold d-block">6. Portaria de
+                                                            Fiscalização?</label>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_portaria" id="chk_portaria_sim" value="sim"
+                                                                onchange="toggleJustificativaChecklist('chk_portaria')">
+                                                            <label class="form-check-label"
+                                                                for="chk_portaria_sim">Sim</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_portaria" id="chk_portaria_nao" value="nao"
+                                                                onchange="toggleJustificativaChecklist('chk_portaria')">
+                                                            <label class="form-check-label"
+                                                                for="chk_portaria_nao">Não</label>
+                                                        </div>
+                                                        <div id="chk_portaria_obs_wrap" class="mt-2 d-none">
+                                                            <textarea class="form-control form-control-sm"
+                                                                id="chk_portaria_obs" rows="2"
+                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">7. Curva
+                                                        ABC?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_curva_abc" id="chk_curva_abc_sim" value="sim"
+                                                            onchange="toggleJustificativaChecklist('chk_curva_abc')">
+                                                        <label class="form-check-label"
+                                                            for="chk_curva_abc_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_curva_abc" id="chk_curva_abc_nao" value="nao"
+                                                            onchange="toggleJustificativaChecklist('chk_curva_abc')">
+                                                        <label class="form-check-label"
+                                                            for="chk_curva_abc_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_curva_abc_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_curva_abc_obs" rows="2"
+                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">8. Composição
+                                                        Própria (CXXXX)?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_comp_propria" id="chk_comp_propria_sim"
+                                                            value="sim"
+                                                            onchange="toggleJustificativaChecklist('chk_comp_propria'); toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
+                                                        <label class="form-check-label"
+                                                            for="chk_comp_propria_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_comp_propria" id="chk_comp_propria_nao"
+                                                            value="nao"
+                                                            onchange="toggleJustificativaChecklist('chk_comp_propria'); toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
+                                                        <label class="form-check-label"
+                                                            for="chk_comp_propria_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_comp_propria_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_comp_propria_obs" rows="2"
+                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                    </div>
+
+                                                    <div id="chk_comp_analiticas_wrap"
+                                                        class="mt-3 ps-3 border-start d-none">
+                                                        <label class="form-label small fw-bold d-block">Composições
+                                                            Analíticas?</label>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_comp_analiticas"
+                                                                id="chk_comp_analiticas_sim" value="sim"
+                                                                onchange="toggleJustificativaChecklist('chk_comp_analiticas')">
+                                                            <label class="form-check-label"
+                                                                for="chk_comp_analiticas_sim">Sim</label>
+                                                        </div>
+                                                        <div class="form-check form-check-inline">
+                                                            <input class="form-check-input" type="radio"
+                                                                name="chk_comp_analiticas"
+                                                                id="chk_comp_analiticas_nao" value="nao"
+                                                                onchange="toggleJustificativaChecklist('chk_comp_analiticas')">
+                                                            <label class="form-check-label"
+                                                                for="chk_comp_analiticas_nao">Não</label>
+                                                        </div>
+                                                        <div id="chk_comp_analiticas_obs_wrap" class="mt-2 d-none">
+                                                            <textarea class="form-control form-control-sm"
+                                                                id="chk_comp_analiticas_obs" rows="2"
+                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">9. Todos os
+                                                        documentos anexados foram assinados pela Fiscalização?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_docs_assinados" id="chk_docs_assinados_sim"
+                                                            value="sim"
+                                                            onchange="toggleJustificativaChecklist('chk_docs_assinados')">
+                                                        <label class="form-check-label"
+                                                            for="chk_docs_assinados_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_docs_assinados" id="chk_docs_assinados_nao"
+                                                            value="nao"
+                                                            onchange="toggleJustificativaChecklist('chk_docs_assinados')">
+                                                        <label class="form-check-label"
+                                                            for="chk_docs_assinados_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_docs_assinados_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_docs_assinados_obs" rows="2"
+                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-0">
+                                                    <label class="form-label small fw-bold d-block">10. Outros</label>
+                                                    <textarea class="form-control form-control-sm"
+                                                        id="chk_outros_obs" rows="2"
+                                                        placeholder="Observações adicionais (opcional)"></textarea>
+                                                </div>
+                                            </form>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary btn-sm"
+                                                onclick="cancelarChecklistAditivo()">Cancelar</button>
+                                            <button type="button" class="btn btn-success btn-sm fw-bold"
+                                                id="btn-finalizar-checklist"
+                                                onclick="salvarChecklistAditivo()">
+                                                <i class="bi bi-check-circle me-1"></i> Finalizar Checklist
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

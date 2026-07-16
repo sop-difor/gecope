@@ -292,6 +292,16 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('[INIT] modalCadastro movido para document.body');
         }
     } catch (e) { console.warn('[INIT] Falha ao mover modalCadastro:', e); }
+
+    // Idem para o modal do checklist de documentação do aditivo (evita ficar preso
+    // dentro de outro modal ainda fechado, com display:none, e nunca aparecer)
+    try {
+        const modalChecklistEl = document.getElementById('modalChecklistAditivo');
+        if (modalChecklistEl && modalChecklistEl.parentElement !== document.body) {
+            document.body.appendChild(modalChecklistEl);
+            console.log('[INIT] modalChecklistAditivo movido para document.body');
+        }
+    } catch (e) { console.warn('[INIT] Falha ao mover modalChecklistAditivo:', e); }
 });
 
 
@@ -1696,6 +1706,19 @@ async function enviarParaPlanilha() {
 
         // Notificação WhatsApp (Apenas se entrar em Análise Fiscal)
         const statusInicial = formData.get("STATUS");
+
+        // Fecha a brecha do cadastro: se o processo já nasce em AGUAR. APROVAÇÃO,
+        // localiza o id recém-criado para abrir o checklist de documentação logo em seguida
+        let processoIdRecemCriado = null;
+        if (statusInicial === 'AGUAR. APROVAÇÃO') {
+            try {
+                const { data: pRow, error: errRow } = await sbClient.from('processos').select('id').eq('processo', numProcesso).maybeSingle();
+                if (!errRow && pRow) processoIdRecemCriado = pRow.id;
+            } catch (e) {
+                console.error('[ERRO] Ao localizar processo recém-criado para o checklist:', e);
+            }
+        }
+
         if (statusInicial === 'ANÁLISE FISCAL') {
             const metaFormatada = payload.data_compromisso_fiscal ? payload.data_compromisso_fiscal.split('-').reverse().join('/') : 'Não definida';
             processarNotificacao('novo_processo', {
@@ -1741,11 +1764,32 @@ async function enviarParaPlanilha() {
             btn.disabled = false;
             btn.innerHTML = 'SALVAR';
             carregarDadosSupabase();
+
+            if (processoIdRecemCriado) {
+                checklistAditivoState = {
+                    processoStr: numProcesso,
+                    processoId: processoIdRecemCriado,
+                    statusOriginal: 'AGUAR. APROVAÇÃO',
+                    sessionFinalized: false,
+                    latestChecklist: null
+                };
+                abrirModalChecklistAditivo();
+            }
         }, 1500);
     }
 }
 
 // --- 5. CORE: DETALHES, ATUALIZAR E EXCLUIR ---
+
+// --- CHECKLIST DE DOCUMENTAÇÃO (ADITIVO) ---
+let checklistAditivoState = {
+    processoStr: null,
+    processoId: null,
+    statusOriginal: null,
+    sessionFinalized: false,
+    latestChecklist: null
+};
+
 async function abrirDetalhes(processoStr) {
     // garante que a role local esteja atualizada com o servidor
     await refreshUserRole();
@@ -1756,6 +1800,15 @@ async function abrirDetalhes(processoStr) {
     document.getElementById('det_tipo').value = row.tipo;
     document.getElementById('det_status').value = row.status;
     document.getElementById('det_descricao').value = row.descricao;
+
+    // Reseta o estado do checklist de documentação para este processo
+    checklistAditivoState = {
+        processoStr: row.processo,
+        processoId: row.id,
+        statusOriginal: row.status,
+        sessionFinalized: false,
+        latestChecklist: null
+    };
     document.getElementById('det_contratante').value = row.contratante;
     document.getElementById('det_contratada').value = row.contratada;
 
@@ -1813,6 +1866,9 @@ async function abrirDetalhes(processoStr) {
     // Buscar histórico de prioridades
     carregarHistoricoPrioridades(processoStr);
 
+    // Buscar checklist de documentação do aditivo (resumo + histórico)
+    carregarChecklistAditivo(processoStr, row.id);
+
     const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
     modal.show();
 }
@@ -1861,6 +1917,275 @@ async function carregarHistoricoPrioridades(processoStr) {
         console.error("Erro ao carregar histórico de prioridades:", err);
         container.innerHTML = '<em class="text-danger">Erro ao carregar histórico.</em>';
     }
+}
+
+// Configuração dos itens Sim/Não do checklist (chave do radio -> coluna no banco)
+const CHECKLIST_ADITIVO_ITENS = [
+    { key: 'chk_planilha', campo: 'planilha_orcamentaria_validada', obsCampo: 'planilha_orcamentaria_obs', label: 'Planilha Orçamentária Validada', obrigatorio: 'sempre' },
+    { key: 'chk_memoria', campo: 'memoria_calculo', obsCampo: 'memoria_calculo_obs', label: 'Memória de Cálculo', obrigatorio: 'sempre' },
+    { key: 'chk_parecer', campo: 'parecer_tecnico', obsCampo: 'parecer_tecnico_obs', label: 'Parecer Técnico', obrigatorio: 'sempre' },
+    { key: 'chk_art_fiscalizacao', campo: 'art_fiscalizacao', obsCampo: 'art_fiscalizacao_obs', label: 'ART de Fiscalização', obrigatorio: 'primeiro_aditivo' },
+    { key: 'chk_art_execucao', campo: 'art_execucao', obsCampo: 'art_execucao_obs', label: 'ART de Execução', obrigatorio: 'primeiro_aditivo' },
+    { key: 'chk_portaria', campo: 'portaria_fiscalizacao', obsCampo: 'portaria_fiscalizacao_obs', label: 'Portaria de Fiscalização', obrigatorio: 'primeiro_aditivo' },
+    { key: 'chk_curva_abc', campo: 'curva_abc', obsCampo: 'curva_abc_obs', label: 'Curva ABC', obrigatorio: 'sempre' },
+    { key: 'chk_comp_propria', campo: 'composicao_propria', obsCampo: 'composicao_propria_obs', label: 'Composição Própria (CXXXX)', obrigatorio: 'sempre' },
+    { key: 'chk_comp_analiticas', campo: 'composicoes_analiticas', obsCampo: 'composicoes_analiticas_obs', label: 'Composições Analíticas', obrigatorio: 'comp_propria' },
+    { key: 'chk_docs_assinados', campo: 'docs_assinados_fiscalizacao', obsCampo: 'docs_assinados_fiscalizacao_obs', label: 'Documentos assinados pela Fiscalização', obrigatorio: 'sempre' }
+];
+
+function onChangeStatusDetalhes(selectEl) {
+    if (!selectEl || selectEl.value !== 'AGUAR. APROVAÇÃO') return;
+    if (getCurrentUserRole() !== 'admin') return;
+    checklistAditivoState.sessionFinalized = false;
+    abrirModalChecklistAditivo();
+}
+
+async function carregarChecklistAditivo(processoStr, processoId) {
+    const elResumo = document.getElementById('det_checklist_status');
+    const elHistWrap = document.getElementById('det_checklist_historico_wrap');
+    const elHist = document.getElementById('det_checklist_historico');
+    if (!elResumo) return;
+
+    elResumo.innerHTML = '<em class="text-muted">Carregando...</em>';
+    if (elHistWrap) elHistWrap.style.display = 'none';
+
+    try {
+        const { data, error } = await sbClient
+            .from('checklist_documentacao_aditivo')
+            .select('*')
+            .eq('processo_id', String(processoId))
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            checklistAditivoState.latestChecklist = null;
+            elResumo.innerHTML = '<em class="text-muted">Nenhum checklist registrado ainda.</em>';
+            return;
+        }
+
+        checklistAditivoState.latestChecklist = data[0];
+        elResumo.innerHTML = montarResumoChecklistHTML(data[0]);
+
+        if (elHist && data.length > 1) {
+            elHist.innerHTML = data.slice(1).map(reg => {
+                const dt = new Date(reg.created_at).toLocaleString('pt-BR');
+                return `
+                    <div class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold text-dark">${escapeHTML(reg.autor_nome || '')}</span>
+                            <span class="text-muted"> em ${dt}</span>
+                        </div>
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick="abrirModalChecklistAditivo(${reg.id})">Ver</button>
+                    </div>
+                `;
+            }).join('');
+            if (elHistWrap) elHistWrap.style.display = '';
+        } else if (elHist) {
+            elHist.innerHTML = '';
+        }
+    } catch (err) {
+        console.error("Erro ao carregar checklist do aditivo:", err);
+        elResumo.innerHTML = '<em class="text-danger">Erro ao carregar checklist.</em>';
+    }
+}
+
+function montarResumoChecklistHTML(registro) {
+    const dt = new Date(registro.created_at).toLocaleString('pt-BR');
+    const pendencias = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false).length;
+    const badge = pendencias > 0
+        ? `<span class="badge bg-warning-subtle text-warning border border-warning-subtle">${pendencias} pendência(s)</span>`
+        : `<span class="badge bg-success-subtle text-success border border-success-subtle">Completo</span>`;
+    return `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <div>${badge} <span class="text-muted ms-1">1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}</span></div>
+            <button type="button" class="btn btn-link btn-sm p-0" onclick="abrirModalChecklistAditivo(${registro.id})">Ver detalhes</button>
+        </div>
+        <div class="text-muted" style="font-size: 0.7rem;">Preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt}</div>
+    `;
+}
+
+function toggleChecklistCondicional(radioName, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const checked = document.querySelector(`input[name="${radioName}"]:checked`);
+    container.classList.toggle('d-none', !(checked && checked.value === 'sim'));
+}
+
+function toggleJustificativaChecklist(itemKey) {
+    const wrap = document.getElementById(`${itemKey}_obs_wrap`);
+    if (!wrap) return;
+    const checked = document.querySelector(`input[name="${itemKey}"]:checked`);
+    const mostrar = !!(checked && checked.value === 'nao');
+    wrap.classList.toggle('d-none', !mostrar);
+    if (!mostrar) {
+        const textarea = document.getElementById(`${itemKey}_obs`);
+        if (textarea) textarea.value = '';
+    }
+}
+
+function resetarFormChecklistAditivo() {
+    const form = document.getElementById('formChecklistAditivo');
+    if (!form) return;
+    form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; r.disabled = false; });
+    form.querySelectorAll('textarea').forEach(t => { t.value = ''; t.disabled = false; });
+    document.getElementById('chk_grupo_primeiro_aditivo').classList.add('d-none');
+    document.getElementById('chk_comp_analiticas_wrap').classList.add('d-none');
+    CHECKLIST_ADITIVO_ITENS.forEach(item => {
+        const wrap = document.getElementById(`${item.key}_obs_wrap`);
+        if (wrap) wrap.classList.add('d-none');
+    });
+}
+
+function abrirModalChecklistAditivo(checklistIdParaVisualizar = null) {
+    resetarFormChecklistAditivo();
+
+    const modoLeitura = !!checklistIdParaVisualizar;
+    document.getElementById('chk_msg_readonly').style.display = modoLeitura ? '' : 'none';
+    document.getElementById('chk_msg_obrigatorio').style.display = modoLeitura ? 'none' : '';
+    document.getElementById('btn-finalizar-checklist').style.display = modoLeitura ? 'none' : '';
+
+    document.getElementById('chk_processo_id').value = checklistAditivoState.processoId || '';
+    document.getElementById('chk_processo_nup').value = checklistAditivoState.processoStr || '';
+    document.getElementById('chk_processo_label').textContent = checklistAditivoState.processoStr || '';
+
+    if (modoLeitura) {
+        // Busca o registro (no atual ou no histórico já carregado) para exibir somente leitura
+        let registro = null;
+        if (checklistAditivoState.latestChecklist && checklistAditivoState.latestChecklist.id === checklistIdParaVisualizar) {
+            registro = checklistAditivoState.latestChecklist;
+        }
+        if (!registro) {
+            sbClient.from('checklist_documentacao_aditivo').select('*').eq('id', checklistIdParaVisualizar).single()
+                .then(({ data, error }) => {
+                    if (!error && data) preencherFormChecklist(data, true);
+                });
+        } else {
+            preencherFormChecklist(registro, true);
+        }
+    }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalChecklistAditivo')).show();
+}
+
+function preencherFormChecklist(registro, desabilitar) {
+    const setRadio = (name, valorBool) => {
+        if (valorBool === null || valorBool === undefined) return;
+        const el = document.getElementById(`${name}_${valorBool ? 'sim' : 'nao'}`);
+        if (el) el.checked = true;
+    };
+
+    setRadio('chk_primeiro_aditivo', registro.eh_primeiro_aditivo);
+    toggleChecklistCondicional('chk_primeiro_aditivo', 'chk_grupo_primeiro_aditivo');
+
+    CHECKLIST_ADITIVO_ITENS.forEach(item => {
+        setRadio(item.key, registro[item.campo]);
+        if (item.obsCampo && registro[item.obsCampo]) {
+            const textarea = document.getElementById(`${item.key}_obs`);
+            if (textarea) textarea.value = registro[item.obsCampo];
+        }
+        toggleJustificativaChecklist(item.key);
+    });
+    toggleChecklistCondicional('chk_comp_propria', 'chk_comp_analiticas_wrap');
+
+    const outros = document.getElementById('chk_outros_obs');
+    if (outros) outros.value = registro.outros_obs || '';
+
+    if (desabilitar) {
+        const form = document.getElementById('formChecklistAditivo');
+        form.querySelectorAll('input, textarea').forEach(el => { el.disabled = true; });
+    }
+}
+
+function cancelarChecklistAditivo() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalChecklistAditivo'));
+    if (modal) modal.hide();
+}
+
+async function salvarChecklistAditivo() {
+    const getRadioValue = (name) => {
+        const el = document.querySelector(`input[name="${name}"]:checked`);
+        return el ? el.value : null;
+    };
+    const focarEAlertar = (msg, elId) => {
+        alert(msg);
+        const el = document.getElementById(elId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    const primeiroAditivo = getRadioValue('chk_primeiro_aditivo');
+    if (!primeiroAditivo) {
+        focarEAlertar('Responda se é o 1º Aditivo deste processo.', 'chk_primeiro_aditivo_sim');
+        return;
+    }
+    const ehPrimeiroAditivo = primeiroAditivo === 'sim';
+
+    const payload = {
+        processo_id: String(checklistAditivoState.processoId),
+        processo_nup: checklistAditivoState.processoStr,
+        eh_primeiro_aditivo: ehPrimeiroAditivo,
+        autor_nome: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido',
+        autor_email: getCurrentUserEmail()
+    };
+
+    for (const item of CHECKLIST_ADITIVO_ITENS) {
+        const ehCondicionalPrimeiroAditivo = item.obrigatorio === 'primeiro_aditivo';
+        const ehCondicionalCompPropria = item.obrigatorio === 'comp_propria';
+
+        if (ehCondicionalPrimeiroAditivo && !ehPrimeiroAditivo) {
+            payload[item.campo] = null;
+            if (item.obsCampo) payload[item.obsCampo] = null;
+            continue;
+        }
+        if (ehCondicionalCompPropria && payload.composicao_propria !== true) {
+            payload[item.campo] = null;
+            if (item.obsCampo) payload[item.obsCampo] = null;
+            continue;
+        }
+
+        const valor = getRadioValue(item.key);
+        if (!valor) {
+            focarEAlertar(`Responda o item "${item.label}" antes de finalizar o checklist.`, `${item.key}_sim`);
+            return;
+        }
+        payload[item.campo] = valor === 'sim';
+        if (item.obsCampo) {
+            const textarea = document.getElementById(`${item.key}_obs`);
+            payload[item.obsCampo] = (valor === 'nao' && textarea && textarea.value.trim()) ? textarea.value.trim() : null;
+        }
+    }
+
+    const outros = document.getElementById('chk_outros_obs');
+    payload.outros_obs = outros && outros.value.trim() ? outros.value.trim() : null;
+
+    const btn = document.getElementById('btn-finalizar-checklist');
+    btn.disabled = true;
+    btn.innerHTML = 'SALVANDO...';
+
+    const { error } = await sbClient.from('checklist_documentacao_aditivo').insert([payload]);
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Finalizar Checklist';
+
+    if (error) {
+        alert('Erro ao salvar checklist: ' + error.message);
+        return;
+    }
+
+    checklistAditivoState.sessionFinalized = true;
+    registrarAtividade('PROCESSO', `preencheu o checklist de documentação do aditivo do processo Nº ${checklistAditivoState.processoStr}`, checklistAditivoState.processoStr);
+    await carregarChecklistAditivo(checklistAditivoState.processoStr, checklistAditivoState.processoId);
+
+    alert('Checklist salvo com sucesso!');
+    cancelarChecklistAditivo();
+}
+
+function checklistValidoParaSalvar(statusFinal) {
+    if (statusFinal !== 'AGUAR. APROVAÇÃO' && statusFinal !== 'APROVADO') return true;
+    if (checklistAditivoState.sessionFinalized) return true;
+    const statusMudou = (statusFinal !== checklistAditivoState.statusOriginal);
+    if (!statusMudou && checklistAditivoState.latestChecklist) return true;
+    return false;
 }
 
 async function executarAcaoDetalhes(actionType) {
@@ -1953,6 +2278,13 @@ async function executarAcaoDetalhes(actionType) {
                 alert(`Para o status "${statusAtual}", os campos de ACRÉSCIMO (GECOPE), SUPRESSÃO (GECOPE) e APROVAÇÃO GECOPE devem estar preenchidos.`);
                 return;
             }
+        }
+
+        // 2.4 Checklist de Documentação do Aditivo obrigatório para AGUAR. APROVAÇÃO/APROVADO
+        if (!checklistValidoParaSalvar(statusAtual)) {
+            alert('É obrigatório preencher o Checklist de Documentação do Aditivo antes de salvar o processo com este status.');
+            abrirModalChecklistAditivo();
+            return;
         }
 
         const formData = new FormData(form);
