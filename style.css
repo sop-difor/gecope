@@ -976,14 +976,29 @@
             height: 100%;
             overflow-y: auto;
             background: linear-gradient(160deg, rgba(0, 20, 10, 0.66), rgba(3, 12, 24, 0.74));
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 70px), transparent 100%);
-            mask-image: linear-gradient(to right, #000 calc(100% - 70px), transparent 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 32px;
+        }
+
+        /* Blur isolado num pseudo-elemento próprio: aplicar backdrop-filter e
+           mask-image juntos no mesmo elemento causa uma emenda/faixa visível
+           na borda do degradê em Chrome/Edge (bug de composição). Separando
+           em camadas, cada uma compõe em seu próprio passe e a emenda some. */
+        .landing-left::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 70px), transparent 100%);
+            mask-image: linear-gradient(to right, #000 calc(100% - 70px), transparent 100%);
+            -webkit-mask-size: 100% 100%;
+            mask-size: 100% 100%;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
         }
 
         /* Entrada suave do painel lateral ao abrir a página (em vez de estático) */
@@ -1100,6 +1115,7 @@
             margin-bottom: 18px;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
         }
 
@@ -1278,8 +1294,10 @@
                 max-width: none;
                 min-width: 0;
                 background: linear-gradient(160deg, rgba(0, 20, 10, 0.96), rgba(3, 12, 24, 0.98));
-                -webkit-mask-image: none;
-                mask-image: none;
+            }
+
+            .landing-left::before {
+                display: none;
             }
         }
 
