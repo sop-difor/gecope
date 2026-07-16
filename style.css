@@ -948,7 +948,7 @@
             background:
                 linear-gradient(100deg, rgba(2, 10, 20, 0.6) 0%, rgba(2, 10, 20, 0.2) 38%, rgba(2, 10, 20, 0) 60%),
                 linear-gradient(0deg, rgba(2, 10, 20, 0.35) 0%, rgba(2, 10, 20, 0) 22%),
-                url('fachada.chat.png') no-repeat center center;
+                url('fachada.gecope.png') no-repeat center center;
             background-size: 100% 100%, 100% 100%, 100% auto;
         }
 
@@ -960,9 +960,11 @@
             min-width: 380px;
             height: 100%;
             overflow-y: auto;
-            background: linear-gradient(160deg, rgba(0, 20, 10, 0.62), rgba(3, 12, 24, 0.68));
+            background: linear-gradient(160deg, rgba(0, 20, 10, 0.66), rgba(3, 12, 24, 0.74));
             backdrop-filter: blur(6px);
             -webkit-backdrop-filter: blur(6px);
+            -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 70px), transparent 100%);
+            mask-image: linear-gradient(to right, #000 calc(100% - 70px), transparent 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -983,6 +985,15 @@
             overflow: hidden;
         }
 
+        .landing-right::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 0 0;
+            width: 220px;
+            background: linear-gradient(to right, rgba(3, 12, 24, 0.55), rgba(3, 12, 24, 0) 100%);
+            pointer-events: none;
+        }
+
         .landing-brand {
             display: flex;
             flex-direction: column;
@@ -997,7 +1008,7 @@
             width: 64px;
             height: 64px;
             object-fit: contain;
-            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 26px rgba(76, 193, 124, 0.35));
         }
 
         .landing-brand h1 {
@@ -1006,6 +1017,7 @@
             font-size: 1.7rem;
             letter-spacing: 0.5px;
             color: #ffffff;
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
         }
 
         .landing-brand p {
@@ -1039,10 +1051,11 @@
 
         .landing-card {
             width: 100%;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 14px;
-            padding: 24px 22px;
+            background: linear-gradient(165deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 26px 24px;
+            box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .landing-card-label {
@@ -1052,6 +1065,18 @@
             text-transform: uppercase;
             color: #ffffff;
             margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .landing-card-label::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--sop-green-light, #4CC17C);
+            box-shadow: 0 0 8px 1px rgba(76, 193, 124, 0.7);
         }
 
         .landing-input-group {
@@ -1076,6 +1101,7 @@
             border: 1px solid rgba(255, 255, 255, 0.15) !important;
             height: 48px !important;
             font-size: 0.95rem !important;
+            transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
         }
 
         .landing-input::placeholder {
@@ -1083,13 +1109,36 @@
         }
 
         .landing-input:focus {
-            background: rgba(255, 255, 255, 0.08) !important;
+            background: rgba(255, 255, 255, 0.09) !important;
             border-color: var(--sop-green-light, #4CC17C) !important;
             box-shadow: 0 0 0 3px rgba(76, 193, 124, 0.2) !important;
         }
 
         .landing-input-wrap {
             position: relative;
+        }
+
+        .landing-input-icon {
+            position: absolute;
+            left: 14px;
+            top: 0;
+            bottom: 0;
+            margin: auto 0;
+            height: 1.1rem;
+            display: flex;
+            align-items: center;
+            color: #64748b;
+            font-size: 1rem;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .landing-input-wrap:focus-within .landing-input-icon {
+            color: var(--sop-green-light, #4CC17C);
+        }
+
+        .landing-input.landing-input-has-icon {
+            padding-left: 40px !important;
         }
 
         .landing-toggle-password {
@@ -1108,6 +1157,11 @@
             justify-content: center;
             font-size: 1.1rem;
             line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .landing-toggle-password:hover {
+            color: var(--sop-green-light, #4CC17C);
         }
 
         .landing-link {
@@ -1137,7 +1191,7 @@
         }
 
         .btn-landing-submit {
-            background: var(--sop-green, #008F3D) !important;
+            background: linear-gradient(135deg, var(--sop-green-light, #4CC17C), var(--sop-green, #008F3D)) !important;
             color: #ffffff !important;
             font-weight: 700 !important;
             font-size: 1rem !important;
@@ -1146,19 +1200,28 @@
             width: 100% !important;
             margin-top: 6px !important;
             border: none !important;
-            transition: background 0.2s !important;
+            transition: transform 0.2s, box-shadow 0.2s, background 0.3s !important;
+            box-shadow: 0 10px 24px -8px rgba(0, 143, 61, 0.55) !important;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
         .btn-landing-submit:hover {
-            background: var(--sop-green-dark, #007233) !important;
+            background: linear-gradient(135deg, var(--sop-green, #008F3D), var(--sop-green-dark, #007233)) !important;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 14px 28px -8px rgba(0, 143, 61, 0.65) !important;
+        }
+
+        .btn-landing-submit:active {
+            transform: translateY(0);
         }
 
         @media (max-width: 900px) {
+            .landing-split {
+                background-image: none;
+            }
+
             .landing-right {
                 display: none;
             }
@@ -1167,6 +1230,24 @@
                 flex: 1 1 100%;
                 max-width: none;
                 min-width: 0;
+                background: linear-gradient(160deg, rgba(0, 20, 10, 0.96), rgba(3, 12, 24, 0.98));
+                -webkit-mask-image: none;
+                mask-image: none;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .landing-input.landing-input-has-icon {
+                padding-left: 34px !important;
+            }
+
+            .landing-input {
+                font-size: 0.85rem !important;
+            }
+
+            .landing-input-icon {
+                left: 12px;
+                font-size: 0.9rem;
             }
         }
 

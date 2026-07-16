@@ -63,14 +63,19 @@
                             <div class="landing-input-group">
                                 <label class="landing-input-label" for="landing-matricula">E-mail ou
                                     Matrícula</label>
-                                <input id="landing-matricula" type="text" placeholder="Digite seu e-mail ou matrícula"
-                                    class="form-control landing-input" required />
+                                <div class="landing-input-wrap">
+                                    <i class="bi bi-person-fill landing-input-icon"></i>
+                                    <input id="landing-matricula" type="text"
+                                        placeholder="Digite seu e-mail ou matrícula"
+                                        class="form-control landing-input landing-input-has-icon" required />
+                                </div>
                             </div>
                             <div class="landing-input-group">
                                 <label class="landing-input-label" for="landing-password">Senha</label>
                                 <div class="landing-input-wrap">
+                                    <i class="bi bi-lock-fill landing-input-icon"></i>
                                     <input id="landing-password" type="password" placeholder="Digite sua senha"
-                                        class="form-control landing-input" required />
+                                        class="form-control landing-input landing-input-has-icon" required />
                                     <button type="button" id="btn-toggle-password" class="landing-toggle-password">
                                         <i class="bi bi-eye"></i>
                                     </button>
