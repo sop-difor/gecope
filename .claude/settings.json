@@ -4,7 +4,14 @@
       "Bash(node -e ' *)",
       "Bash(git show *)",
       "Bash(rm orig_index_check.html)",
-      "PowerShell(Start-Process \"http://localhost:8791/index.html\")"
+      "PowerShell(Start-Process \"http://localhost:8791/index.html\")",
+      "Bash(start \"\" \"c:\\\\Users\\\\Nildeno\\\\Desktop\\\\SOP.GECOPE\\\\gecope\\\\index.html\")",
+      "Bash(python3 -c ' *)",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\(\"c:\\\\Users\\\\Nildeno\\\\Desktop\\\\SOP.GECOPE\\\\gecope\\\\ceara.png\"\\); $bmp = New-Object System.Drawing.Bitmap\\($img\\); Write-Output \"Size: $\\($bmp.Width\\)x$\\($bmp.Height\\) PixelFormat: $\\($bmp.PixelFormat\\)\"; $corners = @\\( $bmp.GetPixel\\(0,0\\), $bmp.GetPixel\\($bmp.Width-1,0\\), $bmp.GetPixel\\(0,$bmp.Height-1\\), $bmp.GetPixel\\($bmp.Width-1,$bmp.Height-1\\), $bmp.GetPixel\\([int]\\($bmp.Width/2\\),5\\) \\); $corners | ForEach-Object { Write-Output \"A=$\\($_.A\\) R=$\\($_.R\\) G=$\\($_.G\\) B=$\\($_.B\\)\" })",
+      "Bash(magick -version)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Nildeno\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Nildeno-Desktop-SOP-GECOPE-gecope\\\\a5c63e10-123c-4879-9b5f-4f2cef4fb6f5\\\\scratchpad\\\\removebg.ps1\")",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"http.server 8791\")"
     ]
   }
 }

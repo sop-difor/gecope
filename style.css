@@ -931,99 +931,237 @@
             flex-shrink: 0;
         }
 
-        /* --- LANDING PAGE (CENTRAL CARD ONLY) --- */
+        /* --- LANDING PAGE (SPLIT SCREEN: FORMULÁRIO + FOTO DA SEDE) --- */
         .landing-overlay {
             position: fixed;
             inset: 0;
             z-index: 2100;
-            /* Fundo com imagem e gradiente overlay para melhorar leitura e "profissionalismo" */
-            background:
-                linear-gradient(135deg, rgba(0, 40, 20, 0.85), rgba(0, 20, 40, 0.75)),
-                url('unnamed22.webp') no-repeat center center;
+            background: var(--sop-slate-900, #0f172a);
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .landing-split {
+            position: relative;
+            display: flex;
+            width: 100%;
+            height: 100%;
+            background: url('SOP.jpg') no-repeat center center;
             background-size: cover;
+        }
+
+        .landing-left {
+            position: relative;
+            flex: 0 0 44%;
+            max-width: 560px;
+            min-width: 380px;
+            height: 100%;
+            overflow-y: auto;
+            background: linear-gradient(160deg, rgba(0, 20, 10, 0.62), rgba(3, 12, 24, 0.68));
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Montserrat', sans-serif;
+            padding: 32px;
+        }
+
+        .landing-left-inner {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .landing-right {
+            flex: 1 1 auto;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .landing-brand {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+
+        .landing-brand-icon {
+            flex-shrink: 0;
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+        }
+
+        .landing-brand h1 {
+            margin: 0;
+            font-weight: 800;
+            font-size: 1.7rem;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+        }
+
+        .landing-brand p {
+            margin: 2px 0 0;
+            font-size: 0.82rem;
+            color: #94a3b8;
+            line-height: 1.35;
+        }
+
+        .landing-features {
+            list-style: none;
+            margin: 0 0 28px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .landing-features li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+        }
+
+        .landing-features li i {
+            color: var(--sop-green-light, #4CC17C);
+            font-size: 1rem;
         }
 
         .landing-card {
             width: 100%;
-            max-width: 400px;
-            /* Bit narrower for 'lighter' feel */
-            background: rgba(255, 255, 255, 0.95);
-            /* Semi-transparent for modern look */
-            backdrop-filter: blur(10px);
-            /* Premium feel */
-            border-radius: 16px;
-            /* More rounded */
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 24px 22px;
         }
 
-        .landing-card-header {
-            background: #2ea55c;
-            /* Exact green from image */
-            color: #ffffff;
-            padding: 24px;
-            text-align: center;
-            border: none;
-        }
-
-        .landing-card-header h2 {
-            margin: 0;
-            font-weight: 800;
-            font-size: 2.2rem;
-            letter-spacing: 2px;
+        .landing-card-label {
+            font-weight: 700;
+            font-size: 0.78rem;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
-        }
-
-        .landing-card-body {
-            padding: 40px 35px;
+            color: #ffffff;
+            margin-bottom: 18px;
         }
 
         .landing-input-group {
             position: relative;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
-        .landing-input-group i {
-            position: absolute;
-            top: 50%;
-            left: 15px;
-            transform: translateY(-50%);
-            color: #888;
-            font-size: 1.2rem;
+        .landing-input-label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 6px;
         }
 
         .landing-input {
-            padding-left: 45px !important;
-            padding-right: 45px !important;
+            background: rgba(255, 255, 255, 0.06) !important;
+            color: #ffffff !important;
             border-radius: 8px !important;
-            border: 1px solid #ced4da !important;
-            height: 54px !important;
-            font-size: 1.05rem !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            height: 48px !important;
+            font-size: 0.95rem !important;
+        }
+
+        .landing-input::placeholder {
+            color: #64748b;
+        }
+
+        .landing-input:focus {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: var(--sop-green-light, #4CC17C) !important;
+            box-shadow: 0 0 0 3px rgba(76, 193, 124, 0.2) !important;
+        }
+
+        .landing-input-wrap {
+            position: relative;
+        }
+
+        .landing-toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 0;
+            bottom: 0;
+            margin: auto 0;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            line-height: 1;
+        }
+
+        .landing-link {
+            text-decoration: none;
+            font-size: 0.82rem;
+            color: #94a3b8;
+        }
+
+        .landing-link:hover {
+            color: #cbd5e1;
+        }
+
+        .landing-link-accent {
+            color: var(--sop-green-light, #4CC17C);
+            font-weight: 700;
+        }
+
+        .landing-link-accent:hover {
+            color: var(--sop-green-light, #4CC17C);
+        }
+
+        .landing-footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 0.72rem;
+            color: #64748b;
         }
 
         .btn-landing-submit {
-            background: #3b6981 !important;
-            /* Exact blueish from image */
+            background: var(--sop-green, #008F3D) !important;
             color: #ffffff !important;
             font-weight: 700 !important;
-            font-size: 1.1rem !important;
-            height: 52px !important;
+            font-size: 1rem !important;
+            height: 50px !important;
             border-radius: 8px !important;
             width: 100% !important;
-            margin-top: 10px !important;
+            margin-top: 6px !important;
             border: none !important;
             transition: background 0.2s !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-landing-submit:hover {
-            background: #2b5166 !important;
+            background: var(--sop-green-dark, #007233) !important;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        @media (max-width: 900px) {
+            .landing-right {
+                display: none;
+            }
+
+            .landing-left {
+                flex: 1 1 100%;
+                max-width: none;
+                min-width: 0;
+            }
         }
 
         /* ------------------------------------------------------------------------
