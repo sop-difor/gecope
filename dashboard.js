@@ -266,7 +266,7 @@
         document.getElementById("gerencial-count-badge") && (document.getElementById("gerencial-count-badge").textContent = `${rows.length} processos`);
         renderHBar("chart_proc_por_fiscal", topN(groupCount(rows, d => d.fiscal), 20), "Qtd");
         const pieD = groupCount(rows, d => d.status).sort((a, b) => b.value - a.value);
-        Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => formatStatusDisplay(d.key)), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false });
+        Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => formatStatusDisplay(d.key)), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false, responsive: true });
         renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
     }
 
@@ -289,7 +289,7 @@
     function renderHBar(id, g, tx) {
         if (!g.length) { Plotly.react(document.getElementById(id), [], { title: "Sem dados" }); return; }
         const y = g.map(r => r.key).reverse(), x = g.map(r => r.value).reverse();
-        Plotly.react(document.getElementById(id), [{ x, y, type: 'bar', orientation: 'h', text: x.map(v => v.toFixed(0)), textposition: 'outside', marker: { color: "#018ABD" } }], { margin: { l: 180, r: 20, t: 10, b: 40 }, xaxis: { title: tx }, yaxis: { automargin: true }, height: Math.max(300, 26 * y.length + 80) }, { displayModeBar: false });
+        Plotly.react(document.getElementById(id), [{ x, y, type: 'bar', orientation: 'h', text: x.map(v => v.toFixed(0)), textposition: 'outside', marker: { color: "#018ABD" } }], { margin: { l: 180, r: 20, t: 10, b: 40 }, xaxis: { title: tx }, yaxis: { automargin: true }, height: Math.max(300, 26 * y.length + 80) }, { displayModeBar: false, responsive: true });
     }
 
     // Re-export nomes compatíveis (mantendo window.* usados no código legado)
@@ -711,7 +711,7 @@
     const renderHBar = (id, g, tx) => {
         if (!g.length) { if (window.Plotly) Plotly.react(document.getElementById(id), [], { title: "Sem dados" }); return; }
         const y = g.map(r => r.key).reverse(), x = g.map(r => r.value).reverse();
-        if (window.Plotly) Plotly.react(document.getElementById(id), [{ x, y, type: 'bar', orientation: 'h', text: x.map(v => v.toFixed(0)), textposition: 'outside', marker: { color: "#018ABD" } }], { margin: { l: 180, r: 20, t: 10, b: 40 }, xaxis: { title: tx }, yaxis: { automargin: true }, height: Math.max(300, 26 * y.length + 80) }, { displayModeBar: false });
+        if (window.Plotly) Plotly.react(document.getElementById(id), [{ x, y, type: 'bar', orientation: 'h', text: x.map(v => v.toFixed(0)), textposition: 'outside', marker: { color: "#018ABD" } }], { margin: { l: 180, r: 20, t: 10, b: 40 }, xaxis: { title: tx }, yaxis: { automargin: true }, height: Math.max(300, 26 * y.length + 80) }, { displayModeBar: false, responsive: true });
     };
 
     var ger = { fiscal: document.getElementById("gerencial-filter-fiscal"), status: document.getElementById("gerencial-filter-status"), clear: document.getElementById("btn-gerencial-clear") };
@@ -751,7 +751,7 @@
         document.getElementById("gerencial-count-badge").textContent = `${rows.length} processos`;
         renderHBar("chart_proc_por_fiscal", topN(groupCount(rows, d => d.fiscal), 20), "Qtd");
         const pieD = groupCount(rows, d => d.status).sort((a, b) => b.value - a.value);
-        if (window.Plotly) Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => window.formatStatusDisplay ? window.formatStatusDisplay(d.key) : d.key), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false });
+        if (window.Plotly) Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => window.formatStatusDisplay ? window.formatStatusDisplay(d.key) : d.key), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false, responsive: true });
         renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
     }
 
