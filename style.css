@@ -699,6 +699,7 @@
             font-family: "Montserrat", system-ui, -apple-system, sans-serif;
             background-color: var(--sop-slate-50);
             color: var(--sop-slate-900);
+            overflow-x: hidden;
         }
 
         /* ------------------------------------------------------------------------
@@ -2064,6 +2065,33 @@
             .filter-group-compact>div {
                 width: 48%;
                 min-width: 100px;
+            }
+
+            .page-wrapper {
+                padding: 12px 12px 28px 12px;
+            }
+
+            #process-tab-nav {
+                flex-wrap: wrap;
+                gap: 16px !important;
+            }
+
+            .modal-body.p-4 {
+                padding: 1rem !important;
+            }
+
+            .chart-placeholder {
+                min-height: 220px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .modal-fullscreen-sm-down .modal-body.p-4 {
+                padding: 0.85rem !important;
+            }
+
+            #modalCriarComposicaoAnalitica .modal-dialog {
+                max-width: calc(100% - 1rem) !important;
             }
         }
 
