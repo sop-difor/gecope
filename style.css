@@ -699,7 +699,6 @@
             font-family: "Montserrat", system-ui, -apple-system, sans-serif;
             background-color: var(--sop-slate-50);
             color: var(--sop-slate-900);
-            overflow-x: hidden;
         }
 
         /* ------------------------------------------------------------------------
@@ -2071,9 +2070,9 @@
                 padding: 12px 12px 28px 12px;
             }
 
-            #process-tab-nav {
+            .proc-tabs {
                 flex-wrap: wrap;
-                gap: 16px !important;
+                width: auto;
             }
 
             .modal-body.p-4 {
@@ -2082,6 +2081,24 @@
 
             .chart-placeholder {
                 min-height: 220px;
+            }
+
+            .proc-kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .proc-filter-row {
+                flex-wrap: wrap;
+            }
+
+            .proc-filter-col,
+            .proc-filter-col-search {
+                flex: 1 1 100%;
+            }
+
+            .proc-filter-actions {
+                flex: 1 1 100%;
+                justify-content: flex-end;
             }
         }
 
@@ -2092,6 +2109,10 @@
 
             #modalCriarComposicaoAnalitica .modal-dialog {
                 max-width: calc(100% - 1rem) !important;
+            }
+
+            .proc-kpi-grid {
+                grid-template-columns: 1fr;
             }
         }
 
