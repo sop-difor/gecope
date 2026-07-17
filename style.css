@@ -2054,6 +2054,28 @@
             margin-right: 8px;
         }
 
+        /* Breakpoint mais largo (cobre tablets em retrato, que costumam ter entre
+           800px e 992px de largura útil — acima do @media 768px tradicional) */
+        @media (max-width: 992px) {
+            .proc-kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .proc-filter-row {
+                flex-wrap: wrap;
+            }
+
+            .proc-filter-col,
+            .proc-filter-col-search {
+                flex: 1 1 220px;
+            }
+
+            .proc-filter-actions {
+                flex: 1 1 100%;
+                justify-content: flex-end;
+            }
+        }
+
         @media (max-width:768px) {
             .sop-header {
                 flex-direction: column;
@@ -2083,22 +2105,9 @@
                 min-height: 220px;
             }
 
-            .proc-kpi-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .proc-filter-row {
-                flex-wrap: wrap;
-            }
-
             .proc-filter-col,
             .proc-filter-col-search {
                 flex: 1 1 100%;
-            }
-
-            .proc-filter-actions {
-                flex: 1 1 100%;
-                justify-content: flex-end;
             }
         }
 
