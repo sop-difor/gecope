@@ -1389,10 +1389,255 @@ tbody td { padding: 10px 15px; vertical-align: top; }
   body { background: white; }
   .card-analista, table, .rotinas-card { box-shadow: none !important; border: 1px solid #ccc !important; transform: none !important; }
 }
+
+/* ============================================================
+   TEMA ESCURO — Painel de Distribuição de Tarefas
+   Reaproveita a classe/alternador do restante do GECOPE (body.theme-dark,
+   toggleAppTheme()). Muita cor desta página já troca sozinha porque usa os
+   tokens --sop-*/--slate-*/--borda (redefinidos em body.theme-dark no
+   style.css); as regras abaixo só cobrem o que ficou com cor fixa
+   (branco/cinza claro em vez de var()) e por isso não se adaptava.
+   ============================================================ */
+
+/* Pílula de aba ativa e botões "outline" com fundo branco fixo */
+body.theme-dark nav button.ativo { background: #1c3f2e; }
+
+/* Cabeçalho do card de analista usa --verde (#008F3D) fixo — muito saturado
+   contra o fundo quase preto do tema escuro, sobretudo nos cards vazios (sem
+   tarefa ativa) onde ele domina o card inteiro. Reaproveita o mesmo verde
+   escuro já usado no acento de aba ativa (#1c3f2e) para manter a identidade
+   de cor sem o brilho excessivo. */
+body.theme-dark .card-analista-header {
+  background: #1c3f2e !important;
+}
+
+/* Borda de 1px (var(--slate-100/200/--borda)) fica clara demais no escuro e
+   desenha um contorno esbranquiçado ao redor de cada card/filtro — remove de
+   vez, diferenciação já vem do próprio fundo (#142e22) contra o fundo da
+   página. O acento colorido da esquerda (--sop-blue/verde/fila/etc.) não é
+   tocado aqui. */
+body.theme-dark .card-resumo,
+body.theme-dark .rel-card-resumo {
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+}
+body.theme-dark .card-analista,
+body.theme-dark .filtro-wrap,
+body.theme-dark .conc-card,
+body.theme-dark .card-cfg,
+body.theme-dark .rotinas-card {
+  border-color: transparent !important;
+}
+
+/* Número do KPI usa --slate-900 (quase preto) fixo, pensado para fundo
+   branco — no escuro ficava ilegível sobre o verde do card. */
+body.theme-dark .card-resumo .num {
+  color: #ffffff !important;
+}
+
+body.theme-dark .btn-verde,
+body.theme-dark .btn-vermelho,
+body.theme-dark .rel-view-btn,
+body.theme-dark .cal-periodo-btn,
+body.theme-dark .cal-periodo-input,
+body.theme-dark .cal-nav-btn {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Contêineres "brancos": fundo escuro + texto claro. Bordas com acento de
+   cor (status, esquerda) já usam var() e não precisam de ajuste aqui. */
+body.theme-dark .card-resumo,
+body.theme-dark .filtro-wrap,
+body.theme-dark .card-analista,
+body.theme-dark .tarefa,
+body.theme-dark .conc-barra,
+body.theme-dark .rel-card-resumo,
+body.theme-dark .cal-nav,
+body.theme-dark table,
+body.theme-dark .card-cfg,
+body.theme-dark .rotinas-card,
+body.theme-dark .conc-card {
+  background-color: #142e22 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Contêineres com borda fixa (sem acento de status) — pode sobrescrever tudo */
+body.theme-dark .rotina-item,
+body.theme-dark .cron-modal,
+body.theme-dark #modal-historico,
+body.theme-dark #cal-popup,
+body.theme-dark .cal-dia {
+  background-color: #142e22 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+body.theme-dark .tarefas-recolhidas { border-color: rgba(255, 255, 255, 0.12) !important; }
+body.theme-dark .tarefas-recolhidas-toggle,
+body.theme-dark .tarefas-recolhidas-corpo {
+  background-color: #16261e !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+body.theme-dark .tarefas-recolhidas-toggle:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+
+/* Cards com acento à esquerda só em cinza neutro — mantém a borda mas escurece o fundo */
+body.theme-dark .tarefa-conc {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+  border-right-color: rgba(255, 255, 255, 0.1) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Formulários (campo, editor rich-text, filtros) */
+body.theme-dark .campo input,
+body.theme-dark .campo select,
+body.theme-dark .campo textarea,
+body.theme-dark .campo-rich,
+body.theme-dark .fmt-barra {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+body.theme-dark .campo input:focus,
+body.theme-dark .campo select:focus,
+body.theme-dark .campo textarea:focus,
+body.theme-dark .campo-rich:focus {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+body.theme-dark .campo-rich[data-alerta="true"] {
+  background-color: rgba(220, 38, 38, 0.12) !important;
+  border-color: #f87171 !important;
+}
+body.theme-dark .campo-rich:empty:before,
+body.theme-dark .filtro-wrap input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+body.theme-dark .fmt-btn { color: rgba(255, 255, 255, 0.85) !important; }
+body.theme-dark .fmt-btn:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+body.theme-dark .fmt-sep { background-color: rgba(255, 255, 255, 0.15) !important; }
+body.theme-dark .btn-fila,
+body.theme-dark .btn-hist-info,
+body.theme-dark .cal-filtro-select {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+body.theme-dark .cal-filtro-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 8L1 3h10z'/%3E%3C/svg%3E") !important;
+}
+body.theme-dark .cal-periodo-limpar { background-color: rgba(220, 38, 38, 0.12) !important; }
+body.theme-dark .cal-dia.outro-mes { background-color: rgba(255, 255, 255, 0.02) !important; }
+body.theme-dark .cal-dia.feriado {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+/* Caixa de justificativa e aviso de revisão (tons de alerta) */
+body.theme-dark .campo-justificativa-box {
+  background-color: rgba(220, 38, 38, 0.1) !important;
+  border-color: rgba(252, 165, 165, 0.4) !important;
+}
+body.theme-dark .campo-justificativa-box label { color: #fca5a5 !important; }
+body.theme-dark .campo-justificativa-box textarea { background-color: rgba(255, 255, 255, 0.06) !important; }
+body.theme-dark .rev-aviso {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+  color: #fcd34d !important;
+}
+body.theme-dark .rev-aviso strong { color: #fbbf24 !important; }
+
+/* Histórico (popup e trilha inline) */
+body.theme-dark .mh-resumo {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+body.theme-dark .mh-resumo-item { border-color: rgba(255, 255, 255, 0.1) !important; }
+body.theme-dark .mh-linha-tempo::before { background-color: rgba(255, 255, 255, 0.15) !important; }
+body.theme-dark .mh-lt-bolinha { border-color: #142e22 !important; }
+body.theme-dark .mh-lt-detalhe {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-left-color: rgba(255, 255, 255, 0.15) !important;
+}
+body.theme-dark .mh-lt-detalhe.paralisada { background-color: rgba(220, 38, 38, 0.12) !important; border-left-color: #fca5a5 !important; }
+body.theme-dark .mh-lt-detalhe.prazo { background-color: rgba(37, 99, 235, 0.12) !important; border-left-color: #93c5fd !important; }
+body.theme-dark .mh-lt-detalhe.retomada { background-color: rgba(22, 163, 74, 0.12) !important; border-left-color: #86efac !important; }
+body.theme-dark .hist-toggle:hover,
+body.theme-dark .hist-toggle.aberto { background-color: rgba(255, 255, 255, 0.08) !important; }
+body.theme-dark .hist-linha,
+body.theme-dark .cp-item { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
+body.theme-dark .tarefa-obs {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-left-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Tabelas e linhas de rotina */
+body.theme-dark tbody tr { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
+body.theme-dark tbody tr:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+body.theme-dark .rotina-linha { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
+body.theme-dark .rotina-linha:hover { background-color: rgba(255, 255, 255, 0.05) !important; }
+
+/* Textos com cor fixa (não usavam var(), então ficavam escuros sobre fundo escuro) */
+body.theme-dark .filtro-wrap select,
+body.theme-dark .filtro-wrap input,
+body.theme-dark .campo label,
+body.theme-dark .tarefa-obs b,
+body.theme-dark .tarefa-obs strong,
+body.theme-dark .mh-ri-valor,
+body.theme-dark .mh-lt-dia,
+body.theme-dark .mh-lt-evento,
+body.theme-dark .mh-lt-detalhe strong,
+body.theme-dark .hist-nota,
+body.theme-dark .cp-item-nome,
+body.theme-dark .cal-dia-num,
+body.theme-dark .tarefa-conc-titulo,
+body.theme-dark .rotina-linha-desc {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+body.theme-dark .tarefa-meta,
+body.theme-dark .cal-filtro-label,
+body.theme-dark .rel-card-resumo .rc-label,
+body.theme-dark .card-cfg .info small,
+body.theme-dark .hist-toggle,
+body.theme-dark .hist-nota em,
+body.theme-dark .tarefa-conc-data {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+body.theme-dark .vazio,
+body.theme-dark .mh-ri-label,
+body.theme-dark .mh-vazio,
+body.theme-dark .mh-lt-hora,
+body.theme-dark .hist-data,
+body.theme-dark .cp-item-analista,
+body.theme-dark .cp-vazio,
+body.theme-dark .cal-dow,
+body.theme-dark .rotina-linha-extra,
+body.theme-dark .rotinas-card-vazio,
+body.theme-dark .tarefa-conc-meta {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
 </style>
 </head>
 <body>
+<script>
+// Aplica o tema salvo (claro/escuro) antes da renderização, evitando "flash" de tema
+// errado — mesma chave/lógica usada no restante do GECOPE (ver index.html).
+// Padrão do sistema é escuro; só fica claro se o usuário escolheu explicitamente 'light'.
+(function () {
+    try {
+        if (localStorage.getItem('gecope_theme') !== 'light') {
+            document.body.classList.add('theme-dark');
+        }
+    } catch (e) {
+        document.body.classList.add('theme-dark');
+    }
+})();
+</script>
 
+<div class="gecope-hero">
+  <div class="gecope-hero-bg" style="background-image:url('hero-ita.jpg')"></div>
+  <div class="gecope-hero-bg" style="background-image:url('hero-huce.jpg')"></div>
+  <div class="gecope-hero-bg" style="background-image:url('hero-obra.jpg')"></div>
+  <div class="gecope-hero-overlay"></div>
+  <div class="gecope-hero-content">
 <div class="top-bar">PORTAL SOP-CE GOVERNO DO ESTADO DO CEARÁ SISTEMA DE ADITIVOS DE OBRAS</div>
 
 <header class="sop-header">
@@ -1403,10 +1648,17 @@ tbody td { padding: 10px 15px; vertical-align: top; }
       <div class="sop-title-sub">Governo do Estado do Ceará - Secretaria das Cidades</div>
     </div>
   </div>
-  <div class="sop-header-right">
-    <strong>GECOPE - Gerência de Controle de Aditivos</strong>
-    <div class="sop-title-sub">Painel de Distribuição de Tarefas . Análise de Dados</div>
-    <div class="sop-title-sub" id="data-hora"></div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="sop-header-right">
+      <strong>GECOPE - Gerência de Controle de Aditivos</strong>
+      <div class="sop-title-sub">Painel de Distribuição de Tarefas . Análise de Dados</div>
+      <div class="sop-title-sub" id="data-hora"></div>
+    </div>
+    <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleAppTheme()"
+      title="Alternar tema claro/escuro">
+      <i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i>
+      <span id="theme-toggle-label">Escuro</span>
+    </button>
   </div>
 </header>
 
@@ -1418,6 +1670,8 @@ tbody td { padding: 10px 15px; vertical-align: top; }
   <div class="panel-tag"><span class="panel-tag-dot"></span><span>Dados consolidados uso interno SOP / GECOPE</span>
   </div>
 </section>
+  </div>
+</div>
 
 <main>
 
@@ -1955,6 +2209,23 @@ function atualizarHora() {
 }
 setInterval(atualizarHora, 10000);
 atualizarHora();
+
+// ══════════════════════════════════════════════════════════
+// TEMA CLARO/ESCURO (persistido em localStorage, mesma chave usada em index.html)
+// ══════════════════════════════════════════════════════════
+function updateThemeToggleUI() {
+  const isDark = document.body.classList.contains('theme-dark');
+  const icon = document.getElementById('theme-toggle-icon');
+  const label = document.getElementById('theme-toggle-label');
+  if (icon) icon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+  if (label) label.textContent = isDark ? 'Claro' : 'Escuro';
+}
+function toggleAppTheme() {
+  const isDark = document.body.classList.toggle('theme-dark');
+  try { localStorage.setItem('gecope_theme', isDark ? 'dark' : 'light'); } catch (e) { /* noop */ }
+  updateThemeToggleUI();
+}
+updateThemeToggleUI();
 
 // ══════════════════════════════════════════════════════════
 // ABAS

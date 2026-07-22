@@ -367,6 +367,12 @@
             --sop-gray-light: var(--sop-slate-100);
             --sop-white: #FFFFFF;
 
+            /* Fundo da página no modo claro: um cinza-esverdeado bem suave,
+               para os cartões brancos ganharem contraste em vez de "sumir"
+               num fundo branco-sobre-branco. */
+            --sop-page-bg: #eef3ef;
+            --shadow-card-elevated: 0 6px 18px -8px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
+
             /* Design Tokens */
             --border-soft: #f1f5f9;
             --radius-xl: 20px;
@@ -393,39 +399,17 @@
         }
 
         /* HOME DASHBOARD STYLES */
-        .home-welcome-section {
+
+        /* Saudação exibida dentro do próprio hero de fotos (só no painel Início) */
+        .hero-home-greeting {
             position: relative;
-            overflow: hidden;
-            background: linear-gradient(120deg, #f0fdf4 0%, #eafff4 50%, #ffffff 100%);
-            border: 1px solid var(--sop-slate-100);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-card-subtle);
-            padding: 30px 34px;
-            margin-bottom: 28px;
-        }
-
-        .home-welcome-watermark {
-            position: absolute;
-            right: 24px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 7rem;
-            color: var(--sop-green);
-            opacity: 0.08;
-            pointer-events: none;
-            line-height: 1;
-        }
-
-        @media (max-width: 768px) {
-            .home-welcome-watermark {
-                display: none;
-            }
+            padding: 10px 24px 34px;
         }
 
         .home-welcome-title {
             font-size: 1.9rem;
             font-weight: 700;
-            color: var(--sop-slate-900);
+            color: #ffffff;
             margin-bottom: 6px;
             letter-spacing: -0.025em;
         }
@@ -433,7 +417,7 @@
         .home-welcome-subtitle {
             font-size: 1.02rem;
             /* Reduzido de 1.1rem */
-            color: var(--sop-slate-500);
+            color: rgba(255, 255, 255, 0.65);
             font-weight: 400;
         }
 
@@ -445,9 +429,30 @@
             color: var(--text-muted);
             margin: 30px 0 12px;
         }
+        body.theme-dark .home-section-eyebrow {
+            color: rgba(255, 255, 255, 0.45);
+        }
 
         .home-section-eyebrow:first-child {
             margin-top: 0;
+        }
+
+        /* Fundo do painel Início: transparente por padrão (mostra o fundo claro
+           do body); no escuro vira a superfície contínua que acompanha o hero. */
+        #pane-home {
+            background: transparent;
+            margin: -18px -24px -40px -24px;
+            padding: 24px 24px 40px;
+        }
+        body.theme-dark #pane-home {
+            background: linear-gradient(180deg, #0c1f17 0%, #0a1a13 100%);
+        }
+
+        @media (max-width: 768px) {
+            #pane-home {
+                margin: -12px -12px -28px -12px;
+                padding: 18px 12px 28px;
+            }
         }
 
         .home-stats-grid {
@@ -468,49 +473,53 @@
             overflow: hidden;
             background: var(--sop-white);
             border-radius: var(--radius-lg);
-            padding: 24px 28px;
-            min-height: 120px;
-            box-shadow: var(--shadow-card-subtle);
-            border: 1px solid var(--sop-slate-100);
+            padding: 22px 26px;
+            min-height: 116px;
+            box-shadow: var(--shadow-card-elevated);
+            border: 1px solid rgba(15, 23, 42, 0.05);
             border-left: 4px solid transparent;
             display: flex;
             align-items: center;
-            gap: 20px;
+            justify-content: space-between;
+            gap: 16px;
             transition: var(--transition-fast);
-        }
-
-        .home-stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--shadow-md);
         }
 
         .home-stat-card.accent-green { border-left-color: var(--sop-green); }
         .home-stat-card.accent-blue { border-left-color: #0d6efd; }
         .home-stat-card.accent-orange { border-left-color: var(--sop-orange); }
 
-        .home-stat-watermark {
-            position: absolute;
-            right: -12px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 6rem;
-            opacity: 0.06;
-            pointer-events: none;
-            line-height: 1;
+        .home-stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px -10px rgb(15 23 42 / 0.16), 0 4px 8px -2px rgb(15 23 42 / 0.08);
         }
 
-        .home-stat-card.accent-green .home-stat-watermark { color: var(--sop-green); }
-        .home-stat-card.accent-blue .home-stat-watermark { color: #0d6efd; }
-        .home-stat-card.accent-orange .home-stat-watermark { color: var(--sop-orange); }
+        /* No escuro, troca o cartão branco + acento à esquerda por um gradiente
+           escuro fechado (sem acento, a cor já vem do ícone) — mesmo visual
+           "premium" do hero acima. */
+        body.theme-dark .home-stat-card {
+            background: linear-gradient(155deg, #142e22 0%, #0c1f17 100%);
+            border-color: rgba(255, 255, 255, 0.06);
+            border-left: none;
+            box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.45);
+        }
+        body.theme-dark .home-stat-card:hover {
+            box-shadow: 0 16px 30px -12px rgba(0, 0, 0, 0.55);
+        }
+
+        .home-stat-watermark {
+            display: none;
+        }
 
         .home-stat-info {
             position: relative;
             z-index: 1;
+            order: 1;
         }
 
         .home-stat-label {
             display: block;
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -519,30 +528,31 @@
         }
 
         .home-stat-value {
-            font-size: 2.6rem;
+            font-size: 2.3rem;
             font-weight: 800;
             color: var(--text-heading);
             line-height: 1;
         }
 
         .home-stat-sub {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             color: var(--text-muted);
             margin-top: 6px;
         }
 
         .home-stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 16px;
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.35rem;
             color: #fff;
             flex: none;
             position: relative;
             z-index: 1;
+            order: 2;
         }
 
         .home-stat-icon.bg-green { background: var(--sop-green); box-shadow: 0 4px 10px -2px var(--sop-green); }
@@ -550,34 +560,37 @@
         .home-stat-icon.bg-orange { background: var(--sop-orange); box-shadow: 0 4px 10px -2px var(--sop-orange); }
 
         .home-quick-actions-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
             margin-bottom: 24px;
         }
 
-        @media (max-width: 1200px) {
-            .home-quick-actions-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        .home-featured-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
         }
 
-        @media (max-width: 640px) {
-            .home-quick-actions-grid {
+        @media (max-width: 720px) {
+            .home-featured-grid {
                 grid-template-columns: 1fr;
             }
         }
 
         .home-action-card {
+            position: relative;
+            overflow: hidden;
             background: var(--sop-white);
             border-radius: var(--radius-lg);
-            padding: 22px 24px;
-            min-height: 112px;
-            box-shadow: var(--shadow-card-subtle);
-            border: 1px solid var(--sop-slate-100);
+            padding: 26px 26px 22px;
+            min-height: 200px;
+            box-shadow: var(--shadow-card-elevated);
+            border: 1px solid rgba(15, 23, 42, 0.05);
             border-left: 4px solid transparent;
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            justify-content: space-between;
             gap: 18px;
             cursor: pointer;
             transition: var(--transition-fast);
@@ -585,18 +598,66 @@
             color: inherit !important;
         }
 
+        .home-action-card.accent-green { border-left-color: var(--sop-green); }
+        .home-action-card.accent-blue { border-left-color: #0d6efd; }
+
         .home-action-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+            box-shadow: 0 16px 30px -10px rgb(15 23 42 / 0.18), 0 4px 10px -2px rgb(15 23 42 / 0.08);
         }
 
-        .home-action-card.accent-green { border-left-color: var(--sop-green); }
-        .home-action-card.accent-orange { border-left-color: var(--sop-orange); }
-        .home-action-card.accent-blue { border-left-color: #0d6efd; }
-        .home-action-card.accent-purple { border-left-color: #6f42c1; }
-        .home-action-card.accent-teal { border-left-color: #0d9488; }
-        .home-action-card.accent-indigo { border-left-color: #4f46e5; }
-        .home-action-card.accent-slate { border-left-color: #475569; }
+        /* No escuro, troca o cartão branco + acento à esquerda pelo gradiente
+           colorido cheio (o ícone some visualmente sem um fundo próprio, então
+           o cartão inteiro carrega a cor do módulo). */
+        body.theme-dark .home-action-card {
+            border-color: rgba(255, 255, 255, 0.08);
+            color: #fff !important;
+            box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.45);
+        }
+        body.theme-dark .home-action-card:hover {
+            box-shadow: 0 18px 32px -12px rgba(0, 0, 0, 0.55);
+        }
+        body.theme-dark .home-action-card.accent-green {
+            background: linear-gradient(160deg, #1c6b3f 0%, #0b2318 75%);
+            border-left: none;
+        }
+        body.theme-dark .home-action-card.accent-blue {
+            background: linear-gradient(160deg, #155a82 0%, #0c2338 75%);
+            border-left: none;
+        }
+
+        body.theme-dark .home-action-card .home-action-icon {
+            background: rgba(255, 255, 255, 0.14) !important;
+            box-shadow: none !important;
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+        }
+        .home-action-card .home-action-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+        }
+
+        .home-featured-badge {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            background: var(--sop-slate-50);
+            border: 1px solid var(--sop-slate-100);
+            padding: 5px 12px;
+            border-radius: 999px;
+        }
+        body.theme-dark .home-featured-badge {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
 
         .home-action-icon {
             width: 56px;
@@ -620,17 +681,89 @@
         .home-action-icon.bg-slate { background: #475569; box-shadow: 0 4px 10px -2px #475569; }
 
         .home-action-text h3 {
-            font-size: 1.05rem;
+            font-size: 1.25rem;
             font-weight: 700;
-            margin-bottom: 3px;
+            margin-bottom: 5px;
             color: var(--text-heading);
+        }
+        body.theme-dark .home-action-text h3 {
+            color: #ffffff;
         }
 
         .home-action-text p {
             margin: 0;
             color: var(--text-muted);
-            font-size: 0.84rem;
-            line-height: 1.3;
+            font-size: 0.88rem;
+            line-height: 1.4;
+        }
+        body.theme-dark .home-action-text p {
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        /* Lista compacta dos demais módulos */
+        .home-list-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+
+        @media (max-width: 640px) {
+            .home-list-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .home-list-row {
+            background: var(--sop-white);
+            border-radius: 14px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: var(--transition-fast);
+            border: 1px solid rgba(15, 23, 42, 0.05);
+            box-shadow: var(--shadow-card-elevated);
+            text-decoration: none !important;
+            color: inherit !important;
+        }
+        body.theme-dark .home-list-row {
+            background: linear-gradient(155deg, #142e22 0%, #0c1f17 100%);
+            border-color: rgba(255, 255, 255, 0.06);
+            color: #fff !important;
+        }
+
+        .home-list-row:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px -10px rgb(15 23 42 / 0.16), 0 3px 8px -2px rgb(15 23 42 / 0.07);
+        }
+        body.theme-dark .home-list-row:hover {
+            box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.55);
+        }
+
+        .home-list-row .home-action-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 11px;
+            font-size: 1.05rem;
+        }
+
+        .home-list-row-title {
+            flex: 1;
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+        body.theme-dark .home-list-row-title {
+            color: #ffffff;
+        }
+
+        .home-list-row .bi-chevron-right {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+        body.theme-dark .home-list-row .bi-chevron-right {
+            color: rgba(255, 255, 255, 0.35);
         }
 
         .btn-back-minimal {
@@ -664,21 +797,29 @@
         .home-activities-panel {
             background: var(--sop-white);
             border-radius: var(--radius-xl);
-            padding: 15px 20px;
-            /* Mais compacto */
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--sop-slate-200);
+            padding: 20px 22px;
+            box-shadow: var(--shadow-card-elevated);
+            border: 1px solid rgba(15, 23, 42, 0.05);
             margin-bottom: 20px;
+        }
+        body.theme-dark .home-activities-panel {
+            background: linear-gradient(155deg, #142e22 0%, #0c1f17 100%);
+            box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.45);
+            border-color: rgba(255, 255, 255, 0.06);
         }
 
         .home-activities-panel h3 {
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             font-weight: 700;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 12px;
-            color: var(--sop-gray-dark);
+            color: var(--text-heading);
+        }
+
+        body.theme-dark .home-activities-panel .text-primary {
+            color: #4cc17c !important;
         }
 
         .activities-list-container {
@@ -701,35 +842,48 @@
         }
 
         .activity-item {
-            background: rgba(248, 249, 250, 0.5);
+            background: var(--sop-slate-50);
             border-radius: 12px;
             padding: 15px;
             display: flex;
             align-items: flex-start;
             gap: 12px;
-            border: 1px solid var(--sop-slate-200);
+            border: 1px solid var(--sop-slate-100);
             transition: all 0.2s ease;
             height: 100%;
         }
+        body.theme-dark .activity-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.07);
+        }
 
         .activity-item:hover {
-            background: #fff;
-            border-color: var(--sop-green-light);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 143, 61, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             transform: translateY(-2px);
+        }
+        body.theme-dark .activity-item:hover {
+            background: rgba(255, 255, 255, 0.09);
+            border-color: rgba(76, 193, 124, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
         }
 
         .activity-icon-box {
             width: 36px;
             height: 36px;
-            background: #fff;
+            background: var(--sop-slate-100);
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-            border: 1px solid #f0f0f0;
+            border: 1px solid var(--sop-slate-200);
+            color: var(--text-heading);
+        }
+        body.theme-dark .activity-icon-box {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
         }
 
         .activity-content {
@@ -739,7 +893,7 @@
 
         .activity-time {
             font-weight: 700;
-            color: var(--sop-gray-dark);
+            color: var(--text-muted);
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -749,9 +903,12 @@
 
         .activity-desc {
             font-size: 0.82rem;
-            color: #444;
+            color: var(--text-heading);
             line-height: 1.5;
             word-wrap: break-word;
+        }
+        body.theme-dark .activity-desc {
+            color: rgba(255, 255, 255, 0.85);
         }
 
         .activity-badge {
@@ -770,6 +927,11 @@
         .activity-badge.badge-composicao { background: rgba(13, 110, 253, 0.12); color: #0d6efd; }
         .activity-badge.badge-tabela { background: rgba(71, 85, 105, 0.12); color: #475569; }
         .activity-badge.badge-outro { background: rgba(100, 116, 139, 0.12); color: #64748b; }
+        body.theme-dark .activity-badge.badge-processo { background: rgba(76, 193, 124, 0.16); color: #7fe3ac; }
+        body.theme-dark .activity-badge.badge-orcamento { background: rgba(242, 140, 0, 0.18); color: #ffb547; }
+        body.theme-dark .activity-badge.badge-composicao { background: rgba(13, 110, 253, 0.18); color: #6ea8fe; }
+        body.theme-dark .activity-badge.badge-tabela { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+        body.theme-dark .activity-badge.badge-outro { background: rgba(148, 163, 184, 0.14); color: #b6c0cc; }
 
         * {
             box-sizing: border-box;
@@ -779,7 +941,7 @@
             margin: 0;
             padding: 0;
             font-family: "Montserrat", system-ui, -apple-system, sans-serif;
-            background-color: var(--sop-slate-50);
+            background-color: var(--sop-page-bg);
             color: var(--sop-slate-900);
         }
 
@@ -878,6 +1040,34 @@
         .accordion-custom-button::after {
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23333'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
             transition: transform 0.2s;
+        }
+
+        /* No modo escuro, a mesma seta (imagem SVG embutida, não responde a "color")
+           precisa de outro data-URI com fill branco, senão fica cinza-escuro quase
+           invisível sobre os cartões escuros do acordeão. */
+        body.theme-dark .accordion-custom-button::after {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ffffff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+        }
+
+        /* Cabeçalhos de destaque do Banco de Composições (pasta própria / pasta SOP oficial) */
+        .accordion-header-me {
+            background-color: #dcfce7 !important;
+            color: #166534 !important;
+            font-weight: 700;
+            border: 1px solid #bbf7d0;
+        }
+
+        .accordion-header-sop {
+            background-color: #f8f9fa !important;
+            color: #334155 !important;
+            font-weight: 800;
+            border: 1px solid #e2e8f0;
+        }
+
+        body.theme-dark .accordion-header-sop {
+            background-color: #142e22 !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
         }
 
         /* 3. Subcategorias (Hierarquia) */
@@ -1456,33 +1646,127 @@
        ESTILOS PADRO (CABEALHO, KPIS, MODAIS) - MANTIDOS
        ------------------------------------------------------------------------ */
 
+        /* ------------------------------------------------------------------------
+           HERO ESCURO (Topbar + Header + Subheader) com carrossel de fotos
+           ------------------------------------------------------------------------ */
+        /* Por padrão (demais abas): cabeçalho compacto, cor sólida — mesmo padrão visual
+           do painel Início (fontes, tamanhos, cores), porém sem a foto/carrossel. */
+        .gecope-hero {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(155deg, #142e22 0%, #0c1f17 100%);
+            isolation: isolate;
+        }
+
+        /* Só no painel Início (classe adicionada via JS) o hero vira a foto em carrossel. */
+        .gecope-hero.has-photo {
+            background: #0b1f18;
+            min-height: 420px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Ancora o topo (logo/topbar) no alto e a saudação embaixo, aproveitando toda a altura da foto. */
+        .gecope-hero.has-photo .gecope-hero-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 768px) {
+            .gecope-hero.has-photo {
+                min-height: 320px;
+            }
+        }
+
+        .gecope-hero-bg,
+        .gecope-hero-overlay {
+            display: none;
+        }
+
+        .gecope-hero.has-photo .gecope-hero-bg,
+        .gecope-hero.has-photo .gecope-hero-overlay {
+            display: block;
+        }
+
+        .gecope-hero-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            z-index: 0;
+            animation: gecopeHeroFade 18s ease-in-out infinite;
+        }
+
+        .gecope-hero-bg:nth-child(1) { animation-delay: 0s; }
+        .gecope-hero-bg:nth-child(2) { animation-delay: 6s; }
+        .gecope-hero-bg:nth-child(3) { animation-delay: 12s; }
+
+        @keyframes gecopeHeroFade {
+            0%   { opacity: 0; }
+            4%   { opacity: 1; }
+            29%  { opacity: 1; }
+            35%  { opacity: 0; }
+            100% { opacity: 0; }
+        }
+
+        .gecope-hero-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background:
+                linear-gradient(180deg, rgba(6, 18, 13, 0.8) 0%, rgba(6, 18, 13, 0.55) 32%, rgba(6, 18, 13, 0.22) 55%, rgba(6, 18, 13, 0.55) 100%),
+                linear-gradient(90deg, rgba(4, 12, 9, 0.4) 0%, rgba(4, 12, 9, 0.08) 55%);
+        }
+
+        .gecope-hero-content {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .gecope-hero-bg {
+                animation: none;
+                opacity: 0;
+            }
+
+            .gecope-hero-bg:first-child {
+                opacity: 1;
+            }
+        }
+
         .top-bar {
-            background: linear-gradient(90deg, var(--sop-green-dark), var(--sop-green), var(--sop-green-light));
-            color: #ffffff;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.75);
             padding: 10px 16px;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             text-align: center;
-            letter-spacing: .04em;
+            letter-spacing: .08em;
+            text-transform: uppercase;
         }
 
         .sop-header {
-            background: var(--sop-green);
+            background: transparent;
             color: #ffffff;
-            padding: 16px 24px;
+            padding: 4px 24px 22px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
         }
 
         .sop-logo {
-            background-color: #ffffff;
-            color: var(--sop-green-dark);
+            background-color: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: #ffffff;
             border-radius: 8px;
             padding: 8px 10px;
             font-weight: 700;
             font-size: 1.0rem;
             text-transform: uppercase;
+            backdrop-filter: blur(4px);
         }
 
         .sop-title-main {
@@ -1494,7 +1778,7 @@
 
         .sop-title-sub {
             font-size: 0.8rem;
-            opacity: 0.9;
+            opacity: 0.85;
         }
 
         .sop-header-right {
@@ -1508,14 +1792,46 @@
         }
 
         .panel-subheader {
-            background-color: #ffffff;
-            border-bottom: 1px solid var(--border-soft);
-            padding: 10px 24px;
+            background-color: transparent;
+            border-bottom: none;
+            padding: 10px 24px 34px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 8px;
+            color: #ffffff;
+        }
+
+        .theme-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 7px 13px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .theme-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .theme-toggle-btn i {
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 576px) {
+            .theme-toggle-btn span {
+                display: none;
+            }
         }
 
         /* --- ESTILOS DE IMPRESSO PARA RELATÓRIOS --- */
@@ -1579,9 +1895,38 @@
         }
 
         .panel-subheader-title {
-            font-size: 1.0rem;
+            font-size: 1.85rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            text-transform: none;
+            color: #ffffff;
+        }
+
+        .panel-subheader-subtitle {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.78);
+            margin-top: 4px;
+        }
+
+        .panel-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
             font-weight: 600;
-            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 999px;
+        }
+
+        .panel-tag-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--sop-green-light);
+            box-shadow: 0 0 0 3px rgba(76, 193, 124, 0.25);
         }
 
         .page-wrapper {
@@ -2378,7 +2723,7 @@
             /* Bootstrap 5 pinta o fundo em cada <td> via var(--bs-table-bg); sobrescrever
                a variável na linha propaga a cor para as células (background-color na tr não funciona).
                !important garante prioridade sobre a regra de zebra (que tem um #id, mais específica). */
-            --bs-table-bg: #d6dee8 !important;
+            --bs-table-bg: #e8edf3 !important;
         }
 
         /* Avatar circular do Analista */
@@ -2870,6 +3215,309 @@
             background-color: #e6f4ea !important;
             color: var(--sop-green) !important;
             border: 1px solid #c3e6cb !important;
+        }
+
+        /* ============================================================
+           TEMA ESCURO ALTERNÁVEL — aplica-se ao conteúdo das demais abas
+           (o painel Início mantém seu visual escuro fixo, independente
+           deste alternador; ver .theme-toggle-btn / toggleAppTheme()).
+           ============================================================ */
+        body.theme-dark {
+            background-color: #0a1a13;
+            color: rgba(255, 255, 255, 0.92);
+
+            --sop-white: #142e22;
+            --sop-slate-50: #0a1a13;
+            --sop-slate-100: rgba(255, 255, 255, 0.08);
+            --sop-slate-200: rgba(255, 255, 255, 0.14);
+            --sop-slate-500: rgba(255, 255, 255, 0.55);
+            --sop-slate-600: rgba(255, 255, 255, 0.65);
+            --sop-slate-700: rgba(255, 255, 255, 0.75);
+            --sop-slate-800: rgba(255, 255, 255, 0.85);
+            --sop-slate-900: #ffffff;
+            --sop-gray-dark: #ffffff;
+            --sop-gray-mid: rgba(255, 255, 255, 0.6);
+            --sop-gray-light: rgba(255, 255, 255, 0.08);
+            --text-heading: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.55);
+            --border-soft: rgba(255, 255, 255, 0.08);
+            --shadow-card-subtle: 0 10px 22px -12px rgba(0, 0, 0, 0.5);
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.35);
+            --shadow-md: 0 4px 10px -2px rgb(0 0 0 / 0.4);
+            --shadow-lg: 0 10px 20px -4px rgb(0 0 0 / 0.45);
+        }
+
+        /* Cards e contêineres "brancos" do sistema */
+        body.theme-dark .card,
+        body.theme-dark .filters-card,
+        body.theme-dark .budget-hero-card,
+        body.theme-dark .kpi-card,
+        body.theme-dark .kpi-count-card,
+        body.theme-dark .chart-card,
+        body.theme-dark .proc-kpi-card,
+        body.theme-dark .proc-tab.active,
+        body.theme-dark .proc-table-wrap,
+        body.theme-dark .proc-table-footer-pill,
+        body.theme-dark .accordion-custom-item,
+        body.theme-dark .accordion-custom-button,
+        body.theme-dark .orcamento-item-row,
+        body.theme-dark .history-card-item,
+        body.theme-dark .multiselect-btn,
+        body.theme-dark .admin-accordion-card,
+        body.theme-dark .search-pill-group,
+        body.theme-dark .search-pill-group-hero,
+        body.theme-dark .btn-action-baixar,
+        body.theme-dark .btn-action-icon,
+        body.theme-dark .proc-btn-pdf {
+            background-color: #142e22 !important;
+            color: rgba(255, 255, 255, 0.92) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        body.theme-dark .card-body,
+        body.theme-dark .card-header,
+        body.theme-dark .card-footer {
+            background-color: transparent !important;
+            color: inherit !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Bootstrap: tabelas */
+        body.theme-dark .table {
+            color: rgba(255, 255, 255, 0.88);
+            --bs-table-color: rgba(255, 255, 255, 0.88);
+            --bs-table-bg: transparent;
+            --bs-table-striped-color: rgba(255, 255, 255, 0.88);
+            --bs-table-striped-bg: rgba(255, 255, 255, 0.04);
+            --bs-table-hover-color: rgba(255, 255, 255, 0.88);
+            --bs-table-hover-bg: rgba(255, 255, 255, 0.07);
+            --bs-table-active-color: rgba(255, 255, 255, 0.88);
+            --bs-table-border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Hover da tabela de Processos usa uma cor fixa clara (#e8edf3) que não
+           passa pelos tokens --sop- / --bs-table-, então precisa de ajuste manual
+           aqui — do contrário a linha fica clara demais e ofusca o texto no escuro. */
+        body.theme-dark .proc-table-wrap tbody tr.tr-processo-row:hover {
+            --bs-table-bg: rgba(255, 255, 255, 0.025) !important;
+        }
+
+        /* Linhas de alerta (fiscal / pré-diligência) usam fundo claro fixo (branco
+           rosado/creme) para chamar atenção no tema claro — no escuro, mantém o
+           acento colorido só na borda esquerda e usa um tingimento translúcido
+           da mesma cor em vez do fundo quase branco original.
+           Os seletores repetem a cadeia completa (.proc-table-wrap tbody tr...) da
+           regra original de hover claro — com a mesma quantidade de classes, o
+           desempate de especificidade CSS cai para elementos/tipo, e a regra com
+           mais elementos na cadeia vence mesmo sem ser a mais "óbvia"; por isso
+           não basta ".tr-alerta-fiscal:hover" sozinho, senão o hover claro global
+           (#d6dee8) volta a vencer nas linhas que são hover + alerta ao mesmo tempo. */
+        body.theme-dark .proc-table-wrap tbody tr.tr-alerta-fiscal {
+            --bs-table-bg: rgba(255, 77, 77, 0.12) !important;
+        }
+        body.theme-dark .proc-table-wrap tbody tr.tr-alerta-fiscal:hover {
+            --bs-table-bg: rgba(255, 77, 77, 0.15) !important;
+        }
+        body.theme-dark .proc-table-wrap tbody tr.tr-alerta-pre-diligencia {
+            --bs-table-bg: rgba(230, 119, 0, 0.14) !important;
+        }
+        body.theme-dark .proc-table-wrap tbody tr.tr-alerta-pre-diligencia:hover {
+            --bs-table-bg: rgba(230, 119, 0, 0.17) !important;
+        }
+
+        body.theme-dark .table thead {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Bootstrap: modais */
+        body.theme-dark .modal-content {
+            background-color: #142e22 !important;
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+
+        body.theme-dark .modal-header,
+        body.theme-dark .modal-footer {
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        body.theme-dark .modal-header.bg-white,
+        body.theme-dark .modal-body.bg-light,
+        body.theme-dark .bg-light,
+        body.theme-dark .bg-white,
+        body.theme-dark .bg-light-subtle {
+            background-color: #142e22 !important;
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+
+        /* Bootstrap: formulários */
+        body.theme-dark .form-control,
+        body.theme-dark .form-select,
+        body.theme-dark textarea {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            border-color: rgba(255, 255, 255, 0.16) !important;
+            color: #ffffff !important;
+        }
+
+        body.theme-dark .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        body.theme-dark .form-control:focus,
+        body.theme-dark .form-select:focus {
+            background-color: rgba(255, 255, 255, 0.09) !important;
+            color: #ffffff !important;
+        }
+
+        /* Opções do <select> nativo abrem como popup do próprio navegador — a cor de
+           fundo/texto do <option> precisa ser sólida (não rgba) para o Chromium
+           repintar o popup corretamente, senão a lista abre em branco. */
+        body.theme-dark .form-select option,
+        body.theme-dark select option {
+            background-color: #1c3d2d;
+            color: #ffffff;
+        }
+
+        body.theme-dark .input-group-text {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.16) !important;
+            color: rgba(255, 255, 255, 0.75) !important;
+        }
+
+        /* Bootstrap: dropdowns, list groups, nav-tabs, accordions */
+        body.theme-dark .dropdown-menu {
+            background-color: #142e22 !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        body.theme-dark .dropdown-item {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        body.theme-dark .dropdown-item:hover,
+        body.theme-dark .dropdown-item:focus {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+        }
+
+        body.theme-dark .list-group-item {
+            background-color: transparent !important;
+            color: rgba(255, 255, 255, 0.88) !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        body.theme-dark .nav-tabs {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body.theme-dark .nav-tabs .nav-link {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        body.theme-dark .nav-tabs .nav-link.active {
+            background-color: #142e22 !important;
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.1) rgba(255, 255, 255, 0.1) transparent;
+        }
+
+        body.theme-dark .accordion-button {
+            background-color: #142e22 !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+        }
+
+        body.theme-dark .accordion-button:not(.collapsed) {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            color: #ffffff !important;
+        }
+
+        body.theme-dark .accordion-body {
+            background-color: transparent !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        /* Botões claros */
+        body.theme-dark .btn-light,
+        body.theme-dark .btn-outline-secondary,
+        body.theme-dark .btn-outline-dark {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        body.theme-dark .btn-white {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+        }
+
+        /* Textos utilitários do Bootstrap */
+        body.theme-dark .text-muted {
+            color: rgba(255, 255, 255, 0.55) !important;
+        }
+
+        body.theme-dark .text-dark,
+        body.theme-dark .text-secondary {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        body.theme-dark hr,
+        body.theme-dark .border,
+        body.theme-dark .border-bottom,
+        body.theme-dark .border-top,
+        body.theme-dark .border-start,
+        body.theme-dark .border-end {
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        body.theme-dark .admin-section-header {
+            background: #142e22;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        body.theme-dark .admin-section-header:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        /* Relatório de Composição Analítica (SINAPI/SEINFRA/genérico): o conteúdo
+           é montado via innerHTML com cores fixas inline, pensadas para impressão
+           em papel branco (ver renderizarComposicaoSINAPI/SEINFRA em main.js e
+           renderizarRelatorioSOP_HTML em relatorio.js). No modo escuro, o relatório
+           deve ficar escuro como o resto do sistema — então, em vez de manter o
+           "papel" branco, reescrevemos aqui os poucos tons fixos usados nesse
+           HTML (fundos claros de metadados/linhas de tabela e textos escuros).
+           Precisa de seletores de atributo + !important porque são estilos
+           inline, que só perdem para outra regra inline ou para !important. */
+        body.theme-dark #modal-report-body [style*="background: white"] {
+            background: #142e22 !important;
+        }
+
+        body.theme-dark #modal-report-body [style*="background-color: #e8e8e8"],
+        body.theme-dark #modal-report-body [style*="background-color: #f5f5f5"],
+        body.theme-dark #modal-report-body [style*="background-color: #f9f9f9"],
+        body.theme-dark #modal-report-body [style*="background-color: #f8f9fa"] {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+        }
+
+        body.theme-dark #modal-report-body [style*="color: #1a1a1a"],
+        body.theme-dark #modal-report-body [style*="color: #333"],
+        body.theme-dark #modal-report-body [style*="color: #666"] {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        /* As bordas cinza-claras (#ddd/#eee) do relatório viram "listras brancas"
+           sobre o fundo escuro; suaviza para uma borda translúcida. */
+        body.theme-dark #modal-report-body [style*="#ddd"],
+        body.theme-dark #modal-report-body [style*="#eee"] {
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        /* A regra acima também apagaria o acento colorido da barra lateral
+           esquerda do cartão de metadados (mesmo elemento, lado diferente)
+           — restaura pela cor original de cada variante do relatório. */
+        body.theme-dark #modal-report-body [style*="border-left: 6px solid #008F3D"] {
+            border-left-color: #008F3D !important;
+        }
+        body.theme-dark #modal-report-body [style*="border-left: 6px solid #F28C00"] {
+            border-left-color: #F28C00 !important;
         }
 
         .swal2-html-container .bg-danger-subtle {

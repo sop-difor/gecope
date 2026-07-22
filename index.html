@@ -57,7 +57,7 @@
                         <li><i class="bi bi-graph-up-arrow"></i> Indicadores em tempo real</li>
                     </ul>
 
-                    <!-- CARTO DE LOGIN -->
+                    <!-- CARTÃO DE LOGIN -->
                     <div id="container-login" class="landing-card">
                         <div class="landing-card-label">Acesso ao Sistema</div>
                         <form id="landingLoginForm">
@@ -155,6 +155,18 @@
                 }
             } catch (e) { /* noop */ }
         })();
+
+        // Aplica o tema salvo (claro/escuro) antes da renderização, evitando "flash" de tema errado.
+        // Padrão do sistema é escuro; só fica claro se o usuário escolheu explicitamente 'light'.
+        (function () {
+            try {
+                if (localStorage.getItem('gecope_theme') !== 'light') {
+                    document.body.classList.add('theme-dark');
+                }
+            } catch (e) {
+                document.body.classList.add('theme-dark');
+            }
+        })();
     </script>
 
     <script>
@@ -173,6 +185,13 @@
     </script>
 
     <div id="app-content" style="display: none;">
+        <div class="gecope-hero">
+            <div class="gecope-hero-bg" style="background-image:url('hero-ita.jpg')"></div>
+            <div class="gecope-hero-bg" style="background-image:url('hero-huce.jpg')"></div>
+            <div class="gecope-hero-bg" style="background-image:url('hero-obra.jpg')"></div>
+            <div class="gecope-hero-overlay"></div>
+            <div class="gecope-hero-content">
+        <div class="gecope-hero-top">
         <div class="top-bar">PORTAL SOP-CE . GOVERNO DO ESTADO DO CEARÁ . SISTEMA DE ADITIVOS DE OBRAS</div>
 
         <header class="sop-header">
@@ -270,6 +289,11 @@
                     <strong>GECOPE Gerência de Controle de Aditivos</strong>
                     <span style="font-size: 0.75rem; opacity: 0.9;">Painel Gerencial de Aditivos de Obras</span>
                 </div>
+                <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleAppTheme()"
+                    title="Alternar tema claro/escuro">
+                    <i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i>
+                    <span id="theme-toggle-label">Escuro</span>
+                </button>
                 <div id="user-info-header" class="d-flex align-items-center gap-2 border-start ps-3"
                     style="display: none !important;">
                     <div class="text-end">
@@ -285,8 +309,9 @@
                 </div>
             </div>
         </header>
+        </div>
 
-        <section class="panel-subheader">
+        <section class="panel-subheader" id="panel-subheader">
             <div>
                 <div class="panel-subheader-title" id="main-subheader-title">
                     Painel Gerencial Aditivos de Obras
@@ -296,6 +321,15 @@
             <div class="panel-tag"><span class="panel-tag-dot"></span><span>Dados consolidados uso interno SOP /
                     GECOPE</span></div>
         </section>
+
+        <section class="hero-home-greeting" id="hero-home-greeting" style="display:none;">
+            <h1 class="home-welcome-title">Olá, <span id="home-user-name">usuário</span>.</h1>
+            <div class="home-welcome-subtitle">Bem-vindo ao GECOPE. Hoje é <span
+                    id="home-current-date">Sexta-feira,
+                    27 de Fevereiro de 2026</span>.</div>
+        </section>
+            </div>
+        </div>
 
         <main class="page-wrapper">
 
@@ -344,14 +378,6 @@
             <div class="tab-content">
                 <!-- PAINEL INICIAL (HOME) -->
                 <div class="tab-pane fade" id="pane-home">
-                    <div class="home-welcome-section">
-                        <i class="bi bi-buildings home-welcome-watermark"></i>
-                        <h1 class="home-welcome-title">Olá, <span id="home-user-name">usuário</span>.</h1>
-                        <div class="home-welcome-subtitle">Bem-vindo ao GECOPE. Hoje é <span
-                                id="home-current-date">Sexta-feira,
-                                27 de Fevereiro de 2026</span>.</div>
-                    </div>
-
                     <!-- Stats Cards Row -->
                     <div class="home-section-eyebrow">Panorama Geral</div>
                     <div class="home-stats-grid">
@@ -388,72 +414,66 @@
                     <!-- Hub de Navegação (Tiles) -->
                     <div class="home-section-eyebrow">Módulos do Sistema</div>
                     <div class="home-quick-actions-grid">
-                        <!-- 1. Administração -->
-                        <div class="home-action-card accent-slate" data-pane="pane-admin" onclick="showPane('pane-admin')">
-                            <div class="home-action-icon bg-slate"><i class="bi bi-shield-lock"></i></div>
-                            <div class="home-action-text">
-                                <h3>Administração</h3>
-                                <p>Gerenciar Usuários e Permissões do Sistema</p>
+                        <!-- Módulos mais usados (destaque) -->
+                        <div class="home-featured-grid">
+                            <div class="home-action-card accent-green" data-pane="pane-reuniao" onclick="showPane('pane-reuniao')">
+                                <div class="home-featured-badge">Mais usado</div>
+                                <div class="home-action-icon bg-green"><i class="bi bi-file-earmark-text"></i></div>
+                                <div class="home-action-text">
+                                    <h3>Processos</h3>
+                                    <p>Gerenciar Processos de Aditivos</p>
+                                </div>
+                            </div>
+                            <div class="home-action-card accent-blue" data-roles="admin,gerente,fiscal"
+                                onclick="window.location.href='cronograma.html'">
+                                <div class="home-featured-badge">2º mais usado</div>
+                                <div class="home-action-icon bg-blue"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
+                                <div class="home-action-text">
+                                    <h3>Atividades</h3>
+                                    <p>Painel de Distribuição de Tarefas da Equipe</p>
+                                </div>
                             </div>
                         </div>
-                        <!-- 2. Atividades (módulo externo: cronograma.html) -->
-                        <div class="home-action-card accent-indigo" data-roles="admin,gerente,fiscal"
-                            onclick="window.location.href='cronograma.html'">
-                            <div class="home-action-icon bg-indigo"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
-                            <div class="home-action-text">
-                                <h3>Atividades</h3>
-                                <p>Painel de Distribuição de Tarefas da Equipe</p>
+
+                        <!-- Demais módulos -->
+                        <div class="home-list-grid">
+                            <!-- Administração -->
+                            <div class="home-list-row" data-pane="pane-admin" onclick="showPane('pane-admin')">
+                                <div class="home-action-icon bg-slate"><i class="bi bi-shield-lock"></i></div>
+                                <div class="home-list-row-title">Administração</div>
+                                <i class="bi bi-chevron-right"></i>
                             </div>
-                        </div>
-                        <!-- 3. Composições -->
-                        <div class="home-action-card accent-blue" data-pane="pane-composicoes"
-                            onclick="showPane('pane-composicoes')">
-                            <div class="home-action-icon bg-blue"><i class="bi bi-journal-text"></i></div>
-                            <div class="home-action-text">
-                                <h3>Composições</h3>
-                                <p>Consultar e Elaborar Composições</p>
+                            <!-- Composições -->
+                            <div class="home-list-row" data-pane="pane-composicoes" onclick="showPane('pane-composicoes')">
+                                <div class="home-action-icon bg-blue"><i class="bi bi-journal-text"></i></div>
+                                <div class="home-list-row-title">Composições</div>
+                                <i class="bi bi-chevron-right"></i>
                             </div>
-                        </div>
-                        <!-- 4. Orçamentos -->
-                        <div class="home-action-card accent-orange" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
-                            <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
-                            <div class="home-action-text">
-                                <h3>Orçamentos</h3>
-                                <p>Orçamentos Revisados pela GEROA</p>
+                            <!-- Orçamentos -->
+                            <div class="home-list-row" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
+                                <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
+                                <div class="home-list-row-title">Orçamentos</div>
+                                <i class="bi bi-chevron-right"></i>
                             </div>
-                        </div>
-                        <!-- 5. Painel Financeiro -->
-                        <div class="home-action-card accent-teal" data-pane="pane-financeiro" data-roles="admin,gerente,fiscal"
-                            onclick="showPane('pane-financeiro')">
-                            <div class="home-action-icon bg-teal"><i class="bi bi-currency-dollar"></i></div>
-                            <div class="home-action-text">
-                                <h3>Painel Financeiro</h3>
-                                <p>Fluxo de Valores de Aditivos</p>
+                            <!-- Painel Financeiro -->
+                            <div class="home-list-row" data-pane="pane-financeiro" data-roles="admin,gerente,fiscal"
+                                onclick="showPane('pane-financeiro')">
+                                <div class="home-action-icon bg-teal"><i class="bi bi-currency-dollar"></i></div>
+                                <div class="home-list-row-title">Financeiro</div>
+                                <i class="bi bi-chevron-right"></i>
                             </div>
-                        </div>
-                        <!-- 6. Painel Gerencial -->
-                        <div class="home-action-card accent-purple" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
-                            onclick="showPane('pane-gerencial')">
-                            <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
-                            <div class="home-action-text">
-                                <h3>Painel Gerencial</h3>
-                                <p>Indicadores de Desempenho e Estatísticas</p>
+                            <!-- Painel Gerencial -->
+                            <div class="home-list-row" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
+                                onclick="showPane('pane-gerencial')">
+                                <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
+                                <div class="home-list-row-title">Gerencial</div>
+                                <i class="bi bi-chevron-right"></i>
                             </div>
-                        </div>
-                        <!-- 7. Processos -->
-                        <div class="home-action-card accent-green" data-pane="pane-reuniao" onclick="showPane('pane-reuniao')">
-                            <div class="home-action-icon bg-green"><i class="bi bi-file-earmark-text"></i></div>
-                            <div class="home-action-text">
-                                <h3>Processos</h3>
-                                <p>Gerenciar Processos de Aditivos</p>
-                            </div>
-                        </div>
-                        <!-- 8. Tabelas -->
-                        <div class="home-action-card accent-slate" data-pane="pane-tabelas" onclick="showPane('pane-tabelas')">
-                            <div class="home-action-icon bg-slate"><i class="bi bi-search"></i></div>
-                            <div class="home-action-text">
-                                <h3>Tabelas</h3>
-                                <p>Consultar Bases de Preços (SEINFRA/SINAPI/ORSE)</p>
+                            <!-- Tabelas -->
+                            <div class="home-list-row" data-pane="pane-tabelas" onclick="showPane('pane-tabelas')">
+                                <div class="home-action-icon bg-slate"><i class="bi bi-search"></i></div>
+                                <div class="home-list-row-title">Tabelas</div>
+                                <i class="bi bi-chevron-right"></i>
                             </div>
                         </div>
                     </div>
@@ -1590,18 +1610,9 @@
                     <div class="page-wrapper pt-0">
 
                         <div class="mb-3 text-center" style="margin-top: -15px;">
-                            <div class="d-flex justify-content-center align-items-center gap-3">
-                                <h4 class="fw-bold mb-0" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE
-                                    REFERÊNCIA
-                                </h4>
-                                <!-- Botão de Notificação de Tabelas (Apenas Admin) -->
-                                <button id="btn-notificar-tabelas"
-                                    class="btn btn-xs btn-outline-danger shadow-sm admin-only"
-                                    style="display:none; font-size: 0.7rem; border-radius: 20px;"
-                                    onclick="notificarAtualizacaoTabelas()">
-                                    <i class="bi bi-megaphone-fill me-1"></i> Notificar Atualização
-                                </button>
-                            </div>
+                            <h4 class="fw-bold mb-0" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE
+                                REFERÊNCIA
+                            </h4>
                             <p class="text-muted small">Consulte bases oficiais (SEINFRA, SINAPI, ORSE) atualizadas.</p>
                         </div>
 

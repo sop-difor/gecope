@@ -2709,6 +2709,37 @@ function updateHome() {
     if (elAprovMes) elAprovMes.textContent = aprovadosMes;
 }
 
+// Tema claro/escuro do conteúdo das abas (persistido em localStorage).
+// O painel Início mantém sempre o visual escuro do hero; este alternador afeta
+// o restante do sistema (tabelas, cards, formulários das demais abas).
+function updateThemeToggleUI() {
+    const isDark = document.body.classList.contains('theme-dark');
+    const icon = document.getElementById('theme-toggle-icon');
+    const label = document.getElementById('theme-toggle-label');
+    if (icon) icon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    if (label) label.textContent = isDark ? 'Claro' : 'Escuro';
+}
+
+function toggleAppTheme() {
+    const isDark = document.body.classList.toggle('theme-dark');
+    try { localStorage.setItem('gecope_theme', isDark ? 'dark' : 'light'); } catch (e) { /* noop */ }
+    updateThemeToggleUI();
+}
+
+document.addEventListener('DOMContentLoaded', updateThemeToggleUI);
+
+// No painel Início, a saudação ("Olá, Nome") aparece dentro do próprio hero de fotos,
+// substituindo o título genérico do subheader (que é usado nas demais páginas).
+function setHeroContext(paneId) {
+    const subheader = document.getElementById('panel-subheader');
+    const greeting = document.getElementById('hero-home-greeting');
+    const hero = document.querySelector('.gecope-hero');
+    const isHome = paneId === 'pane-home';
+    if (subheader) subheader.style.display = isHome ? 'none' : 'flex';
+    if (greeting) greeting.style.display = isHome ? 'block' : 'none';
+    if (hero) hero.classList.toggle('has-photo', isHome);
+}
+
 function showPane(paneId) {
     const tabBtn = document.querySelector(`#dashboardTabs [data-bs-target="#${paneId}"]`);
     if (tabBtn) {
@@ -2727,6 +2758,8 @@ function showPane(paneId) {
     if (backBtn) {
         backBtn.style.display = (paneId === 'pane-home') ? 'none' : 'block';
     }
+
+    setHeroContext(paneId);
 
     // Atualiza o título do subheader
     const titles = {
@@ -3732,7 +3765,7 @@ async function atualizarTabelaSuite(rows) {
 
         const renderData = (data) => {
             if (data && data.sucesso) {
-                const badgeSigla = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color: #f8f9fa !important;">${escapeHTML(data.sigla)}</span>`;
+                const badgeSigla = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color: #f8f9fa !important; color: #212529 !important;">${escapeHTML(data.sigla)}</span>`;
                 suiteCell.innerHTML = badgeSigla;
 
                 if (data.data_chegada_unidade) {
@@ -4119,6 +4152,7 @@ function applyRoleToUI(rawRole) {
     if (homeTab && homePane) {
         homeTab.classList.add('active');
         homePane.classList.add('show', 'active');
+        setHeroContext('pane-home');
         updateHome();
     }
 
@@ -4126,8 +4160,8 @@ function applyRoleToUI(rawRole) {
     // -> cards iniciais devem permanecer visíveis para todos os papéis;
     //    a lógica de restrição de acesso é tratada no showPane() e em cada função.
     document.querySelectorAll('[data-roles]').forEach(el => {
-        if (el.classList.contains('home-action-card')) {
-            // sempre mostra o tile
+        if (el.classList.contains('home-action-card') || el.classList.contains('home-list-row')) {
+            // sempre mostra o tile/linha (layout flex); a restrição de acesso é tratada no showPane()
             el.style.setProperty('display', 'flex', 'important');
             return;
         }
@@ -5741,16 +5775,16 @@ async function carregarComposicoes() {
             const isMe = (userKey === currentUserName || userKey === currentFiscalName || (userEmail && userKey.toUpperCase().includes(userEmail.toUpperCase())));
             const isSop = (userKey === 'SOP');
 
-            let accordionStyle = '';
+            let accordionClass = '';
             let iconClassHeader = 'bi bi-folder2-open me-2 text-success';
             let titleLabel = userKey;
 
             if (isMe) {
-                accordionStyle = 'background-color: #dcfce7 !important; color: #166534 !important; font-weight: 700; border: 1px solid #bbf7d0;';
+                accordionClass = 'accordion-header-me';
                 iconClassHeader = 'bi bi-person-fill-check me-2 text-success';
                 titleLabel = `COMPOSIÇÕES PRÓPRIAS (${userKey})`;
             } else if (isSop) {
-                accordionStyle = 'background-color: #f8f9fa !important; color: #334155 !important; font-weight: 800; border: 1px solid #e2e8f0;';
+                accordionClass = 'accordion-header-sop';
                 iconClassHeader = 'bi bi-building-fill-check me-2 text-primary';
                 titleLabel = 'SOP (OFICIAL)';
             }
@@ -5850,7 +5884,7 @@ async function carregarComposicoes() {
             html += `
                             <div class="accordion-custom-item">
                                 <h2 class="accordion-header">
-                                    <button class="accordion-button accordion-custom-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" style="${accordionStyle}">
+                                    <button class="accordion-button accordion-custom-button collapsed ${accordionClass}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                                         <i class="${iconClassHeader}"></i> ${titleLabel} <span class="badge bg-white text-dark ms-2 opacity-75" style="font-size: 0.65rem;">${itens.length}</span>
                                     </button>
                                 </h2>
