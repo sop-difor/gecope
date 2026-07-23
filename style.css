@@ -1847,12 +1847,16 @@
         /* --- ESTILOS DE IMPRESSO PARA RELATÓRIOS --- */
         @media print {
 
-            /* Ocultar TUDO exceto o corpo do relatório */
-            body>* {
+            /* Ocultar TUDO exceto o corpo do relatório, mas somente quando o
+               modal de composição está de fato aberto (.show). Sem esse escopo,
+               esta regra também disparava em QUALQUER window.print() da página
+               (ex.: Curva ABC), escondendo o conteúdo e deixando só o fundo
+               escuro do body — daí a tela preta no PDF exportado. */
+            body:has(#modalDetalheComposicao.show)>*:not(#modalDetalheComposicao) {
                 display: none !important;
             }
 
-            #modalDetalheComposicao {
+            body:has(#modalDetalheComposicao.show) #modalDetalheComposicao {
                 display: block !important;
                 position: absolute !important;
                 left: 0 !important;
@@ -1861,32 +1865,32 @@
                 visibility: visible !important;
             }
 
-            #modalDetalheComposicao .modal-dialog {
+            body:has(#modalDetalheComposicao.show) #modalDetalheComposicao .modal-dialog {
                 max-width: 100% !important;
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
             }
 
-            #modalDetalheComposicao .modal-content {
+            body:has(#modalDetalheComposicao.show) #modalDetalheComposicao .modal-content {
                 border: none !important;
                 box-shadow: none !important;
             }
 
-            #modalDetalheComposicao .modal-header,
-            #modalDetalheComposicao .modal-footer,
-            #modalDetalheComposicao .btn-close {
+            body:has(#modalDetalheComposicao.show) #modalDetalheComposicao .modal-header,
+            body:has(#modalDetalheComposicao.show) #modalDetalheComposicao .modal-footer,
+            body:has(#modalDetalheComposicao.show) #modalDetalheComposicao .btn-close {
                 display: none !important;
             }
 
-            #modal-report-body {
+            body:has(#modalDetalheComposicao.show) #modal-report-body {
                 display: block !important;
                 visibility: visible !important;
                 padding: 0 !important;
                 margin: 0 !important;
             }
 
-            .report-print-area {
+            body:has(#modalDetalheComposicao.show) .report-print-area {
                 padding: 0 !important;
                 margin: 0 !important;
                 width: 100% !important;

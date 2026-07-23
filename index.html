@@ -1389,7 +1389,57 @@
                         #pane-curva-abc .cv-err.on { display: block }
 
                         @media print {
-                            #pane-curva-abc #cv-drop, #pane-curva-abc .cv-tbar-actions, #pane-curva-abc .cv-params .cv-ghost, #pane-curva-abc #cv-btnPrint { display: none !important }
+                            /* O PDF da Curva ABC compõe processo — deve sair sempre no tema claro,
+                               mesmo que o usuário esteja com o modo escuro ("Escuro") ativado no app.
+                               Reaplica os mesmos valores claros por cima do override de tema escuro
+                               (mesma especificidade de seletor, mas declarado depois → vence no print). */
+                            body.theme-dark #pane-curva-abc {
+                                --cv-bg: #eef2ef; --cv-bg2: #ffffff; --cv-bg3: #f4f7f4; --cv-bg4: #e8eee9;
+                                --cv-border: #cfdad2; --cv-border-soft: #e0e8e2;
+                                --cv-text: #0e2117; --cv-text2: #2f4a3a; --cv-muted: #5c7566;
+                                --cv-green-soft: rgba(34, 161, 85, .12);
+                                --cv-shadow: 0 1px 2px rgba(16, 40, 26, .06), 0 6px 18px rgba(16, 40, 26, .07);
+                            }
+                            /* Sem isso, o fundo escuro do body (tema escuro) aparece nos vãos entre os
+                               cartões, já que os cartões viraram claros mas o body ao redor continua escuro. */
+                            body:has(#pane-curva-abc.active) {
+                                background-color: #eef2ef !important;
+                                color: #0e2117 !important;
+                            }
+
+                            /* Cabeçalho de navegação (logo, usuário, alternância de tema) não é conteúdo
+                               do relatório — os dados de identificação já aparecem no cartão de parâmetros. */
+                            .gecope-hero-top { display: none !important }
+
+                            /* Controles interativos (dropdowns, campo de busca, botões Excel/CSV/PDF) não
+                               fazem sentido num PDF estático — antes só os botões eram escondidos, deixando
+                               os <select> "crus" aparecerem no papel. */
+                            #pane-curva-abc #cv-drop,
+                            #pane-curva-abc .cv-tbar-actions,
+                            #pane-curva-abc #cv-params .cv-card-b { display: none !important }
+
+                            /* position:sticky em cabeçalho de tabela dentro de um container com scroll é um bug
+                               conhecido do Chromium ao imprimir/exportar PDF: a página inteira sai como um
+                               retângulo preto sólido. Desativa o sticky e o scroll só na impressão, e faz o
+                               cabeçalho da tabela repetir em cada página impressa. */
+                            #pane-curva-abc thead th { position: static !important }
+                            #pane-curva-abc .cv-tbl-scroll { overflow: visible !important }
+                            #pane-curva-abc thead { display: table-header-group }
+
+                            /* Evita que cartões e linhas da tabela sejam cortados ao meio entre duas páginas,
+                               e que o título de uma seção fique "órfão" separado do seu conteúdo. */
+                            #pane-curva-abc .cv-kpis,
+                            #pane-curva-abc .cv-kpi,
+                            #pane-curva-abc #cv-params .cv-meta,
+                            #pane-curva-abc .cv-chartbox,
+                            #pane-curva-abc tbody tr {
+                                break-inside: avoid;
+                                page-break-inside: avoid;
+                            }
+                            #pane-curva-abc .cv-card-h {
+                                break-after: avoid;
+                                page-break-after: avoid;
+                            }
                         }
                     </style>
 
