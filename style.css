@@ -772,7 +772,7 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            color: #666;
+            color: var(--text-muted);
             font-size: 0.9rem;
             font-weight: 500;
             padding: 8px 12px;
@@ -788,6 +788,16 @@
             background-color: rgba(0, 143, 61, 0.05);
             border-color: rgba(0, 143, 61, 0.1);
             transform: translateX(-3px);
+        }
+
+        body.theme-dark .btn-back-minimal {
+            border-color: rgba(255, 255, 255, 0.08);
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+        body.theme-dark .btn-back-minimal:hover {
+            color: #7fe3ac;
+            background-color: rgba(0, 143, 61, 0.14);
+            border-color: rgba(0, 143, 61, 0.25);
         }
 
         .btn-back-minimal i {

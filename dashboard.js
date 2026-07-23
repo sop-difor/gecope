@@ -228,59 +228,6 @@
         updateFinanceiro();
     }
 
-    // Gerencial
-    const ger = { fiscal: document.getElementById("gerencial-filter-fiscal"), status: document.getElementById("gerencial-filter-status"), clear: document.getElementById("btn-gerencial-clear") };
-    let gerBase = [];
-    function updateGerencialFilters(rows) { gerBase = rows; fillSelect(ger.fiscal, gerBase.map(d => d.fiscal)); fillSelect(ger.status, gerBase.map(d => d.status)); updateGerencial(); }
-    function getGerencialData() {
-        const f = getSelectedValues(ger.fiscal);
-        const s = getSelectedValues(ger.status);
-
-        const role = getCurrentUserRole();
-        const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
-
-        return gerBase.filter(d => {
-            if (role === 'fiscal' && userFiscal) {
-                const dFiscal = (d.fiscal || "").toUpperCase().trim();
-                const userFiscalUpper = userFiscal.toUpperCase().trim();
-                const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
-                const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
-                if (dFiscalNorm !== userFiscalNorm) return false;
-            }
-
-            return (f.length === 0 || f.includes(d.fiscal)) && (s.length === 0 || s.includes(d.status));
-        });
-    }
-    function updateGerencial() {
-        const f = getSelectedValues(ger.fiscal);
-        const s = getSelectedValues(ger.status);
-        let rows = [...gerBase];
-
-        if (f.length < (ger.fiscal?.options?.length || 0)) {
-            rows = rows.filter(d => f.includes(d.fiscal || "Não informado"));
-        }
-        if (s.length < (ger.status?.options?.length || 0)) {
-            rows = rows.filter(d => s.includes(d.status || "Não informado"));
-        }
-
-        document.getElementById("gerencial-count-badge") && (document.getElementById("gerencial-count-badge").textContent = `${rows.length} processos`);
-        renderHBar("chart_proc_por_fiscal", topN(groupCount(rows, d => d.fiscal), 20), "Qtd");
-        const pieD = groupCount(rows, d => d.status).sort((a, b) => b.value - a.value);
-        Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => formatStatusDisplay(d.key)), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false, responsive: true });
-        renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
-    }
-
-    // Clear helpers for filters (compat with legacy calls from main.js)
-    function clearGerencial() {
-        [ger.fiscal, ger.status].forEach(el => {
-            if (el) {
-                Array.from(el.options).forEach(o => o.selected = true);
-                renderMultiSelectUI(el);
-            }
-        });
-        updateGerencial();
-    }
-
     // Agrupamentos e utilitários pequenos
     function groupCount(rows, kFn) { const c = {}; rows.forEach(r => { const k = kFn(r); c[k] = (c[k] || 0) + 1; }); return Object.keys(c).map(k => ({ key: k, value: c[k] })); }
     function groupAvg(rows, kFn, vFn) { const s = {}, c = {}; rows.forEach(r => { const k = kFn(r), v = vFn(r); if (isFiniteNumber(v)) { s[k] = (s[k] || 0) + v; c[k] = (c[k] || 0) + 1; } }); return Object.keys(s).map(k => ({ key: k, value: c[k] > 0 ? s[k] / c[k] : 0 })).filter(d => d.value > 0); }
@@ -299,15 +246,11 @@
     window.populateFinanceiroFilters = populateFinanceiroFilters;
     window.getFinanceiroData = getFinanceiroData;
     window.clearFinanceiro = clearFinanceiro;
-    window.updateGerencialFilters = updateGerencialFilters;
-    window.getGerencialData = getGerencialData;
-    window.updateGerencial = updateGerencial;
     window.groupCount = groupCount;
     window.groupAvg = groupAvg;
     window.topN = topNArr;
     window.quantile = quantile;
     window.renderHBar = renderHBar;
-    window.clearGerencial = clearGerencial;
 
 })(window);
 (function (window) {
@@ -714,47 +657,6 @@
         if (window.Plotly) Plotly.react(document.getElementById(id), [{ x, y, type: 'bar', orientation: 'h', text: x.map(v => v.toFixed(0)), textposition: 'outside', marker: { color: "#018ABD" } }], { margin: { l: 180, r: 20, t: 10, b: 40 }, xaxis: { title: tx }, yaxis: { automargin: true }, height: Math.max(300, 26 * y.length + 80) }, { displayModeBar: false, responsive: true });
     };
 
-    var ger = { fiscal: document.getElementById("gerencial-filter-fiscal"), status: document.getElementById("gerencial-filter-status"), clear: document.getElementById("btn-gerencial-clear") };
-    let gerBase = [];
-    function updateGerencialFilters(rows) { gerBase = rows; fillSelect(ger.fiscal, gerBase.map(d => d.fiscal)); fillSelect(ger.status, gerBase.map(d => d.status)); updateGerencial(); }
-    function getGerencialData() {
-        const f = getSelectedValues(ger.fiscal);
-        const s = getSelectedValues(ger.status);
-
-        const role = window.getCurrentUserRole ? window.getCurrentUserRole() : (sessionStorage.getItem('sop_role') || 'guest');
-        const userFiscal = role === 'fiscal' ? sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || '' : '';
-
-        return (gerBase || []).filter(d => {
-            if (role === 'fiscal' && userFiscal) {
-                const dFiscal = (d.fiscal || "").toUpperCase().trim();
-                const userFiscalUpper = userFiscal.toUpperCase().trim();
-                const dFiscalNorm = dFiscal.replace(/[\.\-]+/g, ' ').trim();
-                const userFiscalNorm = userFiscalUpper.replace(/[\.\-]+/g, ' ').trim();
-                if (dFiscalNorm !== userFiscalNorm) return false;
-            }
-
-            return (f.length === 0 || f.includes(d.fiscal)) && (s.length === 0 || s.includes(d.status));
-        });
-    }
-    function updateGerencial() {
-        const f = getSelectedValues(ger.fiscal);
-        const s = getSelectedValues(ger.status);
-        let rows = [...gerBase];
-
-        if (f.length < (ger.fiscal?.options?.length || 0)) {
-            rows = rows.filter(d => f.includes(d.fiscal || "Não informado"));
-        }
-        if (s.length < (ger.status?.options?.length || 0)) {
-            rows = rows.filter(d => s.includes(d.status || "Não informado"));
-        }
-
-        document.getElementById("gerencial-count-badge").textContent = `${rows.length} processos`;
-        renderHBar("chart_proc_por_fiscal", topN(groupCount(rows, d => d.fiscal), 20), "Qtd");
-        const pieD = groupCount(rows, d => d.status).sort((a, b) => b.value - a.value);
-        if (window.Plotly) Plotly.react(document.getElementById("chart_proc_por_status"), [{ type: "pie", labels: pieD.map(d => window.formatStatusDisplay ? window.formatStatusDisplay(d.key) : d.key), values: pieD.map(d => d.value), textinfo: "percent+label", marker: { colors: ['#008F3D', '#F28C00', '#018ABD', '#4CC17C', '#D35400'] } }], { margin: { l: 20, r: 20, t: 10, b: 10 }, height: 360 }, { displayModeBar: false, responsive: true });
-        renderHBar("chart_proc_por_tipo", topN(groupCount(rows, d => d.tipo), 20), "Qtd");
-    }
-
     // Expose globals
     window.getSelectedValues = getSelectedValues;
     window.renderMultiSelectUI = renderMultiSelectUI;
@@ -769,11 +671,8 @@
     window.quantile = quantile;
     window.renderHBar = renderHBar;
     window.populateFinanceiroFilters = populateFinanceiroFilters;
-    window.updateGerencialFilters = updateGerencialFilters;
-    window.getGerencialData = getGerencialData;
-    window.updateGerencial = updateGerencial;
 
-    // Also expose fin/ger as globals
-    window.fin = fin; window.ger = ger;
+    // Also expose fin as global
+    window.fin = fin;
 
 })(window);

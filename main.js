@@ -1685,7 +1685,6 @@ async function carregarDadosSupabase() {
         renderLastUpdate();
         updateDashboard();
         clearFinanceiro();
-        clearGerencial();
         updateFinanceiro();
         if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
         iniciarVarreduraRiscoDiligencia();
@@ -2765,7 +2764,7 @@ function showPane(paneId) {
     const titles = {
         'pane-home': 'Painel Gerencial — Aditivos de Obras',
         'pane-financeiro': 'Painel Financeiro',
-        'pane-gerencial': 'Painel Gerencial - Estatísticas',
+        'pane-curva-abc': 'Curva ABC',
         'pane-reuniao': 'Processos',
         'pane-orcamentos': 'Orçamentos',
         'pane-composicoes': 'Composições',
@@ -2814,9 +2813,6 @@ function showPane(paneId) {
         } catch (e) { console.warn('Erro ao resetar filtros de reunião', e); }
         if (typeof updateReuniao === 'function') updateReuniao();
     }
-    if (paneId === 'pane-gerencial') {
-        if (typeof updateGerencial === 'function') updateGerencial();
-    }
     if (paneId === 'pane-financeiro') {
         if (typeof updateFinanceiro === 'function') updateFinanceiro();
     }
@@ -2836,7 +2832,6 @@ function updateDashboard() {
     if (typeof updateHome === 'function') updateHome();
     if (typeof updateReuniao === 'function') updateReuniao();
     if (typeof updateFinanceiro === 'function') updateFinanceiro();
-    if (typeof updateGerencial === 'function') updateGerencial();
 }
 
 // --- 6. EVENT LISTENERS E MÁSCARAS ---
@@ -2899,21 +2894,10 @@ function applyRBACToPainels() {
             fin.fiscal.parentElement.parentElement.style.display = 'none';
         }
 
-        // Ocultar filtro de Fiscal para Fiscal (Painel Gerencial)
-        if (ger.fiscal && ger.fiscal.parentElement) {
-            ger.fiscal.parentElement.parentElement.style.display = 'none';
-        }
-
         // Desabilitar botão Limpar para Fiscal (Painel Financeiro)
         if (fin.clear) {
             fin.clear.disabled = true;
             fin.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
-        }
-
-        // Desabilitar botão Limpar para Fiscal (Painel Gerencial)
-        if (ger.clear) {
-            ger.clear.disabled = true;
-            ger.clear.title = 'Filtro automático por fiscal - não pode ser alterado';
         }
 
     }
@@ -3884,7 +3868,6 @@ function fillCommonStatusFilters() {
     try {
         const statuses = Array.from(new Set((window.allData || []).map(d => d.status))).filter(v => v);
         if (typeof fillSelect === 'function') {
-            if (ger && ger.status) fillSelect(ger.status, statuses);
             if (mt && mt.status) fillSelect(mt.status, statuses);
         }
     } catch (e) { console.warn('fillCommonStatusFilters error', e); }
@@ -3907,7 +3890,7 @@ function populateAllTabFilters() {
         }
     });
 
-    updateGerencialFilters(window.allData); updateReuniaoFilters(window.allData);
+    updateReuniaoFilters(window.allData);
 
     // Verifica notificações de atraso (apenas admins ou autorizados)
     if (getCurrentUserRole() === 'admin') {
@@ -3919,8 +3902,6 @@ function wireEvents() {
     fin.contratada.addEventListener("change", updateFinanceiro); fin.contratante.addEventListener("change", updateFinanceiro); fin.ano.addEventListener("change", updateFinanceiro);
     fin.clear.addEventListener("click", (e) => { e.preventDefault(); clearFinanceiro(); });
     fin.diffMetric.addEventListener("change", updateFinanceiro);
-    ger.fiscal.addEventListener("change", updateGerencial); ger.status.addEventListener("change", updateGerencial);
-    ger.clear.addEventListener("click", (e) => { e.preventDefault(); clearGerencial(); });
     mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
     // Debounce no search de reunião
     mt.search.addEventListener("input", debounce(updateReuniao, 300));
@@ -4488,7 +4469,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const modules = [
     { id: '#pane-financeiro', name: 'Painel Financeiro' },
-    { id: '#pane-gerencial', name: 'Painel Gerencial' },
+    { id: '#pane-curva-abc', name: 'Curva ABC' },
     { id: '#pane-reuniao', name: 'Processos' },
     { id: '#pane-orcamentos', name: 'Orçamentos' },
     { id: '#pane-composicoes', name: 'Composições' },

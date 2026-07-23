@@ -352,7 +352,7 @@
                 <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
                         data-bs-target="#pane-financeiro" data-bs-toggle="tab">Financeiro</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
-                        data-bs-target="#pane-gerencial" data-bs-toggle="tab">Gerencial</button></li>
+                        data-bs-target="#pane-curva-abc" data-bs-toggle="tab">Curva ABC</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo"><button class="nav-link"
                         data-bs-target="#pane-reuniao" data-bs-toggle="tab">Processos</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
@@ -449,10 +449,11 @@
                                 <div class="home-list-row-title">Composições</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
-                            <!-- Orçamentos -->
-                            <div class="home-list-row" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
-                                <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
-                                <div class="home-list-row-title">Orçamentos</div>
+                            <!-- Curva ABC -->
+                            <div class="home-list-row" data-pane="pane-curva-abc" data-roles="admin,gerente,fiscal"
+                                onclick="showPane('pane-curva-abc')">
+                                <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
+                                <div class="home-list-row-title">Curva ABC</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Painel Financeiro -->
@@ -462,11 +463,10 @@
                                 <div class="home-list-row-title">Financeiro</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
-                            <!-- Painel Gerencial -->
-                            <div class="home-list-row" data-pane="pane-gerencial" data-roles="admin,gerente,fiscal"
-                                onclick="showPane('pane-gerencial')">
-                                <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
-                                <div class="home-list-row-title">Gerencial</div>
+                            <!-- Orçamentos -->
+                            <div class="home-list-row" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
+                                <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
+                                <div class="home-list-row-title">Orçamentos</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Tabelas -->
@@ -1268,46 +1268,298 @@
                     </section>
                 </div>
 
-                <div class="tab-pane fade" id="pane-gerencial">
-                    <section class="filters-card">
-                        <div class="filters-title">Filtros Gerenciais</div>
-                        <div class="row g-2">
-                            <div class="col-12 col-md-4"><label class="form-label">Fiscal</label><select
-                                    class="form-select form-select-sm" id="gerencial-filter-fiscal"></select></div>
-                            <div class="col-12 col-md-4"><label class="form-label">Status</label><select
-                                    class="form-select form-select-sm" id="gerencial-filter-status"></select></div>
-                            <div class="col-12 col-md-4 d-flex align-items-end"><button
-                                    class="btn btn-sm w-30 btn-grid-clear" id="btn-gerencial-clear">Limpar</button>
-                            </div>
-                        </div>
-                    </section>
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <div>
-                                <div class="chart-title">Processos por Fiscal</div>
-                            </div><span class="chart-tools-badge" id="gerencial-count-badge">0</span>
-                        </div>
-                        <div class="chart-placeholder" id="chart_proc_por_fiscal"></div>
+                <div class="tab-pane fade" id="pane-curva-abc">
+                    <style>
+                        #pane-curva-abc {
+                            --cv-bg: #eef2ef; --cv-bg2: #ffffff; --cv-bg3: #f4f7f4; --cv-bg4: #e8eee9;
+                            --cv-border: #cfdad2; --cv-border-soft: #e0e8e2;
+                            --cv-text: #0e2117; --cv-text2: #2f4a3a; --cv-muted: #5c7566;
+                            --cv-green: #22a155; --cv-green-hi: #2bbd66; --cv-green-soft: rgba(34, 161, 85, .12);
+                            --cv-amber: #f0a83c; --cv-blue: #2f7fe4; --cv-slate: #64798c; --cv-red: #e1274a;
+                            --cv-cA: #22a155; --cv-cB: #2f7fe4; --cv-cC: #64798c;
+                            --cv-shadow: 0 1px 2px rgba(16, 40, 26, .06), 0 6px 18px rgba(16, 40, 26, .07);
+                            --cv-r: 12px;
+                            --cv-mono: "Montserrat", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+                            --cv-tnum: "tnum" 1, "lnum" 1;
+                            --cv-sans: "Montserrat", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+                            font-family: var(--cv-sans);
+                            font-variant-numeric: tabular-nums lining-nums; font-feature-settings: var(--cv-tnum);
+                        }
+
+                        body.theme-dark #pane-curva-abc {
+                            --cv-bg: #06150e; --cv-bg2: #0d2117; --cv-bg3: #12301f; --cv-bg4: #173d28;
+                            --cv-border: #1d4a31; --cv-border-soft: #163826;
+                            --cv-text: #e9f3ec; --cv-text2: #c2d8ca; --cv-muted: #84a692;
+                            --cv-green-soft: rgba(34, 161, 85, .14);
+                            --cv-shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 8px 24px rgba(0, 0, 0, .35);
+                        }
+
+                        #pane-curva-abc * { box-sizing: border-box }
+                        #pane-curva-abc { color: var(--cv-text); font-size: 14px; line-height: 1.45 }
+                        #pane-curva-abc .cv-eyebrow { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--cv-muted); font-weight: 600 }
+
+                        #pane-curva-abc .cv-card { background: var(--cv-bg2); border: 1px solid var(--cv-border); border-radius: var(--cv-r); box-shadow: var(--cv-shadow) }
+                        #pane-curva-abc .cv-card+.cv-card { margin-top: 20px }
+                        #pane-curva-abc .cv-card-h { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 20px; border-bottom: 1px solid var(--cv-border-soft) }
+                        #pane-curva-abc .cv-card-h h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--cv-text) }
+                        #pane-curva-abc .cv-card-b { padding: 18px 20px }
+
+                        #pane-curva-abc #cv-drop { border: 1.5px dashed var(--cv-border); border-radius: var(--cv-r); background: var(--cv-bg2); padding: 46px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 20px }
+                        #pane-curva-abc #cv-drop:hover, #pane-curva-abc #cv-drop.over { border-color: var(--cv-green); background: var(--cv-green-soft) }
+                        #pane-curva-abc #cv-drop h2 { margin: 12px 0 6px; font-size: 17px; font-weight: 700; color: var(--cv-text) }
+                        #pane-curva-abc #cv-drop p { margin: 0; color: var(--cv-muted); font-size: 13px }
+                        #pane-curva-abc #cv-drop .cv-fmt { margin-top: 12px; display: inline-flex; gap: 8px }
+                        #pane-curva-abc #cv-drop .cv-fmt span { border: 1px solid var(--cv-border); border-radius: 6px; padding: 3px 10px; font-size: 11px; color: var(--cv-muted); font-weight: 600; letter-spacing: .04em }
+                        #pane-curva-abc .cv-upicon { width: 38px; height: 38px; color: var(--cv-green) }
+
+                        #pane-curva-abc .cv-kpis { display: none; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; margin-bottom: 20px }
+                        #pane-curva-abc .cv-kpis.on { display: grid }
+                        #pane-curva-abc .cv-kpi { background: var(--cv-bg2); border: 1px solid var(--cv-border); border-radius: var(--cv-r); padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start; box-shadow: var(--cv-shadow) }
+                        #pane-curva-abc .cv-kpi .ic { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; color: #fff }
+                        #pane-curva-abc .cv-kpi .ic svg { width: 20px; height: 20px }
+                        #pane-curva-abc .cv-kpi .body { min-width: 0; flex: 1 }
+                        #pane-curva-abc .cv-kpi .big { font-size: 24px; font-weight: 700; letter-spacing: -.015em; font-feature-settings: var(--cv-tnum); line-height: 1.15; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--cv-text) }
+                        #pane-curva-abc .cv-kpi .cap { font-size: 12px; color: var(--cv-muted); margin-top: 3px }
+
+                        #pane-curva-abc .cv-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); border-bottom: 1px solid var(--cv-border-soft) }
+                        #pane-curva-abc .cv-meta .f { padding: 12px 20px; border-right: 1px solid var(--cv-border-soft); min-width: 0 }
+                        #pane-curva-abc .cv-meta .f:last-child { border-right: none }
+                        #pane-curva-abc .cv-meta .f .v { font-size: 13.5px; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--cv-text) }
+                        #pane-curva-abc .cv-meta .f .v.mono { font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); font-weight: 600 }
+                        #pane-curva-abc .cv-params { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end }
+                        #pane-curva-abc .cv-ctl { display: flex; flex-direction: column; gap: 6px }
+                        #pane-curva-abc .cv-ctl label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--cv-muted); font-weight: 600 }
+                        #pane-curva-abc select, #pane-curva-abc input[type=text], #pane-curva-abc input[type=number] { font-family: var(--cv-sans); font-size: 13px; padding: 9px 11px; border: 1px solid var(--cv-border); border-radius: 8px; background: var(--cv-bg3); color: var(--cv-text); min-width: 150px }
+                        #pane-curva-abc select { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--cv-muted) 50%), linear-gradient(135deg, var(--cv-muted) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat }
+                        #pane-curva-abc select:focus, #pane-curva-abc input:focus, #pane-curva-abc button:focus-visible, #pane-curva-abc #cv-drop:focus-visible { outline: 2px solid var(--cv-green-hi); outline-offset: 2px }
+                        #pane-curva-abc .cv-cuts { display: flex; align-items: center; gap: 7px }
+                        #pane-curva-abc .cv-cuts input { width: 78px; min-width: 0; font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); text-align: right }
+                        #pane-curva-abc .cv-cuts span { color: var(--cv-muted); font-size: 12.5px }
+                        #pane-curva-abc button { font-family: var(--cv-sans); font-size: 13px; font-weight: 600; padding: 9px 15px; cursor: pointer; border: 1px solid var(--cv-green); background: var(--cv-green); color: #fff; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px }
+                        #pane-curva-abc button:hover { background: var(--cv-green-hi); border-color: var(--cv-green-hi) }
+                        #pane-curva-abc button.cv-ghost { background: transparent; color: var(--cv-text); border-color: var(--cv-border) }
+                        #pane-curva-abc button.cv-ghost:hover { background: var(--cv-bg3); border-color: var(--cv-green) }
+                        #pane-curva-abc button svg { width: 15px; height: 15px }
+                        #pane-curva-abc .cv-spacer { flex: 1 1 auto }
+
+                        #pane-curva-abc .cv-chartbox { display: none }
+                        #pane-curva-abc .cv-chartbox.on { display: block }
+                        #pane-curva-abc #cv-chart svg { display: block; width: 100%; height: auto; font-family: var(--cv-sans); font-feature-settings: var(--cv-tnum) }
+                        #pane-curva-abc #cv-chart .grid { stroke: var(--cv-border-soft) }
+                        #pane-curva-abc #cv-chart .eixo { stroke: var(--cv-border) }
+                        #pane-curva-abc #cv-chart .rot { fill: var(--cv-muted) }
+                        #pane-curva-abc #cv-chart .corte { stroke: var(--cv-amber) }
+                        #pane-curva-abc #cv-chart .corte-lbl { fill: var(--cv-amber); font-weight: 600 }
+                        #pane-curva-abc #cv-chart .corte-bg { fill: var(--cv-bg2); stroke: var(--cv-amber); stroke-width: .8; opacity: .94 }
+                        #pane-curva-abc #cv-chart .linha { stroke: var(--cv-text); fill: none }
+                        #pane-curva-abc #cv-chart .ponto { fill: var(--cv-bg2); stroke: var(--cv-text) }
+                        #pane-curva-abc #cv-chart .bA { fill: var(--cv-cA) }
+                        #pane-curva-abc #cv-chart .bB { fill: var(--cv-cB) }
+                        #pane-curva-abc #cv-chart .bC { fill: var(--cv-cC) }
+                        #pane-curva-abc .cv-leg { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--cv-muted) }
+                        #pane-curva-abc .cv-leg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: -1px }
+
+                        #pane-curva-abc .cv-tablebox { display: none }
+                        #pane-curva-abc .cv-tablebox.on { display: block }
+                        #pane-curva-abc .cv-tbl-scroll { overflow-x: auto }
+                        #pane-curva-abc table { width: 100%; border-collapse: collapse; font-size: 12px }
+                        #pane-curva-abc thead th { position: sticky; top: 0; z-index: 2; background: var(--cv-bg3); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--cv-muted); font-weight: 700; text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--cv-border); white-space: nowrap }
+                        body.theme-dark #pane-curva-abc thead th { color: var(--cv-text) }
+                        #pane-curva-abc tbody td { padding: 8px 12px; border-bottom: 1px solid var(--cv-border-soft); vertical-align: top; color: var(--cv-text2) }
+                        #pane-curva-abc tbody tr:hover td { background: var(--cv-bg3) }
+                        #pane-curva-abc .cv-num { text-align: center; font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); white-space: nowrap; color: var(--cv-text) }
+                        #pane-curva-abc .cv-rank { font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); color: var(--cv-muted); text-align: right; width: 1% }
+                        #pane-curva-abc .cv-conta { font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); white-space: nowrap; color: var(--cv-text); text-align: center }
+                        #pane-curva-abc .cv-desc { min-width: 300px; max-width: 620px }
+                        #pane-curva-abc .cv-center { text-align: center }
+                        #pane-curva-abc .cv-chip { display: inline-block; min-width: 26px; text-align: center; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #fff }
+                        #pane-curva-abc .cv-chip.A { background: var(--cv-cA) }
+                        #pane-curva-abc .cv-chip.B { background: var(--cv-cB) }
+                        #pane-curva-abc .cv-chip.C { background: var(--cv-cC) }
+                        #pane-curva-abc .cv-acum { position: relative; text-align: right; font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); white-space: nowrap; min-width: 112px; color: var(--cv-text) }
+                        #pane-curva-abc .cv-acum .fill { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 3px; z-index: 0 }
+                        #pane-curva-abc .cv-acum .fill.A { background: rgba(34, 161, 85, .20) }
+                        #pane-curva-abc .cv-acum .fill.B { background: rgba(47, 127, 228, .20) }
+                        #pane-curva-abc .cv-acum .fill.C { background: rgba(100, 121, 140, .22) }
+                        #pane-curva-abc .cv-acum span.v { position: relative; z-index: 1 }
+                        #pane-curva-abc tr.cv-cut td { background: var(--cv-bg3); color: var(--cv-amber); border-top: 1px solid var(--cv-amber); border-bottom: 1px solid var(--cv-amber); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; padding: 7px 12px }
+                        #pane-curva-abc .cv-foot { padding: 14px 20px; border-top: 1px solid var(--cv-border-soft); color: var(--cv-muted); font-size: 12px }
+                        #pane-curva-abc .cv-foot code { font-family: var(--cv-mono); font-weight: 600; font-size: 11.5px; background: var(--cv-bg3); border: 1px solid var(--cv-border-soft); border-radius: 4px; padding: 1px 5px; color: var(--cv-text2) }
+                        #pane-curva-abc .cv-err { display: none; margin-bottom: 20px; border: 1px solid var(--cv-red); border-left-width: 4px; border-radius: var(--cv-r); background: rgba(225, 39, 74, .09); padding: 14px 18px; font-size: 13px; color: var(--cv-text) }
+                        #pane-curva-abc .cv-err.on { display: block }
+
+                        @media print {
+                            #pane-curva-abc #cv-drop, #pane-curva-abc .cv-tbar-actions, #pane-curva-abc .cv-params .cv-ghost, #pane-curva-abc #cv-btnPrint { display: none !important }
+                        }
+                    </style>
+
+                    <div class="cv-err" id="cv-err"></div>
+
+                    <div id="cv-drop" tabindex="0" role="button" aria-label="Selecionar planilha">
+                        <svg class="cv-upicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <path d="M7 9l5-5 5 5" />
+                            <path d="M12 4v12" />
+                        </svg>
+                        <h2>Arraste a planilha do replanilhamento</h2>
+                        <p>ou clique para selecionar o arquivo exportado pelo sistema</p>
+                        <div class="cv-fmt"><span>.xlsx</span><span>.xls</span><span>.csv</span></div>
+                        <input type="file" id="cv-file" accept=".xlsx,.xls,.xlsm,.csv" hidden>
                     </div>
-                    <div class="row g-3">
-                        <div class="col-12 col-lg-6">
-                            <div class="chart-card">
-                                <div class="chart-header">
-                                    <div class="chart-title">Por STATUS</div>
-                                </div>
-                                <div class="chart-placeholder" id="chart_proc_por_status"></div>
+
+                    <div class="cv-kpis" id="cv-kpis"></div>
+
+                    <div class="cv-card" id="cv-params" style="display:none">
+                        <div class="cv-meta">
+                            <div class="f">
+                                <div class="cv-eyebrow">Arquivo</div>
+                                <div class="v" id="cv-fArq">—</div>
+                            </div>
+                            <div class="f">
+                                <div class="cv-eyebrow">Coluna base</div>
+                                <div class="v" id="cv-fCol">—</div>
+                            </div>
+                            <div class="f">
+                                <div class="cv-eyebrow">Itens na curva</div>
+                                <div class="v mono" id="cv-fQtd">—</div>
+                            </div>
+                            <div class="f">
+                                <div class="cv-eyebrow">Valor total</div>
+                                <div class="v mono" id="cv-fTot">—</div>
+                            </div>
+                            <div class="f">
+                                <div class="cv-eyebrow">Critério A / B / C</div>
+                                <div class="v mono" id="cv-fCri">—</div>
+                            </div>
+                            <div class="f">
+                                <div class="cv-eyebrow">Emissão</div>
+                                <div class="v mono" id="cv-stamp">—</div>
                             </div>
                         </div>
-                        <div class="col-12 col-lg-6">
-                            <div class="chart-card">
-                                <div class="chart-header">
-                                    <div class="chart-title">Por TIPO</div>
+                        <div class="cv-card-b">
+                            <div class="cv-params">
+                                <div class="cv-ctl">
+                                    <label for="cv-selCol">Coluna de valor</label>
+                                    <select id="cv-selCol"></select>
                                 </div>
-                                <div class="chart-placeholder" id="chart_proc_por_tipo"></div>
+                                <div class="cv-ctl">
+                                    <label for="cv-selCri">Critério</label>
+                                    <select id="cv-selCri">
+                                        <option value="80,15">A 80% · B 15% · C 5%</option>
+                                        <option value="50,30">A 50% · B 30% · C 20%</option>
+                                        <option value="custom">Personalizado</option>
+                                    </select>
+                                </div>
+                                <div class="cv-ctl" id="cv-ctlCustom" style="display:none">
+                                    <label>Faixas A / B (%)</label>
+                                    <div class="cv-cuts">
+                                        <input type="number" id="cv-cutA" value="80" min="1" max="98" step="1">
+                                        <span>/</span>
+                                        <input type="number" id="cv-cutB" value="15" min="1" max="98" step="1">
+                                        <span id="cv-cutC">C 5%</span>
+                                    </div>
+                                </div>
+                                <div class="cv-ctl">
+                                    <label for="cv-selBorda">Item que cruza o corte</label>
+                                    <select id="cv-selBorda">
+                                        <option value="up">Fica na classe superior</option>
+                                        <option value="down">Fica na classe seguinte</option>
+                                    </select>
+                                </div>
+                                <div class="cv-ctl">
+                                    <label for="cv-selQtd">Serviços exibidos</label>
+                                    <select id="cv-selQtd">
+                                        <option value="0">Todos</option>
+                                        <option value="10">10 maiores</option>
+                                        <option value="20">20 maiores</option>
+                                        <option value="30">30 maiores</option>
+                                        <option value="50">50 maiores</option>
+                                        <option value="100">100 maiores</option>
+                                        <option value="custom">Personalizado</option>
+                                    </select>
+                                </div>
+                                <div class="cv-ctl" id="cv-ctlQtd" style="display:none">
+                                    <label for="cv-qtdCustom">Quantidade</label>
+                                    <div class="cv-cuts">
+                                        <input type="number" id="cv-qtdCustom" value="25" min="1" step="1">
+                                        <span id="cv-qtdTotal"></span>
+                                    </div>
+                                </div>
+                                <span class="cv-spacer"></span>
+                                <button class="cv-ghost" id="cv-btnXlsx" type="button">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <path d="M7 10l5 5 5-5" />
+                                        <path d="M12 15V3" />
+                                    </svg>
+                                    Excel
+                                </button>
+                                <button class="cv-ghost" id="cv-btnCsv" type="button">CSV</button>
+                                <button id="cv-btnPrint" type="button">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M6 9V2h12v7" />
+                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                        <path d="M6 14h12v8H6z" />
+                                    </svg>
+                                    PDF
+                                </button>
                             </div>
                         </div>
                     </div>
-                </div> <!-- FIM PANE-GERENCIAL -->
+
+                    <div class="cv-card cv-chartbox" id="cv-chartbox">
+                        <div class="cv-card-h">
+                            <h2>Diagrama de Pareto</h2>
+                            <span class="cv-spacer"></span>
+                            <span class="cv-eyebrow" id="cv-chartN"></span>
+                        </div>
+                        <div class="cv-card-b">
+                            <div id="cv-chart"></div>
+                            <div class="cv-leg" style="margin-top:12px">
+                                <span><i style="background:var(--cv-cA)"></i>Classe A</span>
+                                <span><i style="background:var(--cv-cB)"></i>Classe B</span>
+                                <span><i style="background:var(--cv-cC)"></i>Classe C</span>
+                                <span><i style="background:var(--cv-text)"></i>Percentual acumulado</span>
+                                <span><i style="background:var(--cv-amber)"></i>Cortes das faixas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cv-card cv-tablebox" id="cv-tablebox">
+                        <div class="cv-card-h">
+                            <h2>Itens ordenados por valor</h2>
+                            <span class="cv-spacer"></span>
+                            <span class="cv-eyebrow" id="cv-tblN"></span>
+                            <span class="cv-tbar-actions" style="display:flex;gap:10px;flex-wrap:wrap">
+                                <input type="text" id="cv-busca" placeholder="Filtrar por conta, código ou descrição"
+                                    style="min-width:300px">
+                            </span>
+                        </div>
+                        <div class="cv-tbl-scroll">
+                            <table id="cv-tbl">
+                                <thead>
+                                    <tr>
+                                        <th class="cv-rank">#</th>
+                                        <th class="cv-conta">Conta</th>
+                                        <th class="cv-conta">Comp.</th>
+                                        <th>Descrição</th>
+                                        <th class="cv-center">UN</th>
+                                        <th class="cv-num">Qtd.</th>
+                                        <th class="cv-num">Valor</th>
+                                        <th class="cv-num">%</th>
+                                        <th class="cv-num">% acum.</th>
+                                        <th class="cv-center">Classe</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cv-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div class="cv-foot" id="cv-foot"></div>
+                    </div>
+                </div> <!-- FIM PANE-CURVA-ABC -->
 
                 <!-- PAINEL DE PRAZOS E PRODUTIVIDADE -->
                 <!-- PAINEL DE PROCESSOS -->
@@ -3845,6 +4097,7 @@
                                                                     <script src="database.js"></script>
                                                                     <script src="dashboard.js"></script>
                                                                     <script src="admin.js"></script>
+                                                                    <script src="curva_abc.js"></script>
 
                                                                     <script src="app.js"></script>
                                                                     <script src="main.js"></script>
