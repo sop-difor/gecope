@@ -491,7 +491,7 @@ window.StatusSync = {
             const analista = String(processoGecope.analista || '').trim().toUpperCase();
 
             // Melhoria: Código mais limpo e à prova de falhas para checar a inicial do analista
-            const isAnalistaEspecial = analista ? ["N", "W", "H", "P", "F"].includes(analista.charAt(0)) : false;
+            const isAnalistaEspecial = analista ? ["N", "W", "H", "P", "F", "A"].includes(analista.charAt(0)) : false;
 
             // REGRA 2: ARQUIVAMENTO (Prioridade Máxima)
             if (siglaSuite === 'ARQUIVADO') {
@@ -1420,6 +1420,10 @@ function mapProcessoRow(r) {
     let nomeAnalista = r.analista;
     if (r.analista === "N") nomeAnalista = "Nildeno";
     else if (r.analista === "W") nomeAnalista = "Walace";
+    else if (r.analista === "H") nomeAnalista = "Helder";
+    else if (r.analista === "P") nomeAnalista = "Pedro";
+    else if (r.analista === "F") nomeAnalista = "Felipe";
+    else if (r.analista === "A") nomeAnalista = "Ada";
 
     return {
         id: r.id,
@@ -1900,7 +1904,7 @@ async function enviarParaPlanilha() {
         }
 
         // Notificação para Analistas Específicos
-        const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO'];
+        const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO', 'ADA'];
 
         let analistaExtenso = formData.get("ANALISTA") || "";
         if (analistaExtenso === "N") analistaExtenso = "Nildeno";
@@ -1908,6 +1912,7 @@ async function enviarParaPlanilha() {
         else if (analistaExtenso === "P") analistaExtenso = "Pedro";
         else if (analistaExtenso === "F") analistaExtenso = "Felipe";
         else if (analistaExtenso === "H") analistaExtenso = "Helder";
+        else if (analistaExtenso === "A") analistaExtenso = "Ada";
 
         const analistaNome = analistaExtenso.toUpperCase();
         const usuarioAtual = (sessionStorage.getItem('sop_user_name') || "").toUpperCase();
@@ -2610,7 +2615,7 @@ async function executarAcaoDetalhes(actionType) {
             }
 
             // Notificação para Analistas Específicos (Se mudou o analista ou se foi marcado agora)
-            const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO'];
+            const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO', 'ADA'];
 
             let aAtualExtenso = updates.analista || "";
             if (aAtualExtenso === "N") aAtualExtenso = "Nildeno";
@@ -2618,6 +2623,7 @@ async function executarAcaoDetalhes(actionType) {
             else if (aAtualExtenso === "P") aAtualExtenso = "Pedro";
             else if (aAtualExtenso === "F") aAtualExtenso = "Felipe";
             else if (aAtualExtenso === "H") aAtualExtenso = "Helder";
+            else if (aAtualExtenso === "A") aAtualExtenso = "Ada";
             const analistaAtual = aAtualExtenso.toUpperCase();
 
             let aAnteriorExtenso = registroOriginal.analista || "";
@@ -2626,6 +2632,7 @@ async function executarAcaoDetalhes(actionType) {
             else if (aAnteriorExtenso === "P") aAnteriorExtenso = "Pedro";
             else if (aAnteriorExtenso === "F") aAnteriorExtenso = "Felipe";
             else if (aAnteriorExtenso === "H") aAnteriorExtenso = "Helder";
+            else if (aAnteriorExtenso === "A") aAnteriorExtenso = "Ada";
             const analistaAnterior = aAnteriorExtenso.toUpperCase();
 
             const usuarioAtual = (sessionStorage.getItem('sop_user_name') || "").toUpperCase();
