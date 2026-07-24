@@ -1960,6 +1960,12 @@ let checklistAditivoState = {
     latestChecklist: null
 };
 
+// --- CURVA ABC DO PROCESSO (referência usada ao navegar para a aba Curva ABC) ---
+let curvaAbcProcessoState = {
+    processoStr: null,
+    processoId: null
+};
+
 async function abrirDetalhes(processoStr) {
     // garante que a role local esteja atualizada com o servidor
     await refreshUserRole();
@@ -1970,6 +1976,13 @@ async function abrirDetalhes(processoStr) {
     document.getElementById('det_tipo').value = row.tipo;
     document.getElementById('det_status').value = row.status;
     document.getElementById('det_descricao').value = row.descricao;
+
+    // Reseta o estado da Curva ABC para este processo
+    curvaAbcProcessoState = {
+        processoStr: row.processo,
+        processoId: row.id,
+        descricao: row.descricao || ""
+    };
 
     // Reseta o estado do checklist de documentação para este processo
     checklistAditivoState = {
@@ -2038,6 +2051,9 @@ async function abrirDetalhes(processoStr) {
 
     // Buscar checklist de documentação do aditivo (resumo + histórico)
     carregarChecklistAditivo(processoStr, row.id);
+
+    // Buscar Curva ABC do processo (resumo + versões anteriores)
+    if (typeof carregarCurvaAbcResumo === 'function') carregarCurvaAbcResumo(processoStr, row.id);
 
     const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
     modal.show();
@@ -2755,7 +2771,11 @@ function showPane(paneId) {
 
     const backBtn = document.getElementById('nav-back-container');
     if (backBtn) {
-        backBtn.style.display = (paneId === 'pane-home') ? 'none' : 'block';
+        backBtn.style.display = (paneId === 'pane-home') ? 'none' : 'flex';
+    }
+    const processosBtn = document.getElementById('nav-processos-btn');
+    if (processosBtn) {
+        processosBtn.style.display = (paneId === 'pane-curva-abc') ? '' : 'none';
     }
 
     setHeroContext(paneId);

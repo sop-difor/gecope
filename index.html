@@ -368,10 +368,14 @@
             </ul>
 
             <!-- BOTO VOLTAR (Clean & Professional) -->
-            <div id="nav-back-container" style="display: none; margin-bottom: 15px;">
+            <div id="nav-back-container" style="display: none; margin-bottom: 15px; align-items: center; justify-content: space-between;">
                 <button class="btn-back-minimal" onclick="showPane('pane-home')">
                     <i class="bi bi-arrow-left"></i>
                     <span>Painel Principal</span>
+                </button>
+                <button class="btn-back-minimal btn-forward-minimal" id="nav-processos-btn" onclick="showPane('pane-reuniao')" style="display:none">
+                    <span>Processos</span>
+                    <i class="bi bi-arrow-right"></i>
                 </button>
             </div>
 
@@ -1339,6 +1343,8 @@
                         #pane-curva-abc button:hover { background: var(--cv-green-hi); border-color: var(--cv-green-hi) }
                         #pane-curva-abc button.cv-ghost { background: transparent; color: var(--cv-text); border-color: var(--cv-border) }
                         #pane-curva-abc button.cv-ghost:hover { background: var(--cv-bg3); border-color: var(--cv-green) }
+                        #pane-curva-abc button#cv-btnDesvincular { color: var(--cv-red); border-color: var(--cv-red); flex: 0 0 auto; margin-left: auto }
+                        #pane-curva-abc button#cv-btnDesvincular:hover { background: var(--cv-red); color: #fff }
                         #pane-curva-abc button svg { width: 15px; height: 15px }
                         #pane-curva-abc .cv-spacer { flex: 1 1 auto }
 
@@ -1365,7 +1371,7 @@
                         #pane-curva-abc table { width: 100%; border-collapse: collapse; font-size: 12px }
                         #pane-curva-abc thead th { position: sticky; top: 0; z-index: 2; background: var(--cv-bg3); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--cv-muted); font-weight: 700; text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--cv-border); white-space: nowrap }
                         body.theme-dark #pane-curva-abc thead th { color: var(--cv-text) }
-                        #pane-curva-abc tbody td { padding: 8px 12px; border-bottom: 1px solid var(--cv-border-soft); vertical-align: top; color: var(--cv-text2) }
+                        #pane-curva-abc tbody td { padding: 8px 12px; border-bottom: 1px solid var(--cv-border-soft); vertical-align: middle; color: var(--cv-text2) }
                         #pane-curva-abc tbody tr:hover td { background: var(--cv-bg3) }
                         #pane-curva-abc .cv-num { text-align: center; font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); white-space: nowrap; color: var(--cv-text) }
                         #pane-curva-abc .cv-rank { font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); color: var(--cv-muted); text-align: right; width: 1% }
@@ -1387,6 +1393,29 @@
                         #pane-curva-abc .cv-foot code { font-family: var(--cv-mono); font-weight: 600; font-size: 11.5px; background: var(--cv-bg3); border: 1px solid var(--cv-border-soft); border-radius: 4px; padding: 1px 5px; color: var(--cv-text2) }
                         #pane-curva-abc .cv-err { display: none; margin-bottom: 20px; border: 1px solid var(--cv-red); border-left-width: 4px; border-radius: var(--cv-r); background: rgba(225, 39, 74, .09); padding: 14px 18px; font-size: 13px; color: var(--cv-text) }
                         #pane-curva-abc .cv-err.on { display: block }
+
+                        /* Vínculo com um processo (Gerenciar Processo) */
+                        #pane-curva-abc .cv-vinculo { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; background: var(--cv-bg2); border: 1px solid var(--cv-border); border-radius: var(--cv-r); box-shadow: var(--cv-shadow); padding: 16px 20px; margin-bottom: 20px }
+                        #pane-curva-abc .cv-vinculo input[type=text] { min-width: 260px }
+                        #pane-curva-abc .cv-vinc-status { font-size: 14.5px; color: var(--cv-muted); font-weight: 600; flex: 1 1 320px; min-width: 0; white-space: normal; word-break: break-word; text-align: left }
+                        #pane-curva-abc .cv-vinc-status:empty { flex: 0 0 auto; min-width: 0 }
+                        #pane-curva-abc .cv-vinc-status.on { color: var(--cv-green) }
+                        #pane-curva-abc button#cv-btnVincular { margin-left: auto }
+                        /* quando já há vínculo, não há label acima do texto — centraliza texto e botão Desvincular */
+                        #pane-curva-abc.tem-vinculo .cv-vinculo { align-items: center }
+
+                        /* Colunas de análise (Status/Comentário) só aparecem quando há vínculo */
+                        #pane-curva-abc .cv-col-analise { display: none }
+                        #pane-curva-abc.tem-vinculo .cv-col-analise { display: table-cell }
+                        #pane-curva-abc.tem-vinculo .cv-vinc-only { display: inline-flex !important }
+                        #pane-curva-abc .cv-status-btns { display: inline-flex; gap: 4px }
+                        #pane-curva-abc .cv-status-btns button { padding: 4px 9px; font-size: 11.5px; border-radius: 6px; background: var(--cv-bg3); color: var(--cv-muted); border: 1px solid var(--cv-border) }
+                        #pane-curva-abc .cv-status-btns button.cv-status-ok.on { background: var(--cv-green); color: #fff; border-color: var(--cv-green) }
+                        #pane-curva-abc .cv-status-btns button.cv-status-inc.on { background: var(--cv-red); color: #fff; border-color: var(--cv-red) }
+                        #pane-curva-abc .cv-btn-comentario { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: var(--cv-bg3); color: var(--cv-muted); border: 1px solid var(--cv-border); font-size: 14px }
+                        #pane-curva-abc .cv-btn-comentario.tem { background: var(--cv-amber); color: #fff; border-color: var(--cv-amber) }
+                        #pane-curva-abc tr.cv-row-ok td { background: rgba(34, 161, 85, .09) }
+                        #pane-curva-abc tr.cv-row-inc td { background: rgba(225, 39, 74, .09) }
 
                         @media print {
                             /* O PDF da Curva ABC compõe processo — deve sair sempre no tema claro,
@@ -1415,6 +1444,7 @@
                                fazem sentido num PDF estático — antes só os botões eram escondidos, deixando
                                os <select> "crus" aparecerem no papel. */
                             #pane-curva-abc #cv-drop,
+                            #pane-curva-abc .cv-vinculo,
                             #pane-curva-abc .cv-tbar-actions,
                             #pane-curva-abc #cv-params .cv-card-b { display: none !important }
 
@@ -1442,6 +1472,21 @@
                             }
                         }
                     </style>
+
+                    <div class="cv-vinculo" id="cv-vinculo">
+                        <div class="cv-ctl" id="cv-vinc-form" style="flex:1; min-width:240px">
+                            <label for="cv-vincProcesso">Vincular esta curva a um processo (opcional)</label>
+                            <input type="text" id="cv-vincProcesso" list="cv-listaProcessos"
+                                placeholder="Digite o número do processo...">
+                            <datalist id="cv-listaProcessos"></datalist>
+                        </div>
+                        <button class="cv-ghost" id="cv-btnVincular" type="button">Vincular</button>
+                        <span class="cv-vinc-status" id="cv-vinc-status"></span>
+                        <button class="cv-ghost" id="cv-btnDesvincular" type="button" style="display:none">Desvincular</button>
+                        <button id="cv-btnSalvarAnalise" type="button" style="display:none">
+                            <i class="bi bi-cloud-arrow-up-fill"></i> Salvar como nova versão do processo
+                        </button>
+                    </div>
 
                     <div class="cv-err" id="cv-err"></div>
 
@@ -1547,6 +1592,10 @@
                                     Excel
                                 </button>
                                 <button class="cv-ghost" id="cv-btnCsv" type="button">CSV</button>
+                                <button class="cv-ghost cv-vinc-only" id="cv-btnRelatorioComentarios" type="button" style="display:none">
+                                    <i class="bi bi-chat-left-text"></i>
+                                    Relatório de comentários
+                                </button>
                                 <button id="cv-btnPrint" type="button">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round">
@@ -1602,6 +1651,8 @@
                                         <th class="cv-num">%</th>
                                         <th class="cv-num">% acum.</th>
                                         <th class="cv-center">Classe</th>
+                                        <th class="cv-center cv-col-analise">Status</th>
+                                        <th class="cv-col-analise">Comentário</th>
                                     </tr>
                                 </thead>
                                 <tbody id="cv-tbody"></tbody>
@@ -1610,6 +1661,80 @@
                         <div class="cv-foot" id="cv-foot"></div>
                     </div>
                 </div> <!-- FIM PANE-CURVA-ABC -->
+
+                <!-- Comentário do item da Curva ABC (Gerenciar Processo > análise item a item) -->
+                <div class="modal fade" id="modalCvComentario" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning-subtle">
+                                <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>COMENTÁRIO DO ITEM</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="cv-coment-db-id">
+                                <div class="mb-2 small text-muted fw-bold" id="cv-coment-item-desc"></div>
+                                <div class="cv-coment-toolbar" id="cv-coment-toolbar">
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="bold" title="Negrito"><i class="bi bi-type-bold"></i></button>
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="italic" title="Itálico"><i class="bi bi-type-italic"></i></button>
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="underline" title="Sublinhado"><i class="bi bi-type-underline"></i></button>
+                                    <span class="cv-coment-tb-sep"></span>
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="justifyLeft" title="Alinhar à esquerda"><i class="bi bi-text-left"></i></button>
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="justifyCenter" title="Centralizar"><i class="bi bi-text-center"></i></button>
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="justifyFull" title="Justificar"><i class="bi bi-justify"></i></button>
+                                    <button type="button" class="cv-coment-tb-btn" data-cmd="justifyRight" title="Alinhar à direita"><i class="bi bi-text-right"></i></button>
+                                    <span class="cv-coment-tb-sep"></span>
+                                    <select id="cv-coment-fontsize" title="Tamanho da fonte">
+                                        <option value="9">9</option>
+                                        <option value="10">10</option>
+                                        <option value="11" selected>11</option>
+                                        <option value="12">12</option>
+                                        <option value="14">14</option>
+                                        <option value="16">16</option>
+                                        <option value="18">18</option>
+                                    </select>
+                                </div>
+                                <div class="cv-coment-ruler" id="cv-coment-ruler">
+                                    <div class="cv-ruler-ticks" id="cv-ruler-ticks"></div>
+                                    <div class="cv-ruler-marker cv-ruler-firstline" id="cv-ruler-firstline" title="Recuo da 1ª linha (arraste)"></div>
+                                    <div class="cv-ruler-marker cv-ruler-leftindent" id="cv-ruler-leftindent" title="Recuo do parágrafo (arraste)"></div>
+                                </div>
+                                <div class="form-control cv-coment-editor" id="cv-coment-texto" contenteditable="false"
+                                    style="min-height: 320px; overflow-y:auto"
+                                    data-placeholder="Descreva a inconsistência ou observação sobre este item..."></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                                <button type="button" class="btn btn-outline-warning btn-sm fw-bold" id="cv-coment-btnEditar">
+                                    <i class="bi bi-pencil me-1"></i> Editar
+                                </button>
+                                <button type="button" class="btn btn-warning btn-sm fw-bold" id="cv-coment-btnSalvar" style="display:none">
+                                    <i class="bi bi-check-lg me-1"></i> Salvar comentário
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Relatório consolidado dos comentários cadastrados na Curva ABC de um processo -->
+                <div class="modal fade" id="modalCvRelatorioComentarios" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content border-0 shadow-lg">
+                            <div class="modal-header bg-dark text-white py-2">
+                                <h6 class="modal-title fw-bold mb-0"><i class="bi bi-file-text me-2"></i>RELATÓRIO DE ANÁLISE DO ADITIVO</h6>
+                                <button type="button" class="btn-close btn-close-white m-0" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body bg-white p-0">
+                                <div class="p-5" id="cv-relatorio-comentarios-body"></div>
+                            </div>
+                            <div class="modal-footer py-2 bg-light d-print-none">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="window.print()">
+                                    <i class="bi bi-printer me-1"></i> Imprimir / Salvar PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- PAINEL DE PRAZOS E PRODUTIVIDADE -->
                 <!-- PAINEL DE PROCESSOS -->
@@ -2475,6 +2600,31 @@
                                                         data-bs-target="#det_checklist_historico">Ver histórico
                                                         anterior</button>
                                                     <div class="collapse mt-2" id="det_checklist_historico"
+                                                        style="font-size: 0.75rem;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Curva ABC do Processo -->
+                                        <div class="card border-0 shadow-sm mb-4">
+                                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                        class="bi bi-bar-chart-fill me-2 text-success"></i>CURVA ABC</h6>
+                                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    id="btn-abrir-curva-abc-processo"
+                                                    onclick="abrirCurvaAbcDoProcesso()">Importar/Analisar</button>
+                                            </div>
+                                            <div class="card-body">
+                                                <div id="det_curva_abc_status" style="font-size: 0.8rem;">
+                                                    <em class="text-muted">Carregando...</em>
+                                                </div>
+                                                <div class="mt-2 pt-2 border-top" id="det_curva_abc_historico_wrap"
+                                                    style="display:none;">
+                                                    <button type="button" class="btn btn-link btn-sm p-0"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#det_curva_abc_historico">Ver versões
+                                                        anteriores</button>
+                                                    <div class="collapse mt-2" id="det_curva_abc_historico"
                                                         style="font-size: 0.75rem;"></div>
                                                 </div>
                                             </div>
@@ -4148,6 +4298,7 @@
                                                                     <script src="dashboard.js"></script>
                                                                     <script src="admin.js"></script>
                                                                     <script src="curva_abc.js"></script>
+                                                                    <script src="curva_abc_processo.js"></script>
 
                                                                     <script src="app.js"></script>
                                                                     <script src="main.js"></script>

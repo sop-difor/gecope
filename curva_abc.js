@@ -8,7 +8,12 @@
   if (!pane) return;
 
   function $(id) { return document.getElementById(id); }
-  var state = { rows: [], cols: [], headerRow: 0, fileName: "", valueIdx: null, curva: [], total: 0, limite: 0 };
+  var state = {
+    rows: [], cols: [], headerRow: 0, fileName: "", valueIdx: null, curva: [], total: 0, limite: 0,
+    arquivoOriginal: null,
+    /* vínculo com um processo (Gerenciar Processo): curva_abc_versoes/curva_abc_itens */
+    processoVinculado: null, versaoCarregadaDb: null, versaoMaisRecenteDoVinculo: null, somenteLeitura: false
+  };
 
   /* ---------- utilidades ---------- */
   function norm(s) {
@@ -54,6 +59,7 @@
       return;
     }
     state.fileName = file.name;
+    state.arquivoOriginal = file;
     var fr = new FileReader();
     fr.onload = function (e) {
       try {
@@ -82,6 +88,7 @@
 
   function processarAoa(aoa) {
     if (!aoa || aoa.length < 2) { erro("<b>Planilha vazia.</b> Nenhuma linha de dados encontrada."); return; }
+    state.versaoCarregadaDb = null; /* upload novo: ainda não foi salvo como versão de nenhum processo */
     var h = acharLinhaCabecalho(aoa);
     state.headerRow = h;
     var head = aoa[h] || [];
@@ -276,6 +283,8 @@
         ? " Estão sendo exibidos os <code>" + state.limite + "</code> maiores de <code>" + it.length + "</code> itens — os percentuais continuam calculados sobre o valor total de todos eles."
         : "")
       + " Colunas com valores negativos, como <code>Vl. Suprim.</code>, são ordenadas pelo módulo.";
+
+    atualizarBotaoSalvar();
   }
 
   /* ajusta a tarja de fundo de cada rotulo de corte a largura real do texto */
@@ -360,19 +369,45 @@
     $("cv-chartN").textContent = (N < it.length) ? N + " maiores de " + it.length + " itens" : it.length + " itens";
   }
 
+  /* comentário é salvo como HTML (rich text); para saber se "tem conteúdo" ou
+     para exportar em texto puro é preciso descartar as tags primeiro. */
+  function cvTextoSemHtml(html) {
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html || "";
+    return tmp.textContent || tmp.innerText || "";
+  }
+
+  function colunasAnalise(x) {
+    if (!x.dbId) return '<td class="cv-col-analise"></td><td class="cv-col-analise"></td>';
+    var podeEditar = cvPodeEscrever() && !state.somenteLeitura;
+    var disabledAttr = podeEditar ? "" : "disabled";
+    var okOn = x.statusAnalise === "ok" ? "on" : "";
+    var incOn = x.statusAnalise === "inconsistencia" ? "on" : "";
+    var temComentario = !!(x.comentario && cvTextoSemHtml(x.comentario).trim());
+    return '<td class="cv-col-analise cv-center"><div class="cv-status-btns">'
+      + '<button type="button" class="cv-status-ok ' + okOn + '" data-db-id="' + x.dbId + '" data-status="ok" ' + disabledAttr + ' title="OK"><i class="bi bi-check-lg"></i></button>'
+      + '<button type="button" class="cv-status-inc ' + incOn + '" data-db-id="' + x.dbId + '" data-status="inconsistencia" ' + disabledAttr + ' title="Inconsistência"><i class="bi bi-x-lg"></i></button>'
+      + '</div></td>'
+      + '<td class="cv-col-analise cv-center"><button type="button" class="cv-btn-comentario ' + (temComentario ? "tem" : "") + '" data-comentario-id="' + x.dbId + '" title="' + (temComentario ? "Ver comentário" : "Adicionar comentário") + '"><i class="bi ' + (temComentario ? "bi-chat-left-text-fill" : "bi-chat-left") + '"></i></button></td>';
+  }
+
   function desenhaTabela() {
     var it = state.curva;
     var f = norm($("cv-busca").value);
     var lista = f ? it.filter(function (x) { return norm(x.desc).indexOf(f) > -1 || norm(x.conta).indexOf(f) > -1 || norm(x.comp).indexOf(f) > -1; })
       : it.slice(0, state.limite);
+    var numCols = state.processoVinculado ? 12 : 10;
     var rows = [], ultimo = null;
     for (var i = 0; i < lista.length; i++) {
       var x = lista[i];
       if (!f && ultimo && ultimo !== x.classe) {
-        rows.push('<tr class="cv-cut"><td colspan="10">corte da classe ' + ultimo + ' para a classe ' + x.classe + ' &nbsp;·&nbsp; acumulado ' + pct(lista[i - 1].pctAcum) + '</td></tr>');
+        rows.push('<tr class="cv-cut"><td colspan="' + numCols + '">corte da classe ' + ultimo + ' para a classe ' + x.classe + ' &nbsp;·&nbsp; acumulado ' + pct(lista[i - 1].pctAcum) + '</td></tr>');
       }
       ultimo = x.classe;
-      rows.push('<tr>'
+      var linhaClasse = state.processoVinculado
+        ? (x.statusAnalise === "ok" ? "cv-row-ok" : (x.statusAnalise === "inconsistencia" ? "cv-row-inc" : ""))
+        : "";
+      rows.push('<tr class="' + linhaClasse + '">'
         + '<td class="cv-rank">' + x.pos + '</td>'
         + '<td class="cv-conta">' + esc(x.conta) + '</td>'
         + '<td class="cv-conta">' + esc(x.comp) + '</td>'
@@ -383,9 +418,10 @@
         + '<td class="cv-num">' + pct(x.pctInd) + '</td>'
         + '<td class="cv-acum"><span class="fill ' + x.classe + '" style="width:' + x.pctAcum.toFixed(2) + '%"></span><span class="v">' + pct(x.pctAcum) + '</span></td>'
         + '<td class="cv-center"><span class="cv-chip ' + x.classe + '">' + x.classe + '</span></td>'
+        + colunasAnalise(x)
         + '</tr>');
     }
-    if (!rows.length) rows.push('<tr><td colspan="10" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca.</td></tr>');
+    if (!rows.length) rows.push('<tr><td colspan="' + numCols + '" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca.</td></tr>');
     $("cv-tbody").innerHTML = rows.join("");
     $("cv-tblN").textContent = f
       ? lista.length + " item(ns) encontrado(s) na busca"
@@ -439,6 +475,350 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  /* ---------- relatório consolidado dos comentários (para despacho) ---------- */
+  function cvGerarRelatorioComentarios() {
+    var itens = (state.curva || []).filter(function (x) { return x.dbId && x.comentario && cvTextoSemHtml(x.comentario).trim(); });
+    if (!itens.length) { alert("Nenhum comentário cadastrado nesta Curva ABC ainda."); return; }
+
+    var partes = [];
+    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Técnica — GECOPE</p>');
+    if (state.processoVinculado) {
+      partes.push('<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ' + esc(state.processoVinculado.processo)
+        + (state.processoVinculado.descricao ? ' — ' + esc(state.processoVinculado.descricao) : '') + '</p>');
+    }
+    partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, resolve-se retornar o processo à Fiscalização com os seguintes apontamentos:</p>');
+
+    itens.forEach(function (x, i) {
+      partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.desc) + ':</strong></p>');
+      /* comentário já vem como HTML formatado pelo próprio analista (negrito, itálico,
+         alinhamento, tamanho) no editor do modal — mantém exatamente como foi salvo. */
+      partes.push('<div style="margin:0 0 1.5em 0">' + x.comentario + '</div>');
+    });
+    partes.push('</div>');
+
+    $("cv-relatorio-comentarios-body").innerHTML = partes.join("");
+    bootstrap.Modal.getOrCreateInstance($("modalCvRelatorioComentarios")).show();
+  }
+
+  /* ---------- vínculo com um processo (Gerenciar Processo) ---------- */
+  function cvPodeEscrever() {
+    return (typeof getCurrentUserRole === "function")
+      && (getCurrentUserRole() === "admin" || getCurrentUserRole() === "gerente");
+  }
+
+  function popularDatalistProcessos() {
+    var dl = $("cv-listaProcessos");
+    if (!dl) return;
+    var lista = window.allData || [];
+    dl.innerHTML = lista.map(function (r) {
+      return '<option value="' + esc(r.processo) + '">' + esc(r.descricao || "") + '</option>';
+    }).join("");
+  }
+
+  function resolverProcesso(processoStrDigitado) {
+    var alvo = norm(processoStrDigitado);
+    if (!alvo) return null;
+    var lista = window.allData || [];
+    for (var i = 0; i < lista.length; i++) {
+      if (norm(lista[i].processo) === alvo) return lista[i];
+    }
+    return null;
+  }
+
+  function atualizarVinculoUI() {
+    var elStatus = $("cv-vinc-status");
+    var formVinc = $("cv-vinc-form");
+    var btnVinc = $("cv-btnVincular");
+    var btnDesv = $("cv-btnDesvincular");
+    if (state.processoVinculado) {
+      if (elStatus) {
+        elStatus.textContent = "PROCESSO NUP " + state.processoVinculado.processo
+          + (state.processoVinculado.descricao ? " - " + state.processoVinculado.descricao : "");
+        elStatus.classList.add("on");
+      }
+      if (formVinc) formVinc.style.display = "none";
+      if (btnVinc) btnVinc.style.display = "none";
+      if (btnDesv) btnDesv.style.display = "";
+    } else {
+      if (elStatus) { elStatus.textContent = ""; elStatus.classList.remove("on"); }
+      if (formVinc) formVinc.style.display = "";
+      if (btnVinc) btnVinc.style.display = "";
+      if (btnDesv) btnDesv.style.display = "none";
+      var input = $("cv-vincProcesso");
+      if (input) input.value = "";
+    }
+    atualizarBotaoSalvar();
+  }
+
+  function atualizarBotaoSalvar() {
+    var btn = $("cv-btnSalvarAnalise");
+    if (!btn) return;
+    var mostrar = !!(state.processoVinculado && !state.versaoCarregadaDb && state.curva && state.curva.length && cvPodeEscrever());
+    btn.style.display = mostrar ? "" : "none";
+  }
+
+  async function carregarVersaoDb(versaoRegistro, somenteLeitura) {
+    limpaErro();
+    var { data: itensDb, error } = await sbClient
+      .from("curva_abc_itens")
+      .select("*")
+      .eq("versao_id", versaoRegistro.id)
+      .order("posicao", { ascending: true });
+    if (error) { erro("Erro ao carregar itens da Curva ABC: " + esc(error.message)); return; }
+
+    var itens = (itensDb || []).map(function (x) {
+      return {
+        conta: x.conta || "", comp: x.comp || "", desc: x.descricao || "", un: x.unidade || "",
+        qtd: x.quantidade, valor: Number(x.valor) || 0, ord: Math.abs(Number(x.valor) || 0),
+        pos: x.posicao, pctInd: Number(x.pct_individual) || 0, pctAcum: Number(x.pct_acumulado) || 0,
+        classe: x.classe, dbId: x.id, statusAnalise: x.status_analise, comentario: x.comentario
+      };
+    });
+
+    state.cols = []; state.dados = []; state.arquivoOriginal = null;
+    state.curva = itens;
+    state.total = Number(versaoRegistro.total_valor) || itens.reduce(function (s, x) { return s + x.ord; }, 0);
+    state.fA = Number(versaoRegistro.criterio_a) || 80;
+    state.fB = Number(versaoRegistro.criterio_b) || 15;
+    state.fC = (versaoRegistro.criterio_c != null) ? Number(versaoRegistro.criterio_c) : (100 - state.fA - state.fB);
+    state.cA = state.fA; state.cB = state.fA + state.fB;
+    state.colNome = versaoRegistro.coluna_valor || "—";
+    state.fileName = versaoRegistro.arquivo_nome || ("Versão " + versaoRegistro.versao);
+    state.limite = itens.length;
+    state.usouRep = false;
+    state.versaoCarregadaDb = versaoRegistro;
+    state.somenteLeitura = somenteLeitura;
+
+    var sel = $("cv-selCol"); sel.innerHTML = "";
+    var o = document.createElement("option"); o.textContent = state.colNome; sel.appendChild(o);
+
+    $("cv-drop").style.display = "none";
+    $("cv-params").style.display = "";
+
+    render();
+  }
+
+  async function vincularProcesso(processoStrDigitado) {
+    limpaErro();
+    var proc = resolverProcesso(processoStrDigitado);
+    if (!proc) { erro("Processo não encontrado. Confira o número digitado."); return; }
+    await carregarCurvaAbcDoProcesso(proc.id, proc.processo, null, proc.descricao);
+  }
+
+  function resetVisualizacao() {
+    state.curva = []; state.total = 0; state.cols = []; state.dados = [];
+    state.arquivoOriginal = null; state.fileName = ""; state.limite = 0;
+    ["cv-kpis", "cv-chartbox", "cv-tablebox"].forEach(function (id) {
+      var e = $(id); if (e) e.classList.remove("on");
+    });
+    $("cv-tbody").innerHTML = "";
+    $("cv-chart").innerHTML = "";
+    var busca = $("cv-busca"); if (busca) busca.value = "";
+    $("cv-params").style.display = "none";
+    $("cv-drop").style.display = "";
+    $("cv-file").value = "";
+    limpaErro();
+  }
+
+  async function desvincularProcesso() {
+    if (!state.processoVinculado) return;
+    var proc = state.processoVinculado;
+
+    /* só existe algo a desfazer no banco se já havia versão(ões) salva(s) para este
+       processo; sem isso, "desvincular" é só fechar a visualização em memória */
+    if (state.versaoMaisRecenteDoVinculo) {
+      if (!cvPodeEscrever()) { alert("Você não tem permissão para remover este vínculo."); return; }
+      var ok = confirm("Isso remove definitivamente o vínculo da Curva ABC com o processo Nº " + proc.processo
+        + ". Os dados de todas as versões continuam no sistema, mas deixam de aparecer nesse processo. Deseja continuar?");
+      if (!ok) return;
+
+      var btnDesv = $("cv-btnDesvincular");
+      var textoOriginal = btnDesv ? btnDesv.innerHTML : "";
+      if (btnDesv) { btnDesv.disabled = true; btnDesv.innerHTML = "REMOVENDO..."; }
+
+      /* zera processo_id em TODAS as versões deste processo — não só na que está
+         em tela — senão a versão anterior viraria a "mais recente" e o vínculo
+         reapareceria na próxima vez que o processo fosse aberto. */
+      var { error } = await sbClient.from("curva_abc_versoes").update({ processo_id: null }).eq("processo_id", String(proc.id));
+
+      if (btnDesv) { btnDesv.disabled = false; btnDesv.innerHTML = textoOriginal; }
+      if (error) { alert("Erro ao remover o vínculo: " + error.message); return; }
+
+      if (typeof registrarAtividade === "function") {
+        registrarAtividade("PROCESSO", "removeu o vínculo da Curva ABC com o processo Nº " + proc.processo, proc.processo);
+      }
+    }
+
+    limparVinculoLocal();
+
+    /* se o card de Gerenciar Processo ainda estiver na página (modal fechado, não destruído) */
+    if (typeof carregarCurvaAbcResumo === "function") carregarCurvaAbcResumo(proc.processo, proc.id);
+  }
+
+  /* limpa só o lado do navegador (vínculo em memória + tela) — não mexe no banco.
+     Usada tanto pelo "Desvincular" (depois de já ter tratado o banco, se preciso)
+     quanto ao sair da aba, pra não deixar a curva de uma pessoa "vazar" pra próxima
+     vez que a aba for aberta. */
+  function limparVinculoLocal() {
+    state.processoVinculado = null;
+    state.versaoCarregadaDb = null;
+    state.versaoMaisRecenteDoVinculo = null;
+    state.somenteLeitura = false;
+    pane.classList.remove("tem-vinculo");
+    atualizarVinculoUI();
+    resetVisualizacao();
+  }
+
+  async function carregarCurvaAbcDoProcesso(processoId, processoStr, versaoId, descricao) {
+    limpaErro();
+    state.processoVinculado = { id: processoId, processo: processoStr, descricao: descricao || "" };
+    pane.classList.add("tem-vinculo");
+    atualizarVinculoUI();
+
+    var { data, error } = await sbClient
+      .from("curva_abc_versoes")
+      .select("*")
+      .eq("processo_id", String(processoId))
+      .order("versao", { ascending: false });
+    if (error) { erro("Erro ao consultar Curva ABC do processo: " + esc(error.message)); return; }
+
+    state.versaoMaisRecenteDoVinculo = (data && data.length) ? data[0] : null;
+
+    if (!data || !data.length) {
+      /* nenhuma versão salva ainda: limpa qualquer curva anterior em tela e fica
+         na dropzone, já vinculado a este processo, pronta pra um upload novo */
+      resetVisualizacao();
+      atualizarBotaoSalvar();
+      return;
+    }
+
+    var alvo = versaoId ? data.find(function (v) { return v.id === versaoId; }) : data[0];
+    if (!alvo) alvo = data[0];
+    var ehAtual = (alvo.id === data[0].id);
+    await carregarVersaoDb(alvo, !cvPodeEscrever() || !ehAtual);
+  }
+
+  async function salvarComoNovaVersaoDoProcesso() {
+    if (!state.processoVinculado || !cvPodeEscrever()) return;
+    if (!state.curva || !state.curva.length) return;
+
+    if (state.versaoMaisRecenteDoVinculo) {
+      var ok = confirm("Uma nova versão vai virar a versão corrente da Curva ABC deste processo. A versão anterior continuará disponível no histórico, somente leitura. Deseja continuar?");
+      if (!ok) return;
+    }
+
+    var btn = $("cv-btnSalvarAnalise");
+    var textoOriginal = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = "SALVANDO...";
+
+    try {
+      var proximaVersao = (state.versaoMaisRecenteDoVinculo ? state.versaoMaisRecenteDoVinculo.versao : 0) + 1;
+
+      var arquivoUrl = null, arquivoPath = null, arquivoNome = null;
+      if (state.arquivoOriginal) {
+        arquivoNome = state.arquivoOriginal.name;
+        var nomeLimpo = sanitizarNomeArquivo(arquivoNome);
+        arquivoPath = "curva_abc/" + state.processoVinculado.id + "/v" + proximaVersao + "_" + Date.now() + "_" + nomeLimpo;
+        var up = await sbClient.storage.from("orcamentos").upload(arquivoPath, state.arquivoOriginal);
+        if (up.error) throw up.error;
+        var pub = sbClient.storage.from("orcamentos").getPublicUrl(arquivoPath);
+        arquivoUrl = pub.data.publicUrl;
+      }
+
+      var versaoPayload = {
+        processo_id: String(state.processoVinculado.id),
+        processo_nup: state.processoVinculado.processo,
+        versao: proximaVersao,
+        arquivo_nome: arquivoNome,
+        arquivo_path: arquivoPath,
+        arquivo_url: arquivoUrl,
+        coluna_valor: state.colNome,
+        criterio_a: state.fA,
+        criterio_b: state.fB,
+        criterio_c: state.fC,
+        total_valor: state.total,
+        total_itens: state.curva.length,
+        autor_nome: sessionStorage.getItem("sop_user_name") || "Usuário Desconhecido",
+        autor_email: (typeof getCurrentUserEmail === "function") ? getCurrentUserEmail() : ""
+      };
+
+      var insVersao = await sbClient.from("curva_abc_versoes").insert([versaoPayload]).select().single();
+      if (insVersao.error) throw insVersao.error;
+      var versaoId = insVersao.data.id;
+
+      var itensPayload = state.curva.map(function (x) {
+        return {
+          versao_id: versaoId,
+          posicao: x.pos,
+          conta: x.conta,
+          comp: x.comp,
+          descricao: x.desc,
+          unidade: x.un,
+          quantidade: isFinite(x.qtd) ? x.qtd : null,
+          valor: x.valor,
+          pct_individual: x.pctInd,
+          pct_acumulado: x.pctAcum,
+          classe: x.classe,
+          status_analise: "pendente"
+        };
+      });
+
+      var insItens = await sbClient.from("curva_abc_itens").insert(itensPayload).select();
+      if (insItens.error) throw insItens.error;
+
+      if (typeof registrarAtividade === "function") {
+        registrarAtividade("PROCESSO", "importou uma nova versão da Curva ABC do processo Nº " + state.processoVinculado.processo, state.processoVinculado.processo);
+      }
+
+      state.versaoMaisRecenteDoVinculo = insVersao.data;
+      await carregarVersaoDb(insVersao.data, false);
+      if (typeof carregarCurvaAbcResumo === "function") {
+        carregarCurvaAbcResumo(state.processoVinculado.processo, state.processoVinculado.id);
+      }
+    } catch (err) {
+      console.error("Erro ao salvar Curva ABC do processo:", err);
+      erro("Erro ao salvar: " + esc(err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = textoOriginal;
+    }
+  }
+
+  function cvEncontrarItemPorDbId(dbId) {
+    return (state.curva || []).find(function (x) { return x.dbId === dbId; });
+  }
+
+  async function cvSetStatusItem(dbId, status) {
+    if (!cvPodeEscrever() || state.somenteLeitura) return;
+    var item = cvEncontrarItemPorDbId(dbId);
+    if (!item) return;
+    var patch = {
+      status_analise: status,
+      analisado_por: sessionStorage.getItem("sop_user_name") || ((typeof getCurrentUserEmail === "function") ? getCurrentUserEmail() : "") || "Usuário",
+      analisado_em: new Date().toISOString()
+    };
+    var { error } = await sbClient.from("curva_abc_itens").update(patch).eq("id", dbId);
+    if (error) { alert("Erro ao salvar análise do item: " + error.message); return; }
+    item.statusAnalise = status;
+    desenhaTabela();
+    if (typeof carregarCurvaAbcResumo === "function" && state.processoVinculado) {
+      carregarCurvaAbcResumo(state.processoVinculado.processo, state.processoVinculado.id);
+    }
+  }
+
+  async function cvSalvarComentarioItem(dbId, valorHtml) {
+    if (!cvPodeEscrever() || state.somenteLeitura) return;
+    var item = cvEncontrarItemPorDbId(dbId);
+    if (!item) return;
+    var novo = cvTextoSemHtml(valorHtml).trim() ? valorHtml.trim() : null;
+    if (item.comentario === novo) return;
+    var { error } = await sbClient.from("curva_abc_itens").update({ comentario: novo }).eq("id", dbId);
+    if (error) { alert("Erro ao salvar comentário: " + error.message); return; }
+    item.comentario = novo;
+  }
+
   /* ---------- eventos ---------- */
   var drop = $("cv-drop"), input = $("cv-file");
   drop.addEventListener("click", function () { input.click(); });
@@ -478,5 +858,251 @@
   $("cv-btnXlsx").addEventListener("click", baixarXlsx);
   $("cv-btnCsv").addEventListener("click", baixarCsv);
   $("cv-btnPrint").addEventListener("click", function () { window.print(); });
+  var btnRelatorioComentarios = $("cv-btnRelatorioComentarios");
+  if (btnRelatorioComentarios) btnRelatorioComentarios.addEventListener("click", cvGerarRelatorioComentarios);
+
+  /* ---------- eventos: vínculo com processo e análise item a item ---------- */
+  var vincInput = $("cv-vincProcesso");
+  if (vincInput) {
+    vincInput.addEventListener("focus", popularDatalistProcessos);
+    vincInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); vincularProcesso(vincInput.value); }
+    });
+  }
+  var btnVincular = $("cv-btnVincular");
+  if (btnVincular) btnVincular.addEventListener("click", function () { vincularProcesso(vincInput ? vincInput.value : ""); });
+  var btnDesvincular = $("cv-btnDesvincular");
+  if (btnDesvincular) btnDesvincular.addEventListener("click", desvincularProcesso);
+  var btnSalvarAnalise = $("cv-btnSalvarAnalise");
+  if (btnSalvarAnalise) btnSalvarAnalise.addEventListener("click", salvarComoNovaVersaoDoProcesso);
+
+  /* ao sair da aba (trocar de aba/painel), limpa a tela — nada de planilha ou
+     vínculo "sobrevive" de uma visita pra outra; quem quiser continuar depois
+     precisa vincular/reabrir de novo. Não mexe no banco, só na tela. */
+  var tabBtnCurvaAbc = document.querySelector('#dashboardTabs [data-bs-target="#pane-curva-abc"]');
+  if (tabBtnCurvaAbc) {
+    tabBtnCurvaAbc.addEventListener("hidden.bs.tab", function () {
+      limparVinculoLocal();
+    });
+  }
+
+  var tbody = $("cv-tbody");
+  tbody.addEventListener("click", function (e) {
+    var btnStatus = e.target.closest("button[data-db-id]");
+    if (btnStatus && !btnStatus.disabled) {
+      cvSetStatusItem(parseInt(btnStatus.getAttribute("data-db-id"), 10), btnStatus.getAttribute("data-status"));
+      return;
+    }
+    var btnComentario = e.target.closest("button[data-comentario-id]");
+    if (btnComentario) cvAbrirComentario(parseInt(btnComentario.getAttribute("data-comentario-id"), 10));
+  });
+
+  /* ---------- modal de comentário do item (editor rico: negrito/itálico/alinhamento/tamanho) ---------- */
+  function cvAtualizarToolbarComentario(editavel) {
+    var tb = $("cv-coment-toolbar");
+    if (tb) tb.style.display = editavel ? "" : "none";
+    var regua = $("cv-coment-ruler");
+    if (regua) regua.classList.toggle("on", editavel);
+    if (editavel) setTimeout(cvConstruirReguaTicks, 0);
+  }
+
+  function cvAbrirComentario(dbId) {
+    var item = cvEncontrarItemPorDbId(dbId);
+    if (!item) return;
+    var podeEditar = cvPodeEscrever() && !state.somenteLeitura;
+    $("cv-coment-db-id").value = dbId;
+    $("cv-coment-item-desc").textContent = (item.conta ? item.conta + " — " : "") + item.desc;
+    var ed = $("cv-coment-texto");
+    ed.innerHTML = item.comentario || "";
+    ed.contentEditable = "false"; /* sempre abre em modo leitura; só edita depois de clicar em "Editar" */
+    cvAtualizarToolbarComentario(false);
+    $("cv-ruler-firstline").style.left = "0px";
+    $("cv-ruler-leftindent").style.left = "0px";
+    $("cv-coment-btnEditar").style.display = podeEditar ? "" : "none";
+    $("cv-coment-btnSalvar").style.display = "none";
+    var modalEl = $("modalCvComentario");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  var btnEditarComentario = $("cv-coment-btnEditar");
+  if (btnEditarComentario) {
+    btnEditarComentario.addEventListener("click", function () {
+      var ed = $("cv-coment-texto");
+      ed.contentEditable = "true";
+      ed.focus();
+      cvAtualizarToolbarComentario(true);
+      btnEditarComentario.style.display = "none";
+      $("cv-coment-btnSalvar").style.display = "";
+    });
+  }
+
+  var btnSalvarComentario = $("cv-coment-btnSalvar");
+  if (btnSalvarComentario) {
+    btnSalvarComentario.addEventListener("click", async function () {
+      var dbId = parseInt($("cv-coment-db-id").value, 10);
+      await cvSalvarComentarioItem(dbId, $("cv-coment-texto").innerHTML);
+      desenhaTabela();
+      bootstrap.Modal.getOrCreateInstance($("modalCvComentario")).hide();
+    });
+  }
+
+  /* barra de ferramentas do editor: usa o clássico document.execCommand — evita
+     depender de biblioteca externa de WYSIWYG só para negrito/itálico/alinhamento. */
+  var comentToolbar = $("cv-coment-toolbar");
+  if (comentToolbar) {
+    /* mousedown (não click) + preventDefault: impede que o foco saia do editor
+       antes do comando rodar, senão a seleção de texto se perde */
+    comentToolbar.addEventListener("mousedown", function (e) {
+      if (e.target.closest("button[data-cmd]")) e.preventDefault();
+    });
+    var mapaAlinhamento = { justifyLeft: "left", justifyCenter: "center", justifyFull: "justify", justifyRight: "right" };
+    comentToolbar.addEventListener("click", function (e) {
+      var btn = e.target.closest("button[data-cmd]");
+      if (!btn) return;
+      var cmd = btn.getAttribute("data-cmd");
+      if (mapaAlinhamento[cmd]) cvAplicarAlinhamento(mapaAlinhamento[cmd]);
+      else document.execCommand(cmd, false, null);
+      $("cv-coment-texto").focus();
+    });
+  }
+
+  /* execCommand("justifyX") é inconsistente em contenteditable simples (texto sem
+     parágrafo próprio às vezes não visualiza a mudança) — em vez disso, acha (ou
+     cria) o bloco que contém a seleção e aplica o estilo direto nele, garantindo
+     que o resultado fique dentro do innerHTML salvo (o próprio editor não é
+     persistido, só o conteúdo dele). Usado tanto pelo alinhamento quanto pela régua. */
+  function cvBlocoAtual() {
+    var editor = $("cv-coment-texto");
+    var sel = window.getSelection();
+    var node = (sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null);
+    if (!node || !editor.contains(node)) node = editor;
+    while (node && node !== editor && node.parentNode !== editor) node = node.parentNode;
+    if (node && node !== editor && node.nodeType === 1) return node;
+    var wrapper = document.createElement("div");
+    while (editor.firstChild) wrapper.appendChild(editor.firstChild);
+    editor.appendChild(wrapper);
+    return wrapper;
+  }
+
+  function cvAplicarAlinhamento(align) {
+    cvBlocoAtual().style.textAlign = align;
+  }
+
+  function cvAplicarRecuo(propriedade, valorPx) {
+    cvBlocoAtual().style[propriedade] = valorPx + "px";
+  }
+
+  /* ---------- régua horizontal (recuo de parágrafo, estilo Google Docs) ---------- */
+  var CV_REGUA_PX_POR_CM = 37.8;
+
+  function cvConstruirReguaTicks() {
+    var regua = $("cv-coment-ruler"), ticksWrap = $("cv-ruler-ticks");
+    if (!regua || !ticksWrap) return;
+    var largura = regua.clientWidth;
+    if (!largura) return;
+    ticksWrap.innerHTML = "";
+    var totalCm = Math.floor(largura / CV_REGUA_PX_POR_CM);
+    for (var cm = 0; cm <= totalCm; cm++) {
+      var x = cm * CV_REGUA_PX_POR_CM;
+      var tick = document.createElement("div");
+      tick.className = "cv-ruler-tick major";
+      tick.style.left = x + "px";
+      ticksWrap.appendChild(tick);
+      if (cm > 0) {
+        var label = document.createElement("span");
+        label.className = "cv-ruler-tick-label";
+        label.style.left = x + "px";
+        label.textContent = cm;
+        ticksWrap.appendChild(label);
+      }
+      if (cm < totalCm) {
+        var meio = document.createElement("div");
+        meio.className = "cv-ruler-tick minor";
+        meio.style.left = (x + CV_REGUA_PX_POR_CM / 2) + "px";
+        ticksWrap.appendChild(meio);
+      }
+    }
+  }
+
+  function cvTornarMarcadorArrastavel(marker, aoSoltar) {
+    marker.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      var regua = $("cv-coment-ruler");
+      var rect = regua.getBoundingClientRect();
+      marker.classList.add("dragging");
+      function mover(ev) {
+        var x = ev.clientX - rect.left;
+        x = Math.max(0, Math.min(x, rect.width));
+        marker.style.left = x + "px";
+      }
+      function soltar() {
+        document.removeEventListener("mousemove", mover);
+        document.removeEventListener("mouseup", soltar);
+        marker.classList.remove("dragging");
+        aoSoltar(parseFloat(marker.style.left) || 0);
+      }
+      document.addEventListener("mousemove", mover);
+      document.addEventListener("mouseup", soltar);
+    });
+  }
+
+  var reguaFirstline = $("cv-ruler-firstline"), reguaLeftIndent = $("cv-ruler-leftindent");
+  if (reguaFirstline && reguaLeftIndent) {
+    cvTornarMarcadorArrastavel(reguaFirstline, function (x) { cvAplicarRecuo("textIndent", x); });
+    cvTornarMarcadorArrastavel(reguaLeftIndent, function (x) { cvAplicarRecuo("marginLeft", x); });
+  }
+
+  /* Tab dentro do editor não insere nada por padrão no navegador (ele só troca o
+     foco de elemento) — intercepta e usa como recuo da 1ª linha, 1 "tab stop" de
+     1,25cm por vez (Shift+Tab desfaz), igual ao Word. Mantém a régua em sincronia. */
+  var comentEditor = $("cv-coment-texto");
+  if (comentEditor) {
+    comentEditor.addEventListener("keydown", function (e) {
+      if (e.key !== "Tab" || comentEditor.contentEditable !== "true") return;
+      e.preventDefault();
+      var bloco = cvBlocoAtual();
+      var passo = 1.25 * CV_REGUA_PX_POR_CM;
+      var atual = parseFloat(bloco.style.textIndent) || 0;
+      atual = e.shiftKey ? Math.max(0, atual - passo) : atual + passo;
+      bloco.style.textIndent = atual + "px";
+      reguaFirstline.style.left = atual + "px";
+    });
+  }
+
+  /* mantém os marcadores da régua sincronizados com o recuo do parágrafo onde
+     está o cursor no momento — só reage enquanto o editor está em modo edição */
+  document.addEventListener("selectionchange", function () {
+    var editor = $("cv-coment-texto");
+    if (!editor || editor.contentEditable !== "true") return;
+    var sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    var node = sel.getRangeAt(0).commonAncestorContainer;
+    if (!editor.contains(node)) return;
+    while (node && node !== editor && node.parentNode !== editor) node = node.parentNode;
+    var estilo = (node && node !== editor && node.nodeType === 1) ? node.style : null;
+    reguaLeftIndent.style.left = (estilo && parseFloat(estilo.marginLeft) || 0) + "px";
+    reguaFirstline.style.left = (estilo && parseFloat(estilo.textIndent) || 0) + "px";
+  });
+  var comentFontSize = $("cv-coment-fontsize");
+  if (comentFontSize) {
+    comentFontSize.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    comentFontSize.addEventListener("change", function () {
+      var editor = $("cv-coment-texto");
+      editor.focus();
+      var tamanho = comentFontSize.value;
+      /* execCommand("fontSize") só aceita 1-7 (unidades HTML antigas) — usa o
+         valor 7 como marcador e troca pelo tamanho real em pt logo em seguida. */
+      document.execCommand("fontSize", false, "7");
+      var marcados = editor.querySelectorAll('font[size="7"]');
+      marcados.forEach(function (f) {
+        f.removeAttribute("size");
+        f.style.fontSize = tamanho + "pt";
+      });
+    });
+  }
+
+  /* chamada de fora (do card "CURVA ABC" em Gerenciar Processo) para abrir esta aba já
+     carregada com a curva de um processo específico — ver curva_abc_processo.js */
+  window.carregarCurvaAbcDoProcesso = carregarCurvaAbcDoProcesso;
 
 })();

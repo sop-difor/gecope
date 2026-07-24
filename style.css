@@ -804,6 +804,10 @@
             font-size: 1rem;
         }
 
+        .btn-forward-minimal:hover {
+            transform: translateX(3px);
+        }
+
         .home-activities-panel {
             background: var(--sop-white);
             border-radius: var(--radius-xl);
@@ -1894,6 +1898,47 @@
                 padding: 0 !important;
                 margin: 0 !important;
                 width: 100% !important;
+            }
+
+            /* Relatório de comentários da Curva ABC: mesmo esquema de escopo do
+               modalDetalheComposicao acima, isolado por .show para não interferir
+               no window.print() da própria Curva ABC (cv-btnPrint). */
+            body:has(#modalCvRelatorioComentarios.show)>*:not(#modalCvRelatorioComentarios) {
+                display: none !important;
+            }
+
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios {
+                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                visibility: visible !important;
+            }
+
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios .modal-dialog {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios .modal-content {
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios .modal-header,
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios .modal-footer,
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios .btn-close {
+                display: none !important;
+            }
+
+            body:has(#modalCvRelatorioComentarios.show) #modalCvRelatorioComentarios .modal-body {
+                display: block !important;
+                visibility: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
 
             /* Forçar cores na impressão */
@@ -3362,6 +3407,151 @@
         body.theme-dark .bg-light-subtle {
             background-color: #142e22 !important;
             color: rgba(255, 255, 255, 0.92) !important;
+        }
+
+        /* Cabeçalho do modal de comentário da Curva ABC: no tema escuro o texto
+           herdava a cor quase-branca do .modal-content sobre o fundo amarelo claro
+           do bg-warning-subtle, ficando praticamente ilegível. */
+        body.theme-dark #modalCvComentario .modal-header {
+            background-color: #3a2c0d !important;
+            color: #ffd479 !important;
+        }
+
+        body.theme-dark #modalCvComentario .modal-header .btn-close {
+            filter: invert(1) grayscale(100%) brightness(2);
+        }
+
+        /* Relatório de Análise do Aditivo: representa um documento/despacho que deve
+           sempre parecer "papel", igual em qualquer tema. No modo escuro, o override
+           genérico de .bg-white deixava o fundo escuro enquanto o texto do relatório
+           (cor fixa #1a1a1a definida no JS) permanecia escuro também — texto ilegível
+           sobre fundo escuro. Força fundo branco + texto escuro sempre neste modal. */
+        body.theme-dark #modalCvRelatorioComentarios .modal-body {
+            background-color: #ffffff !important;
+            color: #1a1a1a !important;
+        }
+
+        /* Barra de ferramentas e editor do comentário do item (Curva ABC) */
+        .cv-coment-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            padding: 6px 8px;
+            border: 1px solid #dcdfe3;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+        .cv-coment-toolbar button.cv-coment-tb-btn {
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            background: transparent;
+            color: #333;
+            cursor: pointer;
+        }
+        .cv-coment-toolbar button.cv-coment-tb-btn:hover {
+            background: #e9ecef;
+        }
+        .cv-coment-tb-sep {
+            width: 1px;
+            height: 20px;
+            background: #ccc;
+            margin: 0 4px;
+        }
+        #cv-coment-fontsize {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 12px;
+            padding: 3px 4px;
+        }
+        .cv-coment-editor {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 11pt;
+            width: 100%;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+        .cv-coment-editor:empty:before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+        }
+        .cv-coment-editor[contenteditable="false"] {
+            background: #eef0f2;
+            cursor: default;
+        }
+
+        /* Régua horizontal (estilo Google Docs/Word) para recuo de parágrafo */
+        .cv-coment-ruler {
+            position: relative;
+            height: 26px;
+            margin-bottom: 6px;
+            border: 1px solid #dcdfe3;
+            border-radius: 4px;
+            background: #fbfbfa;
+            overflow: hidden;
+            user-select: none;
+            display: none;
+        }
+        .cv-coment-ruler.on { display: block; }
+        .cv-ruler-ticks { position: absolute; inset: 0; }
+        .cv-ruler-tick { position: absolute; bottom: 0; width: 1px; background: #b7bcc2; }
+        .cv-ruler-tick.major { height: 100%; }
+        .cv-ruler-tick.minor { height: 40%; }
+        .cv-ruler-tick-label { position: absolute; top: 1px; font-size: 8.5px; color: #7c8188; transform: translateX(-50%); }
+        .cv-ruler-marker {
+            position: absolute;
+            width: 0;
+            height: 0;
+            cursor: ew-resize;
+            z-index: 2;
+            transform: translateX(-6px);
+        }
+        .cv-ruler-marker.cv-ruler-firstline {
+            top: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 8px solid #2f7fe4;
+        }
+        .cv-ruler-marker.cv-ruler-leftindent {
+            bottom: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 8px solid #2f7fe4;
+        }
+        .cv-ruler-marker:hover,
+        .cv-ruler-marker.dragging {
+            filter: brightness(0.7);
+        }
+        body.theme-dark .cv-coment-ruler {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.16);
+        }
+        body.theme-dark .cv-ruler-tick {
+            background: rgba(255, 255, 255, 0.28);
+        }
+        body.theme-dark .cv-ruler-tick-label {
+            color: rgba(255, 255, 255, 0.55);
+        }
+        body.theme-dark .cv-coment-toolbar {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.16);
+        }
+        body.theme-dark .cv-coment-toolbar button.cv-coment-tb-btn {
+            color: rgba(255, 255, 255, 0.85);
+        }
+        body.theme-dark .cv-coment-toolbar button.cv-coment-tb-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        body.theme-dark .cv-coment-editor[contenteditable="false"] {
+            background: rgba(255, 255, 255, 0.03) !important;
         }
 
         /* Bootstrap: formulários */
