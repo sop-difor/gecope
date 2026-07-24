@@ -51,6 +51,32 @@
   function erro(msg) { var e = $("cv-err"); e.innerHTML = msg; e.classList.add("on"); }
   function limpaErro() { $("cv-err").classList.remove("on"); }
 
+  /* janelas de aviso/confirmação: usa o SweetAlert2 já carregado pelo index.html
+     (mesma biblioteca usada no resto do GECOPE) em vez do alert()/confirm()
+     nativo do navegador, que foge do visual do sistema. Cai pro nativo só se,
+     por algum motivo, a biblioteca não tiver carregado ainda. */
+  function cvAlerta(titulo, texto, icone) {
+    if (typeof Swal === "undefined") { alert(texto ? titulo + "\n\n" + texto : titulo); return; }
+    Swal.fire({ icon: icone || "error", title: titulo, html: texto || undefined, confirmButtonColor: "#22a155" });
+  }
+  async function cvConfirmar(titulo, texto, opts) {
+    opts = opts || {};
+    if (typeof Swal === "undefined") return confirm(texto ? titulo + "\n\n" + texto : titulo);
+    var r = await Swal.fire({
+      icon: opts.icone || "question",
+      title: titulo,
+      html: texto,
+      showCancelButton: true,
+      confirmButtonText: opts.confirmarTexto || "Sim, continuar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: opts.perigo ? "#e1274a" : "#22a155",
+      cancelButtonColor: "#64798c",
+      reverseButtons: true,
+      focusCancel: !!opts.perigo
+    });
+    return r.isConfirmed;
+  }
+
   /* ---------- leitura do arquivo ---------- */
   function lerArquivo(file) {
     limpaErro();
@@ -117,12 +143,26 @@
     });
     if (!cands.length) { erro("<b>Nenhuma coluna numérica encontrada.</b> Confira se o cabeçalho está na primeira linha da planilha."); return; }
 
-    /* ordem de preferência: Vl. Acresc. primeiro */
-    var pref = [/^vl acresc/, /acresc/, /^vl suprim/, /^vl replan/, /total/];
-    cands.sort(function (a, b) {
-      function score(x) { for (var i = 0; i < pref.length; i++) if (pref[i].test(x.n)) return i; return 99; }
-      return score(a) - score(b);
-    });
+    /* layout padrão do replanilhamento (bloco VALORES: Vl. Acresc. / Vl. Suprim. /
+       Vl. Replan., ou V. ACRESC. / V. SUPR. / V. REPLAN.): quando essas 3 colunas
+       existem, a curva só pode ser feita com base nelas — as demais colunas
+       numéricas (quantidades, saldos etc.) ficam de fora do seletor. Sem elas,
+       cai no comportamento genérico de hoje (qualquer coluna numérica). */
+    var reValoresPadrao = [/^vl?\s+acresc/, /^vl?\s+supr/, /^vl?\s+replan/];
+    var candsPadrao = reValoresPadrao
+      .map(function (re) { return cands.filter(function (c) { return re.test(c.n); })[0]; })
+      .filter(Boolean);
+
+    if (candsPadrao.length) {
+      cands = candsPadrao;
+    } else {
+      /* ordem de preferência: Vl. Acresc. primeiro */
+      var pref = [/^vl acresc/, /acresc/, /^vl suprim/, /^vl replan/, /total/];
+      cands.sort(function (a, b) {
+        function score(x) { for (var i = 0; i < pref.length; i++) if (pref[i].test(x.n)) return i; return 99; }
+        return score(a) - score(b);
+      });
+    }
 
     var sel = $("cv-selCol"); sel.innerHTML = "";
     cands.forEach(function (col) {
@@ -144,18 +184,6 @@
     }
     return null;
   }
-  function colQtdPar(valCol) {
-    var base = valCol.n.replace(/^v(l|al)\s*/, "").trim();  /* "vl acresc" -> "acresc" */
-    if (base && base !== valCol.n) {
-      for (var i = 0; i < state.cols.length; i++) {
-        var c = state.cols[i];
-        if (c.idx !== valCol.idx && c.n === base) return c.idx;
-      }
-    }
-    return achaCol([/^qtd$/, /^quant/]);
-  }
-  function colReplan() { return achaCol([/^replan/]); }
-
   /* ---------- cálculo da curva ---------- */
   function calcular() {
     limpaErro();
@@ -168,9 +196,18 @@
     var iComp = achaCol([/^comp/, /^cod/]);
     var iDesc = achaCol([/descri/, /servic/]);
     var iUn = achaCol([/^un$/, /^und$/, /^unid/]);
-    var iQtd = colQtdPar(vCol);
-    var iRep = colReplan();
-    var usouRep = false;
+    /* bloco CONTRATO (Qtd./QUANT.) + bloco QUANTITATIVO (Acresc./Supr./Replan.)
+       + bloco VALORES (Vl. Acresc./Vl. Suprim./Vl. Replan.) — colunas fixas do
+       layout padrão do replanilhamento, exibidas lado a lado na tabela final. */
+    var iQtdBase = achaCol([/^qtd$/, /^quant/]);
+    var iAcrescQ = achaCol([/^acresc/]);
+    var iSuprQ = achaCol([/^supr/]);
+    var iReplanQ = achaCol([/^replan/]);
+    var iVAcresc = achaCol([/^vl?\s+acresc/]);
+    var iVSupr = achaCol([/^vl?\s+supr/]);
+    var iVReplan = achaCol([/^vl?\s+replan/]);
+
+    function lerNum(row, idx) { return idx == null ? NaN : toNum(row[idx]); }
 
     var itens = [];
     state.dados.forEach(function (r) {
@@ -180,14 +217,18 @@
       if (!desc && !conta) return;
       var v = toNum(r[vIdx]);
       if (!isFinite(v) || v === 0) return;
-      var q = iQtd == null ? NaN : toNum(r[iQtd]);
-      if (!isFinite(q) && iRep != null && iRep !== iQtd) { var q2 = toNum(r[iRep]); if (isFinite(q2)) { q = q2; usouRep = true; } }
       itens.push({
         conta: conta,
         comp: iComp == null ? "" : String(r[iComp] == null ? "" : r[iComp]).trim(),
         desc: desc,
         un: iUn == null ? "" : String(r[iUn] == null ? "" : r[iUn]).trim(),
-        qtd: q,
+        qtdBase: lerNum(r, iQtdBase),
+        acrescQ: lerNum(r, iAcrescQ),
+        suprQ: lerNum(r, iSuprQ),
+        replanQ: lerNum(r, iReplanQ),
+        vAcresc: lerNum(r, iVAcresc),
+        vSupr: lerNum(r, iVSupr),
+        vReplan: lerNum(r, iVReplan),
         valor: v,
         ord: Math.abs(v)
       });
@@ -232,7 +273,7 @@
     state.limite = (lim > 0) ? Math.min(lim, itens.length) : itens.length;
     $("cv-qtdTotal").textContent = "de " + itens.length;
 
-    state.curva = itens; state.total = total; state.cA = cA; state.cB = cB; state.usouRep = usouRep;
+    state.curva = itens; state.total = total; state.cA = cA; state.cB = cB;
     state.colNome = vCol.nome;
     render();
   }
@@ -278,7 +319,6 @@
       + "<code>" + state.fA + "%</code> do valor (acumulado até <code>" + state.cA + "%</code>), a classe B os <code>" + state.fB + "%</code> seguintes "
       + "(acumulado até <code>" + state.cB + "%</code>) e a classe C os <code>" + state.fC + "%</code> finais. "
       + "Itens com valor zero ou em branco na coluna <code>" + esc(state.colNome) + "</code> ficam fora da curva."
-      + (state.usouRep ? " Para itens novos, sem quantidade na coluna correspondente, a quantidade exibida vem de <code>Replan.</code>" : "")
       + (state.limite < it.length
         ? " Estão sendo exibidos os <code>" + state.limite + "</code> maiores de <code>" + it.length + "</code> itens — os percentuais continuam calculados sobre o valor total de todos eles."
         : "")
@@ -396,7 +436,7 @@
     var f = norm($("cv-busca").value);
     var lista = f ? it.filter(function (x) { return norm(x.desc).indexOf(f) > -1 || norm(x.conta).indexOf(f) > -1 || norm(x.comp).indexOf(f) > -1; })
       : it.slice(0, state.limite);
-    var numCols = state.processoVinculado ? 12 : 10;
+    var numCols = state.processoVinculado ? 17 : 15;
     var rows = [], ultimo = null;
     for (var i = 0; i < lista.length; i++) {
       var x = lista[i];
@@ -413,8 +453,13 @@
         + '<td class="cv-conta">' + esc(x.comp) + '</td>'
         + '<td class="cv-desc">' + esc(x.desc) + '</td>'
         + '<td class="cv-center">' + esc(x.un) + '</td>'
-        + '<td class="cv-num">' + qty(x.qtd) + '</td>'
-        + '<td class="cv-num">' + money(x.valor) + '</td>'
+        + '<td class="cv-num">' + qty(x.qtdBase) + '</td>'
+        + '<td class="cv-num">' + qty(x.acrescQ) + '</td>'
+        + '<td class="cv-num">' + qty(x.suprQ) + '</td>'
+        + '<td class="cv-num">' + qty(x.replanQ) + '</td>'
+        + '<td class="cv-num">' + money(x.vAcresc) + '</td>'
+        + '<td class="cv-num">' + money(x.vSupr) + '</td>'
+        + '<td class="cv-num">' + money(x.vReplan) + '</td>'
         + '<td class="cv-num">' + pct(x.pctInd) + '</td>'
         + '<td class="cv-acum"><span class="fill ' + x.classe + '" style="width:' + x.pctAcum.toFixed(2) + '%"></span><span class="v">' + pct(x.pctAcum) + '</span></td>'
         + '<td class="cv-center"><span class="cv-chip ' + x.classe + '">' + x.classe + '</span></td>'
@@ -438,22 +483,25 @@
     ["Itens exibidos", recorte.length + " de " + state.curva.length],
     ["Gerado em", new Date().toLocaleString("pt-BR")],
     [],
-    ["#", "Conta", "Comp.", "Descrição", "UN", "Qtd.", "Valor", "%", "% acum.", "Classe"]];
+    ["#", "Conta", "Comp.", "Descrição", "UN", "Qtd.", "Acresc.", "Supr.", "Replan.", "V. Acresc.", "V. Supr.", "V. Replan.", "%", "% acum.", "Classe"]];
     recorte.forEach(function (x) {
-      m.push([x.pos, x.conta, x.comp, x.desc, x.un, isFinite(x.qtd) ? x.qtd : null, x.valor,
+      m.push([x.pos, x.conta, x.comp, x.desc, x.un,
+      isFinite(x.qtdBase) ? x.qtdBase : null, isFinite(x.acrescQ) ? x.acrescQ : null,
+      isFinite(x.suprQ) ? x.suprQ : null, isFinite(x.replanQ) ? x.replanQ : null,
+      isFinite(x.vAcresc) ? x.vAcresc : null, isFinite(x.vSupr) ? x.vSupr : null, isFinite(x.vReplan) ? x.vReplan : null,
       +(x.pctInd / 100).toFixed(6), +(x.pctAcum / 100).toFixed(6), x.classe]);
     });
     return m;
   }
   function baixarXlsx() {
-    if (typeof XLSX === "undefined") { alert("Biblioteca de exportação não carregada ainda. Aguarde e tente novamente."); return; }
+    if (typeof XLSX === "undefined") { cvAlerta("Aguarde um instante", "Biblioteca de exportação ainda não carregou. Tente novamente em alguns segundos.", "info"); return; }
     var ws = XLSX.utils.aoa_to_sheet(matriz());
-    ws["!cols"] = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 70 }, { wch: 6 }, { wch: 12 }, { wch: 14 }, { wch: 9 }, { wch: 10 }, { wch: 7 }];
+    ws["!cols"] = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 70 }, { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 9 }, { wch: 10 }, { wch: 7 }];
     var ref = XLSX.utils.decode_range(ws["!ref"]);
     for (var r = 8; r <= ref.e.r; r++) {
-      ["G", "H", "I", "F"].forEach(function (c) {
+      ["F", "G", "H", "I", "J", "K", "L", "M", "N"].forEach(function (c) {
         var cell = ws[c + (r + 1)]; if (!cell || cell.t !== "n") return;
-        cell.z = (c === "H" || c === "I") ? "0.00%" : "#,##0.00";
+        cell.z = (c === "M" || c === "N") ? "0.00%" : "#,##0.00";
       });
     }
     var wb = XLSX.utils.book_new();
@@ -478,7 +526,7 @@
   /* ---------- relatório consolidado dos comentários (para despacho) ---------- */
   function cvGerarRelatorioComentarios() {
     var itens = (state.curva || []).filter(function (x) { return x.dbId && x.comentario && cvTextoSemHtml(x.comentario).trim(); });
-    if (!itens.length) { alert("Nenhum comentário cadastrado nesta Curva ABC ainda."); return; }
+    if (!itens.length) { cvAlerta("Nenhum comentário", "Nenhum comentário cadastrado nesta Curva ABC ainda.", "info"); return; }
 
     var partes = [];
     partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
@@ -527,10 +575,16 @@
   }
 
   function atualizarVinculoUI() {
+    var caixa = $("cv-vinculo");
     var elStatus = $("cv-vinc-status");
     var formVinc = $("cv-vinc-form");
     var btnVinc = $("cv-btnVincular");
     var btnDesv = $("cv-btnDesvincular");
+    /* só o analista (admin/gerente — mesmo papel que já grava status/comentário
+       e salva versões) pode vincular/desvincular uma Curva ABC de um processo;
+       os demais só veem o vínculo quando chegam via Gerenciar Processo, sem
+       controles pra criar ou desfazer esse vínculo por conta própria. */
+    var podeVincular = cvPodeEscrever();
     if (state.processoVinculado) {
       if (elStatus) {
         elStatus.textContent = "PROCESSO NUP " + state.processoVinculado.processo
@@ -539,15 +593,18 @@
       }
       if (formVinc) formVinc.style.display = "none";
       if (btnVinc) btnVinc.style.display = "none";
-      if (btnDesv) btnDesv.style.display = "";
+      if (btnDesv) btnDesv.style.display = podeVincular ? "" : "none";
     } else {
       if (elStatus) { elStatus.textContent = ""; elStatus.classList.remove("on"); }
-      if (formVinc) formVinc.style.display = "";
-      if (btnVinc) btnVinc.style.display = "";
+      if (formVinc) formVinc.style.display = podeVincular ? "" : "none";
+      if (btnVinc) btnVinc.style.display = podeVincular ? "" : "none";
       if (btnDesv) btnDesv.style.display = "none";
       var input = $("cv-vincProcesso");
       if (input) input.value = "";
     }
+    /* sem vínculo ativo e sem permissão pra criar um: não há nada útil pra
+       mostrar nessa barra, então some com ela por completo */
+    if (caixa) caixa.style.display = (podeVincular || state.processoVinculado) ? "" : "none";
     atualizarBotaoSalvar();
   }
 
@@ -570,7 +627,14 @@
     var itens = (itensDb || []).map(function (x) {
       return {
         conta: x.conta || "", comp: x.comp || "", desc: x.descricao || "", un: x.unidade || "",
-        qtd: x.quantidade, valor: Number(x.valor) || 0, ord: Math.abs(Number(x.valor) || 0),
+        qtdBase: x.qtd_base != null ? Number(x.qtd_base) : NaN,
+        acrescQ: x.acresc != null ? Number(x.acresc) : NaN,
+        suprQ: x.suprimido != null ? Number(x.suprimido) : NaN,
+        replanQ: x.replan != null ? Number(x.replan) : NaN,
+        vAcresc: x.v_acresc != null ? Number(x.v_acresc) : NaN,
+        vSupr: x.v_suprim != null ? Number(x.v_suprim) : NaN,
+        vReplan: x.v_replan != null ? Number(x.v_replan) : NaN,
+        valor: Number(x.valor) || 0, ord: Math.abs(Number(x.valor) || 0),
         pos: x.posicao, pctInd: Number(x.pct_individual) || 0, pctAcum: Number(x.pct_acumulado) || 0,
         classe: x.classe, dbId: x.id, statusAnalise: x.status_analise, comentario: x.comentario
       };
@@ -586,7 +650,6 @@
     state.colNome = versaoRegistro.coluna_valor || "—";
     state.fileName = versaoRegistro.arquivo_nome || ("Versão " + versaoRegistro.versao);
     state.limite = itens.length;
-    state.usouRep = false;
     state.versaoCarregadaDb = versaoRegistro;
     state.somenteLeitura = somenteLeitura;
 
@@ -601,6 +664,7 @@
 
   async function vincularProcesso(processoStrDigitado) {
     limpaErro();
+    if (!cvPodeEscrever()) { cvAlerta("Sem permissão", "Só o analista (perfil admin/gerente) pode vincular uma Curva ABC a um processo.", "warning"); return; }
     var proc = resolverProcesso(processoStrDigitado);
     if (!proc) { erro("Processo não encontrado. Confira o número digitado."); return; }
     await carregarCurvaAbcDoProcesso(proc.id, proc.processo, null, proc.descricao);
@@ -623,14 +687,18 @@
 
   async function desvincularProcesso() {
     if (!state.processoVinculado) return;
+    if (!cvPodeEscrever()) { cvAlerta("Sem permissão", "Só o analista (perfil admin/gerente) pode remover o vínculo de uma Curva ABC com um processo.", "warning"); return; }
     var proc = state.processoVinculado;
 
     /* só existe algo a desfazer no banco se já havia versão(ões) salva(s) para este
        processo; sem isso, "desvincular" é só fechar a visualização em memória */
     if (state.versaoMaisRecenteDoVinculo) {
-      if (!cvPodeEscrever()) { alert("Você não tem permissão para remover este vínculo."); return; }
-      var ok = confirm("Isso remove definitivamente o vínculo da Curva ABC com o processo Nº " + proc.processo
-        + ". Os dados de todas as versões continuam no sistema, mas deixam de aparecer nesse processo. Deseja continuar?");
+      var ok = await cvConfirmar(
+        "Remover vínculo com o processo?",
+        "Isso remove definitivamente o vínculo da Curva ABC com o processo Nº <b>" + esc(proc.processo) + "</b>. "
+        + "Os dados de todas as versões continuam no sistema, mas deixam de aparecer nesse processo.",
+        { perigo: true, confirmarTexto: "Sim, remover vínculo" }
+      );
       if (!ok) return;
 
       var btnDesv = $("cv-btnDesvincular");
@@ -643,7 +711,7 @@
       var { error } = await sbClient.from("curva_abc_versoes").update({ processo_id: null }).eq("processo_id", String(proc.id));
 
       if (btnDesv) { btnDesv.disabled = false; btnDesv.innerHTML = textoOriginal; }
-      if (error) { alert("Erro ao remover o vínculo: " + error.message); return; }
+      if (error) { cvAlerta("Erro ao remover vínculo", esc(error.message)); return; }
 
       if (typeof registrarAtividade === "function") {
         registrarAtividade("PROCESSO", "removeu o vínculo da Curva ABC com o processo Nº " + proc.processo, proc.processo);
@@ -704,7 +772,11 @@
     if (!state.curva || !state.curva.length) return;
 
     if (state.versaoMaisRecenteDoVinculo) {
-      var ok = confirm("Uma nova versão vai virar a versão corrente da Curva ABC deste processo. A versão anterior continuará disponível no histórico, somente leitura. Deseja continuar?");
+      var ok = await cvConfirmar(
+        "Salvar como nova versão?",
+        "Uma nova versão vai virar a versão corrente da Curva ABC deste processo. A versão anterior continuará disponível no histórico, somente leitura.",
+        { confirmarTexto: "Sim, salvar nova versão" }
+      );
       if (!ok) return;
     }
 
@@ -756,7 +828,13 @@
           comp: x.comp,
           descricao: x.desc,
           unidade: x.un,
-          quantidade: isFinite(x.qtd) ? x.qtd : null,
+          qtd_base: isFinite(x.qtdBase) ? x.qtdBase : null,
+          acresc: isFinite(x.acrescQ) ? x.acrescQ : null,
+          suprimido: isFinite(x.suprQ) ? x.suprQ : null,
+          replan: isFinite(x.replanQ) ? x.replanQ : null,
+          v_acresc: isFinite(x.vAcresc) ? x.vAcresc : null,
+          v_suprim: isFinite(x.vSupr) ? x.vSupr : null,
+          v_replan: isFinite(x.vReplan) ? x.vReplan : null,
           valor: x.valor,
           pct_individual: x.pctInd,
           pct_acumulado: x.pctAcum,
@@ -790,18 +868,41 @@
     return (state.curva || []).find(function (x) { return x.dbId === dbId; });
   }
 
+  function cvRotuloStatus(s) {
+    return s === "ok" ? "OK" : (s === "inconsistencia" ? "Inconsistência" : "Pendente");
+  }
+
   async function cvSetStatusItem(dbId, status) {
     if (!cvPodeEscrever() || state.somenteLeitura) return;
     var item = cvEncontrarItemPorDbId(dbId);
     if (!item) return;
+
+    /* já tem um status marcado: clicar de novo no mesmo botão desmarca (volta
+       pra pendente), clicar no outro botão troca — nos dois casos confirma
+       antes, pra não perder a marcação por um clique sem querer. */
+    var novoStatus = status;
+    var atual = item.statusAnalise;
+    if (atual && atual !== "pendente") {
+      var desmarcando = (atual === status);
+      var pergunta = desmarcando
+        ? "Este item está marcado como <b>" + cvRotuloStatus(atual) + "</b>. Deseja desmarcar e voltar para pendente?"
+        : "Este item está marcado como <b>" + cvRotuloStatus(atual) + "</b>. Deseja alterar para <b>" + cvRotuloStatus(status) + "</b>?";
+      var ok = await cvConfirmar(desmarcando ? "Desmarcar item?" : "Alterar status do item?", pergunta, {
+        perigo: desmarcando,
+        confirmarTexto: desmarcando ? "Sim, desmarcar" : "Sim, alterar"
+      });
+      if (!ok) return;
+      if (desmarcando) novoStatus = "pendente";
+    }
+
     var patch = {
-      status_analise: status,
+      status_analise: novoStatus,
       analisado_por: sessionStorage.getItem("sop_user_name") || ((typeof getCurrentUserEmail === "function") ? getCurrentUserEmail() : "") || "Usuário",
       analisado_em: new Date().toISOString()
     };
     var { error } = await sbClient.from("curva_abc_itens").update(patch).eq("id", dbId);
-    if (error) { alert("Erro ao salvar análise do item: " + error.message); return; }
-    item.statusAnalise = status;
+    if (error) { cvAlerta("Erro ao salvar", esc(error.message)); return; }
+    item.statusAnalise = novoStatus;
     desenhaTabela();
     if (typeof carregarCurvaAbcResumo === "function" && state.processoVinculado) {
       carregarCurvaAbcResumo(state.processoVinculado.processo, state.processoVinculado.id);
@@ -815,7 +916,7 @@
     var novo = cvTextoSemHtml(valorHtml).trim() ? valorHtml.trim() : null;
     if (item.comentario === novo) return;
     var { error } = await sbClient.from("curva_abc_itens").update({ comentario: novo }).eq("id", dbId);
-    if (error) { alert("Erro ao salvar comentário: " + error.message); return; }
+    if (error) { cvAlerta("Erro ao salvar comentário", esc(error.message)); return; }
     item.comentario = novo;
   }
 

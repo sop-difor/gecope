@@ -83,6 +83,19 @@ create table if not exists curva_abc_itens (
 
 create index if not exists idx_curva_abc_itens_versao_id on curva_abc_itens (versao_id);
 
+-- Detalhamento por bloco do replanilhamento (CONTRATO/QUANTITATIVO/VALORES):
+-- além do par quantidade/valor já usado para montar a curva, guarda as 3
+-- quantidades (Acresc./Supr./Replan.) e os 3 valores (V. Acresc./V. Supr./
+-- V. Replan.) exibidos lado a lado na tabela, pra versão salva reabrir com o
+-- mesmo detalhamento que tinha no momento do upload.
+alter table curva_abc_itens add column if not exists qtd_base  numeric;
+alter table curva_abc_itens add column if not exists acresc    numeric;
+alter table curva_abc_itens add column if not exists suprimido numeric;
+alter table curva_abc_itens add column if not exists replan    numeric;
+alter table curva_abc_itens add column if not exists v_acresc  numeric;
+alter table curva_abc_itens add column if not exists v_suprim  numeric;
+alter table curva_abc_itens add column if not exists v_replan  numeric;
+
 -- ── RLS: leitura para admin/gerente/fiscal, escrita para admin/gerente ──────
 alter table curva_abc_versoes enable row level security;
 alter table curva_abc_itens   enable row level security;
