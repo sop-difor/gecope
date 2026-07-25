@@ -1971,15 +1971,71 @@ let curvaAbcProcessoState = {
     processoId: null
 };
 
+// Ativa uma das abas de GERENCIAR PROCESSO (Geral/Financeiro/Documental/Técnica/
+// Histórico) via API de Tab do Bootstrap. Usado ao reabrir o modal (sempre começa
+// em "Geral") e para levar o usuário até a aba certa quando a validação falha num
+// campo que está numa aba não visível no momento.
+function mostrarAbaGerenciarProcesso(tabBtnId) {
+    const btn = document.getElementById(tabBtnId);
+    if (btn && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+        bootstrap.Tab.getOrCreateInstance(btn).show();
+    }
+}
+
+// IDs das abas/painéis de GERENCIAR PROCESSO, na ordem em que aparecem.
+const GP_TABS = [
+    { btn: 'gp-tab-geral-btn', pane: 'gp-pane-geral' },
+    { btn: 'gp-tab-documental-btn', pane: 'gp-pane-documental' },
+    { btn: 'gp-tab-tecnica-btn', pane: 'gp-pane-tecnica' },
+    { btn: 'gp-tab-historico-btn', pane: 'gp-pane-historico' }
+];
+
+// Volta para a aba "Geral" via manipulação direta de classes (sem passar pela API
+// animada bootstrap.Tab.show()). É usada ANTES do modal.show(), com o modal ainda
+// oculto (display:none) — nesse estado a transição CSS do Bootstrap nunca dispara um
+// transitionend real, e o fallback por timeout do bootstrap.Tab pode terminar de
+// aplicar as classes só depois do modal já estar visível, deixando por um instante
+// (ou, em alguns casos, permanentemente) nenhuma aba marcada como ativa — e por isso
+// nenhum conteúdo aparece. Setando as classes na hora, isso não pode acontecer.
+function resetarAbasGerenciarProcesso() {
+    GP_TABS.forEach((tab, i) => {
+        const btn = document.getElementById(tab.btn);
+        const pane = document.getElementById(tab.pane);
+        if (btn) {
+            btn.classList.toggle('active', i === 0);
+            btn.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+        }
+        if (pane) {
+            pane.classList.toggle('active', i === 0);
+            pane.classList.toggle('show', i === 0);
+        }
+    });
+}
+
+// Mostra/oculta o badge numérico no rótulo de uma aba (ex.: pendências/inconsistências).
+function atualizarBadgeAba(elId, count) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (count > 0) {
+        el.textContent = count;
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
 async function abrirDetalhes(processoStr) {
     // garante que a role local esteja atualizada com o servidor
     await refreshUserRole();
     const row = (window.allData || []).find(d => d.processo === processoStr);
     if (!row) { alert("Erro: Dados não encontrados na memória."); return; }
 
+    resetarAbasGerenciarProcesso();
+
     document.getElementById('det_processo').value = row.processo;
     document.getElementById('det_tipo').value = row.tipo;
     document.getElementById('det_status').value = row.status;
+    aplicarCorStatusSelect(document.getElementById('det_status'));
     document.getElementById('det_descricao').value = row.descricao;
 
     // Reseta o estado da Curva ABC para este processo
@@ -2042,14 +2098,14 @@ async function abrirDetalhes(processoStr) {
     // Audit Info Display
     const dtCriacao = row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : '';
     const txtCriador = row.criador || 'Não Registrado';
-    document.getElementById('det_criador').value = dtCriacao ? `${txtCriador} em ${dtCriacao}` : txtCriador;
+    document.getElementById('det_criador').textContent = dtCriacao ? `${txtCriador} em ${dtCriacao}` : txtCriador;
 
     let txtUpdate = 'Sem alterações recentes';
     if (row.atualizado_por) {
         const dt = row.ultima_atualizacao ? new Date(row.ultima_atualizacao).toLocaleString('pt-BR') : '';
         txtUpdate = `${row.atualizado_por} em ${dt}`;
     }
-    document.getElementById('det_atualizacao').value = txtUpdate;
+    document.getElementById('det_atualizacao').textContent = txtUpdate;
 
     // Buscar histórico de prioridades
     carregarHistoricoPrioridades(processoStr);
@@ -2125,10 +2181,41 @@ const CHECKLIST_ADITIVO_ITENS = [
 ];
 
 function onChangeStatusDetalhes(selectEl) {
+    aplicarCorStatusSelect(selectEl);
     if (!selectEl || selectEl.value !== 'AGUAR. APROVAÇÃO') return;
     if (getCurrentUserRole() !== 'admin') return;
     checklistAditivoState.sessionFinalized = false;
     abrirModalChecklistAditivo();
+}
+
+// Mesma classificação de cor por status já usada nos badges da tabela de processos
+// (ver render da tabela de metas/prazos), reaproveitada aqui para colorir o próprio
+// <select> de Status dentro de GERENCIAR PROCESSO — dá pra reconhecer o status de
+// relance, sem precisar ler o texto.
+const GP_STATUS_BADGE_CLASSES = ['badge-status-devolvido', 'badge-status-diligencia', 'badge-status-contratante',
+    'badge-status-dark-blue', 'badge-status-fiscal', 'badge-status-aguar-reanalise', 'badge-status-light-blue',
+    'badge-status-em-reanalise', 'badge-status-em-analise', 'badge-status-aprovado', 'badge-status-arquivado'];
+
+function classeBadgeStatus(statusRaw) {
+    const stTxt = (statusRaw || '').toString().toUpperCase().trim();
+    if (stTxt.includes('DEVOLVIDO')) return 'badge-status-devolvido';
+    if (stTxt.includes('DILIG')) return 'badge-status-diligencia';
+    if (stTxt.includes('CONTRATANTE')) return 'badge-status-contratante';
+    if (stTxt.includes('APROVAÇÃO')) return 'badge-status-dark-blue';
+    if (stTxt.includes('FISCAL') && (stTxt.includes('ANÁLISE') || stTxt.includes('ANALISE'))) return 'badge-status-fiscal';
+    if (stTxt.includes('AGUAR')) return stTxt.includes('REAN') ? 'badge-status-aguar-reanalise' : 'badge-status-light-blue';
+    if (stTxt.startsWith('EM') && stTxt.includes('REANÁLISE')) return 'badge-status-em-reanalise';
+    if (stTxt.startsWith('EM') && (stTxt.includes('ANÁLISE') || stTxt.includes('ANALISE'))) return 'badge-status-em-analise';
+    if (stTxt.includes('APROVADO') || stTxt === 'SEDUC') return 'badge-status-aprovado';
+    if (stTxt.includes('ARQUIVADO')) return 'badge-status-arquivado';
+    return '';
+}
+
+function aplicarCorStatusSelect(selectEl) {
+    if (!selectEl) return;
+    GP_STATUS_BADGE_CLASSES.forEach(c => selectEl.classList.remove(c));
+    const cls = classeBadgeStatus(selectEl.value);
+    if (cls) selectEl.classList.add(cls);
 }
 
 async function carregarChecklistAditivo(processoStr, processoId) {
@@ -2152,11 +2239,20 @@ async function carregarChecklistAditivo(processoStr, processoId) {
         if (!data || data.length === 0) {
             checklistAditivoState.latestChecklist = null;
             elResumo.innerHTML = '<em class="text-muted">Nenhum checklist registrado ainda.</em>';
+            const btnRelatorioVazio = document.getElementById('btn-relatorio-checklist');
+            if (btnRelatorioVazio) btnRelatorioVazio.style.display = 'none';
+            atualizarBadgeAba('gp-badge-documental', 0);
             return;
         }
 
         checklistAditivoState.latestChecklist = data[0];
         elResumo.innerHTML = montarResumoChecklistHTML(data[0]);
+        const btnRelatorio = document.getElementById('btn-relatorio-checklist');
+        if (btnRelatorio) btnRelatorio.style.display = '';
+        const registro = data[0];
+        const totalObsDocumental = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false).length
+            + CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]).length;
+        atualizarBadgeAba('gp-badge-documental', totalObsDocumental);
 
         if (elHist && data.length > 1) {
             elHist.innerHTML = data.slice(1).map(reg => {
@@ -2184,16 +2280,90 @@ async function carregarChecklistAditivo(processoStr, processoId) {
 function montarResumoChecklistHTML(registro) {
     const dt = new Date(registro.created_at).toLocaleString('pt-BR');
     const pendencias = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false).length;
-    const badge = pendencias > 0
-        ? `<span class="badge bg-warning-subtle text-warning border border-warning-subtle">${pendencias} pendência(s)</span>`
-        : `<span class="badge bg-success-subtle text-success border border-success-subtle">Completo</span>`;
+    const inconsistencias = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]).length;
+    const badges = [];
+    if (pendencias > 0) badges.push(`<span class="badge bg-warning-subtle text-warning border border-warning-subtle">${pendencias} pendência(s)</span>`);
+    if (inconsistencias > 0) badges.push(`<span class="badge bg-danger-subtle text-danger border border-danger-subtle">${inconsistencias} inconsistência(s)</span>`);
+    if (!badges.length) badges.push('<span class="badge bg-success-subtle text-success border border-success-subtle">Completo</span>');
     return `
         <div class="d-flex justify-content-between align-items-center mb-1">
-            <div>${badge} <span class="text-muted ms-1">1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}</span></div>
+            <div>${badges.join(' ')} <span class="text-muted ms-1">1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}</span></div>
             <button type="button" class="btn btn-link btn-sm p-0" onclick="abrirModalChecklistAditivo(${registro.id})">Ver detalhes</button>
         </div>
         <div class="text-muted" style="font-size: 0.7rem;">Preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt}</div>
     `;
+}
+
+/* Relatório consolidado da Análise Documental (checklist do aditivo), no mesmo espírito
+   do "Relatório de Análise Técnica" já existente na Curva ABC (cvGerarRelatorioComentarios,
+   em curva_abc.js): monta um documento HTML formal, pronto para impressão/PDF, a partir
+   do último checklist finalizado do processo. */
+function gerarRelatorioChecklistAditivo() {
+    const registro = checklistAditivoState.latestChecklist;
+    if (!registro) {
+        alert('Nenhum checklist de documentação finalizado para este processo ainda. Preencha o checklist antes de gerar o relatório.');
+        return;
+    }
+
+    const dt = new Date(registro.created_at).toLocaleString('pt-BR');
+    const itensAplicaveis = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] !== null && registro[item.campo] !== undefined);
+    const pendencias = itensAplicaveis.filter(item => registro[item.campo] === false);
+    const inconsistencias = itensAplicaveis.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]);
+
+    const partes = [];
+    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Documental — GECOPE</p>');
+    partes.push(`<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ${escapeHTML(checklistAditivoState.processoStr || '')}</p>`);
+    partes.push(`<p style="margin:0 0 1em 0">Em conferência da documentação mínima exigida para o aditivo deste processo (checklist preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt} — 1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}), verificou-se o seguinte:</p>`);
+
+    if (pendencias.length || inconsistencias.length) {
+        const total = pendencias.length + inconsistencias.length;
+        partes.push(`<p style="margin:0 0 0.8em 0">Constatada(s) <strong>${total} observação(ões)</strong> na documentação, que devem ser analisadas/saneadas antes do prosseguimento do processo:</p>`);
+        let n = 1;
+        if (pendencias.length) {
+            partes.push('<p style="margin:0 0 0.4em 0"><strong>Documentos não apresentados:</strong></p>');
+            pendencias.forEach(item => {
+                const obs = item.obsCampo && registro[item.obsCampo] ? registro[item.obsCampo] : null;
+                partes.push(`<p style="margin:0 0 0.3em 0"><strong>${n}. ${escapeHTML(item.label)}:</strong> não apresentado(a).</p>`);
+                if (obs) partes.push(`<div style="margin:0 0 1.2em 0; white-space:pre-wrap;">${escapeHTML(obs)}</div>`);
+                n++;
+            });
+        }
+        if (inconsistencias.length) {
+            partes.push('<p style="margin:0 0 0.4em 0"><strong>Documentos apresentados com inconsistência:</strong></p>');
+            inconsistencias.forEach(item => {
+                partes.push(`<p style="margin:0 0 0.3em 0"><strong>${n}. ${escapeHTML(item.label)}:</strong></p>`);
+                partes.push(`<div style="margin:0 0 1.2em 0; white-space:pre-wrap;">${escapeHTML(registro[item.obsCampo])}</div>`);
+                n++;
+            });
+        }
+    } else {
+        partes.push('<p style="margin:0 0 1.5em 0"><strong>Nenhuma pendência ou inconsistência constatada.</strong> A documentação mínima exigida para este aditivo encontra-se completa.</p>');
+    }
+
+    if (registro.outros_obs) {
+        partes.push('<p style="margin:1em 0 0.4em 0"><strong>Observações adicionais:</strong></p>');
+        partes.push(`<div style="margin:0 0 1.5em 0; white-space:pre-wrap;">${escapeHTML(registro.outros_obs)}</div>`);
+    }
+
+    partes.push('<table style="width:100%; border-collapse:collapse; margin-top:1em; font-size:10pt">');
+    partes.push('<thead><tr>'
+        + '<th style="text-align:left; border-bottom:1px solid #999; padding:4px 6px">Documento</th>'
+        + '<th style="text-align:center; border-bottom:1px solid #999; padding:4px 6px; width:90px">Situação</th>'
+        + '</tr></thead><tbody>');
+    CHECKLIST_ADITIVO_ITENS.forEach(item => {
+        const valor = registro[item.campo];
+        const statusTxt = valor === true ? 'Sim' : (valor === false ? 'Não' : 'N/A');
+        partes.push('<tr>'
+            + `<td style="padding:4px 6px; border-bottom:1px solid #eee">${escapeHTML(item.label)}</td>`
+            + `<td style="text-align:center; padding:4px 6px; border-bottom:1px solid #eee">${statusTxt}</td>`
+            + '</tr>');
+    });
+    partes.push('</tbody></table>');
+    partes.push('</div>');
+
+    document.getElementById('chk-relatorio-body').innerHTML = partes.join('');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRelatorioChecklistAditivo')).show();
 }
 
 function toggleChecklistCondicional(radioName, containerId) {
@@ -2206,8 +2376,11 @@ function toggleChecklistCondicional(radioName, containerId) {
 function toggleJustificativaChecklist(itemKey) {
     const wrap = document.getElementById(`${itemKey}_obs_wrap`);
     if (!wrap) return;
+    // Mostra a observação sempre que o item foi respondido (Sim ou Não): "Não" pede
+    // justificativa de ausência, "Sim" permite registrar inconsistência num documento
+    // que foi apresentado mas tem algum problema.
     const checked = document.querySelector(`input[name="${itemKey}"]:checked`);
-    const mostrar = !!(checked && checked.value === 'nao');
+    const mostrar = !!checked;
     wrap.classList.toggle('d-none', !mostrar);
     if (!mostrar) {
         const textarea = document.getElementById(`${itemKey}_obs`);
@@ -2341,8 +2514,10 @@ async function salvarChecklistAditivo() {
         }
         payload[item.campo] = valor === 'sim';
         if (item.obsCampo) {
+            // Observação é salva tanto para "Não" (justificativa de ausência) quanto
+            // para "Sim" (inconsistência num documento que foi apresentado).
             const textarea = document.getElementById(`${item.key}_obs`);
-            payload[item.obsCampo] = (valor === 'nao' && textarea && textarea.value.trim()) ? textarea.value.trim() : null;
+            payload[item.obsCampo] = (textarea && textarea.value.trim()) ? textarea.value.trim() : null;
         }
     }
 
@@ -2422,15 +2597,16 @@ async function executarAcaoDetalhes(actionType) {
         const camposObrigatorios = [
             { id: 'det_status', nome: 'Status Atual' },
             { id: 'det_tipo', nome: 'Tipologia' },
-            { id: 'det_fiscal', nome: 'Fiscal Responsável' },
-            { id: 'det_descricao', nome: 'Descrição do Objeto' },
-            { id: 'det_contratante', nome: 'Contratante' },
-            { id: 'det_contratada', nome: 'Contratada' }
+            { id: 'det_fiscal', nome: 'Fiscal Responsável', tab: 'gp-tab-geral-btn' },
+            { id: 'det_descricao', nome: 'Descrição do Objeto', tab: 'gp-tab-geral-btn' },
+            { id: 'det_contratante', nome: 'Contratante', tab: 'gp-tab-geral-btn' },
+            { id: 'det_contratada', nome: 'Contratada', tab: 'gp-tab-geral-btn' }
         ];
 
         for (const campo of camposObrigatorios) {
             const el = document.getElementById(campo.id);
             if (!el || !el.value.trim()) {
+                if (campo.tab) mostrarAbaGerenciarProcesso(campo.tab);
                 alert(`O campo "${campo.nome}" é obrigatório.`);
                 el.focus();
                 return;
@@ -2443,6 +2619,7 @@ async function executarAcaoDetalhes(actionType) {
         if (statusAtual === 'AGUAR. ANÁLISE') {
             const valRecebimento = document.getElementById('det_data_recebimento').value.trim();
             if (!valRecebimento) {
+                mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
                 alert("Para o status 'AGUAR. ANÁLISE', o campo 'Recebimento' é obrigatório.");
                 document.getElementById('det_data_recebimento').focus();
                 return;
@@ -2453,6 +2630,7 @@ async function executarAcaoDetalhes(actionType) {
         if (statusAtual === 'DEVOLVIDO P/ REANÁLISE FISCAL') {
             const valDevolucao = document.getElementById('det_data_devolucao').value.trim();
             if (!valDevolucao) {
+                mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
                 alert("Para o status 'REANÁLISE FISCAL', o campo 'Devolução p/ Correções' é obrigatório.");
                 document.getElementById('det_data_devolucao').focus();
                 return;
@@ -2466,6 +2644,7 @@ async function executarAcaoDetalhes(actionType) {
             const valAprovacaoG = document.getElementById('det_data_aprovacao').value.trim();
 
             if (!valAcrescG || !valSupressG || !valAprovacaoG) {
+                mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
                 alert(`Para o status "${statusAtual}", os campos de ACRÉSCIMO (GECOPE), SUPRESSÃO (GECOPE) e APROVAÇÃO GECOPE devem estar preenchidos.`);
                 return;
             }
@@ -2473,6 +2652,7 @@ async function executarAcaoDetalhes(actionType) {
 
         // 2.4 Checklist de Documentação do Aditivo obrigatório para AGUAR. APROVAÇÃO/APROVADO
         if (!checklistValidoParaSalvar(statusAtual)) {
+            mostrarAbaGerenciarProcesso('gp-tab-documental-btn');
             alert('É obrigatório preencher o Checklist de Documentação do Aditivo antes de salvar o processo com este status.');
             abrirModalChecklistAditivo();
             return;

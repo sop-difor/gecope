@@ -2332,79 +2332,151 @@
                             <form id="formDetalhes">
                                 <input type="hidden" name="action" id="detalheAction" value="update">
 
-                                <div class="row g-4">
-                                    <!-- Coluna Esquerda: Informações Principais e Financeiro -->
-                                    <div class="col-lg-7">
-                                        <div class="card border-0 shadow-sm mb-4">
+                                <!-- Barra de identidade: sempre visível, independente da aba selecionada -->
+                                <div class="gp-identity mb-4 pb-3 border-bottom">
+                                    <div class="d-flex flex-wrap align-items-end gap-4">
+                                        <div class="gp-identity-block">
+                                            <label class="gp-identity-label" for="det_processo">Processo Nº</label>
+                                            <input type="text" class="gp-identity-title" name="PROCESSO N."
+                                                id="det_processo" readonly tabindex="-1">
+                                        </div>
+                                        <div class="gp-identity-block">
+                                            <label class="gp-identity-label" for="det_status">Status Atual <span
+                                                    class="text-danger">*</span></label>
+                                            <select class="form-select gp-status-select" name="STATUS" id="det_status"
+                                                onchange="onChangeStatusDetalhes(this)">
+                                                <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
+                                                <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
+                                                <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
+                                                <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
+                                                <option value="APROVADO">APROVADO</option>
+                                                <option value="ARQUIVADO">ARQUIVADO</option>
+                                                <option value="CONTRATANTE">CONTRATANTE</option>
+                                                <option value="DILIGÊNCIA">DILIGÊNCIA</option>
+                                                <option value="EM ANÁLISE">EM ANÁLISE</option>
+                                                <option value="EM REANÁLISE">EM REANÁLISE</option>
+                                                <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE FISCAL</option>
+                                            </select>
+                                        </div>
+                                        <div class="gp-identity-block flex-grow-1" style="min-width: 220px;">
+                                            <label class="gp-identity-label" for="det_tipo">Tipologia <span
+                                                    class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" name="TIPO" id="det_tipo">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Navegação por abas -->
+                                <ul class="nav gp-tabs mb-4" id="gpTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="gp-tab-geral-btn" data-bs-toggle="tab"
+                                            data-bs-target="#gp-pane-geral" type="button" role="tab"
+                                            aria-selected="true">
+                                            <i class="bi bi-info-circle me-1"></i>Geral
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="gp-tab-documental-btn" data-bs-toggle="tab"
+                                            data-bs-target="#gp-pane-documental" type="button" role="tab"
+                                            aria-selected="false">
+                                            <i class="bi bi-clipboard-check me-1"></i>Análise Documental
+                                            <span id="gp-badge-documental" class="badge rounded-pill bg-danger"
+                                                style="display:none;"></span>
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="gp-tab-tecnica-btn" data-bs-toggle="tab"
+                                            data-bs-target="#gp-pane-tecnica" type="button" role="tab"
+                                            aria-selected="false">
+                                            <i class="bi bi-bar-chart-fill me-1"></i>Análise Técnica
+                                            <span id="gp-badge-tecnica" class="badge rounded-pill bg-danger"
+                                                style="display:none;"></span>
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="gp-tab-historico-btn" data-bs-toggle="tab"
+                                            data-bs-target="#gp-pane-historico" type="button" role="tab"
+                                            aria-selected="false">
+                                            <i class="bi bi-clock-history me-1"></i>Histórico
+                                        </button>
+                                    </li>
+                                </ul>
+
+                                <div class="tab-content" id="gpTabsContent">
+
+                                    <!-- GERAL: responsáveis, descrição do objeto, financeiro e cronograma -->
+                                    <div class="tab-pane fade show active" id="gp-pane-geral" role="tabpanel">
+                                        <div class="card border-0 shadow-sm mb-4 gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES
-                                                    GERAIS</h6>
+                                                        class="bi bi-people me-2 text-info"></i>RESPONSÁVEIS</h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="row g-3">
-                                                    <div class="col-md-6">
-                                                        <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Número do Processo</label>
-                                                        <input type="text"
-                                                            class="form-control form-control-lg bg-light border-0 fw-bold text-primary"
-                                                            name="PROCESSO N." id="det_processo" readonly>
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Status Atual <span
-                                                                class="text-danger">*</span></label>
-                                                        <select
-                                                            class="form-select form-select-lg border-primary-subtle text-primary fw-bold"
-                                                            name="STATUS" id="det_status"
-                                                            onchange="onChangeStatusDetalhes(this)">
-                                                            <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
-                                                            <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
-                                                            <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
-                                                            <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
-                                                            <option value="APROVADO">APROVADO</option>
-                                                            <option value="ARQUIVADO">ARQUIVADO</option>
-                                                            <option value="CONTRATANTE">CONTRATANTE</option>
-                                                            <option value="DILIGÊNCIA">DILIGÊNCIA</option>
-                                                            <option value="EM ANÁLISE">EM ANÁLISE</option>
-                                                            <option value="EM REANÁLISE">EM REANÁLISE</option>
-                                                            <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE
-                                                                FISCAL</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Tipologia <span
-                                                                class="text-danger">*</span></label>
-                                                        <input type="text" class="form-control" name="TIPO"
-                                                            id="det_tipo">
-                                                    </div>
-                                                    <div class="col-md-6">
+                                                    <div class="col-md-3">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
                                                             style="font-size: 0.7rem;">Fiscal Responsável <span
                                                                 class="text-danger">*</span></label>
-                                                        <select class="form-select" name="FISCAL" id="det_fiscal">
+                                                        <select class="form-select bg-light border-0 shadow-none gp-plain-field"
+                                                            name="FISCAL" id="det_fiscal" style="font-size: 0.9rem;">
                                                             <option value="">Selecione...</option>
                                                         </select>
                                                     </div>
-                                                    <div class="col-12">
+                                                    <div class="col-md-3">
                                                         <label
                                                             class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Descrição do Objeto <span
+                                                            style="font-size: 0.7rem;">Contratante <span
                                                                 class="text-danger">*</span></label>
-                                                        <textarea class="form-control" name="DESCRIÇÃO"
-                                                            id="det_descricao" rows="6"
-                                                            style="font-size: 0.9rem; min-height: 120px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
+                                                        <input type="text" class="form-control bg-light border-0 shadow-none gp-plain-field"
+                                                            name="CONTRATANTE" id="det_contratante"
+                                                            style="font-size: 0.9rem;">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label
+                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                            style="font-size: 0.7rem;">Contratada <span
+                                                                class="text-danger">*</span></label>
+                                                        <input type="text" class="form-control bg-light border-0 shadow-none gp-plain-field"
+                                                            name="CONTRATADA" id="det_contratada"
+                                                            style="font-size: 0.9rem;">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label
+                                                            class="form-label small fw-bold text-muted text-uppercase"
+                                                            style="font-size: 0.7rem;">Analista Designado</label>
+                                                        <select class="form-select bg-light border-0 shadow-none gp-plain-field" name="ANALISTA"
+                                                            id="det_analista" style="font-size: 0.9rem;">
+                                                            <option value="">Selecione...</option>
+                                                            <option value="A">Ada</option>
+                                                            <option value="F">Felipe</option>
+                                                            <option value="H">Helder</option>
+                                                            <option value="N">Nildeno</option>
+                                                            <option value="P">Pedro</option>
+                                                            <option value="W">Walace</option>
+                                                        </select>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div class="card border-0 shadow-sm">
+                                        <div class="card border-0 shadow-sm mb-4 gp-section-card">
+                                            <div class="card-header bg-white py-3">
+                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                        class="bi bi-file-text me-2 text-primary"></i>DESCRIÇÃO DO
+                                                    OBJETO</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <label class="form-label small fw-bold text-muted text-uppercase"
+                                                    style="font-size: 0.7rem;">Descrição <span
+                                                        class="text-danger">*</span></label>
+                                                <textarea class="form-control" name="DESCRIÇÃO" id="det_descricao"
+                                                    rows="7"
+                                                    style="font-size: 0.9rem; min-height: 150px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div class="card border-0 shadow-sm mb-4 gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
                                                         class="bi bi-cash-stack me-2 text-success"></i>ANÁLISE
@@ -2434,7 +2506,7 @@
                                                                     id="det_supress_f" name="det_supress_f">
                                                             </div>
                                                         </div>
-                                                        <div class="bg-light p-3 rounded-3 border">
+                                                        <div class="bg-light p-3 rounded-3 gp-repercussao-box">
                                                             <label
                                                                 class="form-label small fw-bold text-muted mb-1 text-uppercase"
                                                                 style="font-size: 0.6rem;">REPERCUSSÃO</label>
@@ -2467,7 +2539,7 @@
                                                             </div>
                                                         </div>
                                                         <div
-                                                            class="bg-light p-3 rounded-3 border border-success-subtle">
+                                                            class="bg-light p-3 rounded-3 gp-repercussao-box">
                                                             <label
                                                                 class="form-label small fw-bold text-success mb-1 text-uppercase"
                                                                 style="font-size: 0.6rem;">REPERCUSSÃO</label>
@@ -2480,50 +2552,8 @@
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Coluna Direita: Agentes e Prazos -->
-                                    <div class="col-lg-5">
-                                        <div class="card border-0 shadow-sm mb-4">
-                                            <div class="card-header bg-white py-3">
-                                                <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-people me-2 text-info"></i>AGENTES DO CONTRATO</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                                    <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Contratante <span
-                                                            class="text-danger">*</span></label>
-                                                    <input type="text" class="form-control bg-light border-0"
-                                                        name="CONTRATANTE" id="det_contratante"
-                                                        style="font-size: 0.9rem;">
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Contratada <span
-                                                            class="text-danger">*</span></label>
-                                                    <input type="text" class="form-control bg-light border-0"
-                                                        name="CONTRATADA" id="det_contratada"
-                                                        style="font-size: 0.9rem;">
-                                                </div>
-                                                <div class="mb-0">
-                                                    <label class="form-label small fw-bold text-muted text-uppercase"
-                                                        style="font-size: 0.7rem;">Analista Designado</label>
-                                                    <select class="form-select bg-light border-0" name="ANALISTA"
-                                                        id="det_analista" style="font-size: 0.9rem;">
-                                                        <option value="">Selecione...</option>
-                                                        <option value="A">Ada</option>
-                                                        <option value="F">Felipe</option>
-                                                        <option value="H">Helder</option>
-                                                        <option value="N">Nildeno</option>
-                                                        <option value="P">Pedro</option>
-                                                        <option value="W">Walace</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="card border-0 shadow-sm mb-4">
+                                        <div class="card border-0 shadow-sm gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
                                                         class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA E
@@ -2531,8 +2561,8 @@
                                                 </h6>
                                             </div>
                                             <div class="card-body">
-                                                <div class="row g-3">
-                                                    <div class="col-md-6">
+                                                <div class="row g-3 row-cols-2 row-cols-md-5">
+                                                    <div class="col">
                                                         <label class="form-label small text-muted mb-1"
                                                             style="font-size: 0.7rem;">Data Abertura</label>
                                                         <input type="text"
@@ -2540,7 +2570,7 @@
                                                             name="DATA DE ABERTURA" id="det_data_abertura"
                                                             placeholder="dd/mm/aaaa">
                                                     </div>
-                                                    <div class="col-md-6">
+                                                    <div class="col">
                                                         <label class="form-label small text-muted mb-1"
                                                             style="font-size: 0.7rem;">Recebimento</label>
                                                         <input type="text"
@@ -2548,7 +2578,7 @@
                                                             name="DATA RECEBIMENTO" id="det_data_recebimento"
                                                             placeholder="dd/mm/aaaa">
                                                     </div>
-                                                    <div class="col-md-6">
+                                                    <div class="col">
                                                         <label class="form-label small text-muted mb-1"
                                                             style="font-size: 0.7rem;">Meta Fiscal</label>
                                                         <input type="text"
@@ -2556,7 +2586,7 @@
                                                             name="DATA COMPROMISSO FISCAL" id="det_data_compromisso"
                                                             placeholder="dd/mm/aaaa">
                                                     </div>
-                                                    <div class="col-md-6">
+                                                    <div class="col">
                                                         <label class="form-label small text-muted mb-1"
                                                             style="font-size: 0.7rem;">Aprovação GECOPE</label>
                                                         <input type="text"
@@ -2564,7 +2594,7 @@
                                                             name="DATA APROVAÇÃO GECOPE" id="det_data_aprovacao"
                                                             placeholder="dd/mm/aaaa">
                                                     </div>
-                                                    <div class="col-12">
+                                                    <div class="col">
                                                         <label class="form-label small text-muted mb-1"
                                                             style="font-size: 0.7rem;">Devolução p/ Correções</label>
                                                         <div class="position-relative">
@@ -2582,23 +2612,34 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <!-- Checklist de Documentação (Aditivo) -->
-                                        <div class="card border-0 shadow-sm mb-4">
-                                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                    <!-- ANÁLISE DOCUMENTAL: checklist de documentação mínima do aditivo -->
+                                    <div class="tab-pane fade" id="gp-pane-documental" role="tabpanel">
+                                        <div class="card border-0 shadow-sm gp-section-card">
+                                            <div
+                                                class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-clipboard-check me-2 text-danger"></i>CHECKLIST
-                                                    ADITIVO</h6>
-                                                <button type="button"
-                                                    class="btn btn-sm btn-outline-primary admin-only"
-                                                    id="btn-preencher-checklist"
-                                                    onclick="abrirModalChecklistAditivo()">Preencher/Atualizar</button>
+                                                        class="bi bi-clipboard-check me-2 text-danger"></i>CHECKLIST DE
+                                                    DOCUMENTAÇÃO</h6>
+                                                <div class="d-flex gap-2">
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-outline-primary admin-only"
+                                                        id="btn-preencher-checklist"
+                                                        onclick="abrirModalChecklistAditivo()">Preencher/Atualizar</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                                        id="btn-relatorio-checklist"
+                                                        onclick="gerarRelatorioChecklistAditivo()"
+                                                        style="display:none;">
+                                                        <i class="bi bi-file-earmark-text me-1"></i>Gerar
+                                                        Relatório</button>
+                                                </div>
                                             </div>
                                             <div class="card-body">
-                                                <div id="det_checklist_status" style="font-size: 0.8rem;">
+                                                <div id="det_checklist_status" style="font-size: 0.85rem;">
                                                     <em class="text-muted">Carregando...</em>
                                                 </div>
-                                                <div class="mt-2 pt-2 border-top" id="det_checklist_historico_wrap"
+                                                <div class="mt-3 pt-3 border-top" id="det_checklist_historico_wrap"
                                                     style="display:none;">
                                                     <button type="button" class="btn btn-link btn-sm p-0"
                                                         data-bs-toggle="collapse"
@@ -2609,21 +2650,33 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <!-- Curva ABC do Processo -->
-                                        <div class="card border-0 shadow-sm mb-4">
-                                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                    <!-- ANÁLISE TÉCNICA: Curva ABC do processo -->
+                                    <div class="tab-pane fade" id="gp-pane-tecnica" role="tabpanel">
+                                        <div class="card border-0 shadow-sm gp-section-card">
+                                            <div
+                                                class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-bar-chart-fill me-2 text-success"></i>CURVA ABC</h6>
-                                                <button type="button" class="btn btn-sm btn-outline-primary"
-                                                    id="btn-abrir-curva-abc-processo"
-                                                    onclick="abrirCurvaAbcDoProcesso()">Importar/Analisar</button>
+                                                        class="bi bi-bar-chart-fill me-2 text-success"></i>CURVA
+                                                    ABC</h6>
+                                                <div class="d-flex gap-2">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                                        id="btn-abrir-curva-abc-processo"
+                                                        onclick="abrirCurvaAbcDoProcesso()">Importar/Analisar</button>
+                                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                                        id="btn-relatorio-tecnico"
+                                                        onclick="gerarRelatorioTecnicoDoProcesso()"
+                                                        style="display:none;">
+                                                        <i class="bi bi-file-earmark-text me-1"></i>Gerar
+                                                        Relatório</button>
+                                                </div>
                                             </div>
                                             <div class="card-body">
-                                                <div id="det_curva_abc_status" style="font-size: 0.8rem;">
+                                                <div id="det_curva_abc_status" style="font-size: 0.85rem;">
                                                     <em class="text-muted">Carregando...</em>
                                                 </div>
-                                                <div class="mt-2 pt-2 border-top" id="det_curva_abc_historico_wrap"
+                                                <div class="mt-3 pt-3 border-top" id="det_curva_abc_historico_wrap"
                                                     style="display:none;">
                                                     <button type="button" class="btn btn-link btn-sm p-0"
                                                         data-bs-toggle="collapse"
@@ -2632,42 +2685,55 @@
                                                     <div class="collapse mt-2" id="det_curva_abc_historico"
                                                         style="font-size: 0.75rem;"></div>
                                                 </div>
+                                                <div class="alert alert-secondary small mt-3 mb-0"
+                                                    style="font-size: 0.75rem;">
+                                                    <i class="bi bi-info-circle me-1"></i> O relatório reúne os
+                                                    comentários lançados item a item na Curva ABC (aba
+                                                    "Importar/Analisar"). Para comentar novos itens, use
+                                                    "Importar/Analisar"; depois, gere o relatório aqui mesmo.
+                                                </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <!-- Histórico e Auditoria -->
-                                        <div class="card border-0 bg-transparent">
-                                            <div class="card-body p-0 ps-2">
-                                                <h6 class="text-secondary small fw-bold mb-3 text-uppercase"
-                                                    style="font-size: 0.65rem;"><i
-                                                        class="bi bi-clock-history me-1"></i>Histórico do Registro</h6>
-                                                <div class="mb-2">
-                                                    <label class="form-label x-small text-muted mb-0"
-                                                        style="font-size: 0.6rem;">CRIADO POR</label>
-                                                    <input type="text"
-                                                        class="form-control form-control-sm bg-transparent border-0 text-secondary p-0"
-                                                        id="det_criador" readonly
-                                                        style="font-size: 0.75rem; min-height: auto;">
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label x-small text-muted mb-0"
-                                                        style="font-size: 0.65rem;">ÚLTIMA ATUALIZAÇÃO</label>
-                                                    <input type="text"
-                                                        class="form-control form-control-sm bg-transparent border-0 text-secondary p-0"
-                                                        id="det_atualizacao" readonly
-                                                        style="font-size: 0.75rem; min-height: auto;">
-                                                </div>
-                                                <div class="mb-0 mt-3 pt-2 border-top border-secondary-subtle">
-                                                    <label class="form-label x-small text-muted mb-1"
-                                                        style="font-size: 0.65rem;">HISTÓRICO DE PRIORIDADE</label>
-                                                    <div id="det_historico_prioridade" class="bg-light rounded p-2"
-                                                        style="max-height: 120px; overflow-y: auto; font-size: 0.7rem;">
-                                                        <em class="text-muted">Carregando histórico...</em>
+                                    <!-- HISTÓRICO -->
+                                    <div class="tab-pane fade" id="gp-pane-historico" role="tabpanel">
+                                        <div class="card border-0 shadow-sm gp-section-card">
+                                            <div class="card-header bg-white py-3">
+                                                <h6 class="mb-0 fw-bold text-dark"><i
+                                                        class="bi bi-clock-history me-2 text-secondary"></i>HISTÓRICO
+                                                    DO REGISTRO</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row g-4">
+                                                    <div class="col-md-3">
+                                                        <label class="form-label small fw-bold text-muted text-uppercase"
+                                                            style="font-size: 0.65rem;">Criado por</label>
+                                                        <div id="det_criador" class="bg-light rounded p-2 text-secondary"
+                                                            style="font-size: 0.8rem; line-height: 1.4; word-break: break-word;">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label small fw-bold text-muted text-uppercase"
+                                                            style="font-size: 0.65rem;">Última atualização</label>
+                                                        <div id="det_atualizacao" class="bg-light rounded p-2 text-secondary"
+                                                            style="font-size: 0.8rem; line-height: 1.4; word-break: break-word;">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label small fw-bold text-muted text-uppercase"
+                                                            style="font-size: 0.65rem;">Histórico de prioridade</label>
+                                                        <div id="det_historico_prioridade"
+                                                            class="bg-light rounded p-2"
+                                                            style="max-height: 140px; overflow-y: auto; font-size: 0.75rem;">
+                                                            <em class="text-muted">Carregando histórico...</em>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+
                                 </div>
                             </form>
                             <div id="msg-detalhes" class="mt-3" style="display:none"></div>
@@ -3258,7 +3324,7 @@
                                                     <div id="chk_planilha_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
                                                             id="chk_planilha_obs" rows="2"
-                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
 
@@ -3282,7 +3348,7 @@
                                                     <div id="chk_memoria_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
                                                             id="chk_memoria_obs" rows="2"
-                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
 
@@ -3306,7 +3372,7 @@
                                                     <div id="chk_parecer_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
                                                             id="chk_parecer_obs" rows="2"
-                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
 
@@ -3333,7 +3399,7 @@
                                                         <div id="chk_art_fiscalizacao_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
                                                                 id="chk_art_fiscalizacao_obs" rows="2"
-                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                                placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
 
@@ -3359,7 +3425,7 @@
                                                         <div id="chk_art_execucao_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
                                                                 id="chk_art_execucao_obs" rows="2"
-                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                                placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
 
@@ -3383,7 +3449,7 @@
                                                         <div id="chk_portaria_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
                                                                 id="chk_portaria_obs" rows="2"
-                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                                placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -3408,7 +3474,7 @@
                                                     <div id="chk_curva_abc_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
                                                             id="chk_curva_abc_obs" rows="2"
-                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
 
@@ -3434,7 +3500,7 @@
                                                     <div id="chk_comp_propria_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
                                                             id="chk_comp_propria_obs" rows="2"
-                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
 
                                                     <div id="chk_comp_analiticas_wrap"
@@ -3460,7 +3526,7 @@
                                                         <div id="chk_comp_analiticas_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
                                                                 id="chk_comp_analiticas_obs" rows="2"
-                                                                placeholder="Justificativa (opcional)"></textarea>
+                                                                placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -3487,7 +3553,7 @@
                                                     <div id="chk_docs_assinados_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
                                                             id="chk_docs_assinados_obs" rows="2"
-                                                            placeholder="Justificativa (opcional)"></textarea>
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
 
@@ -3506,6 +3572,33 @@
                                                 id="btn-finalizar-checklist"
                                                 onclick="salvarChecklistAditivo()">
                                                 <i class="bi bi-check-circle me-1"></i> Finalizar Checklist
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Relatório da Análise Documental (checklist de documentação do aditivo) -->
+                            <div class="modal fade" id="modalRelatorioChecklistAditivo" tabindex="-1"
+                                aria-hidden="true">
+                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                    <div class="modal-content border-0 shadow-lg">
+                                        <div class="modal-header bg-dark text-white py-2">
+                                            <h6 class="modal-title fw-bold mb-0"><i
+                                                    class="bi bi-file-text me-2"></i>RELATÓRIO DE ANÁLISE
+                                                DOCUMENTAL</h6>
+                                            <button type="button" class="btn-close btn-close-white m-0"
+                                                data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body bg-white p-0">
+                                            <div class="p-5" id="chk-relatorio-body"></div>
+                                        </div>
+                                        <div class="modal-footer py-2 bg-light d-print-none">
+                                            <button type="button" class="btn btn-secondary btn-sm"
+                                                data-bs-dismiss="modal">Fechar</button>
+                                            <button type="button" class="btn btn-outline-success btn-sm"
+                                                onclick="window.print()">
+                                                <i class="bi bi-printer me-1"></i> Imprimir / Salvar PDF
                                             </button>
                                         </div>
                                     </div>

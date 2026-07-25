@@ -27,6 +27,12 @@
             btn.className = 'multiselect-btn';
             btn.type = 'button';
             btn.setAttribute('data-bs-toggle', 'dropdown');
+            // Sem isso o Bootstrap usa Popper.js pra posicionar o menu, que às
+            // vezes "flipa" o dropdown pra cima quando acha (errado, nesse
+            // layout) que não tem espaço suficiente embaixo. Com display
+            // static o Bootstrap só posiciona via CSS puro, sempre abrindo
+            // pra baixo do botão.
+            btn.setAttribute('data-bs-display', 'static');
             btn.setAttribute('aria-expanded', 'false');
             btn.innerHTML = '<span class="text-truncate">Todos</span>';
 
@@ -281,6 +287,12 @@
             btn.className = 'multiselect-btn';
             btn.type = 'button';
             btn.setAttribute('data-bs-toggle', 'dropdown');
+            // Sem isso o Bootstrap usa Popper.js pra posicionar o menu, que às
+            // vezes "flipa" o dropdown pra cima quando acha (errado, nesse
+            // layout) que não tem espaço suficiente embaixo. Com display
+            // static o Bootstrap só posiciona via CSS puro, sempre abrindo
+            // pra baixo do botão.
+            btn.setAttribute('data-bs-display', 'static');
             btn.setAttribute('aria-expanded', 'false');
             btn.innerHTML = '<span class="text-truncate">Todos</span>';
 

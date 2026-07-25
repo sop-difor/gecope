@@ -1941,6 +1941,46 @@
                 margin: 0 !important;
             }
 
+            /* Relatório de Análise Documental (checklist do aditivo): mesmo esquema de
+               escopo por .show dos dois relatórios acima. */
+            body:has(#modalRelatorioChecklistAditivo.show)>*:not(#modalRelatorioChecklistAditivo) {
+                display: none !important;
+            }
+
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo {
+                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                visibility: visible !important;
+            }
+
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo .modal-dialog {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo .modal-content {
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo .modal-header,
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo .modal-footer,
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo .btn-close {
+                display: none !important;
+            }
+
+            body:has(#modalRelatorioChecklistAditivo.show) #modalRelatorioChecklistAditivo .modal-body {
+                display: block !important;
+                visibility: visible !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
             /* Forçar cores na impressão */
             * {
                 -webkit-print-color-adjust: exact !important;
@@ -2674,6 +2714,29 @@
             padding-top: 0 !important;
             padding-bottom: 0 !important;
             line-height: 36px !important;
+        }
+
+        /* Tema escuro: METAS/PRIORITÁRIO (form-select) e BUSCAR (form-control)
+           pegavam o fundo genérico rgba(255,255,255,.06) do form escuro, mais
+           claro que o fundo do FISCAL/STATUS (multiselect-btn, #142e22 — igual
+           ao card ao redor). Unifica todos os 5 filtros no mesmo tom. */
+        body.theme-dark .proc-filter-row .form-select,
+        body.theme-dark .proc-filter-row .proc-search-wrap input.form-control,
+        body.theme-dark #meetingMetaSelect,
+        body.theme-dark #meetingPrioritarioSelect,
+        body.theme-dark #meetingFiscalSelect,
+        body.theme-dark #meetingStatusSelect,
+        body.theme-dark #meetingSearch {
+            background-color: #142e22 !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+        /* Seta do select nativo (METAS/PRIORITÁRIO) some contra o novo fundo
+           escuro sólido — troca pra seta branca, igual já é feito em outros
+           selects escuros do sistema. */
+        body.theme-dark #meetingMetaSelect,
+        body.theme-dark #meetingPrioritarioSelect {
+            --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
         }
 
         /* Campo de busca — mesmo visual (borda/altura/radius) dos selects, ícone sobreposto */
@@ -3431,6 +3494,13 @@
             color: #1a1a1a !important;
         }
 
+        /* Relatório de Análise Documental: mesmo motivo do override acima — texto com
+           cor fixa (#1a1a1a) definida no JS precisa de fundo claro fixo também. */
+        body.theme-dark #modalRelatorioChecklistAditivo .modal-body {
+            background-color: #ffffff !important;
+            color: #1a1a1a !important;
+        }
+
         /* Barra de ferramentas e editor do comentário do item (Curva ABC) */
         .cv-coment-toolbar {
             display: flex;
@@ -3604,6 +3674,25 @@
             color: #ffffff !important;
         }
 
+        /* Multiselect de FISCAL/STATUS (filtros do Painel de Processos): as
+           opções são <div class="multiselect-option"> soltas dentro do
+           .dropdown-menu, não .dropdown-item — por isso não herdavam o fix de
+           cor acima e ficavam com o texto escuro (--bs-dropdown-color do
+           Bootstrap) sobre o fundo escuro do menu, ilegível. */
+        body.theme-dark .multiselect-option {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+        body.theme-dark .multiselect-option:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #ffffff !important;
+        }
+        /* Seta do botão fechado (::after com border-color fixo #333) some contra
+           o fundo escuro do próprio botão. */
+        body.theme-dark .multiselect-btn::after {
+            border-bottom-color: rgba(255, 255, 255, 0.75);
+            border-right-color: rgba(255, 255, 255, 0.75);
+        }
+
         body.theme-dark .list-group-item {
             background-color: transparent !important;
             color: rgba(255, 255, 255, 0.88) !important;
@@ -3728,4 +3817,157 @@
             background-color: #fce8e6 !important;
             color: #d93025 !important;
             border: 1px solid #f5c6cb !important;
+        }
+
+        /* ── GERENCIAR PROCESSO: abas em pílula segmentada ───────────────────────
+           Mesmo padrão visual das abas "Em Tramitação/Aprovados/Arquivados" do
+           redesign aprovado do Painel de Processos: trilho neutro + pílula branca
+           (ou "--sop-white", que já vira #142e22 no tema escuro) na aba ativa.
+           Usa as variáveis do design system, então funciona nos dois temas sem
+           overrides extras. */
+        .gp-tabs {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 5px;
+            background: var(--sop-slate-100);
+            border-radius: 999px;
+            border: none;
+        }
+
+        .gp-tabs .nav-link {
+            border: none;
+            border-radius: 999px;
+            padding: 8px 18px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--sop-slate-500);
+            background: transparent;
+            transition: var(--transition-fast);
+            white-space: nowrap;
+        }
+
+        .gp-tabs .nav-link:hover:not(.active) {
+            color: var(--sop-slate-700);
+        }
+
+        .gp-tabs .nav-link.active {
+            background: var(--sop-white);
+            color: var(--sop-green);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .gp-tabs .nav-link .badge {
+            font-size: 0.65rem;
+            vertical-align: 2px;
+        }
+
+        /* Barra de identidade (Processo/Status/Tipologia), sempre visível
+           independente da aba selecionada. O número do processo vira um "título"
+           em vez de um input encaixotado; Status usa o mesmo estilo "campo
+           plano" do restante do formulário (ver regra #formDetalhes .form-select
+           mais abaixo) pra ficar visualmente igual ao campo Tipologia ao lado. */
+        .gp-identity-block {
+            min-width: 0;
+        }
+
+        .gp-identity-label {
+            display: block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .gp-identity-title {
+            display: block;
+            border: none;
+            background: transparent;
+            padding: 0;
+            font-size: 1.55rem;
+            font-weight: 800;
+            line-height: 1.2;
+            color: var(--text-heading);
+            min-width: 200px;
+        }
+
+        .gp-identity-title:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+        /* Status Atual não tem mais estilo próprio: fica igual a Tipologia (e aos
+           demais campos do formulário) através da regra #formDetalhes .form-select
+           logo abaixo, que já cobre qualquer .form-control/.form-select da janela. */
+
+        /* Todos os campos da janela GERENCIAR PROCESSO (Status, Tipologia,
+           Responsáveis etc. — exceto os que já são propositalmente
+           transparentes, como REPERCUSSÃO): mesmo visual "texto puro" do card
+           Histórico (bg-light + rounded, sem moldura de input) — a regra
+           genérica .form-control/.form-select do tema escuro (mais acima) força
+           borda/fundo em qualquer input, por isso precisa repetir aqui com
+           !important e especificidade maior (via #formDetalhes) para vencer. */
+        #formDetalhes .form-control:not(.bg-transparent),
+        #formDetalhes .form-select:not(.bg-transparent) {
+            border: none !important;
+            box-shadow: none !important;
+            background-color: transparent !important;
+        }
+        #formDetalhes .form-control:not(.bg-transparent):focus,
+        #formDetalhes .form-select:not(.bg-transparent):focus {
+            border: none !important;
+            box-shadow: none !important;
+            background-color: rgba(15, 23, 42, 0.035) !important;
+        }
+        body.theme-dark #formDetalhes .form-control:not(.bg-transparent),
+        body.theme-dark #formDetalhes .form-select:not(.bg-transparent) {
+            background-color: transparent !important;
+            border: none !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+            box-shadow: none !important;
+        }
+        body.theme-dark #formDetalhes .form-control:not(.bg-transparent):focus,
+        body.theme-dark #formDetalhes .form-select:not(.bg-transparent):focus {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+        /* Seta do <select> some contra o fundo escuro do tema escuro — troca pra
+           uma seta branca. */
+        body.theme-dark #formDetalhes select.form-select {
+            --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+        }
+        /* REPERCUSSÃO: o input já é transparente de propósito (funde com o
+           card que o envolve); o card em si perde a borda pra ficar no mesmo
+           padrão "sem caixa" dos demais campos. */
+        #formDetalhes .gp-repercussao-box {
+            border: none !important;
+        }
+
+        /* Fundo do corpo do modal GERENCIAR PROCESSO: um tom levemente
+           diferente do branco/verde-escuro dos cards, pra eles se destacarem
+           como seções em vez de sumir num "tudo com a mesma cor". */
+        #modalDetalhes .modal-body.bg-light-subtle {
+            background-color: #eef1f4 !important;
+        }
+        body.theme-dark #modalDetalhes .modal-body.bg-light-subtle {
+            background-color: #0e2118 !important;
+        }
+
+        /* Cards de seção do GERENCIAR PROCESSO (RESPONSÁVEIS, DESCRIÇÃO,
+           FINANCEIRA, CRONOGRAMA, CHECKLIST, CURVA ABC, HISTÓRICO): sem essa
+           borda/fundo próprio eles ficam da mesma cor do modal-body acima e a
+           janela vira um bloco só, sem separação visual entre seções. */
+        .gp-section-card {
+            background-color: #ffffff;
+            border: 1px solid var(--sop-slate-200, #e2e8f0) !important;
+            border-radius: 10px;
+        }
+        body.theme-dark .gp-section-card {
+            background-color: rgba(255, 255, 255, 0.045) !important;
+            border-color: rgba(255, 255, 255, 0.14) !important;
+        }
+        body.theme-dark .gp-section-card .card-header,
+        body.theme-dark .gp-section-card .card-footer {
+            border-color: rgba(255, 255, 255, 0.1) !important;
         }
