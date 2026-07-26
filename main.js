@@ -1,3 +1,16 @@
+// Bug conhecido do Bootstrap 5: Modal.hide() sempre remove a classe "modal-open"
+// do <body> ao terminar de fechar, mesmo que OUTRO modal continue aberto por trás
+// (ex.: fechar o modal do checklist, salvo automaticamente, com GERENCIAR PROCESSO
+// ainda aberto). Sem "modal-open" no body, o empilhamento/scroll do modal que
+// permanece aberto fica bagunçado, e o próximo modal aberto a partir dele (ex.: o
+// Relatório de Análise Documental) não aparece corretamente. Aqui a gente restaura
+// a classe se, ao um modal fechar, ainda sobrar algum outro .modal.show na tela.
+document.addEventListener('hidden.bs.modal', function () {
+    if (document.querySelector('.modal.show')) {
+        document.body.classList.add('modal-open');
+    }
+});
+
 // Pré-carrega a página de destino (HTML + assets) assim que o mouse passa por cima
 // do botão de navegação, para a troca de aba parecer instantânea ao clicar.
 function prefetchPagina(url) {
@@ -1962,7 +1975,8 @@ let checklistAditivoState = {
     processoId: null,
     statusOriginal: null,
     sessionFinalized: false,
-    latestChecklist: null
+    latestChecklist: null,
+    versoes: []
 };
 
 // --- CURVA ABC DO PROCESSO (referência usada ao navegar para a aba Curva ABC) ---
@@ -2239,37 +2253,51 @@ async function carregarChecklistAditivo(processoStr, processoId) {
         if (!data || data.length === 0) {
             checklistAditivoState.latestChecklist = null;
             elResumo.innerHTML = '<em class="text-muted">Nenhum checklist registrado ainda.</em>';
-            const btnRelatorioVazio = document.getElementById('btn-relatorio-checklist');
-            if (btnRelatorioVazio) btnRelatorioVazio.style.display = 'none';
             atualizarBadgeAba('gp-badge-documental', 0);
             return;
         }
 
+        // Não há uma coluna "versão" no banco: cada finalização de checklist é uma
+        // linha nova (nunca sobrescreve a anterior), então a posição cronológica já
+        // basta pra numerar — o mais antigo é a Versão 01, cada novo registro soma 1.
+        checklistAditivoState.versoes = data;
         checklistAditivoState.latestChecklist = data[0];
-        elResumo.innerHTML = montarResumoChecklistHTML(data[0]);
-        const btnRelatorio = document.getElementById('btn-relatorio-checklist');
-        if (btnRelatorio) btnRelatorio.style.display = '';
+        // Com pelo menos um checklist salvo, o resumo/badges some daqui: a lista de
+        // versões abaixo (com o botão "Ver" na linha "· Atual") já cobre tanto abrir
+        // o checklist corrente quanto ver o resultado — sem duplicar informação.
+        elResumo.innerHTML = '';
         const registro = data[0];
         const totalObsDocumental = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false).length
             + CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]).length;
         atualizarBadgeAba('gp-badge-documental', totalObsDocumental);
 
-        if (elHist && data.length > 1) {
-            elHist.innerHTML = data.slice(1).map(reg => {
+        // Lista de todas as versões, da mais antiga (01) pra mais nova, cada uma com
+        // botão pra ver o checklist respondido, gerar o relatório e excluir aquela
+        // versão específica — inclusive a versão atual, marcada com "· Atual".
+        if (elHist) {
+            const total = data.length;
+            const ascendente = data.slice().reverse();
+            const podeExcluir = getCurrentUserRole() === 'admin';
+            elHist.innerHTML = ascendente.map((reg, idxAsc) => {
+                const versao = String(idxAsc + 1).padStart(2, '0');
                 const dt = new Date(reg.created_at).toLocaleString('pt-BR');
+                const ehAtual = idxAsc + 1 === total;
                 return `
-                    <div class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center">
+                    <div class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <span class="fw-bold text-dark">${escapeHTML(reg.autor_nome || '')}</span>
-                            <span class="text-muted"> em ${dt}</span>
+                            <span class="fw-bold text-dark">Versão ${versao}</span>
+                            <span class="text-muted"> · ${escapeHTML(reg.autor_nome || '')} em ${dt}</span>
+                            ${ehAtual ? ' <span class="text-success fw-bold">· Atual</span>' : ''}
                         </div>
-                        <button type="button" class="btn btn-link btn-sm p-0" onclick="abrirModalChecklistAditivo(${reg.id})">Ver</button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="abrirModalChecklistAditivo(${reg.id})"><i class="bi bi-eye me-1"></i>Ver</button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="gerarRelatorioChecklistAditivo(${reg.id})"><i class="bi bi-file-earmark-text me-1"></i>Relatório</button>
+                            ${podeExcluir ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirChecklistAditivo(${reg.id}, '${versao}')" title="Excluir esta versão"><i class="bi bi-trash-fill"></i></button>` : ''}
+                        </div>
                     </div>
                 `;
             }).join('');
             if (elHistWrap) elHistWrap.style.display = '';
-        } else if (elHist) {
-            elHist.innerHTML = '';
         }
     } catch (err) {
         console.error("Erro ao carregar checklist do aditivo:", err);
@@ -2277,33 +2305,38 @@ async function carregarChecklistAditivo(processoStr, processoId) {
     }
 }
 
-function montarResumoChecklistHTML(registro) {
-    const dt = new Date(registro.created_at).toLocaleString('pt-BR');
-    const pendencias = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false).length;
-    const inconsistencias = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]).length;
-    const badges = [];
-    if (pendencias > 0) badges.push(`<span class="badge bg-warning-subtle text-warning border border-warning-subtle">${pendencias} pendência(s)</span>`);
-    if (inconsistencias > 0) badges.push(`<span class="badge bg-danger-subtle text-danger border border-danger-subtle">${inconsistencias} inconsistência(s)</span>`);
-    if (!badges.length) badges.push('<span class="badge bg-success-subtle text-success border border-success-subtle">Completo</span>');
-    return `
-        <div class="d-flex justify-content-between align-items-center mb-1">
-            <div>${badges.join(' ')} <span class="text-muted ms-1">1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}</span></div>
-            <button type="button" class="btn btn-link btn-sm p-0" onclick="abrirModalChecklistAditivo(${registro.id})">Ver detalhes</button>
-        </div>
-        <div class="text-muted" style="font-size: 0.7rem;">Preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt}</div>
-    `;
+// Exclui uma versão do checklist de documentação. Não renumera as demais — a
+// Versão 03 continua "03" mesmo se a 02 for apagada, pra não confundir quem já
+// viu/citou aquele número antes (mesmo critério usado na exclusão da Curva ABC).
+async function excluirChecklistAditivo(checklistId, versao) {
+    if (getCurrentUserRole() !== 'admin') return;
+    if (!confirm(`Excluir a Versão ${versao} do checklist de documentação? Essa ação não pode ser desfeita.`)) return;
+
+    const { error } = await sbClient.from('checklist_documentacao_aditivo').delete().eq('id', checklistId);
+    if (error) {
+        alert('Erro ao excluir a versão: ' + error.message);
+        return;
+    }
+
+    registrarAtividade('PROCESSO', `excluiu a Versão ${versao} do checklist de documentação do processo Nº ${checklistAditivoState.processoStr}`, checklistAditivoState.processoStr);
+    await carregarChecklistAditivo(checklistAditivoState.processoStr, checklistAditivoState.processoId);
 }
 
 /* Relatório consolidado da Análise Documental (checklist do aditivo), no mesmo espírito
    do "Relatório de Análise Técnica" já existente na Curva ABC (cvGerarRelatorioComentarios,
    em curva_abc.js): monta um documento HTML formal, pronto para impressão/PDF, a partir
-   do último checklist finalizado do processo. */
-function gerarRelatorioChecklistAditivo() {
-    const registro = checklistAditivoState.latestChecklist;
+   de um checklist finalizado do processo — o mais recente por padrão, ou uma versão
+   específica do histórico se checklistId for informado (botão "Relatório" de cada versão). */
+function gerarRelatorioChecklistAditivo(checklistId) {
+    const versoes = checklistAditivoState.versoes || [];
+    const registro = checklistId
+        ? versoes.find(v => v.id === checklistId)
+        : checklistAditivoState.latestChecklist;
     if (!registro) {
         alert('Nenhum checklist de documentação finalizado para este processo ainda. Preencha o checklist antes de gerar o relatório.');
         return;
     }
+    const versao = versoes.length ? versoes.length - versoes.indexOf(registro) : null;
 
     const dt = new Date(registro.created_at).toLocaleString('pt-BR');
     const itensAplicaveis = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] !== null && registro[item.campo] !== undefined);
@@ -2313,7 +2346,7 @@ function gerarRelatorioChecklistAditivo() {
     const partes = [];
     partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
     partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Documental — GECOPE</p>');
-    partes.push(`<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ${escapeHTML(checklistAditivoState.processoStr || '')}</p>`);
+    partes.push(`<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ${escapeHTML(checklistAditivoState.processoStr || '')}${versao ? ' — Versão ' + versao : ''}</p>`);
     partes.push(`<p style="margin:0 0 1em 0">Em conferência da documentação mínima exigida para o aditivo deste processo (checklist preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt} — 1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}), verificou-se o seguinte:</p>`);
 
     if (pendencias.length || inconsistencias.length) {
@@ -2341,8 +2374,8 @@ function gerarRelatorioChecklistAditivo() {
         partes.push('<p style="margin:0 0 1.5em 0"><strong>Nenhuma pendência ou inconsistência constatada.</strong> A documentação mínima exigida para este aditivo encontra-se completa.</p>');
     }
 
-    if (registro.outros_obs) {
-        partes.push('<p style="margin:1em 0 0.4em 0"><strong>Observações adicionais:</strong></p>');
+    partes.push(`<p style="margin:1em 0 0.4em 0"><strong>Outros documentos relevantes não listados no checklist:</strong> ${registro.outros_flag ? 'Sim' : 'Não'}</p>`);
+    if (registro.outros_flag && registro.outros_obs) {
         partes.push(`<div style="margin:0 0 1.5em 0; white-space:pre-wrap;">${escapeHTML(registro.outros_obs)}</div>`);
     }
 
@@ -2362,8 +2395,40 @@ function gerarRelatorioChecklistAditivo() {
     partes.push('</tbody></table>');
     partes.push('</div>');
 
-    document.getElementById('chk-relatorio-body').innerHTML = partes.join('');
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalRelatorioChecklistAditivo')).show();
+    // Abre em nova aba (documento HTML separado) em vez de num modal aninhado dentro
+    // de GERENCIAR PROCESSO: um modal-dentro-de-modal aqui esbarra numa regra própria
+    // do sistema que fixa o z-index de .modal/.modal-backdrop em !important, o que
+    // impede o relatório de aparecer por cima. Abrir em aba nova evita esse problema
+    // de raiz e ainda facilita imprimir/salvar em PDF.
+    const janela = window.open('', '_blank');
+    if (!janela) {
+        alert('O navegador bloqueou a abertura do relatório em nova aba. Permita pop-ups para este site e tente novamente.');
+        return;
+    }
+    janela.document.write(`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório de Análise Documental — ${escapeHTML(checklistAditivoState.processoStr || '')}</title>
+<style>
+    body { margin: 0; background: #f1f3f5; }
+    .rel-toolbar { padding: 12px 20px; background: #212529; text-align: right; }
+    .rel-toolbar button { padding: 8px 18px; font-weight: 600; border: none; border-radius: 4px; background: #198754; color: #fff; cursor: pointer; }
+    .rel-toolbar button:hover { background: #157347; }
+    .rel-page { max-width: 800px; margin: 20px auto; background: #fff; padding: 50px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+    @media print {
+        .rel-toolbar { display: none; }
+        body { background: #fff; }
+        .rel-page { box-shadow: none; margin: 0; max-width: none; }
+    }
+</style>
+</head>
+<body>
+<div class="rel-toolbar"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>
+<div class="rel-page">${partes.join('')}</div>
+</body>
+</html>`);
+    janela.document.close();
 }
 
 function toggleChecklistCondicional(radioName, containerId) {
@@ -2373,18 +2438,22 @@ function toggleChecklistCondicional(radioName, containerId) {
     container.classList.toggle('d-none', !(checked && checked.value === 'sim'));
 }
 
-function toggleJustificativaChecklist(itemKey) {
+// Observação de cada item fica escondida por padrão: o analista decide se quer
+// comentar clicando no botão, em vez da caixa abrir sozinha ao responder Sim/Não.
+function toggleObsChecklistManual(itemKey) {
     const wrap = document.getElementById(`${itemKey}_obs_wrap`);
+    const btn = document.getElementById(`${itemKey}_obs_toggle`);
     if (!wrap) return;
-    // Mostra a observação sempre que o item foi respondido (Sim ou Não): "Não" pede
-    // justificativa de ausência, "Sim" permite registrar inconsistência num documento
-    // que foi apresentado mas tem algum problema.
-    const checked = document.querySelector(`input[name="${itemKey}"]:checked`);
-    const mostrar = !!checked;
-    wrap.classList.toggle('d-none', !mostrar);
-    if (!mostrar) {
+    const estaAberta = !wrap.classList.contains('d-none');
+    wrap.classList.toggle('d-none', estaAberta);
+    if (estaAberta) {
         const textarea = document.getElementById(`${itemKey}_obs`);
         if (textarea) textarea.value = '';
+    }
+    if (btn) {
+        btn.innerHTML = estaAberta
+            ? '<i class="bi bi-chat-left-text me-1"></i>Adicionar observação'
+            : '<i class="bi bi-dash-circle me-1"></i>Remover observação';
     }
 }
 
@@ -2398,7 +2467,25 @@ function resetarFormChecklistAditivo() {
     CHECKLIST_ADITIVO_ITENS.forEach(item => {
         const wrap = document.getElementById(`${item.key}_obs_wrap`);
         if (wrap) wrap.classList.add('d-none');
+        const btn = document.getElementById(`${item.key}_obs_toggle`);
+        if (btn) btn.innerHTML = '<i class="bi bi-chat-left-text me-1"></i>Adicionar observação';
     });
+    document.getElementById('chk_outros_obs_wrap').classList.add('d-none');
+}
+
+// Item 10 (Outros): diferente dos demais itens do checklist, a observação só faz
+// sentido quando a resposta é "Sim" (há outra documentação a comentar) — "Não" não
+// tem o que justificar, então a caixa de texto fica escondida nesse caso.
+function toggleOutrosChecklist() {
+    const wrap = document.getElementById('chk_outros_obs_wrap');
+    if (!wrap) return;
+    const checked = document.querySelector('input[name="chk_outros"]:checked');
+    const mostrar = !!checked && checked.value === 'sim';
+    wrap.classList.toggle('d-none', !mostrar);
+    if (!mostrar) {
+        const textarea = document.getElementById('chk_outros_obs');
+        if (textarea) textarea.value = '';
+    }
 }
 
 function abrirModalChecklistAditivo(checklistIdParaVisualizar = null) {
@@ -2447,13 +2534,18 @@ function preencherFormChecklist(registro, desabilitar) {
         if (item.obsCampo && registro[item.obsCampo]) {
             const textarea = document.getElementById(`${item.key}_obs`);
             if (textarea) textarea.value = registro[item.obsCampo];
+            const wrap = document.getElementById(`${item.key}_obs_wrap`);
+            if (wrap) wrap.classList.remove('d-none');
+            const btn = document.getElementById(`${item.key}_obs_toggle`);
+            if (btn) btn.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Remover observação';
         }
-        toggleJustificativaChecklist(item.key);
     });
     toggleChecklistCondicional('chk_comp_propria', 'chk_comp_analiticas_wrap');
 
+    setRadio('chk_outros', registro.outros_flag);
     const outros = document.getElementById('chk_outros_obs');
     if (outros) outros.value = registro.outros_obs || '';
+    toggleOutrosChecklist();
 
     if (desabilitar) {
         const form = document.getElementById('formChecklistAditivo');
@@ -2521,8 +2613,14 @@ async function salvarChecklistAditivo() {
         }
     }
 
+    const outrosValor = getRadioValue('chk_outros');
+    if (!outrosValor) {
+        focarEAlertar('Responda o item "Outros documentos relevantes não listados acima?" antes de finalizar o checklist.', 'chk_outros_sim');
+        return;
+    }
+    payload.outros_flag = outrosValor === 'sim';
     const outros = document.getElementById('chk_outros_obs');
-    payload.outros_obs = outros && outros.value.trim() ? outros.value.trim() : null;
+    payload.outros_obs = (payload.outros_flag && outros && outros.value.trim()) ? outros.value.trim() : null;
 
     const btn = document.getElementById('btn-finalizar-checklist');
     btn.disabled = true;

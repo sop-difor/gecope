@@ -2626,13 +2626,8 @@
                                                     <button type="button"
                                                         class="btn btn-sm btn-outline-primary admin-only"
                                                         id="btn-preencher-checklist"
-                                                        onclick="abrirModalChecklistAditivo()">Preencher/Atualizar</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-success"
-                                                        id="btn-relatorio-checklist"
-                                                        onclick="gerarRelatorioChecklistAditivo()"
-                                                        style="display:none;">
-                                                        <i class="bi bi-file-earmark-text me-1"></i>Gerar
-                                                        Relatório</button>
+                                                        onclick="abrirModalChecklistAditivo()"><i
+                                                            class="bi bi-plus-lg me-1"></i>Novo Checklist</button>
                                                 </div>
                                             </div>
                                             <div class="card-body">
@@ -2641,12 +2636,8 @@
                                                 </div>
                                                 <div class="mt-3 pt-3 border-top" id="det_checklist_historico_wrap"
                                                     style="display:none;">
-                                                    <button type="button" class="btn btn-link btn-sm p-0"
-                                                        data-bs-toggle="collapse"
-                                                        data-bs-target="#det_checklist_historico">Ver histórico
-                                                        anterior</button>
-                                                    <div class="collapse mt-2" id="det_checklist_historico"
-                                                        style="font-size: 0.75rem;"></div>
+                                                    <div id="det_checklist_historico" style="font-size: 0.75rem;">
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2663,13 +2654,8 @@
                                                 <div class="d-flex gap-2">
                                                     <button type="button" class="btn btn-sm btn-outline-primary"
                                                         id="btn-abrir-curva-abc-processo"
-                                                        onclick="abrirCurvaAbcDoProcesso()">Importar/Analisar</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-success"
-                                                        id="btn-relatorio-tecnico"
-                                                        onclick="gerarRelatorioTecnicoDoProcesso()"
-                                                        style="display:none;">
-                                                        <i class="bi bi-file-earmark-text me-1"></i>Gerar
-                                                        Relatório</button>
+                                                        onclick="iniciarNovaCurvaAbcDoProcesso()"><i
+                                                            class="bi bi-plus-lg me-1"></i>Nova Curva ABC</button>
                                                 </div>
                                             </div>
                                             <div class="card-body">
@@ -2678,15 +2664,11 @@
                                                 </div>
                                                 <div class="mt-3 pt-3 border-top" id="det_curva_abc_historico_wrap"
                                                     style="display:none;">
-                                                    <button type="button" class="btn btn-link btn-sm p-0"
-                                                        data-bs-toggle="collapse"
-                                                        data-bs-target="#det_curva_abc_historico">Ver versões
-                                                        anteriores</button>
-                                                    <div class="collapse mt-2" id="det_curva_abc_historico"
-                                                        style="font-size: 0.75rem;"></div>
+                                                    <div id="det_curva_abc_historico" style="font-size: 0.75rem;">
+                                                    </div>
                                                 </div>
-                                                <div class="alert alert-secondary small mt-3 mb-0"
-                                                    style="font-size: 0.75rem;">
+                                                <div class="small mt-3 mb-0"
+                                                    style="font-size: 0.75rem; color: var(--text-muted);">
                                                     <i class="bi bi-info-circle me-1"></i> O relatório reúne os
                                                     comentários lançados item a item na Curva ABC (aba
                                                     "Importar/Analisar"). Para comentar novos itens, use
@@ -3309,21 +3291,24 @@
                                                         Orçamentária Validada?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_planilha" id="chk_planilha_sim" value="sim"
-                                                            onchange="toggleJustificativaChecklist('chk_planilha')">
+                                                            name="chk_planilha" id="chk_planilha_sim" value="sim">
                                                         <label class="form-check-label"
                                                             for="chk_planilha_sim">Sim</label>
                                                     </div>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_planilha" id="chk_planilha_nao" value="nao"
-                                                            onchange="toggleJustificativaChecklist('chk_planilha')">
+                                                            name="chk_planilha" id="chk_planilha_nao" value="nao">
                                                         <label class="form-check-label"
                                                             for="chk_planilha_nao">Não</label>
                                                     </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_planilha_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_planilha')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
                                                     <div id="chk_planilha_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
-                                                            id="chk_planilha_obs" rows="2"
+                                                            id="chk_planilha_obs" rows="6"
                                                             placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
@@ -3333,21 +3318,24 @@
                                                         Cálculo?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_memoria" id="chk_memoria_sim" value="sim"
-                                                            onchange="toggleJustificativaChecklist('chk_memoria')">
+                                                            name="chk_memoria" id="chk_memoria_sim" value="sim">
                                                         <label class="form-check-label"
                                                             for="chk_memoria_sim">Sim</label>
                                                     </div>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_memoria" id="chk_memoria_nao" value="nao"
-                                                            onchange="toggleJustificativaChecklist('chk_memoria')">
+                                                            name="chk_memoria" id="chk_memoria_nao" value="nao">
                                                         <label class="form-check-label"
                                                             for="chk_memoria_nao">Não</label>
                                                     </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_memoria_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_memoria')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
                                                     <div id="chk_memoria_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
-                                                            id="chk_memoria_obs" rows="2"
+                                                            id="chk_memoria_obs" rows="6"
                                                             placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
@@ -3357,21 +3345,24 @@
                                                         Técnico?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_parecer" id="chk_parecer_sim" value="sim"
-                                                            onchange="toggleJustificativaChecklist('chk_parecer')">
+                                                            name="chk_parecer" id="chk_parecer_sim" value="sim">
                                                         <label class="form-check-label"
                                                             for="chk_parecer_sim">Sim</label>
                                                     </div>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_parecer" id="chk_parecer_nao" value="nao"
-                                                            onchange="toggleJustificativaChecklist('chk_parecer')">
+                                                            name="chk_parecer" id="chk_parecer_nao" value="nao">
                                                         <label class="form-check-label"
                                                             for="chk_parecer_nao">Não</label>
                                                     </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_parecer_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_parecer')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
                                                     <div id="chk_parecer_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
-                                                            id="chk_parecer_obs" rows="2"
+                                                            id="chk_parecer_obs" rows="6"
                                                             placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
@@ -3383,22 +3374,25 @@
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
                                                                 name="chk_art_fiscalizacao"
-                                                                id="chk_art_fiscalizacao_sim" value="sim"
-                                                                onchange="toggleJustificativaChecklist('chk_art_fiscalizacao')">
+                                                                id="chk_art_fiscalizacao_sim" value="sim">
                                                             <label class="form-check-label"
                                                                 for="chk_art_fiscalizacao_sim">Sim</label>
                                                         </div>
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
                                                                 name="chk_art_fiscalizacao"
-                                                                id="chk_art_fiscalizacao_nao" value="nao"
-                                                                onchange="toggleJustificativaChecklist('chk_art_fiscalizacao')">
+                                                                id="chk_art_fiscalizacao_nao" value="nao">
                                                             <label class="form-check-label"
                                                                 for="chk_art_fiscalizacao_nao">Não</label>
                                                         </div>
+                                                        <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                            id="chk_art_fiscalizacao_obs_toggle"
+                                                            onclick="toggleObsChecklistManual('chk_art_fiscalizacao')"><i
+                                                                class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                            observação</button>
                                                         <div id="chk_art_fiscalizacao_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
-                                                                id="chk_art_fiscalizacao_obs" rows="2"
+                                                                id="chk_art_fiscalizacao_obs" rows="6"
                                                                 placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
@@ -3409,22 +3403,25 @@
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
                                                                 name="chk_art_execucao" id="chk_art_execucao_sim"
-                                                                value="sim"
-                                                                onchange="toggleJustificativaChecklist('chk_art_execucao')">
+                                                                value="sim">
                                                             <label class="form-check-label"
                                                                 for="chk_art_execucao_sim">Sim</label>
                                                         </div>
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
                                                                 name="chk_art_execucao" id="chk_art_execucao_nao"
-                                                                value="nao"
-                                                                onchange="toggleJustificativaChecklist('chk_art_execucao')">
+                                                                value="nao">
                                                             <label class="form-check-label"
                                                                 for="chk_art_execucao_nao">Não</label>
                                                         </div>
+                                                        <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                            id="chk_art_execucao_obs_toggle"
+                                                            onclick="toggleObsChecklistManual('chk_art_execucao')"><i
+                                                                class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                            observação</button>
                                                         <div id="chk_art_execucao_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
-                                                                id="chk_art_execucao_obs" rows="2"
+                                                                id="chk_art_execucao_obs" rows="6"
                                                                 placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
@@ -3434,21 +3431,24 @@
                                                             Fiscalização?</label>
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
-                                                                name="chk_portaria" id="chk_portaria_sim" value="sim"
-                                                                onchange="toggleJustificativaChecklist('chk_portaria')">
+                                                                name="chk_portaria" id="chk_portaria_sim" value="sim">
                                                             <label class="form-check-label"
                                                                 for="chk_portaria_sim">Sim</label>
                                                         </div>
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
-                                                                name="chk_portaria" id="chk_portaria_nao" value="nao"
-                                                                onchange="toggleJustificativaChecklist('chk_portaria')">
+                                                                name="chk_portaria" id="chk_portaria_nao" value="nao">
                                                             <label class="form-check-label"
                                                                 for="chk_portaria_nao">Não</label>
                                                         </div>
+                                                        <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                            id="chk_portaria_obs_toggle"
+                                                            onclick="toggleObsChecklistManual('chk_portaria')"><i
+                                                                class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                            observação</button>
                                                         <div id="chk_portaria_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
-                                                                id="chk_portaria_obs" rows="2"
+                                                                id="chk_portaria_obs" rows="6"
                                                                 placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
@@ -3459,21 +3459,24 @@
                                                         ABC?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_curva_abc" id="chk_curva_abc_sim" value="sim"
-                                                            onchange="toggleJustificativaChecklist('chk_curva_abc')">
+                                                            name="chk_curva_abc" id="chk_curva_abc_sim" value="sim">
                                                         <label class="form-check-label"
                                                             for="chk_curva_abc_sim">Sim</label>
                                                     </div>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
-                                                            name="chk_curva_abc" id="chk_curva_abc_nao" value="nao"
-                                                            onchange="toggleJustificativaChecklist('chk_curva_abc')">
+                                                            name="chk_curva_abc" id="chk_curva_abc_nao" value="nao">
                                                         <label class="form-check-label"
                                                             for="chk_curva_abc_nao">Não</label>
                                                     </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_curva_abc_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_curva_abc')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
                                                     <div id="chk_curva_abc_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
-                                                            id="chk_curva_abc_obs" rows="2"
+                                                            id="chk_curva_abc_obs" rows="6"
                                                             placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
@@ -3485,7 +3488,7 @@
                                                         <input class="form-check-input" type="radio"
                                                             name="chk_comp_propria" id="chk_comp_propria_sim"
                                                             value="sim"
-                                                            onchange="toggleJustificativaChecklist('chk_comp_propria'); toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
+                                                            onchange="toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
                                                         <label class="form-check-label"
                                                             for="chk_comp_propria_sim">Sim</label>
                                                     </div>
@@ -3493,13 +3496,18 @@
                                                         <input class="form-check-input" type="radio"
                                                             name="chk_comp_propria" id="chk_comp_propria_nao"
                                                             value="nao"
-                                                            onchange="toggleJustificativaChecklist('chk_comp_propria'); toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
+                                                            onchange="toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
                                                         <label class="form-check-label"
                                                             for="chk_comp_propria_nao">Não</label>
                                                     </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_comp_propria_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_comp_propria')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
                                                     <div id="chk_comp_propria_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
-                                                            id="chk_comp_propria_obs" rows="2"
+                                                            id="chk_comp_propria_obs" rows="6"
                                                             placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
 
@@ -3510,22 +3518,25 @@
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
                                                                 name="chk_comp_analiticas"
-                                                                id="chk_comp_analiticas_sim" value="sim"
-                                                                onchange="toggleJustificativaChecklist('chk_comp_analiticas')">
+                                                                id="chk_comp_analiticas_sim" value="sim">
                                                             <label class="form-check-label"
                                                                 for="chk_comp_analiticas_sim">Sim</label>
                                                         </div>
                                                         <div class="form-check form-check-inline">
                                                             <input class="form-check-input" type="radio"
                                                                 name="chk_comp_analiticas"
-                                                                id="chk_comp_analiticas_nao" value="nao"
-                                                                onchange="toggleJustificativaChecklist('chk_comp_analiticas')">
+                                                                id="chk_comp_analiticas_nao" value="nao">
                                                             <label class="form-check-label"
                                                                 for="chk_comp_analiticas_nao">Não</label>
                                                         </div>
+                                                        <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                            id="chk_comp_analiticas_obs_toggle"
+                                                            onclick="toggleObsChecklistManual('chk_comp_analiticas')"><i
+                                                                class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                            observação</button>
                                                         <div id="chk_comp_analiticas_obs_wrap" class="mt-2 d-none">
                                                             <textarea class="form-control form-control-sm"
-                                                                id="chk_comp_analiticas_obs" rows="2"
+                                                                id="chk_comp_analiticas_obs" rows="6"
                                                                 placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                         </div>
                                                     </div>
@@ -3537,31 +3548,51 @@
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
                                                             name="chk_docs_assinados" id="chk_docs_assinados_sim"
-                                                            value="sim"
-                                                            onchange="toggleJustificativaChecklist('chk_docs_assinados')">
+                                                            value="sim">
                                                         <label class="form-check-label"
                                                             for="chk_docs_assinados_sim">Sim</label>
                                                     </div>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
                                                             name="chk_docs_assinados" id="chk_docs_assinados_nao"
-                                                            value="nao"
-                                                            onchange="toggleJustificativaChecklist('chk_docs_assinados')">
+                                                            value="nao">
                                                         <label class="form-check-label"
                                                             for="chk_docs_assinados_nao">Não</label>
                                                     </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_docs_assinados_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_docs_assinados')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
                                                     <div id="chk_docs_assinados_obs_wrap" class="mt-2 d-none">
                                                         <textarea class="form-control form-control-sm"
-                                                            id="chk_docs_assinados_obs" rows="2"
+                                                            id="chk_docs_assinados_obs" rows="6"
                                                             placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
                                                     </div>
                                                 </div>
 
                                                 <div class="mb-0">
-                                                    <label class="form-label small fw-bold d-block">10. Outros</label>
-                                                    <textarea class="form-control form-control-sm"
-                                                        id="chk_outros_obs" rows="2"
-                                                        placeholder="Observações adicionais (opcional)"></textarea>
+                                                    <label class="form-label small fw-bold d-block">10. Outros
+                                                        documentos relevantes não listados acima?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_outros" id="chk_outros_sim" value="sim"
+                                                            onchange="toggleOutrosChecklist()">
+                                                        <label class="form-check-label"
+                                                            for="chk_outros_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_outros" id="chk_outros_nao" value="nao"
+                                                            onchange="toggleOutrosChecklist()">
+                                                        <label class="form-check-label"
+                                                            for="chk_outros_nao">Não</label>
+                                                    </div>
+                                                    <div id="chk_outros_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_outros_obs" rows="6"
+                                                            placeholder="Comente sobre a(s) outra(s) documentação(ões)"></textarea>
+                                                    </div>
                                                 </div>
                                             </form>
                                         </div>
@@ -3572,33 +3603,6 @@
                                                 id="btn-finalizar-checklist"
                                                 onclick="salvarChecklistAditivo()">
                                                 <i class="bi bi-check-circle me-1"></i> Finalizar Checklist
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Relatório da Análise Documental (checklist de documentação do aditivo) -->
-                            <div class="modal fade" id="modalRelatorioChecklistAditivo" tabindex="-1"
-                                aria-hidden="true">
-                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                                    <div class="modal-content border-0 shadow-lg">
-                                        <div class="modal-header bg-dark text-white py-2">
-                                            <h6 class="modal-title fw-bold mb-0"><i
-                                                    class="bi bi-file-text me-2"></i>RELATÓRIO DE ANÁLISE
-                                                DOCUMENTAL</h6>
-                                            <button type="button" class="btn-close btn-close-white m-0"
-                                                data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body bg-white p-0">
-                                            <div class="p-5" id="chk-relatorio-body"></div>
-                                        </div>
-                                        <div class="modal-footer py-2 bg-light d-print-none">
-                                            <button type="button" class="btn btn-secondary btn-sm"
-                                                data-bs-dismiss="modal">Fechar</button>
-                                            <button type="button" class="btn btn-outline-success btn-sm"
-                                                onclick="window.print()">
-                                                <i class="bi bi-printer me-1"></i> Imprimir / Salvar PDF
                                             </button>
                                         </div>
                                     </div>

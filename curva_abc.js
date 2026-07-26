@@ -738,7 +738,7 @@
     resetVisualizacao();
   }
 
-  async function carregarCurvaAbcDoProcesso(processoId, processoStr, versaoId, descricao) {
+  async function carregarCurvaAbcDoProcesso(processoId, processoStr, versaoId, descricao, forcarNova) {
     limpaErro();
     state.processoVinculado = { id: processoId, processo: processoStr, descricao: descricao || "" };
     pane.classList.add("tem-vinculo");
@@ -753,9 +753,11 @@
 
     state.versaoMaisRecenteDoVinculo = (data && data.length) ? data[0] : null;
 
-    if (!data || !data.length) {
-      /* nenhuma versão salva ainda: limpa qualquer curva anterior em tela e fica
-         na dropzone, já vinculado a este processo, pronta pra um upload novo */
+    if (forcarNova || !data || !data.length) {
+      /* nenhuma versão salva ainda (ou o analista pediu explicitamente uma nova
+         análise, botão "Nova Curva ABC" em Gerenciar Processo): limpa qualquer
+         curva anterior em tela e fica na dropzone, já vinculado a este processo,
+         pronta pra um upload novo — sem mexer nas versões já existentes. */
       resetVisualizacao();
       atualizarBotaoSalvar();
       return;

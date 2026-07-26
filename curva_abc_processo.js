@@ -10,14 +10,17 @@
 
   function el(id) { return document.getElementById(id); }
   function esc(s) { return (typeof escapeHTML === "function") ? escapeHTML(s) : String(s == null ? "" : s); }
+  // Mesma regra de escrita usada pela RLS de curva_abc_versoes/itens (admin ou gerente).
+  function podeEscreverCurvaAbc() {
+    return (typeof getCurrentUserRole === "function")
+      && (getCurrentUserRole() === "admin" || getCurrentUserRole() === "gerente");
+  }
 
   /* ---------- resumo em GERENCIAR PROCESSO ---------- */
   async function carregarCurvaAbcResumo(processoStr, processoId) {
     var elStatus = el("det_curva_abc_status");
     var elHistWrap = el("det_curva_abc_historico_wrap");
     var elHist = el("det_curva_abc_historico");
-    var btn = el("btn-abrir-curva-abc-processo");
-    var btnRelatorio = el("btn-relatorio-tecnico");
     if (!elStatus) return;
 
     elStatus.innerHTML = '<em class="text-muted">Carregando...</em>';
@@ -33,8 +36,6 @@
 
       if (!data || !data.length) {
         elStatus.innerHTML = '<em class="text-muted">Nenhuma Curva ABC importada ainda.</em>';
-        if (btn) btn.textContent = "Importar planilha";
-        if (btnRelatorio) btnRelatorio.style.display = "none";
         if (elHist) elHist.innerHTML = "";
         if (typeof atualizarBadgeAba === "function") atualizarBadgeAba("gp-badge-tecnica", 0);
         return;
@@ -47,41 +48,44 @@
         .eq("versao_id", atual.id);
       if (errItens) throw errItens;
 
-      var okN = 0, incN = 0, pendN = 0;
+      var incN = 0;
       (itensStatus || []).forEach(function (x) {
-        if (x.status_analise === "ok") okN++;
-        else if (x.status_analise === "inconsistencia") incN++;
-        else pendN++;
+        if (x.status_analise === "inconsistencia") incN++;
       });
 
-      var dt = atual.created_at ? new Date(atual.created_at).toLocaleString("pt-BR") : "";
-      var badge = incN > 0
-        ? '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">' + incN + ' inconsistência(s)</span>'
-        : (pendN > 0
-          ? '<span class="badge bg-warning-subtle text-warning border border-warning-subtle">' + pendN + ' pendente(s)</span>'
-          : '<span class="badge bg-success-subtle text-success border border-success-subtle">Análise completa</span>');
-
-      elStatus.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-1">'
-        + '<div>' + badge + ' <span class="text-muted ms-1">Versão ' + atual.versao + ' · ' + (atual.total_itens || (itensStatus || []).length) + ' itens</span></div>'
-        + '</div>'
-        + '<div class="text-muted" style="font-size:0.7rem;">Enviado por ' + esc(atual.autor_nome || "") + ' em ' + dt + '</div>';
-
-      if (btn) btn.textContent = "Analisar versão atual";
-      if (btnRelatorio) btnRelatorio.style.display = "";
+      // Com pelo menos uma versão salva, o resumo/status some daqui: a lista de
+      // versões abaixo (com o botão "Curva ABC" na linha "· Atual") já cobre tanto
+      // abrir a análise corrente quanto ver o resultado — sem duplicar informação.
+      elStatus.innerHTML = "";
       if (typeof atualizarBadgeAba === "function") atualizarBadgeAba("gp-badge-tecnica", incN);
 
-      if (elHist && data.length > 1) {
-        elHist.innerHTML = data.slice(1).map(function (v) {
+      // Lista de todas as versões, da mais antiga (01) pra mais nova, cada uma com
+      // botão pra abrir a análise (Curva ABC), gerar o relatório e excluir aquela
+      // versão específica — inclusive a versão atual, marcada com "· Atual".
+      var podeExcluir = podeEscreverCurvaAbc();
+      if (elHist) {
+        var ascendente = data.slice().reverse();
+        elHist.innerHTML = ascendente.map(function (v) {
           var vdt = v.created_at ? new Date(v.created_at).toLocaleString("pt-BR") : "";
-          return '<div class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center">'
-            + '<div><span class="fw-bold text-dark">Versão ' + v.versao + '</span>'
-            + '<span class="text-muted"> · ' + esc(v.autor_nome || "") + ' em ' + vdt + '</span></div>'
-            + '<button type="button" class="btn btn-link btn-sm p-0" onclick="abrirCurvaAbcDoProcesso(' + v.id + ')">Ver</button>'
+          var numero = String(v.versao).padStart(2, "0");
+          var ehAtual = v.id === atual.id;
+          return '<div class="mb-2 pb-2 border-bottom border-light d-flex justify-content-between align-items-center flex-wrap gap-2">'
+            + '<div><span class="fw-bold text-dark">Versão ' + numero + '</span>'
+            + '<span class="text-muted"> · ' + esc(v.autor_nome || "") + ' em ' + vdt + '</span>'
+            + (ehAtual ? ' <span class="text-success fw-bold">· Atual</span>' : '') + '</div>'
+            + '<div class="d-flex gap-2">'
+            + '<button type="button" class="btn btn-sm btn-outline-primary" onclick="abrirCurvaAbcDoProcesso(' + v.id + ')">'
+            + '<i class="bi bi-bar-chart-fill me-1"></i>Curva ABC</button>'
+            + '<button type="button" class="btn btn-sm btn-outline-success" onclick="gerarRelatorioTecnicoDoProcesso(' + v.id + ')">'
+            + '<i class="bi bi-file-earmark-text me-1"></i>Relatório</button>'
+            + (podeExcluir
+              ? '<button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirVersaoCurvaAbc(' + v.id + ', ' + numero + ')" title="Excluir esta versão">'
+                + '<i class="bi bi-trash-fill"></i></button>'
+              : '')
+            + '</div>'
             + '</div>';
         }).join("");
         if (elHistWrap) elHistWrap.style.display = "";
-      } else if (elHist) {
-        elHist.innerHTML = "";
       }
     } catch (err) {
       console.error("Erro ao carregar Curva ABC do processo:", err);
@@ -89,28 +93,53 @@
     }
   }
 
+  /* ---------- exclusão de uma versão da Curva ABC ----------
+     Apaga curva_abc_versoes (curva_abc_itens some junto via on delete cascade).
+     Não reordena o número das demais versões — a Versão 03 continua "03" mesmo
+     se a 02 for apagada, pra não confundir quem já viu/citou aquele número antes. */
+  async function excluirVersaoCurvaAbc(versaoId, numeroVersao) {
+    if (!podeEscreverCurvaAbc()) return;
+    var ok = confirm("Excluir a Versão " + numeroVersao + " da Curva ABC? Essa ação não pode ser desfeita.");
+    if (!ok) return;
+
+    var { error } = await sbClient.from("curva_abc_versoes").delete().eq("id", versaoId);
+    if (error) { alert("Erro ao excluir a versão: " + error.message); return; }
+
+    if (typeof registrarAtividade === "function") {
+      registrarAtividade("PROCESSO", "excluiu a Versão " + numeroVersao + " da Curva ABC do processo Nº " + curvaAbcProcessoState.processoStr, curvaAbcProcessoState.processoStr);
+    }
+    await carregarCurvaAbcResumo(curvaAbcProcessoState.processoStr, curvaAbcProcessoState.processoId);
+  }
+
   /* ---------- relatório de análise técnica, direto de GERENCIAR PROCESSO ----------
-     Reaproveita o mesmo formato/modal de cvGerarRelatorioComentarios (curva_abc.js),
-     mas busca os itens comentados diretamente no Supabase — não depende da aba Curva
-     ABC estar aberta/carregada, já que aqui o analista pode nem ter navegado até lá. */
-  async function gerarRelatorioTecnicoDoProcesso() {
+     Mesmo conteúdo de cvGerarRelatorioComentarios (curva_abc.js), mas busca os itens
+     comentados diretamente no Supabase — não depende da aba Curva ABC estar
+     aberta/carregada, já que aqui o analista pode nem ter navegado até lá. Aceita um
+     versaoId opcional pra gerar o relatório de uma versão específica do histórico
+     (por padrão, usa a mais recente). Abre em nova aba (documento HTML separado) em
+     vez de reaproveitar o modalCvRelatorioComentarios: aberto de dentro de
+     GERENCIAR PROCESSO ele fica aninhado num modal já aberto, o que esbarra numa
+     regra própria do sistema que fixa o z-index de .modal/.modal-backdrop em
+     !important e impede o relatório de aparecer por cima (mesmo problema já
+     corrigido no relatório de Análise Documental). */
+  async function gerarRelatorioTecnicoDoProcesso(versaoId) {
     var processoId = curvaAbcProcessoState.processoId;
     var processoStr = curvaAbcProcessoState.processoStr;
     var descricao = curvaAbcProcessoState.descricao;
 
-    var { data: versoes, error: errV } = await sbClient
-      .from("curva_abc_versoes")
-      .select("*")
-      .eq("processo_id", String(processoId))
-      .order("versao", { ascending: false })
-      .limit(1);
+    var versaoQuery = sbClient.from("curva_abc_versoes").select("*");
+    versaoQuery = versaoId
+      ? versaoQuery.eq("id", versaoId)
+      : versaoQuery.eq("processo_id", String(processoId)).order("versao", { ascending: false }).limit(1);
+    var { data: versoes, error: errV } = await versaoQuery;
     if (errV) { alert("Erro ao buscar a Curva ABC: " + errV.message); return; }
     if (!versoes || !versoes.length) { alert("Nenhuma Curva ABC importada ainda para este processo."); return; }
+    var versaoRegistro = versoes[0];
 
     var { data: itens, error: errI } = await sbClient
       .from("curva_abc_itens")
       .select("*")
-      .eq("versao_id", versoes[0].id)
+      .eq("versao_id", versaoRegistro.id)
       .order("posicao", { ascending: true });
     if (errI) { alert("Erro ao buscar os itens da Curva ABC: " + errI.message); return; }
 
@@ -123,7 +152,7 @@
     partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
     partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Técnica — GECOPE</p>');
     partes.push('<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ' + esc(processoStr)
-      + (descricao ? ' — ' + esc(descricao) : '') + '</p>');
+      + (descricao ? ' — ' + esc(descricao) : '') + ' — Versão ' + versaoRegistro.versao + '</p>');
     partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, resolve-se retornar o processo à Fiscalização com os seguintes apontamentos:</p>');
     comentados.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.descricao) + ':</strong></p>');
@@ -131,8 +160,25 @@
     });
     partes.push('</div>');
 
-    document.getElementById("cv-relatorio-comentarios-body").innerHTML = partes.join("");
-    bootstrap.Modal.getOrCreateInstance(document.getElementById("modalCvRelatorioComentarios")).show();
+    var janela = window.open('', '_blank');
+    if (!janela) {
+      alert('O navegador bloqueou a abertura do relatório em nova aba. Permita pop-ups para este site e tente novamente.');
+      return;
+    }
+    janela.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
+      + '<title>Relatório de Análise Técnica — ' + esc(processoStr) + '</title>'
+      + '<style>'
+      + 'body{margin:0;background:#f1f3f5;}'
+      + '.rel-toolbar{padding:12px 20px;background:#212529;text-align:right;}'
+      + '.rel-toolbar button{padding:8px 18px;font-weight:600;border:none;border-radius:4px;background:#198754;color:#fff;cursor:pointer;}'
+      + '.rel-toolbar button:hover{background:#157347;}'
+      + '.rel-page{max-width:800px;margin:20px auto;background:#fff;padding:50px;box-shadow:0 1px 4px rgba(0,0,0,0.15);}'
+      + '@media print{.rel-toolbar{display:none;}body{background:#fff;}.rel-page{box-shadow:none;margin:0;max-width:none;}}'
+      + '</style></head><body>'
+      + '<div class="rel-toolbar"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>'
+      + '<div class="rel-page">' + partes.join('') + '</div>'
+      + '</body></html>');
+    janela.document.close();
   }
 
   /* ---------- navegação para a aba Curva ABC, já carregada com o processo ---------- */
@@ -155,7 +201,31 @@
     }, 50);
   }
 
+  /* ---------- botão "Nova Curva ABC" de Gerenciar Processo ----------
+     Diferente de abrirCurvaAbcDoProcesso: não carrega nenhuma versão existente,
+     vai direto pra dropzone (já vinculada ao processo) pronta pra receber a
+     planilha da nova análise — vira uma versão nova ao salvar, sem tocar nas
+     versões anteriores. */
+  function iniciarNovaCurvaAbcDoProcesso() {
+    var modalDetalhesEl = document.getElementById("modalDetalhes");
+    var modalDetalhes = modalDetalhesEl ? bootstrap.Modal.getInstance(modalDetalhesEl) : null;
+    if (modalDetalhes) modalDetalhes.hide();
+
+    var processoId = curvaAbcProcessoState.processoId;
+    var processoStr = curvaAbcProcessoState.processoStr;
+    var descricao = curvaAbcProcessoState.descricao;
+
+    showPane("pane-curva-abc");
+    setTimeout(function () {
+      if (typeof carregarCurvaAbcDoProcesso === "function") {
+        carregarCurvaAbcDoProcesso(processoId, processoStr, null, descricao, true);
+      }
+    }, 50);
+  }
+
   window.carregarCurvaAbcResumo = carregarCurvaAbcResumo;
   window.abrirCurvaAbcDoProcesso = abrirCurvaAbcDoProcesso;
+  window.iniciarNovaCurvaAbcDoProcesso = iniciarNovaCurvaAbcDoProcesso;
   window.gerarRelatorioTecnicoDoProcesso = gerarRelatorioTecnicoDoProcesso;
+  window.excluirVersaoCurvaAbc = excluirVersaoCurvaAbc;
 })();
