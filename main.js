@@ -2090,7 +2090,9 @@ async function abrirDetalhes(processoStr) {
 
     document.getElementById('msg-detalhes').style.display = 'none';
     document.getElementById('btn-atualizar').innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
-    document.getElementById('btn-excluir').innerHTML = '<i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO';
+    const btnExcluirModal = document.getElementById('btn-excluir');
+    btnExcluirModal.innerHTML = '<i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO';
+    btnExcluirModal.disabled = false;
 
     // Audit Info Display
     const dtCriacao = row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : '';
