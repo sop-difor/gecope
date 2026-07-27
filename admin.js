@@ -166,10 +166,10 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="ps-4">
-                        <div class="fw-bold text-dark">${nomeComp}</div>
-                        <div class="small text-muted">${u.email}</div>
+                        <div class="fw-bold text-dark">${escapeHTML(nomeComp)}</div>
+                        <div class="small text-muted">${escapeHTML(u.email)}</div>
                     </td>
-                    <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(u.matricula) || '-'}</span></td>
                     <td><span class="text-muted small">${dataSolic}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
@@ -179,10 +179,10 @@
                                 <option value="gerente">GERENTE</option>
                                 <option value="admin">ADMIN</option>
                             </select>
-                            <button class="btn btn-sm btn-success" onclick="aprovarUsuario('${u.email}', document.getElementById('role-pending-${u.id}').value)">
+                            <button class="btn btn-sm btn-success" data-email="${escapeHTML(u.email)}" data-role-select-id="role-pending-${u.id}" onclick="aprovarUsuario(this.dataset.email, document.getElementById(this.dataset.roleSelectId).value)">
                                 <i class="bi bi-check-lg me-1"></i> Aprovar
                             </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="excluirUsuario('${u.email}')" title="Recusar">
+                            <button class="btn btn-sm btn-outline-danger" data-email="${escapeHTML(u.email)}" onclick="excluirUsuario(this.dataset.email)" title="Recusar">
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
@@ -199,10 +199,10 @@
                 const selectId = `role-notif-${n.notif_id || idx}`;
                 tr.innerHTML = `
                     <td class="ps-4">
-                        <div class="fw-bold text-dark">${nomeComp} <small class="text-muted">(notificação)</small></div>
-                        <div class="small text-muted">${n.matricula ? (n.matricula + '@gecope.app') : 'sem matrícula'}</div>
+                        <div class="fw-bold text-dark">${escapeHTML(nomeComp)} <small class="text-muted">(notificação)</small></div>
+                        <div class="small text-muted">${n.matricula ? (escapeHTML(n.matricula) + '@gecope.app') : 'sem matrícula'}</div>
                     </td>
-                    <td><span class="badge bg-light text-dark border fw-normal">${n.matricula || '-'}</span></td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(n.matricula) || '-'}</span></td>
                     <td><span class="text-muted small">${dataSolic}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
@@ -212,10 +212,10 @@
                                 <option value="gerente">GERENTE</option>
                                 <option value="admin">ADMIN</option>
                             </select>
-                            <button class="btn btn-sm btn-success" onclick="aprovarFromNotification('${n.notif_id}', document.getElementById('${selectId}').value, '${n.matricula}', '${(n.nome||'').replace(/'/g,'&#39;')}', '${(n.email||'').replace(/'/g,'&#39;')}')">
+                            <button class="btn btn-sm btn-success" data-notif-id="${escapeHTML(n.notif_id)}" data-role-select-id="${selectId}" data-matricula="${escapeHTML(n.matricula)}" data-nome="${escapeHTML(n.nome)}" data-email="${escapeHTML(n.email)}" onclick="aprovarFromNotification(this.dataset.notifId, document.getElementById(this.dataset.roleSelectId).value, this.dataset.matricula, this.dataset.nome, this.dataset.email)">
                                 <i class="bi bi-check-lg me-1"></i> Aprovar
                             </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="recusarNotification('${n.notif_id}')" title="Recusar">
+                            <button class="btn btn-sm btn-outline-danger" data-notif-id="${escapeHTML(n.notif_id)}" onclick="recusarNotification(this.dataset.notifId)" title="Recusar">
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
@@ -253,21 +253,21 @@
                 tr.innerHTML = `
                     <td class="ps-4">
                         <div class="d-flex align-items-center gap-2">
-                            <div class="admin-user-avatar">${iniciais}</div>
-                            <div class="fw-bold text-dark">${fullNome}</div>
+                            <div class="admin-user-avatar">${escapeHTML(iniciais)}</div>
+                            <div class="fw-bold text-dark">${escapeHTML(fullNome)}</div>
                         </div>
                     </td>
-                    <td><div class="small text-muted">${u.email}</div></td>
-                    <td><div class="small fw-bold text-secondary">${u.telefone_whatsapp || '-'}</div></td>
-                    <td><span class="badge bg-light text-dark border fw-normal">${u.matricula || '-'}</span></td>
-                    <td><span class="badge bg-light text-dark border fw-normal">${u.gedop || '-'}</span></td>
+                    <td><div class="small text-muted">${escapeHTML(u.email)}</div></td>
+                    <td><div class="small fw-bold text-secondary">${escapeHTML(u.telefone_whatsapp) || '-'}</div></td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(u.matricula) || '-'}</span></td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(u.gedop) || '-'}</span></td>
                     <td><span class="badge rounded-pill ${roleClass} px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
-                            <button class="btn-action-icon" onclick="abrirModalEdicaoUsuario('${u.email}')" title="Editar Usuário">
+                            <button class="btn-action-icon" data-email="${escapeHTML(u.email)}" onclick="abrirModalEdicaoUsuario(this.dataset.email)" title="Editar Usuário">
                                 <i class="bi bi-pencil icon-cloud"></i>
                             </button>
-                            <button class="btn-action-icon" onclick="excluirUsuario('${u.email}')" title="Excluir Usuário">
+                            <button class="btn-action-icon" data-email="${escapeHTML(u.email)}" onclick="excluirUsuario(this.dataset.email)" title="Excluir Usuário">
                                 <i class="bi bi-trash-fill icon-trash"></i>
                             </button>
                         </div>

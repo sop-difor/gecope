@@ -56,15 +56,6 @@
 
 
 
-        /* Badge Status Em Revisão (Ajuste) */
-        .badge-status-revisao {
-            background-color: #ffc107;
-            /* Amarelo */
-            color: #000;
-            font-size: 0.65rem;
-            margin-left: 8px;
-        }
-
         /* Ajuste para esconder botões em logs de sistema */
         .system-log-entry {
             background-color: #f8f9fa;
@@ -127,11 +118,6 @@
             color: #0d6efd;
         }
 
-        /* Azul */
-        .icon-chat {
-            color: #6c757d;
-        }
-
         /* Cinza */
         .icon-trash {
             color: #dc3545;
@@ -175,40 +161,6 @@
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08) !important;
         }
 
-        /* Classe custom para altura dos cards do dashboard */
-        .h-150 {
-            min-height: 120px !important;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .admin-stat-icon-wrapper {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1rem;
-        }
-
-        .admin-stat-label {
-            font-size: 0.72rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: #64748b;
-            margin-bottom: 0.5rem;
-        }
-
-        .admin-stat-value {
-            font-size: 2rem;
-            font-weight: 800;
-            line-height: 1;
-            margin-bottom: 0;
-            color: #1e293b;
-        }
-
         /* Accordion Retrofit */
         .admin-accordion-card {
             border-radius: 16px !important;
@@ -216,79 +168,6 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04) !important;
             margin-bottom: 1.75rem !important;
             overflow: hidden;
-        }
-
-        .admin-accordion-header {
-            padding: 1.25rem 1.5rem !important;
-            border: 1px solid rgba(0, 0, 0, 0.02) !important;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-
-        .admin-accordion-header:hover {
-            filter: brightness(0.98);
-        }
-
-        .admin-accordion-header h6 {
-            font-size: 1rem;
-            letter-spacing: -0.2px;
-        }
-
-        /* Soft Header Variations */
-        .header-soft-green {
-            background: linear-gradient(90deg, #f0fdf4 0%, #dcfce7 100%);
-            color: #166534 !important;
-            border-left: 6px solid #22c55e !important;
-        }
-
-        .header-soft-blue {
-            background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
-            color: #1e40af !important;
-            border-left: 6px solid #3b82f6 !important;
-        }
-
-        .header-soft-orange {
-            background: linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%);
-            color: #92400e !important;
-            border-left: 6px solid #f59e0b !important;
-        }
-
-        .header-soft-red {
-            background: linear-gradient(90deg, #fef2f2 0%, #fee2e2 100%);
-            color: #991b1b !important;
-            border-left: 6px solid #ef4444 !important;
-        }
-
-        .header-soft-dark {
-            background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
-            color: #1e293b !important;
-            border-left: 6px solid #475569 !important;
-        }
-
-        /* Icon backgrounds */
-        .icon-bg-green {
-            background-color: #dcfce7;
-            color: #166534;
-        }
-
-        .icon-bg-blue {
-            background-color: #dbeafe;
-            color: #1e40af;
-        }
-
-        .icon-bg-orange {
-            background-color: #fef3c7;
-            color: #92400e;
-        }
-
-        .icon-bg-red {
-            background-color: #fee2e2;
-            color: #991b1b;
-        }
-
-        .icon-bg-slate {
-            background-color: #f1f5f9;
-            color: #475569;
         }
 
         /* ... outros estilos existentes ... */
@@ -311,35 +190,6 @@
             font-size: 0.85rem;
             color: #888;
             font-weight: 500;
-        }
-
-        /* Ajuste na Barra de Pesquisa para caber neste card */
-        .search-pill-group-hero {
-            width: 100%;
-            background-color: #f8f9fa;
-            /* Fundo cinza bem claro para contrastar com o card branco */
-            border: 1px solid #e9ecef;
-            border-radius: 50px;
-            display: flex;
-            align-items: center;
-            padding: 8px 20px;
-            transition: all 0.3s ease;
-        }
-
-        .search-pill-group-hero:focus-within {
-            background-color: #fff;
-            border-color: var(--sop-green);
-            box-shadow: 0 4px 12px rgba(0, 143, 61, 0.1);
-        }
-
-        .search-input-hero {
-            border: none;
-            background: transparent;
-            width: 100%;
-            font-size: 0.95rem;
-            color: #444;
-            outline: none !important;
-            margin-left: 10px;
         }
 
         /* ------------------------------------------------------------------------
@@ -677,7 +527,6 @@
         .home-action-icon.bg-blue { background: #0d6efd; box-shadow: 0 4px 10px -2px #0d6efd; }
         .home-action-icon.bg-purple { background: #6f42c1; box-shadow: 0 4px 10px -2px #6f42c1; }
         .home-action-icon.bg-teal { background: #0d9488; box-shadow: 0 4px 10px -2px #0d9488; }
-        .home-action-icon.bg-indigo { background: #4f46e5; box-shadow: 0 4px 10px -2px #4f46e5; }
         .home-action-icon.bg-slate { background: #475569; box-shadow: 0 4px 10px -2px #475569; }
 
         .home-action-text h3 {
@@ -855,31 +704,37 @@
             }
         }
 
+        /* Fundo branco (mesmo tom do painel que envolve), sem o preenchimento cinza
+           de antes — a separação entre os cards vem de uma sombra suave "flutuando"
+           sobre o painel, não de uma caixa cinza cheia. Efeito 3D discreto, não um
+           bloco de cor à parte. */
         .activity-item {
-            background: var(--sop-slate-50);
+            background: var(--sop-white);
             border-radius: 12px;
             padding: 15px;
             display: flex;
             align-items: flex-start;
             gap: 12px;
-            border: 1px solid var(--sop-slate-100);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 3px 8px -3px rgba(15, 23, 42, 0.10);
             transition: all 0.2s ease;
             height: 100%;
         }
         body.theme-dark .activity-item {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.07);
+            background: rgba(255, 255, 255, 0.025);
+            border-color: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.35);
         }
 
         .activity-item:hover {
             border-color: rgba(0, 143, 61, 0.3);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.14);
             transform: translateY(-2px);
         }
         body.theme-dark .activity-item:hover {
-            background: rgba(255, 255, 255, 0.09);
+            background: rgba(255, 255, 255, 0.05);
             border-color: rgba(76, 193, 124, 0.4);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.45);
         }
 
         .activity-icon-box {
@@ -962,63 +817,6 @@
         /* ------------------------------------------------------------------------
        NOVO DESIGN: ABA DE ORAMENTOS (UPLOAD, SEARCH & LISTA)
        ------------------------------------------------------------------------ */
-
-        /* 1. Barra de Pesquisa "Pílula" (Centralizada e Moderna) */
-        .search-container-wrapper {
-            background-color: transparent;
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: center;
-            /* Centraliza a barra na tela */
-            padding: 0 15px;
-        }
-
-        .search-pill-group {
-            width: 100%;
-            max-width: 700px;
-            /* Largura máxima para não ficar gigante em monitores */
-            background-color: #ffffff;
-            border: 1px solid #e0e0e0;
-            border-radius: 50px;
-            /* Borda totalmente arredondada */
-            display: flex;
-            align-items: center;
-            padding: 5px 15px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-            /* Sombra suave */
-            transition: all 0.3s ease;
-        }
-
-        /* Efeito de foco na barra de pesquisa */
-        .search-pill-group:focus-within {
-            border-color: var(--sop-green);
-            box-shadow: 0 4px 15px rgba(0, 143, 61, 0.15);
-            transform: translateY(-1px);
-        }
-
-        .search-icon-wrapper {
-            color: #999;
-            font-size: 1.1rem;
-            padding-right: 12px;
-            display: flex;
-            align-items: center;
-        }
-
-        /* Campo de texto limpo (sem bordas padrão) */
-        .search-input-clean {
-            border: none;
-            background: transparent;
-            width: 100%;
-            height: 40px;
-            font-size: 0.95rem;
-            color: #333;
-            outline: none !important;
-        }
-
-        .search-input-clean::placeholder {
-            color: #bbb;
-            font-weight: 400;
-        }
 
         /* 2. Acordeão (Categorias Principais) */
         .accordion-custom-item {
@@ -1571,16 +1369,6 @@
             min-height: 120px;
         }
 
-        .admin-section-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--sop-slate-800);
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
         #pane-admin .card {
             border-radius: 16px !important;
         }
@@ -1610,13 +1398,6 @@
             border-bottom: 1px solid var(--sop-slate-100) !important;
         }
 
-        .config-card-footer {
-            background-color: var(--sop-slate-50);
-            padding: 15px 20px;
-            border-top: 1px solid var(--sop-slate-100);
-        }
-
-
         .icon-xls {
 
             background-color: #e6f4ea;
@@ -1636,25 +1417,6 @@
         }
 
         /* Azul Genérico */
-
-        /* Botão "Novo Orçamento" */
-        .btn-novo-orcamento {
-            background-color: var(--sop-green);
-            border: none;
-            padding: 10px 24px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            border-radius: 50px;
-            /* Redondo estilo Pílula */
-            box-shadow: 0 4px 6px rgba(0, 143, 61, 0.2);
-            transition: transform 0.2s, background-color 0.2s;
-        }
-
-        .btn-novo-orcamento:hover {
-            background-color: var(--sop-green-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 143, 61, 0.3);
-        }
 
         /* ------------------------------------------------------------------------
        ESTILOS PADRO (CABEALHO, KPIS, MODAIS) - MANTIDOS
@@ -2324,12 +2086,6 @@
             color: #000000;
             border: 1px solid #FFC107;
             font-weight: 700;
-        }
-
-        .badge-status-light-green {
-            background-color: #D1E7DD;
-            color: #0f5132;
-            border: 1px solid #badbcc;
         }
 
         .badge-status-fiscal {
@@ -3008,53 +2764,6 @@
             }
         }
 
-        /* ESTILOS DO HISTÓRICO DE REVISÃO */
-        .history-container {
-            margin-left: 20px;
-            margin-top: 5px;
-            margin-bottom: 15px;
-            padding-left: 15px;
-            border-left: 2px solid #e0e0e0;
-        }
-
-        .history-item {
-            font-size: 0.8rem;
-            color: #555;
-            background-color: #f9f9f9;
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin-bottom: 6px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .history-header {
-            font-weight: 700;
-            color: var(--sop-green-dark);
-            font-size: 0.75rem;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .history-msg {
-            margin-top: 4px;
-        }
-
-        .history-link {
-            display: inline-block;
-            margin-top: 4px;
-            color: var(--sop-blue);
-            font-weight: 600;
-            text-decoration: none;
-            font-size: 0.75rem;
-        }
-
-        .history-link:hover {
-            text-decoration: underline;
-        }
-
-
-
         /* Estilo do botão de cadeado */
         .btn-admin-login {
             background: none;
@@ -3098,11 +2807,6 @@
         /* Garante visibilidade padrão dos itens de menu */
         #dashboardTabs .nav-item {
             display: block;
-        }
-
-        /* Esconde as abas restritas se não tiver a classe is-admin no body */
-        body:not(.is-admin) .admin-tab {
-            display: none !important;
         }
 
         .btn-toggle-history:hover {
@@ -3150,13 +2854,6 @@
             color: #888;
             text-transform: uppercase;
             font-weight: 700;
-        }
-
-        /* Texto da mensagem */
-        .history-card-msg {
-            font-size: 0.9rem;
-            color: #333;
-            margin-bottom: 8px;
         }
 
         /* Botão do Anexo dentro do card */
@@ -3359,8 +3056,6 @@
         body.theme-dark .history-card-item,
         body.theme-dark .multiselect-btn,
         body.theme-dark .admin-accordion-card,
-        body.theme-dark .search-pill-group,
-        body.theme-dark .search-pill-group-hero,
         body.theme-dark .btn-action-baixar,
         body.theme-dark .btn-action-icon,
         body.theme-dark .proc-btn-pdf {
@@ -3630,16 +3325,6 @@
             border-color: rgba(255, 255, 255, 0.12) !important;
         }
 
-        body.theme-dark .dropdown-item {
-            color: rgba(255, 255, 255, 0.85) !important;
-        }
-
-        body.theme-dark .dropdown-item:hover,
-        body.theme-dark .dropdown-item:focus {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
-        }
-
         /* Multiselect de FISCAL/STATUS (filtros do Painel de Processos): as
            opções são <div class="multiselect-option"> soltas dentro do
            .dropdown-menu, não .dropdown-item — por isso não herdavam o fix de
@@ -3696,16 +3381,10 @@
 
         /* Botões claros */
         body.theme-dark .btn-light,
-        body.theme-dark .btn-outline-secondary,
-        body.theme-dark .btn-outline-dark {
+        body.theme-dark .btn-outline-secondary {
             background-color: rgba(255, 255, 255, 0.08) !important;
             color: rgba(255, 255, 255, 0.85) !important;
             border-color: rgba(255, 255, 255, 0.2) !important;
-        }
-
-        body.theme-dark .btn-white {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            color: #ffffff !important;
         }
 
         /* Textos utilitários do Bootstrap */

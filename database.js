@@ -39,19 +39,24 @@
         }
     }
 
-    // Helper simples para invocar funções do Supabase Edge
-    async function invokeFunction(name, opts) {
-        if (!sbClient || !sbClient.functions) throw new Error('Supabase client não inicializado');
-        return sbClient.functions.invoke(name, opts);
-    }
-
     // Expor API mínima
     window.initSupabaseClient = initSupabaseClient;
-    window.invokeFunction = invokeFunction;
     window.sbClient = sbClient; // garante que está exposto
 
     // Auto-init quando o script for carregado (se supabase já estiver disponível)
-    try { initSupabaseClient(); } catch (e) { /* noop */ }
-    window.addEventListener && window.addEventListener('load', initSupabaseClient);
+    try { initSupabaseClient(); } catch (e) { console.error('[Supabase] Falha ao inicializar:', e); }
+    window.addEventListener('load', () => {
+        try { initSupabaseClient(); } catch (e) { console.error('[Supabase] Falha ao inicializar (load):', e); }
+        // Se, mesmo depois do carregamento completo da página, o cliente continuar nulo,
+        // o CDN do Supabase provavelmente foi bloqueado (ad-blocker, proxy, rede) — sem
+        // este aviso, toda chamada a sbClient.from(...) falha silenciosamente com um
+        // TypeError, e a tela simplesmente fica travada sem explicação ao usuário.
+        setTimeout(() => {
+            if (!window.sbClient) {
+                console.error('[Supabase] Cliente não inicializado após o carregamento da página.');
+                alert('Não foi possível conectar ao banco de dados. Verifique sua conexão com a internet ou desative bloqueadores de anúncio/script para este site, e recarregue a página.');
+            }
+        }, 4000);
+    });
 
 })(window);

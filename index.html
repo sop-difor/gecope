@@ -30,6 +30,7 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
 </head>
 
 <body class="login-active">
@@ -102,12 +103,12 @@
                         <form id="landingRegisterForm">
                             <div class="row g-2 mb-3">
                                 <div class="col"><input id="reg-nome" type="text" placeholder="Nome"
-                                        class="form-control landing-input" required /></div>
+                                        class="form-control landing-input" maxlength="60" required /></div>
                                 <div class="col"><input id="reg-sobrenome" type="text" placeholder="Sobrenome"
-                                        class="form-control landing-input" required /></div>
+                                        class="form-control landing-input" maxlength="60" required /></div>
                             </div>
                             <div class="mb-3"><input id="reg-matricula" type="text" placeholder="Matrícula"
-                                    class="form-control landing-input" required /></div>
+                                    class="form-control landing-input" maxlength="20" required /></div>
                             <div class="mb-3"><input id="reg-email" type="email" placeholder="E-mail Institucional"
                                     class="form-control landing-input" required /></div>
                             <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha"
@@ -683,11 +684,11 @@
                                                             <i class="bi bi-arrow-clockwise"></i> Atualizar
                                                         </button>
                                                         <a href="https://evolution-api-production-1522.up.railway.app/manager"
-                                                            target="_blank" class="btn btn-sm btn-info text-white">
+                                                            target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-info text-white">
                                                             <i class="bi bi-chat-left-dots"></i> Ver Mensagens (API)
                                                         </a>
                                                         <a href="https://evolution-api-production-1522.up.railway.app/manager"
-                                                            target="_blank" class="btn btn-sm btn-success">
+                                                            target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-success">
                                                             <i class="bi bi-qr-code-scan"></i> Conectar
                                                         </a>
                                                     </div>
@@ -3084,7 +3085,7 @@
                                                                             INCC-DI
                                                                         </button>
                                                                         <a href="https://sindusconce.com.br/indices-economicos/"
-                                                                            target="_blank"
+                                                                            target="_blank" rel="noopener noreferrer"
                                                                             class="btn btn-sm btn-outline-primary py-0"
                                                                             style="font-size: 0.8rem;"
                                                                             title="Consultar Manualmente">
