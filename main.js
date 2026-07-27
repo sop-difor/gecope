@@ -2330,6 +2330,7 @@ function gerarRelatorioChecklistAditivo(checklistId) {
 
     const partes = [];
     partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push(montarCabecalhoLogosRelatorio());
     partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Documental — GECOPE</p>');
     partes.push(`<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ${escapeHTML(checklistAditivoState.processoStr || '')}${versao ? ' — Versão ' + versao : ''}</p>`);
     partes.push(`<p style="margin:0 0 1em 0">Em conferência da documentação mínima exigida para o aditivo deste processo (checklist preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt} — 1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}), verificou-se o seguinte:</p>`);

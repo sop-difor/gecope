@@ -150,6 +150,7 @@
 
     var partes = [];
     partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push(montarCabecalhoLogosRelatorio());
     partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Técnica — GECOPE</p>');
     partes.push('<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ' + esc(processoStr)
       + (descricao ? ' — ' + esc(descricao) : '') + ' — Versão ' + versaoRegistro.versao + '</p>');

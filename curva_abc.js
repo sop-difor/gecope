@@ -530,12 +530,13 @@
 
     var partes = [];
     partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push(montarCabecalhoLogosRelatorio());
     partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Técnica — GECOPE</p>');
     if (state.processoVinculado) {
       partes.push('<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ' + esc(state.processoVinculado.processo)
         + (state.processoVinculado.descricao ? ' — ' + esc(state.processoVinculado.descricao) : '') + '</p>');
     }
-    partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, resolve-se retornar o processo à Fiscalização com os seguintes apontamentos:</p>');
+    partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, retorna-se o processo à Fiscalização com o(s) seguinte(s) apontamento(s):</p>');
 
     itens.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.desc) + ':</strong></p>');

@@ -186,6 +186,92 @@
     </script>
 
     <div id="app-content" style="display: none;">
+        <!-- Modal Diagnóstico Admin (fora do .gecope-hero: esse container tem
+             isolation:isolate, que cria um novo contexto de empilhamento e prende
+             modais posicionados dentro dele — o modal chega a abrir, mas fica
+             preso atrás do conteúdo da página em vez de por cima, deixando a tela
+             como travada/escurecida sem o corpo do modal aparecer.) -->
+        <div class="modal fade" id="modalAdminDiag" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title">Diagnóstico: Verificação de Pendentes</h5>
+                        <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">Resultado bruto das consultas (até 50 registros).</p>
+                        <pre id="admin-diag-output"
+                            style="white-space:pre-wrap; word-break:break-word; max-height:60vh; overflow:auto; background:#f8f9fa; padding:12px; border-radius:6px;">Aguardando diagnóstico...</pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Editar Usuário Admin (mesmo motivo acima: movido para fora do .gecope-hero) -->
+        <div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Editar Usuário</h5>
+                        <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="formEditarUsuario">
+                            <input type="hidden" id="edit-user-email-original">
+                            <div class="row g-2 mb-2">
+                                <div class="col"><label class="form-label small fw-bold">Nome</label><input
+                                        type="text" id="edit-user-nome" class="form-control form-control-sm"
+                                        required></div>
+                                <div class="col"><label class="form-label small fw-bold">Sobrenome</label><input
+                                        type="text" id="edit-user-sobrenome"
+                                        class="form-control form-control-sm"></div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col"><label class="form-label small fw-bold">Matrícula</label><input
+                                        type="text" id="edit-user-matricula"
+                                        class="form-control form-control-sm"></div>
+                                <div class="col"><label class="form-label small fw-bold">GEDOP</label><input
+                                        type="text" id="edit-user-gedop" class="form-control form-control-sm">
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold">E-mail Institucional</label>
+                                <input type="email" id="edit-user-email" class="form-control form-control-sm"
+                                    required>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col"><label class="form-label small fw-bold">WhatsApp</label><input
+                                        type="text" id="edit-user-whatsapp" class="form-control form-control-sm"
+                                        placeholder="Ex: 85988887777"></div>
+                                <div class="col">
+                                    <label class="form-label small fw-bold">Função</label>
+                                    <select id="edit-user-role" class="form-select form-select-sm">
+                                        <option value="externo">EXTERNO</option>
+                                        <option value="fiscal">FISCAL</option>
+                                        <option value="gerente">GERENTE</option>
+                                        <option value="admin">ADMIN</option>
+                                        <option value="pending">PENDENTE</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary btn-sm fw-bold"
+                            onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="gecope-hero">
             <div class="gecope-hero-bg" style="background-image:url('hero-ita.jpg')"></div>
             <div class="gecope-hero-bg" style="background-image:url('hero-huce.jpg')"></div>
@@ -201,88 +287,6 @@
                 <div>
                     <div class="sop-title-main">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
                     <div class="sop-title-sub">Governo do Estado do Ceará - Secretaria das Cidades</div>
-                </div>
-
-                <!-- Modal Diagnóstico Admin -->
-                <div class="modal fade" id="modalAdminDiag" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                        <div class="modal-content">
-                            <div class="modal-header bg-secondary text-white">
-                                <h5 class="modal-title">Diagnóstico: Verificação de Pendentes</h5>
-                                <button type="button" class="btn-close btn-close-white"
-                                    data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <p class="small text-muted">Resultado bruto das consultas (até 50 registros).</p>
-                                <pre id="admin-diag-output"
-                                    style="white-space:pre-wrap; word-break:break-word; max-height:60vh; overflow:auto; background:#f8f9fa; padding:12px; border-radius:6px;">Aguardando diagnóstico...</pre>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary btn-sm"
-                                    data-bs-dismiss="modal">Fechar</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Modal Editar Usuário Admin -->
-                <div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header bg-primary text-white">
-                                <h5 class="modal-title"><i class="bi bi-person-lines-fill me-2"></i>Editar Usuário</h5>
-                                <button type="button" class="btn-close btn-close-white"
-                                    data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <form id="formEditarUsuario">
-                                    <input type="hidden" id="edit-user-email-original">
-                                    <div class="row g-2 mb-2">
-                                        <div class="col"><label class="form-label small fw-bold">Nome</label><input
-                                                type="text" id="edit-user-nome" class="form-control form-control-sm"
-                                                required></div>
-                                        <div class="col"><label class="form-label small fw-bold">Sobrenome</label><input
-                                                type="text" id="edit-user-sobrenome"
-                                                class="form-control form-control-sm"></div>
-                                    </div>
-                                    <div class="row g-2 mb-2">
-                                        <div class="col"><label class="form-label small fw-bold">Matrícula</label><input
-                                                type="text" id="edit-user-matricula"
-                                                class="form-control form-control-sm"></div>
-                                        <div class="col"><label class="form-label small fw-bold">GEDOP</label><input
-                                                type="text" id="edit-user-gedop" class="form-control form-control-sm">
-                                        </div>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label class="form-label small fw-bold">E-mail Institucional</label>
-                                        <input type="email" id="edit-user-email" class="form-control form-control-sm"
-                                            required>
-                                    </div>
-                                    <div class="row g-2 mb-2">
-                                        <div class="col"><label class="form-label small fw-bold">WhatsApp</label><input
-                                                type="text" id="edit-user-whatsapp" class="form-control form-control-sm"
-                                                placeholder="Ex: 85988887777"></div>
-                                        <div class="col">
-                                            <label class="form-label small fw-bold">Função</label>
-                                            <select id="edit-user-role" class="form-select form-select-sm">
-                                                <option value="externo">EXTERNO</option>
-                                                <option value="fiscal">FISCAL</option>
-                                                <option value="gerente">GERENTE</option>
-                                                <option value="admin">ADMIN</option>
-                                                <option value="pending">PENDENTE</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary btn-sm"
-                                    data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-primary btn-sm fw-bold"
-                                    onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div class="sop-header-right d-flex align-items-center gap-3">

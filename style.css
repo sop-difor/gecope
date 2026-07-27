@@ -1617,8 +1617,16 @@
                modal de composição está de fato aberto (.show). Sem esse escopo,
                esta regra também disparava em QUALQUER window.print() da página
                (ex.: Curva ABC), escondendo o conteúdo e deixando só o fundo
-               escuro do body — daí a tela preta no PDF exportado. */
-            body:has(#modalDetalheComposicao.show)>*:not(#modalDetalheComposicao) {
+               escuro do body — daí a tela preta no PDF exportado.
+               Usa "*" (qualquer descendente do body), e não só os filhos diretos
+               (">*"), porque o modal está aninhado várias camadas abaixo do body
+               (body > #app-content > ... > #modalDetalheComposicao); com ">*" só
+               o #app-content era escondido, o que já apaga o modal junto (um
+               ancestro com display:none esconde o descendente mesmo que este
+               tenha display:block) e a impressão saía em branco. As exclusões
+               ":not(#id *)" e ":not(:has(#id))" preservam, respectivamente, o
+               conteúdo interno do modal e a cadeia de ancestrais até ele. */
+            body:has(#modalDetalheComposicao.show) *:not(#modalDetalheComposicao):not(#modalDetalheComposicao *):not(:has(#modalDetalheComposicao)) {
                 display: none !important;
             }
 
@@ -1664,8 +1672,11 @@
 
             /* Relatório de comentários da Curva ABC: mesmo esquema de escopo do
                modalDetalheComposicao acima, isolado por .show para não interferir
-               no window.print() da própria Curva ABC (cv-btnPrint). */
-            body:has(#modalCvRelatorioComentarios.show)>*:not(#modalCvRelatorioComentarios) {
+               no window.print() da própria Curva ABC (cv-btnPrint). Mesmo motivo
+               do comentário acima para usar "*" em vez de ">*": o modal fica
+               aninhado dentro de #app-content, então ">*" apagava o app-content
+               (e o modal junto) e a impressão saía em branco. */
+            body:has(#modalCvRelatorioComentarios.show) *:not(#modalCvRelatorioComentarios):not(#modalCvRelatorioComentarios *):not(:has(#modalCvRelatorioComentarios)) {
                 display: none !important;
             }
 
