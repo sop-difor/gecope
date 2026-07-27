@@ -540,8 +540,9 @@
     itens.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.desc) + ':</strong></p>');
       /* comentário já vem como HTML formatado pelo próprio analista (negrito, itálico,
-         alinhamento, tamanho) no editor do modal — mantém exatamente como foi salvo. */
-      partes.push('<div style="margin:0 0 1.5em 0">' + x.comentario + '</div>');
+         alinhamento, tamanho) no editor do modal — mantém a formatação, mas passa por
+         sanitizeRichHTML() (DOMPurify) para nunca renderizar HTML não confiável. */
+      partes.push('<div style="margin:0 0 1.5em 0">' + sanitizeRichHTML(x.comentario) + '</div>');
     });
     partes.push('</div>');
 
@@ -915,7 +916,7 @@
     if (!cvPodeEscrever() || state.somenteLeitura) return;
     var item = cvEncontrarItemPorDbId(dbId);
     if (!item) return;
-    var novo = cvTextoSemHtml(valorHtml).trim() ? valorHtml.trim() : null;
+    var novo = cvTextoSemHtml(valorHtml).trim() ? sanitizeRichHTML(valorHtml.trim()) : null;
     if (item.comentario === novo) return;
     var { error } = await sbClient.from("curva_abc_itens").update({ comentario: novo }).eq("id", dbId);
     if (error) { cvAlerta("Erro ao salvar comentário", esc(error.message)); return; }
@@ -1016,7 +1017,7 @@
     $("cv-coment-db-id").value = dbId;
     $("cv-coment-item-desc").textContent = (item.conta ? item.conta + " — " : "") + item.desc;
     var ed = $("cv-coment-texto");
-    ed.innerHTML = item.comentario || "";
+    ed.innerHTML = sanitizeRichHTML(item.comentario || "");
     ed.contentEditable = "false"; /* sempre abre em modo leitura; só edita depois de clicar em "Editar" */
     cvAtualizarToolbarComentario(false);
     $("cv-ruler-firstline").style.left = "0px";

@@ -415,45 +415,6 @@ window.EVO_INSTANCE = window.EVO_INSTANCE || '';
 })();
 
 
-/* --- FUNES DE DECISO CORRIGIDAS (SEM TRAVAMENTO) --- */
-
-function abrirModalAtender(id, index) {
-    const modalEl = document.getElementById('modalAtenderRevisao');
-
-    // TRUQUE: Move o modal para o final do body para evitar conflito de z-index (Tela Escura)
-    if (modalEl.parentElement !== document.body) {
-        document.body.appendChild(modalEl);
-    }
-
-    document.getElementById('atender-id-orcamento').value = id;
-    document.getElementById('atender-index-comentario').value = index;
-    document.getElementById('formAtender').reset();
-
-    // Usa getOrCreateInstance para evitar duplicidade
-    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    modal.show();
-}
-
-function abrirModalRecusar(id, index) {
-    const modalEl = document.getElementById('modalRecusarRevisao');
-
-    // TRUQUE: Move o modal para o final do body
-    if (modalEl.parentElement !== document.body) {
-        document.body.appendChild(modalEl);
-    }
-
-    document.getElementById('recusar-id-orcamento').value = id;
-    document.getElementById('recusar-index-comentario').value = index;
-    document.getElementById('formRecusar').reset();
-
-    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    modal.show();
-}
-
-// ... Mantenha as funções processarAtendimento e processarRecusa como estavam, 
-// apenas certifique-se de que no processarAtendimento o status mudou para 'Atualizado':
-// status: 'Atualizado'
-
 /* --------------------------------------------------------------
    SCRIPT PRINCIPAL - CORRIGIDO (V7)
 -------------------------------------------------------------- */
@@ -806,10 +767,25 @@ async function salvarAlertaRetornoComentario() {
     alert('Comentário registrado com sucesso!');
 }
 
+// Executa `tarefa` para cada item de `items`, respeitando no máximo `limite` chamadas
+// simultâneas (padrão "worker pool"). Usado nas duas integrações com a Edge Function
+// consultar-suite (atualizarTabelaSuite e varrerRiscoDiligenciaSegundoPlano) para limitar
+// a carga na API sem escalonar sequencialmente (o escalonamento antigo, 150ms × índice,
+// fazia o tempo total crescer linearmente com o número de processos).
+async function executarComPool(items, limite, tarefa) {
+    const fila = items.slice();
+    const workers = Array.from({ length: Math.min(limite, fila.length) }, async () => {
+        while (fila.length) {
+            const item = fila.shift();
+            await tarefa(item);
+        }
+    });
+    await Promise.all(workers);
+}
+
 // Varredura em segundo plano: verifica TODOS os processos APROVADO no SUITE, mesmo que a
 // aba "Aprovados" não esteja aberta na tela, para que o alerta apareça antes de o usuário
-// precisar navegar até lá. Respeita o mesmo cache de 5 min usado pela tabela (window.suiteCache)
-// e escalona as chamadas para não sobrecarregar a função consultar-suite.
+// precisar navegar até lá. Respeita o mesmo cache de 5 min usado pela tabela (window.suiteCache).
 let varreduraDiligenciaEmAndamento = false;
 async function varrerRiscoDiligenciaSegundoPlano() {
     if (varreduraDiligenciaEmAndamento || !sbClient) return;
@@ -818,15 +794,15 @@ async function varrerRiscoDiligenciaSegundoPlano() {
         const candidatos = (window.allData || []).filter(d => (d.status || '').toString().toUpperCase().trim() === 'APROVADO');
         if (!candidatos.length) return;
 
-        // Mesma estratégia de atualizarTabelaSuite: dispara as consultas em paralelo (respeitando
-        // cache de 5 min), escalonando só as novas requisições reais, em vez de aguardar uma por
-        // vez — sequencial faria o alerta demorar dezenas de segundos para aparecer fora da aba Aprovados.
-        const naoCacheados = candidatos.filter(d => {
-            const cached = window.suiteCache[d.processo];
-            return !(cached && (Date.now() - cached.timestamp < 5 * 60 * 1000));
+        // Monta o mapa numero->tr uma única vez (1 varredura do DOM), em vez de um
+        // querySelector('tr[data-numero=...]') por candidato — antes era O(candidatos × linhas
+        // da tabela), repetido a cada 5 min para todos os processos "APROVADO".
+        const trPorNumero = new Map();
+        document.querySelectorAll('tr[data-numero]').forEach(tr => {
+            trPorNumero.set(tr.getAttribute('data-numero'), tr);
         });
 
-        const promises = candidatos.map(async (d) => {
+        const processarCandidato = async (d) => {
             const num = d.processo;
             const cached = window.suiteCache[num];
             const cacheValido = cached && (Date.now() - cached.timestamp < 5 * 60 * 1000);
@@ -836,8 +812,6 @@ async function varrerRiscoDiligenciaSegundoPlano() {
                 if (cacheValido) {
                     data = cached.data;
                 } else {
-                    const idx = naoCacheados.findIndex(r => r.processo === num);
-                    if (idx !== -1) await new Promise(r => setTimeout(r, idx * 150));
                     const { data: res, error } = await sbClient.functions.invoke('consultar-suite', { body: { numero: num } });
                     if (error) return;
                     data = res;
@@ -848,13 +822,17 @@ async function varrerRiscoDiligenciaSegundoPlano() {
             }
 
             if (data && data.sucesso) {
-                const tr = document.querySelector(`tr[data-numero="${escapeHTML(num)}"]`);
+                const tr = trPorNumero.get(num);
                 const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
                 aplicarAlertaPreDiligencia(d, tr, alertaIcone, data.sigla, d.status);
             }
-        });
+        };
 
-        await Promise.all(promises);
+        // Mesmo pool de concorrência de atualizarTabelaSuite (no máximo 6 simultâneas) — antes
+        // escalonava 150ms por candidato não cacheado, o que podia levar dezenas de segundos
+        // para todos os alertas aparecerem numa varredura com muitos processos "APROVADO".
+        await executarComPool(candidatos, 6, processarCandidato);
+        persistSuiteCache();
     } catch (e) {
         console.error('[Alerta Pré-Diligência] erro na varredura em segundo plano:', e);
     } finally {
@@ -1300,7 +1278,11 @@ async function carregarAtividades() {
             // Então o filtro é apenas para tipo PROCESSO.
             // Mas na query do Supabase é difícil fazer OR (tipo != PROCESSO OR fiscal == userName).
             // Vamos filtrar no JS para simplificar ou usar .or()
-            query = query.or(`tipo.neq.PROCESSO,fiscal.eq.${userName}`);
+            // userName vai interpolado na sintaxe de filtro do PostgREST (vírgula separa condições,
+            // parênteses agrupam) — removemos esses caracteres para que um nome de cadastro não
+            // consiga forjar uma condição extra e ver atividades de outros fiscais/processos.
+            const safeUserName = String(userName).replace(/[,()]/g, '');
+            query = query.or(`tipo.neq.PROCESSO,fiscal.eq.${safeUserName}`);
         }
 
         const { data, error } = await query;
@@ -1324,7 +1306,7 @@ async function carregarAtividades() {
                                         </div>
                                         <div>
                                             <div class="small text-muted mb-1">${dataHora}  ${at.tipo}</div>
-                                            <div class="fw-semibold" style="font-size: 0.95rem;">${at.usuario} ${at.descricao}</div>
+                                            <div class="fw-semibold" style="font-size: 0.95rem;">${escapeHTML(at.usuario)} ${escapeHTML(at.descricao)}</div>
                         </div>
                     </div>
                 </div>
@@ -1351,7 +1333,8 @@ async function carregarAtividadesResumoHome() {
             .order('created_at', { ascending: false });
 
         if (userRole.toLowerCase() === 'fiscal' && userName) {
-            query = query.or(`tipo.neq.PROCESSO,fiscal.eq.${userName}`);
+            const safeUserName = String(userName).replace(/[,()]/g, '');
+            query = query.or(`tipo.neq.PROCESSO,fiscal.eq.${safeUserName}`);
         }
 
         const { data, error } = await query;
@@ -1380,7 +1363,7 @@ async function carregarAtividadesResumoHome() {
                                             <span class="activity-time mb-0">${timeLabel}</span>
                                             <span class="activity-badge ${badgeClass}">${badgeLabel}</span>
                                         </div>
-                                        <div class="activity-desc"><strong>${at.usuario}</strong> ${at.descricao}</div>
+                                        <div class="activity-desc"><strong>${escapeHTML(at.usuario)}</strong> ${escapeHTML(at.descricao)}</div>
                                     </div>
                                 </div>
                             `;
@@ -3141,14 +3124,9 @@ function updateDashboard() {
 
 // --- 6. EVENT LISTENERS E MÁSCARAS ---
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('[DEBUG] === DOMContentLoaded iniciado ===');
-    console.log('[DEBUG] Usuário:', sessionStorage.getItem('sop_user') || 'nenhum');
-    console.log('[DEBUG] Role:', sessionStorage.getItem('sop_role') || 'nenhum');
     const landing = document.getElementById('landingOverlay');
-    console.log('[DEBUG] Landing display:', landing ? landing.style.display || 'padrão' : 'não encontrado');
 
     // Carrega dados automaticamente
-    console.log('[DEBUG] Executando carregarDadosSupabase()...');
     carregarDadosSupabase();
 
     // Carrega lista de fiscais/usuários do Banco
@@ -3677,7 +3655,9 @@ function updateReuniao() {
         else { headerHTML += `<th class="text-${col.align}" style="width: ${col.width};">${col.title}</th>`; }
     });
     headerHTML += "</tr>";
-    thead.innerHTML = headerHTML;
+    // Só reescreve o thead quando o HTML muda de fato (ex.: seta de ordenação) — updateReuniao()
+    // roda a cada filtro/busca/refresh, e o cabeçalho quase sempre é idêntico ao anterior.
+    if (thead.innerHTML !== headerHTML) thead.innerHTML = headerHTML;
 
     rows.sort((a, b) => {
         if (currentSort.length === 0) {
@@ -4029,21 +4009,42 @@ function updateReuniao() {
     atualizarTabelaSuite(rows);
 }
 
-window.suiteCache = window.suiteCache || {};
+// Cache de consultas ao SUITE, persistido em sessionStorage para sobreviver a recarregamentos
+// de página — sem isso, cada F5 refazia a consulta de todos os processos, mesmo dentro da
+// janela de 5 min em que os dados já são considerados atuais (checagem de frescor continua
+// nos pontos de uso, esta hidratação só evita começar sempre do zero).
+window.suiteCache = window.suiteCache || (() => {
+    try {
+        return JSON.parse(sessionStorage.getItem('sop_suite_cache') || '{}');
+    } catch (e) {
+        return {};
+    }
+})();
+
+function persistSuiteCache() {
+    try {
+        sessionStorage.setItem('sop_suite_cache', JSON.stringify(window.suiteCache));
+    } catch (e) {
+        console.warn('Não foi possível persistir suiteCache:', e);
+    }
+}
 
 async function atualizarTabelaSuite(rows) {
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
     if (rows.length === 0) {
         return;
     }
 
-    // Filter out cached processes to apply delay only to new API requests
-    const nonCachedRows = rows.filter(d => !window.suiteCache[escapeHTML(d.processo)]);
+    // Monta o mapa numero->tr uma única vez (1 varredura do DOM) em vez de um
+    // querySelector('tr[data-numero=...]') por linha — antes era O(linhas × linhas),
+    // repetido a cada refresh da tabela.
+    const trPorNumero = new Map();
+    document.querySelectorAll('tr[data-numero]').forEach(tr => {
+        trPorNumero.set(tr.getAttribute('data-numero'), tr);
+    });
 
-    const promises = rows.map(async (d) => {
+    const processarLinha = async (d) => {
         const num = escapeHTML(d.processo);
-        const tr = document.querySelector(`tr[data-numero="${num}"]`);
+        const tr = trPorNumero.get(num);
         if (!tr) return;
 
         const suiteCell = tr.querySelector('.suite-badge-container');
@@ -4094,10 +4095,6 @@ async function atualizarTabelaSuite(rows) {
         }
 
         try {
-            // Aplica delay incremental apenas nas requisições reais (para não sobrecarregar API)
-            const reqIndex = nonCachedRows.findIndex(r => r.processo === d.processo);
-            if (reqIndex !== -1) await delay(reqIndex * 150);
-
             const { data, error } = await sbClient.functions.invoke('consultar-suite', {
                 body: { numero: d.processo }
             });
@@ -4145,9 +4142,14 @@ async function atualizarTabelaSuite(rows) {
             console.error("Erro na integração SUITE:", e);
             suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-danger border badge-custom-size">Erro Cloud</span>`;
         }
-    });
+    };
 
-    await Promise.all(promises);
+    // No máximo 6 requisições simultâneas à Edge Function consultar-suite (linhas já
+    // cacheadas resolvem na hora, sem rede, e liberam a vaga quase imediatamente) — substitui
+    // o escalonamento sequencial (150ms × índice) que fazia o tempo total da coluna Suíte
+    // crescer linearmente com o número de processos na tela.
+    await executarComPool(rows, 6, processarLinha);
+    persistSuiteCache();
 
     // Após finalizar o fetch do SUITE, reordena o DOM para a página de ARQUIVADOS apenas
     // se houve alguma atualização nova (o cache alimenta o sort inicial, evitando o pulo)
@@ -4253,6 +4255,19 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
         // e app_users fiquem com o mesmo valor e possam ser correlacionados pelo e-mail.
         email = (email || '').trim().toLowerCase();
 
+        // Sanitiza nome/sobrenome/matrícula na entrada: esses valores acabam renderizados via
+        // innerHTML em várias telas (Atividades, comentários) e também interpolados em filtros
+        // .or() do PostgREST — sem essa allowlist, um nome com HTML/vírgula/parêntese vira XSS
+        // armazenado ou bypass do filtro por perfil "fiscal".
+        nome = String(nome || '').trim().replace(/[^\p{L}\p{M}\s'.-]/gu, '').slice(0, 60);
+        sobrenome = String(sobrenome || '').trim().replace(/[^\p{L}\p{M}\s'.-]/gu, '').slice(0, 60);
+        matricula = String(matricula || '').trim().replace(/[^A-Za-z0-9-]/g, '').slice(0, 20);
+
+        if (!nome || !sobrenome || !matricula) {
+            alert('Nome, sobrenome e matrícula devem conter apenas letras, números e espaços.');
+            return false;
+        }
+
         // 1. Criar usuário no Auth
         const options = {
             email: email,
@@ -4345,9 +4360,6 @@ async function signInWithEmail(email, password, opts = {}) {
             }
         }
 
-        console.log('[DEBUG] signInWithEmail iniciado para:', email);
-
-        console.log('[DEBUG] Autenticando com Supabase Auth...');
         const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
 
         if (error) {
@@ -4359,12 +4371,9 @@ async function signInWithEmail(email, password, opts = {}) {
             return false;
         }
 
-        console.log('[DEBUG] Autenticação bem-sucedida. Buscando perfil no app_users...');
         // Busca perfil por email (app_users.id é bigserial, não UUID do Auth)
         const profile = await sbClient.from('app_users').select('*').eq('email', email).maybeSingle();
         const role = profile?.data?.role || 'pending';
-
-        console.log('[DEBUG] Perfil encontrado:', { email, role });
 
         // Salva no sessionStorage
         sessionStorage.setItem('sop_user', email);
@@ -4385,18 +4394,11 @@ async function signInWithEmail(email, password, opts = {}) {
         } else {
             sessionStorage.removeItem('sop_user_name');
         }
-        console.log('[DEBUG] Dados salvos em localStorage. Nome:', finalName);
-
         applyRoleToUI(role);
 
         // Esconde landing
         toggleLanding(false);
-        console.log('[DEBUG] Landing overlay ocultado');
 
-        // notifica
-        // alert('Bem-vindo: ' + email + '\\nPermissão: ' + role);
-
-        console.log('[DEBUG] Carregando dados após login...');
         setTimeout(() => carregarDadosSupabase(), 500);
         return true;
     } catch (err) {
@@ -4688,7 +4690,6 @@ function canMarkDateAsMeta() {
 // Ao carregar, aplica role salvo (se houver)
 (function () {
     const savedRole = sessionStorage.getItem('sop_role') || 'guest';
-    console.log('[DEBUG] IIFE: Role salvo ao iniciar:', savedRole);
 
     const savedEmail = sessionStorage.getItem('sop_user');
     const savedUserName = sessionStorage.getItem('sop_user_name');
@@ -4706,7 +4707,6 @@ function canMarkDateAsMeta() {
 
                 if (realName) {
                     sessionStorage.setItem('sop_user_name', realName);
-                    console.log('[DEBUG] Nome do usuário corrigido/carregado:', realName);
                 }
             }
         });
@@ -5170,12 +5170,12 @@ async function carregarOrcamentos() {
                         if (c.decisao === 'atendido') {
                             classeStatus = 'status-atendido';
                             badgeDecisao = `<span class="badge-decision badge-atendido"><i class="bi bi-check-lg"></i> ATENDIDO</span>`;
-                            if (c.resp_admin) respostaAdminHTML = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${c.resp_admin}</div>`;
+                            if (c.resp_admin) respostaAdminHTML = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${escapeHTML(c.resp_admin)}</div>`;
                         } else {
                             if (c.decisao === 'recusado') {
                                 classeStatus = 'status-recusado';
                                 badgeDecisao = `<span class="badge-decision badge-recusado"><i class="bi bi-x-lg"></i> NO ACATADO</span>`;
-                                if (c.resp_admin) respostaAdminHTML = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${c.resp_admin}</div>`;
+                                if (c.resp_admin) respostaAdminHTML = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${escapeHTML(c.resp_admin)}</div>`;
                             } else {
                                 if (isAdmin && !isSystemLog) {
                                     botoesAcaoAdmin = `
@@ -5194,7 +5194,7 @@ async function carregarOrcamentos() {
 
                         let btnAnexo = '';
                         if (c.arquivo) {
-                            btnAnexo = `<a href="${c.arquivo}" target="_blank" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória/Anexo</a>`;
+                            btnAnexo = `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória/Anexo</a>`;
                         }
 
                         let btnExcluirHist = '';
@@ -5205,14 +5205,14 @@ async function carregarOrcamentos() {
                         return `
                         <div class="history-card-item ${classeStatus}">
                             <div class="history-card-header">
-                                <div><strong>${c.autor}</strong> <span class="fw-normal ms-1">- ${dataComent}</span></div>
+                                <div><strong>${escapeHTML(c.autor)}</strong> <span class="fw-normal ms-1">- ${dataComent}</span></div>
                                 <div class="d-flex align-items-center">
                                     ${badgeDecisao}
                                     ${btnExcluirHist}
                                 </div>
                             </div>
                             <div class="history-card-body">
-                                <div>${c.mensagem}</div>
+                                <div>${escapeHTML(c.mensagem)}</div>
                                 ${btnAnexo}
                                 ${respostaAdminHTML}
                                 ${botoesAcaoAdmin}
@@ -5235,7 +5235,7 @@ async function carregarOrcamentos() {
                             <div class="file-icon-box ${iconClass}">${iconSymbol}</div>
                             <div>
                                 <div class="d-flex align-items-center flex-wrap">
-                                    <span class="fw-bold text-dark" style="font-size:0.95rem;">${obra.nome_obra}</span>
+                                    <span class="fw-bold text-dark" style="font-size:0.95rem;">${escapeHTML(obra.nome_obra)}</span>
                                     <span class="badge bg-secondary ms-2" style="font-size:0.7rem;">${obra.versao_atual}</span>
                                     ${badgeStatus}
                                 </div>
@@ -5387,7 +5387,7 @@ async function prepararComentario(id) {
         const sel = document.getElementById('coment-fiscal');
         // Preenche automaticamente com o usuário logado
         const currentUserName = sessionStorage.getItem('sop_user_name') || sessionStorage.getItem('sop_user') || 'Usuário';
-        sel.innerHTML = `<option value="${currentUserName}" selected>${currentUserName}</option>`;
+        sel.innerHTML = `<option value="${escapeHTML(currentUserName)}" selected>${escapeHTML(currentUserName)}</option>`;
         // Visualmente "readonly"
         sel.style.backgroundColor = '#e9ecef';
         sel.style.pointerEvents = 'none';
@@ -5396,9 +5396,9 @@ async function prepararComentario(id) {
         const comentarios = data.comentarios_revisao || [];
         chatContainer.innerHTML = comentarios.length ? comentarios.map(c => `
                             <div class="mb-2 border-bottom pb-1">
-                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${c.autor}</strong><span class="text-muted" style="font-size:0.7rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
-                                <div style="font-size:0.8rem">${c.mensagem}</div>
-                                ${c.arquivo ? `<a href="${c.arquivo}" target="_blank" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
+                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.7rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
+                                <div style="font-size:0.8rem">${escapeHTML(c.mensagem)}</div>
+                                ${c.arquivo ? `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
                             </div>`).join('') : '<em class="text-muted">Sem mensagens.</em>';
 
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -5647,10 +5647,6 @@ function abrirModalRecusar(id, index) {
    LGICA DAS NOVAS ABAS: COMPOSIÇÕES E TABELAS
    ========================================================================== */
 
-/* ==========================================================================
-   LGICA DAS NOVAS ABAS: COMPOSIÇÕES E TABELAS
-   ========================================================================== */
-
 /* --- 1. LGICA DE COMPOSIÇÕES (IDNTICA A ORAMENTOS) --- */
 
 // 1.1 SALVAR NOVA COMPOSIÇÃO
@@ -5828,7 +5824,7 @@ async function prepararComentarioComposicao(id) {
         const sel = document.getElementById('coment-fiscal-comp');
         // Preenche automaticamente com o usuário logado
         const currentUserNameComp = sessionStorage.getItem('sop_user_name') || sessionStorage.getItem('sop_user') || 'Usuário';
-        sel.innerHTML = `<option value="${currentUserNameComp}" selected>${currentUserNameComp}</option>`;
+        sel.innerHTML = `<option value="${escapeHTML(currentUserNameComp)}" selected>${escapeHTML(currentUserNameComp)}</option>`;
         // Visualmente "readonly"
         sel.style.backgroundColor = '#e9ecef';
         sel.style.pointerEvents = 'none';
@@ -5838,9 +5834,9 @@ async function prepararComentarioComposicao(id) {
 
         chat.innerHTML = comments.length ? comments.map(c => `
                             <div class="mb-2 border-bottom pb-1">
-                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${c.autor}</strong><span class="text-muted" style="font-size:0.7rem">${new Date(c.data).toLocaleDateString()}</span></div>
-                                <div style="font-size:0.8rem">${c.mensagem}</div>
-                                ${c.arquivo ? `<a href="${c.arquivo}" target="_blank" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
+                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.7rem">${new Date(c.data).toLocaleDateString()}</span></div>
+                                <div style="font-size:0.8rem">${escapeHTML(c.mensagem)}</div>
+                                ${c.arquivo ? `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
                             </div>`).join('') : '<em class="text-muted">Sem mensagens.</em>';
 
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -5910,16 +5906,6 @@ function abrirModalAtenderComposicao(id, index) {
 
 function abrirModalRecusarComposicao(id, index) {
     abrirModalDecisao('modalRecusarComposicao', id, index, 'recusar-id-composicao', 'recusar-index-comentario-comp', 'formRecusarComp');
-}
-
-async function deletarComposicao(id, path) {
-    if (!confirm("️ Tem certeza que deseja EXCLUIR esta composição?")) return;
-    try {
-        if (path) await sbClient.storage.from('composicoes_biblioteca').remove([path]);
-        await sbClient.from('composicoes_biblioteca').delete().eq('id', id);
-        alert("Composição excluída!");
-        carregarComposicoes();
-    } catch (e) { alert("Erro: " + e.message); }
 }
 
 async function deletarItemHistoricoComposicao(id, index) {
@@ -6110,16 +6096,16 @@ async function carregarComposicoes() {
                         if (c.autor && c.autor.toLowerCase().includes('sistema')) clSt = 'system-log-entry';
                         if (c.decisao === 'atendido') {
                             clSt = 'status-atendido'; bD = `<span class="badge-decision badge-atendido"><i class="bi bi-check-lg"></i> ATENDIDO</span>`;
-                            if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${c.resp_admin}</div>`;
+                            if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${escapeHTML(c.resp_admin)}</div>`;
                         } else if (c.decisao === 'recusado') {
                             clSt = 'status-recusado'; bD = `<span class="badge-decision badge-recusado"><i class="bi bi-x-lg"></i> NO ACATADO</span>`;
-                            if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${c.resp_admin}</div>`;
+                            if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${escapeHTML(c.resp_admin)}</div>`;
                         } else if (isAdmin && !clSt.includes('system')) {
                             bAA = `<div class="admin-decision-actions"><button class="btn btn-sm btn-outline-success" onclick="abrirModalAtenderComposicao(${obra.id}, ${idx})"><i class="bi bi-check-lg"></i> Atender</button><button class="btn btn-sm btn-outline-danger" onclick="abrirModalRecusarComposicao(${obra.id}, ${idx})"><i class="bi bi-x-lg"></i> Não Acatar</button></div>`;
                         }
-                        let bAnex = c.arquivo ? `<a href="${c.arquivo}" target="_blank" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória Anexo</a>` : '';
+                        let bAnex = c.arquivo ? `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="btn-history-anexo mt-2"><i class="bi bi-paperclip"></i> Ver Memória Anexo</a>` : '';
                         let bExc = isAdmin ? `<button class="btn btn-sm text-danger border-0 p-0 ms-2 admin-only" title="Excluir Registro" onclick="deletarItemHistoricoComposicao(${obra.id}, ${idx})"><i class="bi bi-x-lg"></i></button>` : '';
-                        return `<div class="history-card-item ${clSt}"><div class="history-card-header"><div><strong>${c.autor}</strong> <span class="fw-normal ms-1">- ${dC}</span></div><div class="d-flex align-items-center">${bD}${bExc}</div></div><div class="history-card-body"><div>${c.mensagem}</div>${bAnex}${rA}${bAA}</div></div>`;
+                        return `<div class="history-card-item ${clSt}"><div class="history-card-header"><div><strong>${escapeHTML(c.autor)}</strong> <span class="fw-normal ms-1">- ${dC}</span></div><div class="d-flex align-items-center">${bD}${bExc}</div></div><div class="history-card-body"><div>${escapeHTML(c.mensagem)}</div>${bAnex}${rA}${bAA}</div></div>`;
                     }).join('');
                     containerHistoricoHtml = `<div class="collapse" id="${histId}"><div class="history-collapse-box">${listaComentarios}</div></div>`;
                 }
@@ -6140,10 +6126,10 @@ async function carregarComposicoes() {
                                                     ${badgeStatus}
                                                 </div>
                                                 <div class="fw-bold text-dark pe-3" style="font-size:0.95rem; text-align: justify; line-height: 1.4;">
-                                                    ${obra.descricao || "Sem Descrição"}
+                                                    ${escapeHTML(obra.descricao) || "Sem Descrição"}
                                                 </div>
                                                 <div class="text-muted mt-1" style="font-size:0.75rem;">
-                                                    ${isSop ? '  Criado por: Setor de Orçamento da SOP' : `Subcategoria: ${obra.subcategoria || 'GERAL'}  Criado por: ${autorV1} em ${dataFormatada}`}
+                                                    ${isSop ? '  Criado por: Setor de Orçamento da SOP' : `Subcategoria: ${escapeHTML(obra.subcategoria) || 'GERAL'}  Criado por: ${escapeHTML(autorV1)} em ${dataFormatada}`}
                                                 </div>
                                                 ${botaoHistorico}
                                             </div>
@@ -7318,7 +7304,7 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                             <!-- Metadados (Estilo SINAPI adaptado) -->
                             <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
                                 <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CDIGO</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
                                 <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
@@ -7337,8 +7323,8 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                                     <thead>
                                         <tr style="font-size: 0.75rem; background-color: #f5f5f5; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
                                             <th style="width: 8%;" class="fw-bold text-uppercase p-2">FONTE</th>
-                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSO</th>
-                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CDIGO</th>
+                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSÃO</th>
+                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CÓDIGO</th>
                                             <th style="width: 48%;" class="fw-bold text-uppercase p-2">DESCRIÇÃO DO INSUMO</th>
                                             <th style="width: 5%;" class="fw-bold text-uppercase text-center p-2">UNID.</th>
                                             <th style="width: 7%;" class="fw-bold text-uppercase text-center p-2">COEF.</th>
@@ -7478,7 +7464,7 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                             <!-- Metadados (Estilo SEINFRA adaptado) -->
                             <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
                                 <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CDIGO</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
                                 <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
@@ -7497,8 +7483,8 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                                     <thead>
                                         <tr style="font-size: 0.75rem; background-color: #f5f5f5; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
                                             <th style="width: 8%;" class="fw-bold text-uppercase p-2">FONTE</th>
-                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSO</th>
-                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CDIGO</th>
+                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSÃO</th>
+                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CÓDIGO</th>
                                             <th style="width: 48%;" class="fw-bold text-uppercase p-2">DESCRIÇÃO DO INSUMO</th>
                                             <th style="width: 5%;" class="fw-bold text-uppercase text-center p-2">UNID.</th>
                                             <th style="width: 7%;" class="fw-bold text-uppercase text-center p-2">COEF.</th>
@@ -7611,7 +7597,7 @@ async function abrirDetalheTabela(codigo, fonte, versao, tipoRef) {
                                         <div class="text-white p-2 rounded me-3 fw-bold fs-5" style="background-color: #008F3D !important; min-width: 80px; text-align: center;">SOP-CE</div>
                                         <div>
                                             <div class="fw-bold fs-6" style="color: #008F3D;">ESTADO DO CEARÁ</div>
-                                            <div class="text-dark fw-bold" style="font-size: 0.75rem;">SUPERINTENDNCIA DE OBRAS PBLICAS</div>
+                                            <div class="text-dark fw-bold" style="font-size: 0.75rem;">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
                                         </div>
                                     </div>
                                     <div class="text-end">
@@ -7623,7 +7609,7 @@ async function abrirDetalheTabela(codigo, fonte, versao, tipoRef) {
                                 <!-- Metadados -->
                                 <div class="mb-4" style="background: white; border: 1px solid #eee; border-left: 6px solid #F28C00; border-radius: 12px; padding: 1.2rem; display: flex; align-items: center;">
                                     <div class="me-4 border-end pe-4">
-                                        <small class="text-muted fw-bold d-block mb-1">CDIGO</small>
+                                        <small class="text-muted fw-bold d-block mb-1">CÓDIGO</small>
                                         <div class="fw-bold fs-5">${dadosPai.codigo}</div>
                                     </div>
                                     <div class="flex-grow-1">
@@ -7666,7 +7652,7 @@ async function abrirDetalheTabela(codigo, fonte, versao, tipoRef) {
 
                                 <!-- Rodapé Total Verde -->
                                 <div class="mt-3 p-3 text-white d-flex justify-content-between align-items-center" style="background: #008F3D; border-radius: 8px;">
-                                    <div class="fw-bold">PREO TOTAL DA COMPOSIÇÃO</div>
+                                    <div class="fw-bold">PREÇO TOTAL DA COMPOSIÇÃO</div>
                                     <div class="fs-4 fw-bold">R$ ${totalSOPResult.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 </div>
                             </div>
@@ -8024,7 +8010,7 @@ async function gerarPDF_Profissional(rawInput) {
         doc.text("SOP-CE", 24, 16.5, { align: "center" });
 
         doc.setTextColor(...verdeSOP); doc.setFontSize(10); doc.text("ESTADO DO CEARÁ", 38, 14);
-        doc.setTextColor(60, 60, 60); doc.setFontSize(7); doc.text("SUPERINTENDNCIA DE OBRAS PBLICAS", 38, 18);
+        doc.setTextColor(60, 60, 60); doc.setFontSize(7); doc.text("SUPERINTENDÊNCIA DE OBRAS PÚBLICAS", 38, 18);
 
         doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.text("COMPOSIÇÃO ANALÍTICA", 196, 14, { align: "right" });
         doc.setTextColor(...cinzaTexto); doc.setFontSize(6); doc.text("GEROA - GERÊNCIA DE ORAMENTOS E AVALIAO DE IMVEIS", 196, 18, { align: "right" });

@@ -79,7 +79,7 @@
             + '<button type="button" class="btn btn-sm btn-outline-success" onclick="gerarRelatorioTecnicoDoProcesso(' + v.id + ')">'
             + '<i class="bi bi-file-earmark-text me-1"></i>Relatório</button>'
             + (podeExcluir
-              ? '<button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirVersaoCurvaAbc(' + v.id + ', ' + numero + ')" title="Excluir esta versão">'
+              ? '<button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirVersaoCurvaAbc(' + v.id + ', \'' + numero + '\')" title="Excluir esta versão">'
                 + '<i class="bi bi-trash-fill"></i></button>'
               : '')
             + '</div>'
@@ -156,7 +156,7 @@
     partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, resolve-se retornar o processo à Fiscalização com os seguintes apontamentos:</p>');
     comentados.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.descricao) + ':</strong></p>');
-      partes.push('<div style="margin:0 0 1.5em 0">' + x.comentario + '</div>');
+      partes.push('<div style="margin:0 0 1.5em 0">' + sanitizeRichHTML(x.comentario) + '</div>');
     });
     partes.push('</div>');
 

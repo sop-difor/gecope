@@ -60,7 +60,7 @@
                                     };
 
                                     const codigo = dados.codigo || 'N/A';
-                                    const descricao = (dados.descricao || 'SEM DESCRIÇÃO').toUpperCase();
+                                    const descricao = escapeHTML((dados.descricao || 'SEM DESCRIÇÃO').toUpperCase());
                                     const unidade = dados.unidade || 'N/A';
                                     const bdiText = (dados.bdi !== null && dados.bdi !== undefined) ? (safeLoc(dados.bdi, 2) + '%') : '0,00%';
                                     const descText = (dados.desconto !== null && dados.desconto !== undefined) ? (safeLoc(dados.desconto, 2) + '%') : '0,00%';
@@ -109,7 +109,7 @@
                                                 retroativos.push({ ...item, codInsumo: item.codigo, descInsumo: item.descricao });
                                             }
 
-                                            let fonteDisplay = `<div>${item.origem}</div>`;
+                                            let fonteDisplay = `<div>${escapeHTML(item.origem)}</div>`;
                                             if ((item.origem === 'SEINFRA' || item.origem === 'SINAPI') && item.referencia) {
                                                 const refLabel = item.referencia.toLowerCase().includes('deson') ? 'Desonerada' : 'Onerada';
                                                 fonteDisplay += `<div class="text-muted" style="font-size: 0.65rem;">${refLabel}</div>`;
@@ -121,7 +121,7 @@
                                     <td style="padding: 0.5rem 0.5rem; text-align: center;">${item.versao || '-'}</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: center; font-weight: bold;">${item.codigo}</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: justify;">
-                                        <div class="text-dark">${item.descricao}</div>
+                                        <div class="text-dark">${escapeHTML(item.descricao)}</div>
                                         ${item.retroativo ? '<div class="text-success fw-bold mt-1" style="font-size: 0.6rem;"><i class="bi bi-info-circle me-1"></i> Ver Memória de Cálculo na Pág. 02</div>' : ''}
                                     </td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: center;">${item.unidade}</td>
@@ -178,7 +178,7 @@
                                     <table class="table table-sm table-bordered mb-2" style="font-size: 0.7rem; max-width: 500px;">
                                         <thead class="bg-light"><tr><th>Fornecedor</th><th class="text-end" style="width: 120px;">Valor Cotado</th></tr></thead>
                                         <tbody>
-                                            ${ret.fornecedores.map(f => `<tr><td>${f.nome}</td><td class="text-end">R$ ${safeLoc(f.valor)}</td></tr>`).join('')}
+                                            ${ret.fornecedores.map(f => `<tr><td>${escapeHTML(f.nome)}</td><td class="text-end">R$ ${safeLoc(f.valor)}</td></tr>`).join('')}
                                         </tbody>
                                     </table>
                                 </div>
@@ -186,7 +186,7 @@
 
                                             return `
                                         <div class="mb-5 border-bottom pb-3">
-                                            <div class="fw-bold text-dark mb-2" style="font-size: 0.85rem;">Item: ${r.codInsumo} - ${r.descInsumo}</div>
+                                            <div class="fw-bold text-dark mb-2" style="font-size: 0.85rem;">Item: ${escapeHTML(r.codInsumo)} - ${escapeHTML(r.descInsumo)}</div>
                                             
                                             ${fornecedoresHTML}
 

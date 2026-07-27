@@ -12,7 +12,9 @@
       "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Nildeno\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Nildeno-Desktop-SOP-GECOPE-gecope\\\\a5c63e10-123c-4879-9b5f-4f2cef4fb6f5\\\\scratchpad\\\\removebg.ps1\")",
       "Bash(kill %1)",
       "Bash(pkill -f \"http.server 8791\")",
-      "Bash(python -c \"import PIL; print\\(PIL.__version__\\)\")"
+      "Bash(python -c \"import PIL; print\\(PIL.__version__\\)\")",
+      "Bash(awk '$1>1')",
+      "Bash(node --check main.js)"
     ]
   }
 }

@@ -1,3 +1,15 @@
+                                                                        // Todas as chamadas à Evolution API passam por aqui — sem timeout, uma API
+                                                                        // travada deixava o spinner/texto "Consultando..." pendurado indefinidamente.
+                                                                        async function fetchComTimeout(url, options = {}, timeoutMs = 15000) {
+                                                                            const controller = new AbortController();
+                                                                            const timer = setTimeout(() => controller.abort(), timeoutMs);
+                                                                            try {
+                                                                                return await fetch(url, { ...options, signal: controller.signal });
+                                                                            } finally {
+                                                                                clearTimeout(timer);
+                                                                            }
+                                                                        }
+
                                                                         async function notificarAtualizacaoTabelas() {
                                                                             const fonte = document.getElementById('busca-fonte').value;
                                                                             const versao = document.getElementById('busca-versao').value;
@@ -203,8 +215,8 @@
                                                                                     // Adiciona Ativos e Cadastrados
                                                                                     filteredUsers.sort((a, b) => a.name.localeCompare(b.name)).forEach(u => {
                                                                                         const hasPhone = !!u.telefone_whatsapp && u.telefone_whatsapp !== '-';
-                                                                                        html += `<option value="${u.telefone_whatsapp || 'missing_' + u.name}" data-name="${u.name}" data-email="${u.email}" ${!hasPhone ? 'style="color: #dc3545;"' : ''}>
-                                ${u.name} (${u.role.toUpperCase()}) ${u.isGhost ? '[CONTATO SALVO]' : ''} ${!hasPhone ? ' [SEM WHATSAPP]' : ''}
+                                                                                        html += `<option value="${escapeHTML(u.telefone_whatsapp || 'missing_' + u.name)}" data-name="${escapeHTML(u.name)}" data-email="${escapeHTML(u.email)}" ${!hasPhone ? 'style="color: #dc3545;"' : ''}>
+                                ${escapeHTML(u.name)} (${u.role.toUpperCase()}) ${u.isGhost ? '[CONTATO SALVO]' : ''} ${!hasPhone ? ' [SEM WHATSAPP]' : ''}
                             </option>`;
                                                                                     });
 
@@ -476,7 +488,7 @@
                                                                                     console.warn("[WhatsApp] Erro não-crítico ao registrar log inicial:", e);
                                                                                 }
 
-                                                                                const response = await fetch(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
+                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
                                                                                     method: 'POST',
                                                                                     headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
                                                                                     body: JSON.stringify({
@@ -526,6 +538,11 @@
                                                                                 if (lastNotificationCache.has(cacheKey) && (agoraMs - lastNotificationCache.get(cacheKey) < 8000)) {
                                                                                     console.warn(`[WhatsApp] Bloqueio de duplicidade: O evento "${eventoGatilho}" para "${identificador}" já foi processado recentemente.`);
                                                                                     return;
+                                                                                }
+                                                                                // Poda entradas expiradas a cada novo registro — sem isso o Map crescia
+                                                                                // sem limite ao longo da sessão (nunca era limpo).
+                                                                                for (const [k, t] of lastNotificationCache) {
+                                                                                    if (agoraMs - t >= 8000) lastNotificationCache.delete(k);
                                                                                 }
                                                                                 lastNotificationCache.set(cacheKey, agoraMs);
 
@@ -754,7 +771,7 @@
                                                                                     targetNumber = targetNumber.substring(0, 4) + targetNumber.substring(5);
                                                                                 }
 
-                                                                                const response = await fetch(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
+                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
                                                                                     method: 'POST',
                                                                                     headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
                                                                                     body: JSON.stringify({ number: targetNumber, text: log.mensagem, delay: 500, linkPreview: false })
@@ -780,7 +797,7 @@
                                                                             try {
                                                                                 Swal.fire({ title: 'Consultando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
                                                                                 const jid = destinatario.includes('@') ? destinatario : (destinatario + '@s.whatsapp.net');
-                                                                                const response = await fetch(`${EVO_API_URL}/chat/findMessages/${EVO_INSTANCE}`, {
+                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/chat/findMessages/${EVO_INSTANCE}`, {
                                                                                     method: 'POST',
                                                                                     headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
                                                                                     body: JSON.stringify({ where: { id: messageId }, remoteJid: jid })
@@ -900,7 +917,7 @@
 
                                                                             try {
                                                                                 statusText.innerText = "Consultando instância...";
-                                                                                const response = await fetch(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
                                                                                     headers: { 'apikey': EVO_API_KEY }
                                                                                 });
 
@@ -930,7 +947,7 @@
 
                                                                         async function criarInstanciaEvolution() {
                                                                             try {
-                                                                                const response = await fetch(`${EVO_API_URL}/instance/create`, {
+                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/instance/create`, {
                                                                                     method: 'POST',
                                                                                     headers: {
                                                                                         'Content-Type': 'application/json',
@@ -965,7 +982,7 @@
                                                                             showToast("Verificando status da instância...", "info");
 
                                                                             try {
-                                                                                const response = await fetch(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
+                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
                                                                                     method: 'GET',
                                                                                     headers: { 'apikey': EVO_API_KEY }
                                                                                 });

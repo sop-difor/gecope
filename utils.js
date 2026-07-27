@@ -153,6 +153,20 @@
 
     function escapeHTML(str) { const s = String(str || ''); return s.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
 
+    /* Sanitiza HTML rico salvo pelo editor contentEditable do comentário da Curva ABC
+       (negrito/itálico/sublinhado/alinhamento/recuo/tamanho de fonte, via execCommand).
+       Diferente de escapeHTML() — aqui o objetivo é MANTER a formatação, só removendo
+       o que pode executar JS (script, on*, javascript:, etc.). Usa DOMPurify (carregado
+       via CDN em index.html); se por algum motivo a lib não carregar, cai para
+       escapeHTML() puro (perde formatação, mas nunca executa HTML não confiável). */
+    function sanitizeRichHTML(html) {
+        if (typeof DOMPurify === 'undefined') return escapeHTML(html);
+        return DOMPurify.sanitize(String(html || ''), {
+            ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 'font', 'span', 'div', 'p', 'br', 'ul', 'ol', 'li'],
+            ALLOWED_ATTR: ['style']
+        });
+    }
+
     function sum(rows, fn) { return rows.reduce((acc, it) => { const v = fn(it); return acc + (isFiniteNumber(v) ? v : 0); }, 0); }
 
     function formatStatusDisplay(status) {
@@ -179,10 +193,6 @@
 
     function formatCurrencyValue(val) { return val.toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
 
-    function quantile(arr, q) { const p = (arr.length - 1) * q, b = Math.floor(p), r = p - b; return arr[b + 1] !== undefined ? arr[b] + r * (arr[b + 1] - arr[b]) : arr[b]; }
-
-    function topN(g, n) { return g.sort((a, b) => b.value - a.value).slice(0, n); }
-
     // Expor no escopo global (conforme diretriz: anexar ao objeto window)
     window.mascaraProcesso = mascaraProcesso;
     window.sanitizarNomeArquivo = sanitizarNomeArquivo;
@@ -199,11 +209,10 @@
     window.formatPercentage = formatPercentage;
     window.isFiniteNumber = isFiniteNumber;
     window.escapeHTML = escapeHTML;
+    window.sanitizeRichHTML = sanitizeRichHTML;
     window.sum = sum;
     window.formatStatusDisplay = formatStatusDisplay;
     window.parseMoneyInput = parseMoneyInput;
     window.formatCurrencyValue = formatCurrencyValue;
-    window.quantile = quantile;
-    window.topN = topN;
 
 })(window);
