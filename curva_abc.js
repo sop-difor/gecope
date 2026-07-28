@@ -508,59 +508,6 @@
     XLSX.utils.book_append_sheet(wb, ws, "Curva ABC");
     XLSX.writeFile(wb, "curva-abc-" + norm(state.colNome).replace(/\s+/g, "-") + ".xlsx");
   }
-  function baixarCsv() {
-    var linhas = matriz().map(function (r) {
-      return r.map(function (v) {
-        if (v == null) return "";
-        if (typeof v === "number") return String(v).replace(".", ",");
-        var s = String(v).replace(/"/g, '""');
-        return /[;"\n]/.test(s) ? '"' + s + '"' : s;
-      }).join(";");
-    }).join("\r\n");
-    var blob = new Blob(["﻿" + linhas], { type: "text/csv;charset=utf-8" });
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "curva-abc.csv"; a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-  }
-
-  /* ---------- relatório consolidado dos comentários (para despacho) ---------- */
-  function cvGerarRelatorioComentarios() {
-    var itens = (state.curva || []).filter(function (x) { return x.dbId && x.comentario && cvTextoSemHtml(x.comentario).trim(); });
-    if (!itens.length) { cvAlerta("Nenhum comentário", "Nenhum comentário cadastrado nesta Curva ABC ainda.", "info"); return; }
-
-    var partes = [];
-    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:10pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
-    partes.push(montarCabecalhoLogosRelatorio('Relatório de Análise Técnica'));
-
-    var versaoInfo = state.versaoCarregadaDb;
-    var dtConf = '';
-    if (versaoInfo && versaoInfo.created_at) {
-      var dConf = new Date(versaoInfo.created_at);
-      dtConf = dConf.toLocaleDateString('pt-BR') + ', ' + dConf.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    }
-    partes.push(montarIdentificacaoRelatorio(
-      state.processoVinculado ? esc(state.processoVinculado.processo) : '',
-      (state.processoVinculado && state.processoVinculado.descricao) ? esc(state.processoVinculado.descricao) : '',
-      versaoInfo ? esc((versaoInfo.autor_nome || '').toUpperCase()) : '',
-      versaoInfo ? String(versaoInfo.versao) : '',
-      dtConf
-    ));
-
-    partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, retorna-se o processo à Fiscalização com o(s) seguinte(s) apontamento(s):</p>');
-
-    itens.forEach(function (x, i) {
-      partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.desc) + ':</strong></p>');
-      /* comentário já vem como HTML formatado pelo próprio analista (negrito, itálico,
-         alinhamento, tamanho) no editor do modal — mantém a formatação, mas passa por
-         sanitizeRichHTML() (DOMPurify) para nunca renderizar HTML não confiável. */
-      partes.push('<div style="margin:0 0 1.5em 0">' + sanitizeRichHTML(x.comentario) + '</div>');
-    });
-    partes.push('</div>');
-
-    $("cv-relatorio-comentarios-body").innerHTML = partes.join("");
-    bootstrap.Modal.getOrCreateInstance($("modalCvRelatorioComentarios")).show();
-  }
-
   /* ---------- vínculo com um processo (Gerenciar Processo) ---------- */
   function cvPodeEscrever() {
     return (typeof getCurrentUserRole === "function")
@@ -971,10 +918,7 @@
   $("cv-qtdCustom").addEventListener("change", calcular);
   $("cv-qtdCustom").addEventListener("input", calcular);
   $("cv-btnXlsx").addEventListener("click", baixarXlsx);
-  $("cv-btnCsv").addEventListener("click", baixarCsv);
   $("cv-btnPrint").addEventListener("click", function () { window.print(); });
-  var btnRelatorioComentarios = $("cv-btnRelatorioComentarios");
-  if (btnRelatorioComentarios) btnRelatorioComentarios.addEventListener("click", cvGerarRelatorioComentarios);
 
   /* ---------- eventos: vínculo com processo e análise item a item ---------- */
   var vincInput = $("cv-vincProcesso");

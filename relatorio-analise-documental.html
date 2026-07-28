@@ -47,14 +47,22 @@
     text-align: left; padding: 5px 8px; font-size: 7.4pt; letter-spacing: 0.5px;
     text-transform: uppercase; color: #45564c; border-bottom: 1.5px solid #0f3d2e;
   }
-  table.check th.st { text-align: right; width: 120px; }
+  table.check th.st { text-align: center; width: 120px; }
   table.check td { padding: 4px 8px; border-bottom: 0.5px solid #e6ece7; }
-  table.check td.st { text-align: right; }
+  table.check td.st { text-align: center; }
   .st svg { vertical-align: middle; margin-right: 5px; }
   .st .lbl { font-weight: 700; font-size: 8.6pt; vertical-align: middle; }
   .s-ok .lbl { color: #1c6b40; }
   .s-no .lbl { color: #b02a1c; }
   .s-na .lbl { color: #8a938c; }
+
+  /* legenda da conferência de documentação */
+  .legenda {
+    display: flex; flex-direction: column; gap: 3px;
+    margin: 8px 0 4px 0; padding: 6px 8px;
+    font-size: 7.6pt; color: #63736a;
+  }
+  .legenda .leg-item b { color: #2a332c; }
 
   /* comentários do analista — área livre */
   .note {
@@ -118,6 +126,11 @@
       <tr><td>Documentos assinados pela Fiscalização</td><td class="st s-ok"><svg width="14" height="14" viewBox="0 0 14 14"><rect width="14" height="14" rx="3" fill="#dcf0e3"/><path d="M3.5 7.3 L6 9.6 L10.5 4.4" fill="none" stroke="#1c6b40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Sim</span></td></tr>
     </tbody>
   </table>
+  <div class="legenda">
+    <span class="leg-item"><b>Sim</b> — Documentação anexada ao processo;</span>
+    <span class="leg-item"><b>Não</b> — Documentação não anexada ao processo;</span>
+    <span class="leg-item"><b>N/A</b> — Documentação não se aplica.</span>
+  </div>
 
   <!-- comentários livres -->
   <h2>Comentários do Analista</h2>

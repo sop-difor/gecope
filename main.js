@@ -1965,9 +1965,14 @@ let checklistAditivoState = {
 };
 
 // --- CURVA ABC DO PROCESSO (referência usada ao navegar para a aba Curva ABC) ---
+// vindoDoModal: true quando a navegação partiu do botão "Curva ABC"/"Nova Curva
+// ABC" de dentro de GERENCIAR PROCESSO — troca o botão "Processos →" da Curva ABC
+// por "Voltar", que reabre o mesmo processo na aba Análise Técnica, em vez de
+// simplesmente levar à lista geral de Processos.
 let curvaAbcProcessoState = {
     processoStr: null,
-    processoId: null
+    processoId: null,
+    vindoDoModal: false
 };
 
 // Ativa uma das abas de GERENCIAR PROCESSO (Geral/Financeiro/Documental/Técnica/
@@ -2041,7 +2046,8 @@ async function abrirDetalhes(processoStr) {
     curvaAbcProcessoState = {
         processoStr: row.processo,
         processoId: row.id,
-        descricao: row.descricao || ""
+        descricao: row.descricao || "",
+        vindoDoModal: false
     };
 
     // Reseta o estado do checklist de documentação para este processo
@@ -2384,6 +2390,11 @@ function gerarRelatorioChecklistAditivo(checklistId) {
       <thead><tr><th>Documento</th><th class="st">Situação</th></tr></thead>
       <tbody>${linhasTabela}</tbody>
     </table>
+    <div class="legenda">
+      <span class="leg-item"><b>Sim</b> — Documentação anexada ao processo;</span>
+      <span class="leg-item"><b>Não</b> — Documentação não anexada ao processo;</span>
+      <span class="leg-item"><b>N/A</b> — Documentação não se aplica.</span>
+    </div>
 
     <h2>Comentários do Analista</h2>
     <div class="hint">Registre aqui as observações sobre qualquer documento — do checklist ou não.</div>
@@ -2442,14 +2453,22 @@ function gerarRelatorioChecklistAditivo(checklistId) {
     text-align: left; padding: 5px 8px; font-size: 7.4pt; letter-spacing: 0.5px;
     text-transform: uppercase; color: #45564c; border-bottom: 1.5px solid #0f3d2e;
   }
-  table.check th.st { text-align: right; width: 120px; }
+  table.check th.st { text-align: center; width: 120px; }
   table.check td { padding: 4px 8px; border-bottom: 0.5px solid #e6ece7; }
-  table.check td.st { text-align: right; }
+  table.check td.st { text-align: center; }
   .st svg { vertical-align: middle; margin-right: 5px; }
   .st .lbl { font-weight: 700; font-size: 8.6pt; vertical-align: middle; }
   .s-ok .lbl { color: #1c6b40; }
   .s-no .lbl { color: #b02a1c; }
   .s-na .lbl { color: #8a938c; }
+
+  /* legenda da conferência de documentação */
+  .legenda {
+    display: flex; flex-direction: column; gap: 3px;
+    margin: 8px 0 4px 0; padding: 6px 8px;
+    font-size: 7.6pt; color: #63736a;
+  }
+  .legenda .leg-item b { color: #2a332c; }
 
   /* comentários do analista — área livre */
   .note { border-left: 3px solid #2e8b57; padding: 2px 0 2px 11px; margin-bottom: 11px; }
@@ -3102,7 +3121,21 @@ function showPane(paneId) {
     }
     const processosBtn = document.getElementById('nav-processos-btn');
     if (processosBtn) {
-        processosBtn.style.display = (paneId === 'pane-curva-abc') ? '' : 'none';
+        if (paneId === 'pane-curva-abc' && curvaAbcProcessoState.vindoDoModal) {
+            // Curva ABC aberta a partir de GERENCIAR PROCESSO (Análise Técnica): em vez de
+            // levar à lista geral de Processos, volta a reabrir o mesmo processo.
+            processosBtn.style.display = '';
+            processosBtn.classList.add('btn-back-minimal');
+            processosBtn.classList.remove('btn-forward-minimal');
+            processosBtn.innerHTML = '<span>Voltar</span><i class="bi bi-arrow-right ms-1"></i>';
+            processosBtn.onclick = () => { if (typeof voltarCurvaAbcParaProcesso === 'function') voltarCurvaAbcParaProcesso(); };
+        } else {
+            processosBtn.style.display = (paneId === 'pane-curva-abc') ? '' : 'none';
+            processosBtn.classList.add('btn-forward-minimal');
+            processosBtn.innerHTML = '<span>Processos</span><i class="bi bi-arrow-right"></i>';
+            processosBtn.onclick = () => showPane('pane-reuniao');
+        }
+        if (paneId !== 'pane-curva-abc') curvaAbcProcessoState.vindoDoModal = false;
     }
 
     setHeroContext(paneId);

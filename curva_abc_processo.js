@@ -204,6 +204,7 @@
     var processoStr = curvaAbcProcessoState.processoStr;
     var descricao = curvaAbcProcessoState.descricao;
 
+    curvaAbcProcessoState.vindoDoModal = true;
     showPane("pane-curva-abc");
     // dá tempo da aba ficar visível antes de carregar/renderizar o gráfico
     // (mesmo padrão de espera usado em main.js para o modal de detalhes, ex.: calcularRepercussao)
@@ -228,6 +229,7 @@
     var processoStr = curvaAbcProcessoState.processoStr;
     var descricao = curvaAbcProcessoState.descricao;
 
+    curvaAbcProcessoState.vindoDoModal = true;
     showPane("pane-curva-abc");
     setTimeout(function () {
       if (typeof carregarCurvaAbcDoProcesso === "function") {
@@ -236,9 +238,27 @@
     }, 50);
   }
 
+  /* ---------- botão "Voltar" da Curva ABC, quando aberta a partir de GERENCIAR
+     PROCESSO ---------- reabre o mesmo processo direto na aba Análise Técnica,
+     em vez de levar à lista geral de Processos (comportamento do botão padrão
+     "Processos →", usado quando a Curva ABC é aberta direto pelo card do Início). */
+  function voltarCurvaAbcParaProcesso() {
+    var processoStr = curvaAbcProcessoState.processoStr;
+    curvaAbcProcessoState.vindoDoModal = false;
+    if (!processoStr || typeof abrirDetalhes !== "function") {
+      showPane("pane-reuniao");
+      return;
+    }
+    showPane("pane-reuniao");
+    Promise.resolve(abrirDetalhes(processoStr)).then(function () {
+      if (typeof mostrarAbaGerenciarProcesso === "function") mostrarAbaGerenciarProcesso("gp-tab-tecnica-btn");
+    });
+  }
+
   window.carregarCurvaAbcResumo = carregarCurvaAbcResumo;
   window.abrirCurvaAbcDoProcesso = abrirCurvaAbcDoProcesso;
   window.iniciarNovaCurvaAbcDoProcesso = iniciarNovaCurvaAbcDoProcesso;
   window.gerarRelatorioTecnicoDoProcesso = gerarRelatorioTecnicoDoProcesso;
   window.excluirVersaoCurvaAbc = excluirVersaoCurvaAbc;
+  window.voltarCurvaAbcParaProcesso = voltarCurvaAbcParaProcesso;
 })();
