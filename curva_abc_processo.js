@@ -149,11 +149,22 @@
     if (!comentados.length) { alert("Nenhum comentário cadastrado nesta Curva ABC ainda."); return; }
 
     var partes = [];
-    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
-    partes.push(montarCabecalhoLogosRelatorio());
-    partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Técnica — GECOPE</p>');
-    partes.push('<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ' + esc(processoStr)
-      + (descricao ? ' — ' + esc(descricao) : '') + ' — Versão ' + versaoRegistro.versao + '</p>');
+    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:10pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push(montarCabecalhoLogosRelatorio('Relatório de Análise Técnica'));
+
+    var dtConf = '';
+    if (versaoRegistro.created_at) {
+      var dConf = new Date(versaoRegistro.created_at);
+      dtConf = dConf.toLocaleDateString('pt-BR') + ', ' + dConf.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    partes.push(montarIdentificacaoRelatorio(
+      esc(processoStr),
+      descricao ? esc(descricao) : '',
+      esc((versaoRegistro.autor_nome || '').toUpperCase()),
+      String(versaoRegistro.versao),
+      dtConf
+    ));
+
     partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, resolve-se retornar o processo à Fiscalização com os seguintes apontamentos:</p>');
     comentados.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.descricao) + ':</strong></p>');
@@ -168,13 +179,14 @@
     }
     janela.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
       + '<title>Relatório de Análise Técnica — ' + esc(processoStr) + '</title>'
+      + '<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">'
       + '<style>'
-      + 'body{margin:0;background:#f1f3f5;}'
+      + 'body{margin:0;background:#f1f3f5;font-family:"Montserrat","Arial",sans-serif;font-size:10pt;}'
       + '.rel-toolbar{padding:12px 20px;background:#212529;text-align:right;}'
       + '.rel-toolbar button{padding:8px 18px;font-weight:600;border:none;border-radius:4px;background:#198754;color:#fff;cursor:pointer;}'
       + '.rel-toolbar button:hover{background:#157347;}'
-      + '.rel-page{max-width:800px;margin:20px auto;background:#fff;padding:50px;box-shadow:0 1px 4px rgba(0,0,0,0.15);}'
-      + '@media print{.rel-toolbar{display:none;}body{background:#fff;}.rel-page{box-shadow:none;margin:0;max-width:none;}}'
+      + '.rel-page{max-width:800px;aspect-ratio:210/297;margin:20px auto;background:#fff;padding:50px;box-shadow:0 1px 4px rgba(0,0,0,0.15);}'
+      + '@media print{.rel-toolbar{display:none;}body{background:#fff;}.rel-page{box-shadow:none;margin:0;max-width:none;aspect-ratio:auto;}}'
       + '</style></head><body>'
       + '<div class="rel-toolbar"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>'
       + '<div class="rel-page">' + partes.join('') + '</div>'

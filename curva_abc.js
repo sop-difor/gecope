@@ -529,13 +529,23 @@
     if (!itens.length) { cvAlerta("Nenhum comentário", "Nenhum comentário cadastrado nesta Curva ABC ainda.", "info"); return; }
 
     var partes = [];
-    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
-    partes.push(montarCabecalhoLogosRelatorio());
-    partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Técnica — GECOPE</p>');
-    if (state.processoVinculado) {
-      partes.push('<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ' + esc(state.processoVinculado.processo)
-        + (state.processoVinculado.descricao ? ' — ' + esc(state.processoVinculado.descricao) : '') + '</p>');
+    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:10pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
+    partes.push(montarCabecalhoLogosRelatorio('Relatório de Análise Técnica'));
+
+    var versaoInfo = state.versaoCarregadaDb;
+    var dtConf = '';
+    if (versaoInfo && versaoInfo.created_at) {
+      var dConf = new Date(versaoInfo.created_at);
+      dtConf = dConf.toLocaleDateString('pt-BR') + ', ' + dConf.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
+    partes.push(montarIdentificacaoRelatorio(
+      state.processoVinculado ? esc(state.processoVinculado.processo) : '',
+      (state.processoVinculado && state.processoVinculado.descricao) ? esc(state.processoVinculado.descricao) : '',
+      versaoInfo ? esc((versaoInfo.autor_nome || '').toUpperCase()) : '',
+      versaoInfo ? String(versaoInfo.versao) : '',
+      dtConf
+    ));
+
     partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, retorna-se o processo à Fiscalização com o(s) seguinte(s) apontamento(s):</p>');
 
     itens.forEach(function (x, i) {

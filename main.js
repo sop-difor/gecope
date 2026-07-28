@@ -1940,6 +1940,7 @@ async function enviarParaPlanilha() {
                 checklistAditivoState = {
                     processoStr: numProcesso,
                     processoId: processoIdRecemCriado,
+                    descricao: formData.get("DESCRIÇÃO") || "",
                     statusOriginal: 'AGUAR. APROVAÇÃO',
                     sessionFinalized: false,
                     latestChecklist: null
@@ -1956,6 +1957,7 @@ async function enviarParaPlanilha() {
 let checklistAditivoState = {
     processoStr: null,
     processoId: null,
+    descricao: null,
     statusOriginal: null,
     sessionFinalized: false,
     latestChecklist: null,
@@ -2046,6 +2048,7 @@ async function abrirDetalhes(processoStr) {
     checklistAditivoState = {
         processoStr: row.processo,
         processoId: row.id,
+        descricao: row.descricao || "",
         statusOriginal: row.status,
         sessionFinalized: false,
         latestChecklist: null
@@ -2175,7 +2178,7 @@ const CHECKLIST_ADITIVO_ITENS = [
     { key: 'chk_portaria', campo: 'portaria_fiscalizacao', obsCampo: 'portaria_fiscalizacao_obs', label: 'Portaria de Fiscalização', obrigatorio: 'primeiro_aditivo' },
     { key: 'chk_curva_abc', campo: 'curva_abc', obsCampo: 'curva_abc_obs', label: 'Curva ABC', obrigatorio: 'sempre' },
     { key: 'chk_comp_propria', campo: 'composicao_propria', obsCampo: 'composicao_propria_obs', label: 'Composição Própria (CXXXX)', obrigatorio: 'sempre' },
-    { key: 'chk_comp_analiticas', campo: 'composicoes_analiticas', obsCampo: 'composicoes_analiticas_obs', label: 'Composições Analíticas', obrigatorio: 'comp_propria' },
+    { key: 'chk_comp_analiticas', campo: 'composicoes_analiticas', obsCampo: 'composicoes_analiticas_obs', label: 'Composições Analíticas', obrigatorio: 'sempre' },
     { key: 'chk_docs_assinados', campo: 'docs_assinados_fiscalizacao', obsCampo: 'docs_assinados_fiscalizacao_obs', label: 'Documentos assinados pela Fiscalização', obrigatorio: 'sempre' }
 ];
 
@@ -2321,65 +2324,74 @@ function gerarRelatorioChecklistAditivo(checklistId) {
         alert('Nenhum checklist de documentação finalizado para este processo ainda. Preencha o checklist antes de gerar o relatório.');
         return;
     }
-    const versao = versoes.length ? versoes.length - versoes.indexOf(registro) : null;
+    const versao = versoes.length ? versoes.length - versoes.indexOf(registro) : 1;
 
-    const dt = new Date(registro.created_at).toLocaleString('pt-BR');
+    const dt = new Date(registro.created_at);
+    const dtConferencia = dt.toLocaleDateString('pt-BR') + ', ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     const itensAplicaveis = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] !== null && registro[item.campo] !== undefined);
     const pendencias = itensAplicaveis.filter(item => registro[item.campo] === false);
     const inconsistencias = itensAplicaveis.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]);
+    const totalObservacoes = pendencias.length + inconsistencias.length;
 
-    const partes = [];
-    partes.push('<div style="font-family:\'Montserrat\',sans-serif; font-size:11pt; text-align:justify; line-height:1.5; color:#1a1a1a">');
-    partes.push(montarCabecalhoLogosRelatorio());
-    partes.push('<p style="text-align:center; font-weight:700; text-transform:uppercase; margin:0 0 1em 0">Relatório de Análise Documental — GECOPE</p>');
-    partes.push(`<p style="font-weight:700; margin:0 0 1em 0">PROCESSO NUP ${escapeHTML(checklistAditivoState.processoStr || '')}${versao ? ' — Versão ' + versao : ''}</p>`);
-    partes.push(`<p style="margin:0 0 1em 0">Em conferência da documentação mínima exigida para o aditivo deste processo (checklist preenchido por ${escapeHTML(registro.autor_nome || '')} em ${dt} — 1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}), verificou-se o seguinte:</p>`);
+    const ICON_OK = '<svg width="14" height="14" viewBox="0 0 14 14"><rect width="14" height="14" rx="3" fill="#dcf0e3"/><path d="M3.5 7.3 L6 9.6 L10.5 4.4" fill="none" stroke="#1c6b40" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const ICON_NO = '<svg width="14" height="14" viewBox="0 0 14 14"><rect width="14" height="14" rx="3" fill="#fbe0dd"/><path d="M4.2 4.2 L9.8 9.8 M9.8 4.2 L4.2 9.8" fill="none" stroke="#b02a1c" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
-    if (pendencias.length || inconsistencias.length) {
-        const total = pendencias.length + inconsistencias.length;
-        partes.push(`<p style="margin:0 0 0.8em 0">Constatada(s) <strong>${total} observação(ões)</strong> na documentação, que devem ser analisadas/saneadas antes do prosseguimento do processo:</p>`);
-        let n = 1;
-        if (pendencias.length) {
-            partes.push('<p style="margin:0 0 0.4em 0"><strong>Documentos não apresentados:</strong></p>');
-            pendencias.forEach(item => {
-                const obs = item.obsCampo && registro[item.obsCampo] ? registro[item.obsCampo] : null;
-                partes.push(`<p style="margin:0 0 0.3em 0"><strong>${n}. ${escapeHTML(item.label)}:</strong> não apresentado(a).</p>`);
-                if (obs) partes.push(`<div style="margin:0 0 1.2em 0; white-space:pre-wrap;">${escapeHTML(obs)}</div>`);
-                n++;
-            });
-        }
-        if (inconsistencias.length) {
-            partes.push('<p style="margin:0 0 0.4em 0"><strong>Documentos apresentados com inconsistência:</strong></p>');
-            inconsistencias.forEach(item => {
-                partes.push(`<p style="margin:0 0 0.3em 0"><strong>${n}. ${escapeHTML(item.label)}:</strong></p>`);
-                partes.push(`<div style="margin:0 0 1.2em 0; white-space:pre-wrap;">${escapeHTML(registro[item.obsCampo])}</div>`);
-                n++;
-            });
-        }
-    } else {
-        partes.push('<p style="margin:0 0 1.5em 0"><strong>Nenhuma pendência ou inconsistência constatada.</strong> A documentação mínima exigida para este aditivo encontra-se completa.</p>');
-    }
-
-    partes.push(`<p style="margin:1em 0 0.4em 0"><strong>Outros documentos relevantes não listados no checklist:</strong> ${registro.outros_flag ? 'Sim' : 'Não'}</p>`);
-    if (registro.outros_flag && registro.outros_obs) {
-        partes.push(`<div style="margin:0 0 1.5em 0; white-space:pre-wrap;">${escapeHTML(registro.outros_obs)}</div>`);
-    }
-
-    partes.push('<table style="width:100%; border-collapse:collapse; margin-top:1em; font-size:10pt">');
-    partes.push('<thead><tr>'
-        + '<th style="text-align:left; border-bottom:1px solid #999; padding:4px 6px">Documento</th>'
-        + '<th style="text-align:center; border-bottom:1px solid #999; padding:4px 6px; width:90px">Situação</th>'
-        + '</tr></thead><tbody>');
-    CHECKLIST_ADITIVO_ITENS.forEach(item => {
+    const linhasTabela = CHECKLIST_ADITIVO_ITENS.map(item => {
         const valor = registro[item.campo];
-        const statusTxt = valor === true ? 'Sim' : (valor === false ? 'Não' : 'N/A');
-        partes.push('<tr>'
-            + `<td style="padding:4px 6px; border-bottom:1px solid #eee">${escapeHTML(item.label)}</td>`
-            + `<td style="text-align:center; padding:4px 6px; border-bottom:1px solid #eee">${statusTxt}</td>`
-            + '</tr>');
+        if (valor === true) return `<tr><td>${escapeHTML(item.label)}</td><td class="st s-ok">${ICON_OK}<span class="lbl">Sim</span></td></tr>`;
+        if (valor === false) return `<tr><td>${escapeHTML(item.label)}</td><td class="st s-no">${ICON_NO}<span class="lbl">Não</span></td></tr>`;
+        return `<tr><td>${escapeHTML(item.label)}</td><td class="st s-na"><span class="lbl">N/A</span></td></tr>`;
+    }).join('');
+
+    const notas = [];
+    pendencias.forEach(item => {
+        const obs = item.obsCampo && registro[item.obsCampo]
+            ? registro[item.obsCampo]
+            : 'Não consta nos autos. Documento indispensável — deve ser providenciado antes do prosseguimento.';
+        notas.push({ doc: item.label, tag: 'Checklist', txt: obs });
     });
-    partes.push('</tbody></table>');
-    partes.push('</div>');
+    inconsistencias.forEach(item => {
+        notas.push({ doc: item.label, tag: 'Checklist', txt: registro[item.obsCampo] });
+    });
+    if (registro.outros_flag && registro.outros_obs) {
+        notas.push({ doc: 'Outros documentos relevantes', tag: 'Fora do checklist', txt: registro.outros_obs });
+    }
+
+    const notasHTML = notas.length
+        ? notas.map(n => `
+        <div class="note">
+            <span class="doc">${escapeHTML(n.doc)}</span><span class="tag">${escapeHTML(n.tag)}</span>
+            <div class="txt">${escapeHTML(n.txt)}</div>
+        </div>`).join('')
+        : '<div class="hint" style="font-style:normal">Nenhuma observação registrada — documentação sem pendências além do checklist padrão.</div>';
+
+    const conclusaoTxt = totalObservacoes > 0
+        ? `Situação geral: <span class="st">pendente de saneamento</span>. Constatada(s) <b>${totalObservacoes} pendência(s)/observação(ões) no checklist</b> a serem sanadas antes do prosseguimento. Após regularização, retornar os autos à GECOPE para reanálise.`
+        : `Situação geral: <b>regular</b>. Não foram constatadas pendências na documentação mínima exigida para este aditivo (1º Aditivo: ${registro.eh_primeiro_aditivo ? 'Sim' : 'Não'}).`;
+
+    const objeto = checklistAditivoState.descricao ? escapeHTML(checklistAditivoState.descricao) : '—';
+    const analistaNome = escapeHTML((registro.autor_nome || '').toUpperCase());
+
+    const conteudo = `
+    <div class="head">
+      ${montarCabecalhoLogosRelatorio('Relatório de Análise Documental')}
+    </div>
+    ${montarIdentificacaoRelatorio(escapeHTML(checklistAditivoState.processoStr || ''), objeto, analistaNome, String(versao), dtConferencia)}
+
+    <h2>Conferência da Documentação</h2>
+    <table class="check">
+      <thead><tr><th>Documento</th><th class="st">Situação</th></tr></thead>
+      <tbody>${linhasTabela}</tbody>
+    </table>
+
+    <h2>Comentários do Analista</h2>
+    <div class="hint">Registre aqui as observações sobre qualquer documento — do checklist ou não.</div>
+    ${notasHTML}
+
+    <h2>Conclusão</h2>
+    <div class="concl">${conclusaoTxt}</div>
+    `;
 
     // Abre em nova aba (documento HTML separado) em vez de num modal aninhado dentro
     // de GERENCIAR PROCESSO: um modal-dentro-de-modal aqui esbarra numa regra própria
@@ -2396,22 +2408,74 @@ function gerarRelatorioChecklistAditivo(checklistId) {
 <head>
 <meta charset="utf-8">
 <title>Relatório de Análise Documental — ${escapeHTML(checklistAditivoState.processoStr || '')}</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    body { margin: 0; background: #f1f3f5; }
-    .rel-toolbar { padding: 12px 20px; background: #212529; text-align: right; }
-    .rel-toolbar button { padding: 8px 18px; font-weight: 600; border: none; border-radius: 4px; background: #198754; color: #fff; cursor: pointer; }
-    .rel-toolbar button:hover { background: #157347; }
-    .rel-page { max-width: 800px; margin: 20px auto; background: #fff; padding: 50px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
-    @media print {
-        .rel-toolbar { display: none; }
-        body { background: #fff; }
-        .rel-page { box-shadow: none; margin: 0; max-width: none; }
+  @page {
+    size: A4;
+    margin: 18mm 16mm 18mm 16mm;
+    @bottom-center {
+      content: "SOP-CE · GECOPE   |   Relatório de Análise Documental   |   Página " counter(page) " de " counter(pages);
+      font-family: "Montserrat", sans-serif; font-size: 7pt; color: #8a978d;
     }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f1f3f5; font-family: "Montserrat", "Arial", sans-serif; color: #2a332c; font-size: 10pt; line-height: 1.5; }
+
+  .rel-toolbar { padding: 12px 20px; background: #212529; text-align: right; }
+  .rel-toolbar button { padding: 8px 18px; font-weight: 600; border: none; border-radius: 4px; background: #198754; color: #fff; cursor: pointer; }
+  .rel-toolbar button:hover { background: #157347; }
+  .rel-page { max-width: 800px; aspect-ratio: 210 / 297; margin: 20px auto; background: #fff; padding: 50px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+
+  /* cabeçalho (logos, divisor e título vêm de montarCabecalhoLogosRelatorio()) */
+  .head { margin-bottom: 14px; }
+
+  /* seções */
+  h2 {
+    font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.8px;
+    color: #0f3d2e; margin: 18px 0 7px 0; padding-bottom: 3px;
+    border-bottom: 1px solid #d6e0d9;
+  }
+
+  /* tabela de conferência */
+  table.check { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  table.check th {
+    text-align: left; padding: 5px 8px; font-size: 7.4pt; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #45564c; border-bottom: 1.5px solid #0f3d2e;
+  }
+  table.check th.st { text-align: right; width: 120px; }
+  table.check td { padding: 4px 8px; border-bottom: 0.5px solid #e6ece7; }
+  table.check td.st { text-align: right; }
+  .st svg { vertical-align: middle; margin-right: 5px; }
+  .st .lbl { font-weight: 700; font-size: 8.6pt; vertical-align: middle; }
+  .s-ok .lbl { color: #1c6b40; }
+  .s-no .lbl { color: #b02a1c; }
+  .s-na .lbl { color: #8a938c; }
+
+  /* comentários do analista — área livre */
+  .note { border-left: 3px solid #2e8b57; padding: 2px 0 2px 11px; margin-bottom: 11px; }
+  .note .doc { font-weight: 700; color: #0f3d2e; font-size: 9.3pt; }
+  .note .tag {
+    font-size: 6.8pt; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+    color: #63736a; background: #eef3ef; border-radius: 3px; padding: 1px 6px; margin-left: 6px;
+  }
+  .note .txt { font-size: 10pt; color: #3a453d; margin-top: 3px; white-space: pre-wrap; }
+  .hint { font-size: 8pt; color: #8a978d; font-style: italic; margin: -2px 0 10px 0; }
+
+  /* conclusão */
+  .concl { font-size: 9.3pt; line-height: 1.55; }
+  .concl b { color: #0f3d2e; }
+  .concl .st { font-weight: 700; color: #8a6410; }
+
+  @media print {
+    .rel-toolbar { display: none; }
+    body { background: #fff; }
+    .rel-page { box-shadow: none; margin: 0; max-width: none; padding: 0; aspect-ratio: auto; }
+  }
 </style>
 </head>
 <body>
 <div class="rel-toolbar"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>
-<div class="rel-page">${partes.join('')}</div>
+<div class="rel-page">${conteudo}</div>
 </body>
 </html>`);
     janela.document.close();
@@ -2449,7 +2513,6 @@ function resetarFormChecklistAditivo() {
     form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; r.disabled = false; });
     form.querySelectorAll('textarea').forEach(t => { t.value = ''; t.disabled = false; });
     document.getElementById('chk_grupo_primeiro_aditivo').classList.add('d-none');
-    document.getElementById('chk_comp_analiticas_wrap').classList.add('d-none');
     CHECKLIST_ADITIVO_ITENS.forEach(item => {
         const wrap = document.getElementById(`${item.key}_obs_wrap`);
         if (wrap) wrap.classList.add('d-none');
@@ -2526,7 +2589,6 @@ function preencherFormChecklist(registro, desabilitar) {
             if (btn) btn.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Remover observação';
         }
     });
-    toggleChecklistCondicional('chk_comp_propria', 'chk_comp_analiticas_wrap');
 
     setRadio('chk_outros', registro.outros_flag);
     const outros = document.getElementById('chk_outros_obs');
@@ -2572,14 +2634,8 @@ async function salvarChecklistAditivo() {
 
     for (const item of CHECKLIST_ADITIVO_ITENS) {
         const ehCondicionalPrimeiroAditivo = item.obrigatorio === 'primeiro_aditivo';
-        const ehCondicionalCompPropria = item.obrigatorio === 'comp_propria';
 
         if (ehCondicionalPrimeiroAditivo && !ehPrimeiroAditivo) {
-            payload[item.campo] = null;
-            if (item.obsCampo) payload[item.obsCampo] = null;
-            continue;
-        }
-        if (ehCondicionalCompPropria && payload.composicao_propria !== true) {
             payload[item.campo] = null;
             if (item.obsCampo) payload[item.obsCampo] = null;
             continue;
