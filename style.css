@@ -3474,13 +3474,13 @@
             word-break: break-word;
         }
         /* Enter no editor cria um <p> por parágrafo (ver defaultParagraphSeparator
-           em curva_abc.js) — remove a margem grande que o navegador aplica por
-           padrão a <p>, trocando por um respiro menor e consistente entre eles. */
+           em curva_abc.js) — sem linha em branco entre parágrafos, cada um começa
+           com recuo na 1ª linha (padrão de documento formal). O recuo pode ser
+           ajustado por parágrafo específico arrastando a régua (vira text-indent
+           inline, que sobrepõe este padrão). */
         .cv-coment-editor p {
-            margin: 0 0 8px 0;
-        }
-        .cv-coment-editor p:last-child {
-            margin-bottom: 0;
+            margin: 0;
+            text-indent: 1.25cm;
         }
         .cv-coment-editor:empty:before {
             content: attr(data-placeholder);

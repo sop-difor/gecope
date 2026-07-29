@@ -169,10 +169,12 @@
     comentados.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.descricao) + ':</strong></p>');
       /* mesmo padrão do editor do comentário (Montserrat 11pt, entrelinha 1,5,
-         justificado), aplicado aqui de novo porque o container do relatório
-         inteiro usa 10pt (ver acima) — o comentário em si sempre sai no
-         tamanho em que foi escrito, mesmo que o resto do relatório mude. */
-      partes.push('<div style="margin:0 0 1.5em 0; font-family:\'Montserrat\',sans-serif; font-size:11pt; line-height:1.5; text-align:justify">' + sanitizeRichHTML(x.comentario) + '</div>');
+         justificado, parágrafos com recuo na 1ª linha e sem linha em branco entre
+         eles — ver .cv-coment-editor em style.css), aplicado aqui de novo porque
+         o container do relatório inteiro usa 10pt (ver acima) — o comentário em
+         si sempre sai no tamanho em que foi escrito, mesmo que o resto do
+         relatório mude. */
+      partes.push('<div class="coment-corpo" style="margin:0 0 1.5em 0; font-family:\'Montserrat\',sans-serif; font-size:11pt; line-height:1.5; text-align:justify">' + sanitizeRichHTML(x.comentario) + '</div>');
     });
     partes.push('</div>');
 
@@ -190,6 +192,7 @@
       + '.rel-toolbar button{padding:8px 18px;font-weight:600;border:none;border-radius:4px;background:#198754;color:#fff;cursor:pointer;}'
       + '.rel-toolbar button:hover{background:#157347;}'
       + '.rel-page{max-width:800px;aspect-ratio:210/297;margin:20px auto;background:#fff;padding:50px;box-shadow:0 1px 4px rgba(0,0,0,0.15);}'
+      + '.coment-corpo p{margin:0;text-indent:1.25cm;}'
       + '@media print{.rel-toolbar{display:none;}body{background:#fff;}.rel-page{box-shadow:none;margin:0;max-width:none;aspect-ratio:auto;}}'
       + '</style></head><body>'
       + '<div class="rel-toolbar"><button onclick="window.print()">Imprimir / Salvar PDF</button></div>'

@@ -993,6 +993,20 @@
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
 
+  /* cola qualquer coisa (Word, Excel, e-mail, outro site) sempre como texto puro,
+     nunca com a formatação de origem — sem isso, colar um trecho de outro lugar
+     trazia a fonte/tamanho/cor de lá junto, quebrando o padrão Montserrat/11/1,5/
+     justificado exigido pro comentário (o texto colado herda o estilo do parágrafo
+     onde caiu, igual quando é digitado na mão). */
+  var edComentario = $("cv-coment-texto");
+  if (edComentario) {
+    edComentario.addEventListener("paste", function (e) {
+      e.preventDefault();
+      var texto = (e.clipboardData || window.clipboardData).getData("text/plain");
+      document.execCommand("insertText", false, texto);
+    });
+  }
+
   var btnEditarComentario = $("cv-coment-btnEditar");
   if (btnEditarComentario) {
     btnEditarComentario.addEventListener("click", function () {
