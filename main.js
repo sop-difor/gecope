@@ -3085,6 +3085,13 @@ function toggleAppTheme() {
     const isDark = document.body.classList.toggle('theme-dark');
     try { localStorage.setItem('gecope_theme', isDark ? 'dark' : 'light'); } catch (e) { /* noop */ }
     updateThemeToggleUI();
+    // Os gráficos Plotly do Financeiro fixam cor de fonte/grade no momento do
+    // render (Plotly não lê variáveis CSS), então precisam ser redesenhados ao
+    // trocar de tema, senão ficam com as cores do tema anterior até o próximo filtro.
+    const paneFinanceiro = document.getElementById('pane-financeiro');
+    if (paneFinanceiro && paneFinanceiro.classList.contains('active') && typeof window.updateFinanceiro === 'function') {
+        window.updateFinanceiro();
+    }
 }
 
 document.addEventListener('DOMContentLoaded', updateThemeToggleUI);

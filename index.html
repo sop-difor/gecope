@@ -1046,8 +1046,17 @@
                 </div> <!-- FIM PANE ADMIN -->
 
                 <div class="tab-pane fade" id="pane-financeiro">
+                    <div class="fin-page-header">
+                        <div class="fin-page-header-icon"><i class="bi bi-cash-coin"></i></div>
+                        <div>
+                            <h2 class="fin-page-title">Financeiro</h2>
+                            <p class="fin-page-subtitle">Consolidado dos valores financeiros dos processos analisados
+                                pelos analistas da GECOPE</p>
+                        </div>
+                    </div>
+
                     <section class="filters-card">
-                        <div class="filters-title">Filtros de consulta</div>
+                        <div class="filters-title"><i class="bi bi-funnel me-1"></i> Filtros de consulta</div>
                         <div class="filter-group-compact">
                             <div><label class="form-label">Status</label><select class="form-select form-select-sm"
                                     id="filter-status"></select></div>
@@ -1059,38 +1068,49 @@
                                     id="filter-contratante"></select></div>
                             <div><label class="form-label">Ano</label><select class="form-select form-select-sm"
                                     id="filter-ano"></select></div>
-                        </div>
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-grid-clear" id="btn-clear-filters">Limpar</button>
+                            <div class="fin-filter-clear-wrap">
+                                <label class="form-label" aria-hidden="true">&nbsp;</label>
+                                <button class="btn btn-sm btn-grid-clear" id="btn-clear-filters"><i
+                                        class="bi bi-arrow-counterclockwise me-1"></i>Limpar</button>
+                            </div>
                         </div>
                     </section>
 
-                    <section class="mb-3">
+                    <section class="mb-4">
                         <div class="kpi-count-card">
-                            <div>
-                                <div class="kpi-label">Processos considerados nesta análise</div>
-                                <div class="kpi-count-value" id="fin-count-total">0 processos</div>
-                            </div>
-                            <div class="kpi-count-breakdown">
-                                <span><b id="fin-count-aprovados">0</b> Aprovados</span>
-                                <span><b id="fin-count-arquivados">0</b> Arquivados revisados pela GECOPE</span>
+                            <div class="kpi-count-icon"><i class="bi bi-folder2-open"></i></div>
+                            <div class="kpi-count-body">
+                                <div>
+                                    <div class="kpi-label">Processos considerados nesta análise</div>
+                                    <div class="kpi-count-value" id="fin-count-total">0 processos</div>
+                                </div>
+                                <div class="kpi-count-breakdown">
+                                    <span><b id="fin-count-aprovados">0</b>&nbsp;Aprovados</span>
+                                    <span><b id="fin-count-arquivados">0</b>&nbsp;Arquivados revisados pela GECOPE</span>
+                                </div>
                             </div>
                         </div>
                     </section>
 
-                    <section class="mb-3">
-                        <div class="row g-2">
+                    <section class="mb-4">
+                        <div class="fin-section-heading">
+                            <i class="bi bi-clipboard-check"></i>
+                            <span class="fin-section-heading-title">Fiscalização</span>
+                            <span class="fin-section-heading-desc">Valores apurados na fiscalização do contrato</span>
+                        </div>
+                        <div class="row g-3">
                             <div class="col-12 col-md-4">
                                 <div class="kpi-card kpi-acresc-fiscal">
                                     <div class="kpi-header">
                                         <div class="kpi-icon"
-                                            style="background:rgba(0,143,61,0.16);color:var(--sop-green-dark);"></div>
+                                            style="background:rgba(0,143,61,0.16);color:var(--sop-green-dark);"><i
+                                                class="bi bi-graph-up-arrow"></i></div>
                                         <div class="kpi-label">Acréscimo Fiscalização</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-acresc-fiscal">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
-                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><span
-                                                class="kpi-trend-up"></span> Fiscal</span>
+                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><i
+                                                class="bi bi-arrow-up-short kpi-trend-up"></i> Fiscal</span>
                                     </div>
                                 </div>
                             </div>
@@ -1098,14 +1118,14 @@
                                 <div class="kpi-card kpi-supress-fiscal">
                                     <div class="kpi-header">
                                         <div class="kpi-icon"
-                                            style="background:rgba(242,140,0,0.18);color:var(--sop-orange);">
-                                        </div>
+                                            style="background:rgba(242,140,0,0.18);color:var(--sop-orange);"><i
+                                                class="bi bi-graph-down-arrow"></i></div>
                                         <div class="kpi-label">Supressão Fiscalização</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-supress-fiscal">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
-                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><span
-                                                class="kpi-trend-down"></span> Fiscal</span>
+                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><i
+                                                class="bi bi-arrow-down-short kpi-trend-down"></i> Fiscal</span>
                                     </div>
                                 </div>
                             </div>
@@ -1113,8 +1133,8 @@
                                 <div class="kpi-card kpi-reperc-fiscal">
                                     <div class="kpi-header">
                                         <div class="kpi-icon"
-                                            style="background:rgba(1,138,189,0.14);color:var(--sop-blue);">R$
-                                        </div>
+                                            style="background:rgba(1,138,189,0.14);color:var(--sop-blue);"><i
+                                                class="bi bi-cash-stack"></i></div>
                                         <div class="kpi-label">Repercussão Fiscalização</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-reperc-fiscal">R$ 0,00</div>
@@ -1123,40 +1143,50 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </section>
 
-                            <div class="col-12 col-md-4 hide-fiscal">
+                    <section class="mb-4 hide-fiscal">
+                        <div class="fin-section-heading">
+                            <i class="bi bi-patch-check"></i>
+                            <span class="fin-section-heading-title">GECOPE — Revisão Técnica</span>
+                            <span class="fin-section-heading-desc">Valores após revisão técnica da GECOPE</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
                                 <div class="kpi-card kpi-acresc-gecope">
                                     <div class="kpi-header">
                                         <div class="kpi-icon"
-                                            style="background:rgba(0,114,51,0.2);color:var(--sop-green-dark);"></div>
+                                            style="background:rgba(0,114,51,0.2);color:var(--sop-green-dark);"><i
+                                                class="bi bi-graph-up-arrow"></i></div>
                                         <div class="kpi-label">Acréscimo GECOPE</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-acresc-gecope">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
-                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><span
-                                                class="kpi-trend-up"></span> Revisão</span>
+                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><i
+                                                class="bi bi-arrow-up-short kpi-trend-up"></i> Revisão</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4 hide-fiscal">
+                            <div class="col-12 col-md-4">
                                 <div class="kpi-card kpi-supress-gecope">
                                     <div class="kpi-header">
-                                        <div class="kpi-icon" style="background:rgba(211,84,0,0.2);color:#d35400;">
-                                        </div>
+                                        <div class="kpi-icon" style="background:rgba(211,84,0,0.2);color:#d35400;"><i
+                                                class="bi bi-graph-down-arrow"></i></div>
                                         <div class="kpi-label">Supressão GECOPE</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-supress-gecope">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
-                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><span
-                                                class="kpi-trend-down"></span> Revisão</span>
+                                        <div class="kpi-sub">Soma Total</div><span class="kpi-badge"><i
+                                                class="bi bi-arrow-down-short kpi-trend-down"></i> Revisão</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4 hide-fiscal">
+                            <div class="col-12 col-md-4">
                                 <div class="kpi-card kpi-reperc-gecope">
                                     <div class="kpi-header">
-                                        <div class="kpi-icon" style="background:rgba(0,95,138,0.18);color:#005f8a;">R$
-                                        </div>
+                                        <div class="kpi-icon" style="background:rgba(0,95,138,0.18);color:#005f8a;"><i
+                                                class="bi bi-bank2"></i></div>
                                         <div class="kpi-label">Repercussão GECOPE</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-reperc-gecope">R$ 0,00</div>
@@ -1165,12 +1195,21 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </section>
 
-                            <div class="col-12 col-md-6 hide-fiscal">
+                    <section class="mb-4 hide-fiscal">
+                        <div class="fin-section-heading">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span class="fin-section-heading-title">Comparativo</span>
+                            <span class="fin-section-heading-desc">Diferença entre Fiscalização e GECOPE</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
                                 <div class="kpi-card kpi-diff-abs">
                                     <div class="kpi-header">
-                                        <div class="kpi-icon" style="background:rgba(142,68,173,0.18);color:#8e44ad;">
-                                        </div>
+                                        <div class="kpi-icon" style="background:rgba(142,68,173,0.18);color:#8e44ad;"><i
+                                                class="bi bi-arrow-left-right"></i></div>
                                         <div class="kpi-label">Diferença Total</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-diff-abs">R$ 0,00</div>
@@ -1185,11 +1224,11 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-6 hide-fiscal">
+                            <div class="col-12 col-md-6">
                                 <div class="kpi-card kpi-diff-perc">
                                     <div class="kpi-header">
-                                        <div class="kpi-icon" style="background:rgba(192,57,43,0.18);color:#c0392b;">%
-                                        </div>
+                                        <div class="kpi-icon" style="background:rgba(192,57,43,0.18);color:#c0392b;"><i
+                                                class="bi bi-percent"></i></div>
                                         <div class="kpi-label">Índice Médio de Revisão</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-diff-perc">0,0%</div>
@@ -1199,75 +1238,94 @@
                         </div>
                     </section>
 
-                    <section class="mb-3 hide-fiscal">
-                        <div class="row g-2">
-                            <div class="col-12">
+                    <section class="mb-4 hide-fiscal">
+                        <div class="fin-section-heading">
+                            <i class="bi bi-bar-chart-line"></i>
+                            <span class="fin-section-heading-title">Fiscalização × GECOPE</span>
+                            <span class="fin-section-heading-desc">Comparativo consolidado dos valores revisados</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-lg-7">
                                 <div class="chart-card">
                                     <div class="chart-header">
-                                        <div class="chart-title">Repercussão por Fiscal — Fiscalização vs GECOPE</div>
+                                        <div class="chart-header-titles">
+                                            <div class="chart-header-icon"><i class="bi bi-bar-chart-steps"></i></div>
+                                            <div>
+                                                <div class="chart-title">Acréscimo, Supressão e Repercussão</div>
+                                                <div class="chart-subtitle">Totais apurados — Fiscalização vs GECOPE
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="chart-placeholder" id="chart-fin-fiscal"></div>
+                                    <div class="chart-placeholder" id="chart-fin-comparativo"></div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="chart-card">
+                                    <div class="chart-header">
+                                        <div class="chart-header-titles">
+                                            <div class="chart-header-icon"><i class="bi bi-arrow-left-right"></i>
+                                            </div>
+                                            <div>
+                                                <div class="chart-title">Da Fiscalização ao GECOPE</div>
+                                                <div class="chart-subtitle">Efeito da revisão técnica sobre a
+                                                    repercussão</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="chart-placeholder" id="chart-fin-waterfall"></div>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <section class="mb-3 hide-fiscal">
-                        <div class="row g-2">
-                            <div class="col-12 col-md-4">
-                                <div class="kpi-card kpi-reperc-fiscal">
-                                    <div class="kpi-header">
-                                        <div class="kpi-icon"
-                                            style="background:rgba(1,138,189,0.14);color:var(--sop-blue);"><i
-                                                class="bi bi-hourglass-split"></i></div>
-                                        <div class="kpi-label">Prazo médio (processos considerados)</div>
-                                    </div>
-                                    <div class="kpi-value" id="kpi-fin-prazo-medio">0 dias</div>
-                                    <div class="kpi-sub">Abertura → Aprovação GECOPE</div>
-                                </div>
-                            </div>
-                            <div class="col-12 col-md-8">
-                                <div class="chart-card">
-                                    <div class="chart-header">
-                                        <div class="chart-title">Valor revisado (barra) × Prazo médio em dias (linha) por
-                                            Fiscal</div>
-                                    </div>
-                                    <div class="chart-placeholder" id="chart-fin-prazo-valor"></div>
-                                </div>
-                            </div>
+                    <section class="mb-3">
+                        <div class="fin-section-heading">
+                            <i class="bi bi-table"></i>
+                            <span class="fin-section-heading-title">Detalhamento por Processo</span>
                         </div>
-                    </section>
-
-                    <section class="mb-3 hide-fiscal">
                         <div class="chart-card">
                             <div class="chart-header d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="chart-title">Processos detalhados</div>
-                                    <div class="chart-subtitle" id="fin-drilldown-count">0 processos · clique numa
-                                        coluna para ordenar</div>
+                                <div class="chart-header-titles">
+                                    <div class="chart-header-icon"><i class="bi bi-list-check"></i></div>
+                                    <div>
+                                        <div class="chart-title">Processos detalhados</div>
+                                        <div class="chart-subtitle" id="fin-drilldown-count">0 processos · clique numa
+                                            coluna para ordenar</div>
+                                    </div>
                                 </div>
                                 <button class="btn btn-sm btn-outline-success fw-bold" id="btn-fin-export"
                                     onclick="exportarFinanceiroExcel()" title="Exportar tabela para Excel">
                                     <i class="bi bi-file-earmark-excel"></i> Excel
                                 </button>
                             </div>
-                            <div class="table-responsive" style="max-height: 420px;">
+                            <div class="fin-table-filters">
+                                <div class="fin-table-search">
+                                    <i class="bi bi-search"></i>
+                                    <input type="text" class="form-control form-control-sm" id="fin-drilldown-search"
+                                        placeholder="Buscar por processo, fiscal, contratada ou analista...">
+                                </div>
+                                <select class="form-select form-select-sm" id="fin-drilldown-status-filter">
+                                    <option value="">Todos os status</option>
+                                </select>
+                            </div>
+                            <div class="table-responsive fin-table-wrap" style="max-height: 420px;">
                                 <table class="table table-hover table-striped align-middle mb-0"
                                     style="font-size: 0.82rem;">
                                     <thead class="table-light">
                                         <tr id="fin-drilldown-head">
-                                            <th data-key="processo" style="cursor:pointer;">Processo</th>
-                                            <th data-key="status" style="cursor:pointer;">Status</th>
-                                            <th data-key="fiscal" style="cursor:pointer;">Fiscal</th>
-                                            <th data-key="nomeAnalista" style="cursor:pointer;">Analista</th>
-                                            <th data-key="contratada" style="cursor:pointer;">Contratada</th>
-                                            <th data-key="dataAbertura" style="cursor:pointer;">Abertura</th>
-                                            <th data-key="dataAprovacao" style="cursor:pointer;">Aprov. GECOPE</th>
-                                            <th data-key="prazoDias" style="cursor:pointer;">Prazo</th>
-                                            <th data-key="repercFiscal" style="cursor:pointer;">Repercussão Fiscal</th>
-                                            <th data-key="repercGecope" style="cursor:pointer;">Repercussão GECOPE</th>
-                                            <th data-key="_diff" style="cursor:pointer;">Diferença</th>
-                                            <th data-key="_diffPerc" style="cursor:pointer;">% Revisão</th>
+                                            <th data-key="processo">Processo</th>
+                                            <th data-key="status">Status</th>
+                                            <th data-key="fiscal">Fiscal</th>
+                                            <th data-key="nomeAnalista">Analista</th>
+                                            <th data-key="contratada">Contratada</th>
+                                            <th data-key="dataAbertura">Abertura</th>
+                                            <th data-key="dataAprovacao">Aprov. GECOPE</th>
+                                            <th data-key="prazoDias">Prazo</th>
+                                            <th data-key="repercFiscal">Repercussão Fiscal</th>
+                                            <th data-key="repercGecope">Repercussão GECOPE</th>
+                                            <th data-key="_diff">Diferença</th>
+                                            <th data-key="_diffPerc">% Revisão</th>
                                         </tr>
                                     </thead>
                                     <tbody id="fin-drilldown-body"></tbody>

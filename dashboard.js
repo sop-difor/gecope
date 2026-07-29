@@ -231,24 +231,31 @@
         updateFinanceiro();
     }
 
+    function calcularTotaisFinanceiro(rows) {
+        const s = fn => window.sum ? window.sum(rows, fn) : rows.reduce((a, b) => a + (fn(b) || 0), 0);
+        return {
+            acrescFiscal: s(d => d.acrescFiscal),
+            supressFiscal: s(d => d.supressFiscal),
+            repercFiscal: s(d => d.repercFiscal),
+            acrescGecope: s(d => d.acrescGecope),
+            supressGecope: s(d => d.supressGecope),
+            repercGecope: s(d => d.repercGecope)
+        };
+    }
+
     function renderKPIsFinanceiro(rows) {
-        const acrescFiscal = window.sum ? window.sum(rows, d => d.acrescFiscal) : rows.reduce((a,b)=>a+(b.acrescFiscal||0),0);
-        const supressFiscal = window.sum ? window.sum(rows, d => d.supressFiscal) : rows.reduce((a,b)=>a+(b.supressFiscal||0),0);
-        const repercFiscal = window.sum ? window.sum(rows, d => d.repercFiscal) : rows.reduce((a,b)=>a+(b.repercFiscal||0),0);
-        const acrescGecope = window.sum ? window.sum(rows, d => d.acrescGecope) : rows.reduce((a,b)=>a+(b.acrescGecope||0),0);
-        const supressGecope = window.sum ? window.sum(rows, d => d.supressGecope) : rows.reduce((a,b)=>a+(b.supressGecope||0),0);
-        const repercGecope = window.sum ? window.sum(rows, d => d.repercGecope) : rows.reduce((a,b)=>a+(b.repercGecope||0),0);
-        const diffReperc = repercGecope - repercFiscal; const diffAcresc = acrescGecope - acrescFiscal; const diffSupress = supressGecope - supressFiscal;
+        const t = calcularTotaisFinanceiro(rows);
+        const diffReperc = t.repercGecope - t.repercFiscal; const diffAcresc = t.acrescGecope - t.acrescFiscal; const diffSupress = t.supressGecope - t.supressFiscal;
         let diffAbs = 0; let diffPerc = 0; const metric = fin.diffMetric.value;
-        if (metric === "reperc") { diffAbs = diffReperc; diffPerc = (repercFiscal !== 0) ? (Math.abs(diffAbs) / Math.abs(repercFiscal)) * 100 : 0; }
-        else if (metric === "acresc") { diffAbs = diffAcresc; diffPerc = (acrescFiscal !== 0) ? (Math.abs(diffAbs) / Math.abs(acrescFiscal)) * 100 : 0; }
-        else if (metric === "supress") { diffAbs = diffSupress; diffPerc = (supressFiscal !== 0) ? (Math.abs(diffAbs) / Math.abs(supressFiscal)) * 100 : 0; }
-        document.getElementById("kpi-acresc-fiscal").textContent = window.formatCompact ? window.formatCompact(acrescFiscal) : String(acrescFiscal);
-        document.getElementById("kpi-supress-fiscal").textContent = window.formatCompact ? window.formatCompact(supressFiscal) : String(supressFiscal);
-        document.getElementById("kpi-reperc-fiscal").textContent = window.formatCompact ? window.formatCompact(repercFiscal) : String(repercFiscal);
-        document.getElementById("kpi-acresc-gecope").textContent = window.formatCompact ? window.formatCompact(acrescGecope) : String(acrescGecope);
-        document.getElementById("kpi-supress-gecope").textContent = window.formatCompact ? window.formatCompact(supressGecope) : String(supressGecope);
-        document.getElementById("kpi-reperc-gecope").textContent = window.formatCompact ? window.formatCompact(repercGecope) : String(repercGecope);
+        if (metric === "reperc") { diffAbs = diffReperc; diffPerc = (t.repercFiscal !== 0) ? (Math.abs(diffAbs) / Math.abs(t.repercFiscal)) * 100 : 0; }
+        else if (metric === "acresc") { diffAbs = diffAcresc; diffPerc = (t.acrescFiscal !== 0) ? (Math.abs(diffAbs) / Math.abs(t.acrescFiscal)) * 100 : 0; }
+        else if (metric === "supress") { diffAbs = diffSupress; diffPerc = (t.supressFiscal !== 0) ? (Math.abs(diffAbs) / Math.abs(t.supressFiscal)) * 100 : 0; }
+        document.getElementById("kpi-acresc-fiscal").textContent = window.formatCompact ? window.formatCompact(t.acrescFiscal) : String(t.acrescFiscal);
+        document.getElementById("kpi-supress-fiscal").textContent = window.formatCompact ? window.formatCompact(t.supressFiscal) : String(t.supressFiscal);
+        document.getElementById("kpi-reperc-fiscal").textContent = window.formatCompact ? window.formatCompact(t.repercFiscal) : String(t.repercFiscal);
+        document.getElementById("kpi-acresc-gecope").textContent = window.formatCompact ? window.formatCompact(t.acrescGecope) : String(t.acrescGecope);
+        document.getElementById("kpi-supress-gecope").textContent = window.formatCompact ? window.formatCompact(t.supressGecope) : String(t.supressGecope);
+        document.getElementById("kpi-reperc-gecope").textContent = window.formatCompact ? window.formatCompact(t.repercGecope) : String(t.repercGecope);
         document.getElementById("kpi-diff-abs").textContent = window.formatCompact ? window.formatCompact(diffAbs) : String(diffAbs);
         document.getElementById("kpi-diff-perc").textContent = window.formatPercentage ? window.formatPercentage(diffPerc) : String(diffPerc);
     }
@@ -264,65 +271,114 @@
         if (arqEl) arqEl.textContent = String(arquivados);
     }
 
-    function groupSumPair(rows, kFn, v1Fn, v2Fn) {
-        const m = new Map();
-        rows.forEach(r => {
-            const k = kFn(r);
-            if (k === null || k === undefined) return;
-            if (!m.has(k)) m.set(k, { key: k, v1: 0, v2: 0 });
-            const g = m.get(k);
-            g.v1 += v1Fn(r) || 0;
-            g.v2 += v2Fn(r) || 0;
-        });
-        return Array.from(m.values());
+    // Paleta/tipografia dos gráficos Plotly do Financeiro, adaptada ao tema
+    // claro/escuro do app (Plotly não lê variáveis CSS, então isso é recalculado
+    // a cada render a partir da classe body.theme-dark).
+    function finChartTheme() {
+        const dark = document.body.classList.contains("theme-dark");
+        return {
+            font: { family: "Montserrat, Segoe UI, system-ui, -apple-system, Roboto, sans-serif", color: dark ? "rgba(255,255,255,0.75)" : "#475569", size: 11 },
+            gridColor: dark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.07)",
+            lineColor: dark ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.14)"
+        };
     }
 
-    function renderPorFiscalFinanceiro(rows) {
-        const grupos = groupSumPair(rows, d => d.fiscal || "Não informado", d => d.repercFiscal, d => d.repercGecope);
-        grupos.sort((a, b) => (Math.abs(b.v1) + Math.abs(b.v2)) - (Math.abs(a.v1) + Math.abs(a.v2)));
-        const top = grupos.slice(0, 15).reverse();
+    function renderComparativoFinanceiro(rows) {
+        const t = calcularTotaisFinanceiro(rows);
+        const theme = finChartTheme();
+        const categorias = ["Acréscimo", "Supressão", "Repercussão"];
         const data = [
-            { y: top.map(g => g.key), x: top.map(g => g.v1), name: "Fiscalização", type: "bar", orientation: "h", marker: { color: "#008F3D" } },
-            { y: top.map(g => g.key), x: top.map(g => g.v2), name: "GECOPE", type: "bar", orientation: "h", marker: { color: "#018ABD" } }
+            { x: categorias, y: [t.acrescFiscal, t.supressFiscal, t.repercFiscal], name: "Fiscalização", type: "bar", marker: { color: "#008F3D" }, hovertemplate: "%{x}<br>Fiscalização: R$ %{y:,.2f}<extra></extra>" },
+            { x: categorias, y: [t.acrescGecope, t.supressGecope, t.repercGecope], name: "GECOPE", type: "bar", marker: { color: "#018ABD" }, hovertemplate: "%{x}<br>GECOPE: R$ %{y:,.2f}<extra></extra>" }
         ];
-        const layout = { margin: { l: 140, r: 20, t: 10, b: 40 }, barmode: "group", xaxis: { title: "Repercussão", tickprefix: "R$ " }, legend: { orientation: "h", y: -0.15 }, height: Math.max(300, 34 * top.length + 80) };
-        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-fiscal"), top.length ? data : [], layout, { displayModeBar: false, responsive: true });
+        const layout = {
+            margin: { l: 60, r: 20, t: 10, b: 40 },
+            barmode: "group",
+            bargap: 0.3,
+            bargroupgap: 0.12,
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)",
+            font: theme.font,
+            yaxis: { title: "R$", tickprefix: "R$ ", gridcolor: theme.gridColor, zerolinecolor: theme.lineColor },
+            xaxis: { gridcolor: theme.gridColor, linecolor: theme.lineColor },
+            legend: { orientation: "h", y: -0.18, font: theme.font },
+            height: 320
+        };
+        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-comparativo"), data, layout, { displayModeBar: false, responsive: true });
     }
 
-    function renderPrazoValorFinanceiro(rows) {
-        const comPrazo = rows.filter(d => typeof d.prazoDias === "number" && isFinite(d.prazoDias));
-        const prazoMedio = comPrazo.length ? Math.round(comPrazo.reduce((a, b) => a + b.prazoDias, 0) / comPrazo.length) : 0;
-        const kpiEl = document.getElementById("kpi-fin-prazo-medio");
-        if (kpiEl) kpiEl.textContent = `${prazoMedio} dias`;
-
-        const m = new Map();
-        comPrazo.forEach(d => {
-            const k = d.fiscal || "Não informado";
-            if (!m.has(k)) m.set(k, { valor: 0, somaPrazo: 0, qtd: 0 });
-            const g = m.get(k);
-            g.valor += d.repercGecope || 0;
-            g.somaPrazo += d.prazoDias;
-            g.qtd += 1;
-        });
-        const grupos = Array.from(m.entries()).map(([key, g]) => ({ key, valor: g.valor, prazoMedio: g.qtd ? g.somaPrazo / g.qtd : 0 }));
-        grupos.sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
-        const top = grupos.slice(0, 10);
-
-        const data = [
-            { x: top.map(g => g.key), y: top.map(g => g.valor), name: "Valor revisado (GECOPE)", type: "bar", marker: { color: "#018ABD" }, yaxis: "y" },
-            { x: top.map(g => g.key), y: top.map(g => g.prazoMedio), name: "Prazo médio (dias)", mode: "lines+markers", line: { color: "#F28C00", width: 3 }, marker: { size: 8 }, yaxis: "y2" }
-        ];
-        const layout = { margin: { l: 60, r: 60, t: 10, b: 60 }, yaxis: { title: "R$" }, yaxis2: { title: "Dias", overlaying: "y", side: "right" }, legend: { orientation: "h", y: -0.25 }, height: 320 };
-        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-prazo-valor"), top.length ? data : [], layout, { displayModeBar: false, responsive: true });
+    function renderWaterfallFinanceiro(rows) {
+        const t = calcularTotaisFinanceiro(rows);
+        const theme = finChartTheme();
+        const diff = t.repercGecope - t.repercFiscal;
+        const fmt = v => window.formatCompact ? window.formatCompact(v) : String(v);
+        const data = [{
+            type: "waterfall",
+            orientation: "v",
+            x: ["Fiscalização", diff >= 0 ? "Acréscimo GECOPE" : "Redução GECOPE", "GECOPE"],
+            measure: ["absolute", "relative", "total"],
+            y: [t.repercFiscal, diff, 0],
+            text: [fmt(t.repercFiscal), (diff >= 0 ? "+" : "") + fmt(diff), fmt(t.repercGecope)],
+            textposition: "outside",
+            // Sem isso o Plotly recorta o texto que fica acima da barra mais alta
+            // quando ele ultrapassa a área do gráfico (era o corte visto no topo).
+            cliponaxis: false,
+            connector: { line: { color: theme.lineColor, width: 1 } },
+            increasing: { marker: { color: "#008F3D" } },
+            decreasing: { marker: { color: "#dc3545" } },
+            totals: { marker: { color: "#018ABD" } }
+        }];
+        // Dá folga acima da maior barra para o rótulo "outside" caber sem ser
+        // cortado pela borda do eixo (o autorange do Plotly não reserva espaço
+        // para texto, só para as barras em si).
+        const valores = [0, t.repercFiscal, t.repercGecope];
+        const maxV = Math.max(...valores);
+        const minV = Math.min(...valores);
+        const folga = Math.max((maxV - minV) * 0.22, 1);
+        const layout = {
+            margin: { l: 60, r: 20, t: 40, b: 40 },
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)",
+            font: theme.font,
+            showlegend: false,
+            yaxis: { title: "R$", tickprefix: "R$ ", gridcolor: theme.gridColor, zerolinecolor: theme.lineColor, range: [minV < 0 ? minV - folga : 0, maxV + folga] },
+            xaxis: { gridcolor: theme.gridColor, linecolor: theme.lineColor },
+            height: 320
+        };
+        if (window.Plotly) Plotly.react(document.getElementById("chart-fin-waterfall"), data, layout, { displayModeBar: false, responsive: true });
     }
 
     let finDrilldownRows = [];
     let finSort = { key: "repercGecope", dir: "desc" };
+    let finTableSearch = "";
+    let finTableStatus = "";
     const finFmtMoney = v => window.formatCompact ? window.formatCompact(v) : String(v);
     const finFmtData = d => (d instanceof Date && !isNaN(d)) ? d.toLocaleDateString("pt-BR") : "-";
+    const finNorm = v => String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    function populateFinDrilldownStatusFilter(rows) {
+        const sel = document.getElementById("fin-drilldown-status-filter");
+        if (!sel) return;
+        const atual = sel.value;
+        const statusUnicos = Array.from(new Set(rows.map(d => d.status || "Não informado"))).sort((a, b) => String(a).localeCompare(String(b), "pt-BR"));
+        sel.innerHTML = '<option value="">Todos os status</option>' + statusUnicos.map(s => {
+            const label = window.formatStatusDisplay ? window.formatStatusDisplay(s) : s;
+            return `<option value="${window.escapeHTML ? window.escapeHTML(s) : s}">${window.escapeHTML ? window.escapeHTML(label) : label}</option>`;
+        }).join("");
+        if (statusUnicos.includes(atual)) sel.value = atual;
+    }
 
     function renderDrilldownFinanceiro(rows) {
-        const withDiff = rows.map(d => {
+        populateFinDrilldownStatusFilter(rows);
+
+        let filtrado = rows;
+        if (finTableStatus) filtrado = filtrado.filter(d => (d.status || "Não informado") === finTableStatus);
+        if (finTableSearch) {
+            const termo = finNorm(finTableSearch);
+            filtrado = filtrado.filter(d => [d.processo, d.fiscal, d.contratada, d.nomeAnalista].some(v => finNorm(v).includes(termo)));
+        }
+
+        const withDiff = filtrado.map(d => {
             const diff = (d.repercGecope || 0) - (d.repercFiscal || 0);
             const diffPerc = d.repercFiscal ? (diff / Math.abs(d.repercFiscal)) * 100 : 0;
             return Object.assign({}, d, { _diff: diff, _diffPerc: diffPerc });
@@ -344,38 +400,70 @@
         window.finDrilldownRows = withDiff;
 
         const countEl = document.getElementById("fin-drilldown-count");
-        if (countEl) countEl.textContent = `${withDiff.length} processos · clique numa coluna para ordenar`;
+        if (countEl) countEl.textContent = `${withDiff.length} de ${rows.length} processos · clique numa coluna para ordenar`;
 
         const esc = v => window.escapeHTML ? window.escapeHTML(v || "") : String(v || "");
         const tbody = document.getElementById("fin-drilldown-body");
         if (!tbody) return;
-        tbody.innerHTML = withDiff.map(d => `
+        tbody.innerHTML = withDiff.map(d => {
+            const statusTxt = window.formatStatusDisplay ? window.formatStatusDisplay(d.status) : d.status;
+            const statusCls = window.classeBadgeStatus ? window.classeBadgeStatus(d.status) : "";
+            const diffIcon = d._diff < 0 ? "bi-arrow-down-short" : "bi-arrow-up-short";
+            const diffPercIcon = d._diffPerc < 0 ? "bi-arrow-down-short" : "bi-arrow-up-short";
+            return `
             <tr>
                 <td>${esc(d.processo)}</td>
-                <td>${esc(window.formatStatusDisplay ? window.formatStatusDisplay(d.status) : d.status)}</td>
+                <td><span class="badge ${statusCls}">${esc(statusTxt)}</span></td>
                 <td>${esc(d.fiscal)}</td>
                 <td>${esc(d.nomeAnalista)}</td>
                 <td>${esc(d.contratada)}</td>
-                <td>${finFmtData(d.dataAbertura)}</td>
-                <td>${finFmtData(d.dataAprovacao)}</td>
-                <td>${typeof d.prazoDias === "number" && isFinite(d.prazoDias) ? d.prazoDias + "d" : "-"}</td>
-                <td>${finFmtMoney(d.repercFiscal)}</td>
-                <td>${finFmtMoney(d.repercGecope)}</td>
-                <td class="${d._diff < 0 ? "diff-neg" : "diff-pos"}">${finFmtMoney(d._diff)}</td>
-                <td class="${d._diffPerc < 0 ? "diff-neg" : "diff-pos"}">${d._diffPerc.toFixed(1)}%</td>
-            </tr>`).join("");
+                <td class="fin-td-mono">${finFmtData(d.dataAbertura)}</td>
+                <td class="fin-td-mono">${finFmtData(d.dataAprovacao)}</td>
+                <td class="fin-td-mono">${typeof d.prazoDias === "number" && isFinite(d.prazoDias) ? d.prazoDias + "d" : "-"}</td>
+                <td class="fin-td-mono">${finFmtMoney(d.repercFiscal)}</td>
+                <td class="fin-td-mono">${finFmtMoney(d.repercGecope)}</td>
+                <td class="fin-td-mono"><span class="fin-diff-pill ${d._diff < 0 ? "diff-neg" : "diff-pos"}"><i class="bi ${diffIcon}"></i>${finFmtMoney(Math.abs(d._diff))}</span></td>
+                <td class="fin-td-mono"><span class="fin-diff-pill ${d._diffPerc < 0 ? "diff-neg" : "diff-pos"}"><i class="bi ${diffPercIcon}"></i>${Math.abs(d._diffPerc).toFixed(1)}%</span></td>
+            </tr>`;
+        }).join("");
     }
 
     (function wireFinDrilldownSort() {
         const head = document.getElementById("fin-drilldown-head");
         if (!head) return;
+        function updateSortIndicators() {
+            head.querySelectorAll("th[data-key]").forEach(th => {
+                const active = th.getAttribute("data-key") === finSort.key;
+                th.classList.toggle("fin-th-sorted", active);
+                if (active) th.setAttribute("data-dir", finSort.dir); else th.removeAttribute("data-dir");
+            });
+        }
         head.querySelectorAll("th[data-key]").forEach(th => {
             th.addEventListener("click", () => {
                 const key = th.getAttribute("data-key");
                 finSort = { key, dir: (finSort.key === key && finSort.dir === "desc") ? "asc" : "desc" };
+                updateSortIndicators();
                 renderDrilldownFinanceiro(getFinanceiroData());
             });
         });
+        updateSortIndicators();
+    })();
+
+    (function wireFinDrilldownTableFilters() {
+        const searchEl = document.getElementById("fin-drilldown-search");
+        const statusEl = document.getElementById("fin-drilldown-status-filter");
+        if (searchEl) {
+            searchEl.addEventListener("input", () => {
+                finTableSearch = searchEl.value;
+                renderDrilldownFinanceiro(getFinanceiroData());
+            });
+        }
+        if (statusEl) {
+            statusEl.addEventListener("change", () => {
+                finTableStatus = statusEl.value;
+                renderDrilldownFinanceiro(getFinanceiroData());
+            });
+        }
     })();
 
     function updateFinanceiro() {
@@ -393,8 +481,8 @@
 
         renderKPIsFinanceiro(filtered);
         renderContadorFinanceiro(filtered);
-        renderPorFiscalFinanceiro(filtered);
-        renderPrazoValorFinanceiro(filtered);
+        renderComparativoFinanceiro(filtered);
+        renderWaterfallFinanceiro(filtered);
         renderDrilldownFinanceiro(filtered);
     }
 

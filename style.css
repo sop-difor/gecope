@@ -1811,51 +1811,106 @@
         }
 
         .kpi-card {
+            --kpi-accent: var(--sop-green);
             background-color: #ffffff;
             border-radius: var(--radius-lg);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
-            padding: 12px 14px;
+            box-shadow: var(--shadow-card-subtle, 0 2px 5px rgba(0, 0, 0, 0.06));
+            padding: 16px 18px 14px;
             position: relative;
             overflow: hidden;
-            border-bottom: 3px solid transparent;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
             height: 100%;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .kpi-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--kpi-accent);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card-elevated, 0 8px 18px -8px rgba(0, 0, 0, 0.16));
         }
 
         .kpi-count-card {
             background-color: #ffffff;
-            border-left: 4px solid var(--sop-green);
             border-radius: var(--radius-lg);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
-            padding: 14px 18px;
+            box-shadow: var(--shadow-card-subtle, 0 2px 5px rgba(0, 0, 0, 0.06));
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .kpi-count-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex: none;
+            background: rgba(0, 143, 61, 0.14);
+            color: var(--sop-green-dark);
+        }
+
+        .kpi-count-body {
+            flex: 1;
+            min-width: 200px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 12px;
             flex-wrap: wrap;
-            gap: 8px;
         }
 
         .kpi-count-value {
-            font-size: 1.4rem;
-            font-weight: 700;
+            font-size: 1.55rem;
+            font-weight: 800;
             color: var(--sop-gray-dark);
+            letter-spacing: -0.01em;
+        }
+
+        .kpi-count-breakdown {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .kpi-count-breakdown span {
-            display: inline-block;
-            margin-left: 14px;
-            font-size: 0.78rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.76rem;
+            font-weight: 600;
             color: var(--sop-gray-mid);
+            background: var(--sop-gray-light);
+            border-radius: 999px;
+            padding: 4px 10px 4px 8px;
         }
 
-        .kpi-count-breakdown span:first-child {
-            margin-left: 0;
+        .kpi-count-breakdown span::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: 0.55;
         }
 
         .kpi-count-breakdown b {
             color: var(--sop-slate-700);
+            font-weight: 700;
         }
 
         .diff-pos {
@@ -1869,14 +1924,14 @@
         }
 
         .kpi-icon {
-            width: 26px;
-            height: 26px;
-            border-radius: 999px;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.95rem;
-            margin-right: 6px;
+            font-size: 1rem;
+            margin-right: 8px;
             flex-shrink: 0;
         }
 
@@ -1887,32 +1942,37 @@
         }
 
         .kpi-label {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .06em;
             color: var(--sop-gray-mid);
         }
 
         .kpi-value {
-            font-size: 1.35rem;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: 800;
             color: var(--sop-gray-dark);
+            letter-spacing: -0.01em;
+            font-variant-numeric: tabular-nums;
         }
 
         .kpi-sub {
-            font-size: 0.7rem;
+            font-size: 0.72rem;
             color: var(--sop-gray-mid);
         }
 
         .kpi-badge {
             font-size: 0.7rem;
+            font-weight: 600;
             border-radius: 999px;
-            padding: 2px 7px;
+            padding: 3px 9px;
             background-color: var(--sop-gray-light);
             color: var(--sop-gray-mid);
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            white-space: nowrap;
         }
 
         .kpi-trend-up {
@@ -1924,42 +1984,42 @@
         }
 
         .kpi-acresc-fiscal {
-            border-bottom-color: var(--sop-green-light);
+            --kpi-accent: var(--sop-green-light);
         }
 
         .kpi-supress-fiscal {
-            border-bottom-color: var(--sop-orange);
+            --kpi-accent: var(--sop-orange);
         }
 
         .kpi-reperc-fiscal {
-            border-bottom-color: var(--sop-blue);
+            --kpi-accent: var(--sop-blue);
         }
 
         .kpi-acresc-gecope {
-            border-bottom-color: var(--sop-green);
+            --kpi-accent: var(--sop-green);
         }
 
         .kpi-supress-gecope {
-            border-bottom-color: #d35400;
+            --kpi-accent: #d35400;
         }
 
         .kpi-reperc-gecope {
-            border-bottom-color: #005f8a;
+            --kpi-accent: #005f8a;
         }
 
         .kpi-diff-abs {
-            border-bottom-color: #8e44ad;
+            --kpi-accent: #8e44ad;
         }
 
         .kpi-diff-perc {
-            border-bottom-color: #c0392b;
+            --kpi-accent: #c0392b;
         }
 
         .chart-card {
             background-color: #ffffff;
             border-radius: var(--radius-lg);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-            padding: 12px 14px;
+            box-shadow: var(--shadow-card-subtle, 0 2px 6px rgba(0, 0, 0, 0.08));
+            padding: 16px 18px;
             margin-bottom: 18px;
             height: 100%;
             display: flex;
@@ -1970,23 +2030,216 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 4px;
-            margin-bottom: 6px;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-soft, #f1f5f9);
+        }
+
+        .chart-header-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            flex: none;
+            margin-right: 10px;
+            background: rgba(0, 143, 61, 0.12);
+            color: var(--sop-green-dark);
+        }
+
+        .chart-header-titles {
+            display: flex;
+            align-items: flex-start;
+            min-width: 0;
         }
 
         .chart-title {
-            font-size: 0.9rem;
-            font-weight: 600;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text-heading, var(--sop-gray-dark));
         }
 
         .chart-subtitle {
             font-size: 0.74rem;
             color: var(--sop-gray-mid);
+            margin-top: 2px;
         }
 
         .chart-placeholder {
             flex: 1;
             min-height: 260px;
+        }
+
+        /* --- FINANCEIRO: cabeçalho de página e títulos de seção --- */
+        .fin-page-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .fin-page-header-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex: none;
+            background: linear-gradient(135deg, var(--sop-green) 0%, var(--sop-green-dark) 100%);
+            color: #fff;
+            box-shadow: 0 4px 10px -3px rgba(0, 143, 61, 0.5);
+        }
+
+        .fin-page-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text-heading, var(--sop-gray-dark));
+            margin: 0;
+            letter-spacing: -0.01em;
+        }
+
+        .fin-page-subtitle {
+            font-size: 0.82rem;
+            color: var(--text-muted, var(--sop-gray-mid));
+            margin: 2px 0 0;
+        }
+
+        .fin-section-heading {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin: 6px 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-soft, #e2e8f0);
+        }
+
+        .fin-section-heading i {
+            color: var(--sop-green);
+            font-size: 0.95rem;
+        }
+
+        .fin-section-heading-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--text-heading, var(--sop-gray-dark));
+        }
+
+        .fin-section-heading-desc {
+            font-size: 0.75rem;
+            color: var(--sop-gray-mid);
+        }
+
+        /* --- FINANCEIRO: filtros locais da tabela de detalhamento --- */
+        .fin-table-filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .fin-table-search {
+            position: relative;
+            flex: 1 1 260px;
+            min-width: 220px;
+        }
+
+        .fin-table-search i {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--sop-gray-mid);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+
+        .fin-table-search input {
+            width: 100%;
+            padding-left: 32px;
+        }
+
+        #fin-drilldown-status-filter {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 160px;
+            max-width: 220px;
+        }
+
+        /* --- FINANCEIRO: tabela de detalhamento --- */
+        #pane-financeiro .fin-table-wrap {
+            overflow-y: auto;
+        }
+
+        #pane-financeiro .fin-table-wrap thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background-color: var(--sop-white);
+        }
+
+        body.theme-dark #pane-financeiro .fin-table-wrap thead th {
+            background-color: #0f2419 !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        body.theme-dark #pane-financeiro .fin-table-wrap tbody td {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        #pane-financeiro .fin-table-wrap th[data-key] {
+            /* sem position aqui: herda "sticky" da regra thead th acima — sticky já
+               funciona como contexto de posicionamento para o ::after abaixo, então
+               declarar "relative" aqui de novo (mais específico por causa do
+               atributo [data-key]) sobrescreveria o sticky e quebraria o cabeçalho fixo. */
+            padding-right: 18px;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        #pane-financeiro .fin-table-wrap th[data-key]:hover {
+            color: var(--sop-green-dark);
+        }
+
+        #pane-financeiro .fin-table-wrap th[data-key]::after {
+            content: "\2195";
+            position: absolute;
+            right: 6px;
+            opacity: .35;
+            font-size: .68rem;
+        }
+
+        #pane-financeiro .fin-table-wrap th[data-key].fin-th-sorted::after {
+            opacity: 1;
+            color: var(--sop-green);
+        }
+
+        #pane-financeiro .fin-table-wrap th[data-key].fin-th-sorted[data-dir="asc"]::after {
+            content: "\2191";
+        }
+
+        #pane-financeiro .fin-table-wrap th[data-key].fin-th-sorted[data-dir="desc"]::after {
+            content: "\2193";
+        }
+
+        #pane-financeiro .fin-td-mono {
+            font-variant-numeric: tabular-nums;
+            font-size: 0.8rem;
+        }
+
+        .fin-diff-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            font-weight: 700;
         }
 
         .table {
