@@ -871,14 +871,24 @@
   }
 
   async function cvSalvarComentarioItem(dbId, valorHtml) {
-    if (!cvPodeEscrever() || state.somenteLeitura) return;
+    if (!cvPodeEscrever() || state.somenteLeitura) return true;
     var item = cvEncontrarItemPorDbId(dbId);
-    if (!item) return;
+    if (!item) return true;
     var novo = cvTextoSemHtml(valorHtml).trim() ? sanitizeRichHTML(valorHtml.trim()) : null;
-    if (item.comentario === novo) return;
-    var { error } = await sbClient.from("curva_abc_itens").update({ comentario: novo }).eq("id", dbId);
-    if (error) { cvAlerta("Erro ao salvar comentário", esc(error.message)); return; }
+    if (item.comentario === novo) return true;
+    /* falha de rede (sem internet, timeout etc.) pode fazer o próprio await
+       lançar uma exceção em vez de devolver {error} — sem o try/catch isso ficava
+       como uma promise rejeitada sem tratamento: o botão "Salvar" nunca reagia
+       de volta e o modal parecia travado, sem fechar e sem avisar nada ao usuário */
+    try {
+      var { error } = await sbClient.from("curva_abc_itens").update({ comentario: novo }).eq("id", dbId);
+      if (error) { cvAlerta("Erro ao salvar comentário", esc(error.message)); return false; }
+    } catch (ex) {
+      cvAlerta("Erro ao salvar comentário", "Verifique sua conexão com a internet e tente novamente.");
+      return false;
+    }
     item.comentario = novo;
+    return true;
   }
 
   /* ---------- eventos ---------- */
@@ -989,6 +999,10 @@
       var ed = $("cv-coment-texto");
       ed.contentEditable = "true";
       ed.focus();
+      /* sem isso, o Enter dentro do contenteditable cria <div> (Chrome) em vez de
+         <p> — força o navegador a tratar cada Enter como um novo parágrafo de
+         verdade, no padrão exigido pro relatório. */
+      try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (ex) { /* comando indisponível neste navegador */ }
       cvAtualizarToolbarComentario(true);
       btnEditarComentario.style.display = "none";
       $("cv-coment-btnSalvar").style.display = "";
@@ -998,8 +1012,16 @@
   var btnSalvarComentario = $("cv-coment-btnSalvar");
   if (btnSalvarComentario) {
     btnSalvarComentario.addEventListener("click", async function () {
+      /* evita duplo envio: clicar de novo enquanto o salvamento anterior ainda
+         está em andamento (rede lenta) parecia "travar" o botão sem dar retorno */
+      if (btnSalvarComentario.disabled) return;
       var dbId = parseInt($("cv-coment-db-id").value, 10);
-      await cvSalvarComentarioItem(dbId, $("cv-coment-texto").innerHTML);
+      btnSalvarComentario.disabled = true;
+      var ok = await cvSalvarComentarioItem(dbId, $("cv-coment-texto").innerHTML);
+      btnSalvarComentario.disabled = false;
+      /* falhou (erro já mostrado dentro de cvSalvarComentarioItem): mantém o modal
+         aberto com o texto digitado em vez de fechar e perder o que foi escrito */
+      if (!ok) return;
       desenhaTabela();
       bootstrap.Modal.getOrCreateInstance($("modalCvComentario")).hide();
     });
@@ -1019,8 +1041,13 @@
       var btn = e.target.closest("button[data-cmd]");
       if (!btn) return;
       var cmd = btn.getAttribute("data-cmd");
-      if (mapaAlinhamento[cmd]) cvAplicarAlinhamento(mapaAlinhamento[cmd]);
-      else document.execCommand(cmd, false, null);
+      /* sem o try/catch, um execCommand não suportado lançava exceção e pulava o
+         focus() logo abaixo — o cursor "sumia" do editor e o próximo clique num
+         botão parecia não fazer nada (o comando corria sem seleção nenhuma) */
+      try {
+        if (mapaAlinhamento[cmd]) cvAplicarAlinhamento(mapaAlinhamento[cmd]);
+        else document.execCommand(cmd, false, null);
+      } catch (ex) { /* comando indisponível neste navegador: ignora e mantém o foco */ }
       $("cv-coment-texto").focus();
     });
   }
@@ -1029,18 +1056,26 @@
      parágrafo próprio às vezes não visualiza a mudança) — em vez disso, acha (ou
      cria) o bloco que contém a seleção e aplica o estilo direto nele, garantindo
      que o resultado fique dentro do innerHTML salvo (o próprio editor não é
-     persistido, só o conteúdo dele). Usado tanto pelo alinhamento quanto pela régua. */
+     persistido, só o conteúdo dele). Usado tanto pelo alinhamento quanto pela régua.
+     Antes, quando a seleção não tinha um bloco próprio, o código juntava TODO o
+     conteúdo do editor num único wrapper "na mão" (moveAllChildren) — isso perdia
+     o cursor/seleção no meio da formatação (parecia que o editor tinha travado) e
+     ainda misturava parágrafos diferentes num só bloco. Usar o
+     execCommand("formatBlock") nativo resolve os dois problemas: o próprio
+     navegador cuida de manter a seleção e envolve só o parágrafo atual. */
   function cvBlocoAtual() {
     var editor = $("cv-coment-texto");
-    var sel = window.getSelection();
-    var node = (sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null);
-    if (!node || !editor.contains(node)) node = editor;
-    while (node && node !== editor && node.parentNode !== editor) node = node.parentNode;
-    if (node && node !== editor && node.nodeType === 1) return node;
-    var wrapper = document.createElement("div");
-    while (editor.firstChild) wrapper.appendChild(editor.firstChild);
-    editor.appendChild(wrapper);
-    return wrapper;
+    function blocoDireto(sel) {
+      var node = (sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null);
+      if (!node || !editor.contains(node)) node = editor;
+      while (node && node !== editor && node.parentNode !== editor) node = node.parentNode;
+      return (node && node !== editor && node.nodeType === 1) ? node : null;
+    }
+    var achado = blocoDireto(window.getSelection());
+    if (achado) return achado;
+    try { document.execCommand("formatBlock", false, "p"); } catch (ex) { /* comando indisponível neste navegador */ }
+    achado = blocoDireto(window.getSelection());
+    return achado || editor;
   }
 
   function cvAplicarAlinhamento(align) {

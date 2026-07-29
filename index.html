@@ -1430,7 +1430,13 @@
 
                         #pane-curva-abc .cv-tablebox { display: none }
                         #pane-curva-abc .cv-tablebox.on { display: block }
-                        #pane-curva-abc .cv-tbl-scroll { overflow-x: auto }
+                        /* SEM overflow-x/overflow-y aqui: qualquer overflow diferente de "visible"
+                           (mesmo só no eixo X) faz o navegador tratar este div como um container de
+                           rolagem próprio — e "position: sticky" no thead (linha abaixo) passa a
+                           grudar SÓ dentro dele, criando uma segunda barra de rolagem interna em vez
+                           de aproveitar a barra da página. Deixando "visible" (padrão), quem rola é
+                           só a página, e o cabeçalho gruda de verdade no topo da tela. */
+                        #pane-curva-abc .cv-tbl-scroll { overflow: visible }
                         #pane-curva-abc table { width: 100%; border-collapse: collapse; font-size: 12px }
                         #pane-curva-abc thead th { position: sticky; top: 0; z-index: 2; background: var(--cv-bg3); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--cv-muted); font-weight: 700; text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--cv-border); white-space: nowrap }
                         body.theme-dark #pane-curva-abc thead th { color: var(--cv-text) }
@@ -1516,7 +1522,6 @@
                                retângulo preto sólido. Desativa o sticky e o scroll só na impressão, e faz o
                                cabeçalho da tabela repetir em cada página impressa. */
                             #pane-curva-abc thead th { position: static !important }
-                            #pane-curva-abc .cv-tbl-scroll { overflow: visible !important }
                             #pane-curva-abc thead { display: table-header-group }
 
                             /* Evita que cartões e linhas da tabela sejam cortados ao meio entre duas páginas,

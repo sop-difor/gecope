@@ -3457,14 +3457,30 @@
             font-size: 12px;
             padding: 3px 4px;
         }
+        /* Formato padrão do texto do comentário (herdado por qualquer parágrafo
+           novo, a menos que o usuário escolha outro alinhamento/tamanho pra um
+           trecho específico): Montserrat, 11pt, entrelinha 1,5, justificado —
+           o mesmo padrão replicado no relatório de análise técnica gerado a
+           partir destes comentários (ver gerarRelatorioTecnicoDoProcesso). */
         .cv-coment-editor {
             font-family: 'Montserrat', sans-serif;
             font-size: 11pt;
+            line-height: 1.5;
+            text-align: justify;
             width: 100%;
             box-sizing: border-box;
             white-space: pre-wrap;
             overflow-wrap: break-word;
             word-break: break-word;
+        }
+        /* Enter no editor cria um <p> por parágrafo (ver defaultParagraphSeparator
+           em curva_abc.js) — remove a margem grande que o navegador aplica por
+           padrão a <p>, trocando por um respiro menor e consistente entre eles. */
+        .cv-coment-editor p {
+            margin: 0 0 8px 0;
+        }
+        .cv-coment-editor p:last-child {
+            margin-bottom: 0;
         }
         .cv-coment-editor:empty:before {
             content: attr(data-placeholder);
