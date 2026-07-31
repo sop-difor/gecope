@@ -431,13 +431,48 @@
       + '<td class="cv-col-analise cv-center"><button type="button" class="cv-btn-comentario ' + (temComentario ? "tem" : "") + '" data-comentario-id="' + x.dbId + '" title="' + (temComentario ? "Ver comentário" : "Adicionar comentário") + '"><i class="bi ' + (temComentario ? "bi-chat-left-text-fill" : "bi-chat-left") + '"></i></button></td>';
   }
 
+  function montarColunasTabela() {
+    var nome = norm(state.colNome || "");
+    var mostrarAcresc = !(/supr|suprim/.test(nome));
+    var mostrarSupr = !(/acresc/.test(nome));
+
+    return [
+      { key: "rank", title: "#", cls: "cv-rank", mostrar: true, render: function (x) { return '<td class="cv-rank">' + x.pos + '</td>'; } },
+      { key: "conta", title: "Conta", cls: "cv-conta", mostrar: true, render: function (x) { return '<td class="cv-conta">' + esc(x.conta) + '</td>'; } },
+      { key: "comp", title: "Comp.", cls: "cv-conta", mostrar: true, render: function (x) { return '<td class="cv-conta">' + esc(x.comp) + '</td>'; } },
+      { key: "desc", title: "Descrição", cls: "", mostrar: true, render: function (x) { return '<td class="cv-desc">' + esc(x.desc) + '</td>'; } },
+      { key: "un", title: "UN", cls: "cv-center", mostrar: true, render: function (x) { return '<td class="cv-center">' + esc(x.un) + '</td>'; } },
+      { key: "qtd", title: "Qtd.", cls: "cv-num", mostrar: true, render: function (x) { return '<td class="cv-num">' + qty(x.qtdBase) + '</td>'; } },
+      { key: "acrescQ", title: "Acresc.", cls: "cv-num", mostrar: mostrarAcresc, render: function (x) { return '<td class="cv-num">' + qty(x.acrescQ) + '</td>'; } },
+      { key: "suprQ", title: "Supr.", cls: "cv-num", mostrar: mostrarSupr, render: function (x) { return '<td class="cv-num">' + qty(x.suprQ) + '</td>'; } },
+      { key: "replanQ", title: "Replan.", cls: "cv-num", mostrar: true, render: function (x) { return '<td class="cv-num">' + qty(x.replanQ) + '</td>'; } },
+      { key: "vAcresc", title: "V. Acresc.", cls: "cv-num", mostrar: mostrarAcresc, render: function (x) { return '<td class="cv-num">' + money(x.vAcresc) + '</td>'; } },
+      { key: "vSupr", title: "V. Supr.", cls: "cv-num", mostrar: mostrarSupr, render: function (x) { return '<td class="cv-num">' + money(x.vSupr) + '</td>'; } },
+      { key: "vReplan", title: "V. Replan.", cls: "cv-num", mostrar: true, render: function (x) { return '<td class="cv-num">' + money(x.vReplan) + '</td>'; } },
+      { key: "pct", title: "%", cls: "cv-num", mostrar: false, render: function (x) { return '<td class="cv-num">' + pct(x.pctInd) + '</td>'; } },
+      { key: "pctAcum", title: "% acum.", cls: "cv-acum-col", mostrar: true, render: function (x) { return '<td class="cv-acum"><span class="fill ' + x.classe + '" style="width:' + x.pctAcum.toFixed(2) + '%"></span><span class="v">' + pct(x.pctAcum) + '</span></td>'; } },
+      { key: "classe", title: "Classe", cls: "cv-center", mostrar: true, render: function (x) { return '<td class="cv-center"><span class="cv-chip ' + x.classe + '">' + x.classe + '</span></td>'; } }
+    ];
+  }
+
+  function renderCabecalhoTabela() {
+    var colunas = montarColunasTabela();
+    var header = '<tr>' + colunas.filter(function (col) { return col.mostrar; }).map(function (col) {
+      return '<th class="' + col.cls + '">' + col.title + '</th>';
+    }).join("") + '</tr>';
+    $("cv-thead").innerHTML = header;
+  }
+
   function desenhaTabela() {
     var it = state.curva;
     var f = norm($("cv-busca").value);
     var lista = f ? it.filter(function (x) { return norm(x.desc).indexOf(f) > -1 || norm(x.conta).indexOf(f) > -1 || norm(x.comp).indexOf(f) > -1; })
       : it.slice(0, state.limite);
-    var numCols = state.processoVinculado ? 17 : 15;
+    var colunas = montarColunasTabela();
+    var colunasVisiveis = colunas.filter(function (col) { return col.mostrar; });
+    var numCols = colunasVisiveis.length + (state.processoVinculado ? 2 : 0);
     var rows = [], ultimo = null;
+    renderCabecalhoTabela();
     for (var i = 0; i < lista.length; i++) {
       var x = lista[i];
       if (!f && ultimo && ultimo !== x.classe) {
@@ -447,24 +482,8 @@
       var linhaClasse = state.processoVinculado
         ? (x.statusAnalise === "ok" ? "cv-row-ok" : (x.statusAnalise === "inconsistencia" ? "cv-row-inc" : ""))
         : "";
-      rows.push('<tr class="' + linhaClasse + '">'
-        + '<td class="cv-rank">' + x.pos + '</td>'
-        + '<td class="cv-conta">' + esc(x.conta) + '</td>'
-        + '<td class="cv-conta">' + esc(x.comp) + '</td>'
-        + '<td class="cv-desc">' + esc(x.desc) + '</td>'
-        + '<td class="cv-center">' + esc(x.un) + '</td>'
-        + '<td class="cv-num">' + qty(x.qtdBase) + '</td>'
-        + '<td class="cv-num">' + qty(x.acrescQ) + '</td>'
-        + '<td class="cv-num">' + qty(x.suprQ) + '</td>'
-        + '<td class="cv-num">' + qty(x.replanQ) + '</td>'
-        + '<td class="cv-num">' + money(x.vAcresc) + '</td>'
-        + '<td class="cv-num">' + money(x.vSupr) + '</td>'
-        + '<td class="cv-num">' + money(x.vReplan) + '</td>'
-        + '<td class="cv-num">' + pct(x.pctInd) + '</td>'
-        + '<td class="cv-acum"><span class="fill ' + x.classe + '" style="width:' + x.pctAcum.toFixed(2) + '%"></span><span class="v">' + pct(x.pctAcum) + '</span></td>'
-        + '<td class="cv-center"><span class="cv-chip ' + x.classe + '">' + x.classe + '</span></td>'
-        + colunasAnalise(x)
-        + '</tr>');
+      var celulas = colunasVisiveis.map(function (col) { return col.render(x); }).join("");
+      rows.push('<tr class="' + linhaClasse + '">' + celulas + (state.processoVinculado ? colunasAnalise(x) : "") + '</tr>');
     }
     if (!rows.length) rows.push('<tr><td colspan="' + numCols + '" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca.</td></tr>');
     $("cv-tbody").innerHTML = rows.join("");
