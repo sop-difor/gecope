@@ -2280,7 +2280,7 @@
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-cloud-plus me-2"></i>CADASTRAR ORAMENTO
+                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-cloud-plus me-2"></i>CADASTRAR ORÇAMENTO
                             </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
@@ -2316,7 +2316,7 @@
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">ARQUIVO DO ORAMENTO *</label>
+                                    <label class="form-label small fw-bold">ARQUIVO DO ORÇAMENTO *</label>
                                     <input type="file" class="form-control" id="inputArquivoUpload" required
                                         accept=".xlsx,.xls,.pdf">
                                     <div class="form-text">O sistema fará o upload e gerará o link automaticamente.
@@ -2351,7 +2351,7 @@
 
             <!-- Modal Comentar Orçamento -->
             <div class="modal fade" id="modalComentarioOrcamento" tabindex="-1">
-                <div class="modal-dialog">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header bg-warning-subtle">
                             <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>SOLICITAR
@@ -2364,7 +2364,7 @@
                             <form id="formComentarioOrcamento">
                                 <input type="hidden" id="coment-id-orcamento" name="ID">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">ORAMENTO</label>
+                                    <label class="form-label small fw-bold">ORÇAMENTO</label>
                                     <input type="text" class="form-control form-control-sm bg-light"
                                         id="coment-nome-obra" readonly>
                                 </div>
@@ -2374,7 +2374,7 @@
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">MENSAGEM / SOLICITAO</label>
+                                    <label class="form-label small fw-bold">MENSAGEM / SOLICITAÇÃO</label>
                                     <textarea class="form-control" name="MENSAGEM" rows="30" style="min-height: 200px;"
                                         required
                                         placeholder="Descreva o motivo da revisão ou seu comentário..."></textarea>
@@ -2383,7 +2383,7 @@
 
                                     <label class="form-label small fw-bold text-success"><i class="bi bi-paperclip"></i>
                                         ANEXAR
-                                        MEMRIA/ARQUIVO (Opcional)</label>
+                                        MEMÓRIA/ARQUIVO (Opcional)</label>
                                     <input type="file" class="form-control form-control-sm" id="inputArquivoComentario"
                                         accept=".xlsx,.xls,.pdf,.doc,.docx">
                                 </div>
@@ -4149,7 +4149,12 @@
                                                         onclick="salvarNovaComposicao()">Salvar</button>
                                                 </div>
                                             </div>
-                                            <div class="modal-dialog modal-xl">
+                                        </div>
+                                    </div>
+
+                                    <!-- Modal Comentar Composição -->
+                                    <div class="modal fade" id="modalComentarioComposicao" tabindex="-1">
+                                            <div class="modal-dialog modal-xl modal-dialog-scrollable">
                                                 <div class="modal-content">
                                                     <div class="modal-header bg-warning-subtle">
                                                         <h5 class="modal-title fs-6 fw-bold"><i
@@ -4213,6 +4218,11 @@
                                                             Solicitação</button>
                                                     </div>
                                                 </div>
+                                            </div>
+                                    </div>
+
+                                    <!-- Modal Nova Versão Composição -->
+                                    <div class="modal fade" id="modalNovaVersaoComposicao" tabindex="-1">
                                                 <div class="modal-dialog">
                                                     <div class="modal-content">
                                                         <div class="modal-header bg-success text-white">
@@ -4261,6 +4271,11 @@
                                                             </button>
                                                         </div>
                                                     </div>
+                                                </div>
+                                    </div>
+
+                                    <!-- Modal Atender Solicitação (Composição) -->
+                                    <div class="modal fade" id="modalAtenderComposicao" tabindex="-1">
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header bg-success text-white">
@@ -4303,6 +4318,11 @@
                                                                 </button>
                                                             </div>
                                                         </div>
+                                                    </div>
+                                    </div>
+
+                                    <!-- Modal Recusar Solicitação (Composição) -->
+                                    <div class="modal fade" id="modalRecusarComposicao" tabindex="-1">
                                                         <div class="modal-dialog">
                                                             <div class="modal-content">
                                                                 <div class="modal-header bg-danger text-white">
@@ -4350,41 +4370,12 @@
                                                                     </button>
                                                                 </div>
                                                             </div>
-                                                            <div class="modal-dialog modal-dialog-centered">
-                                                                <div class="modal-content">
-                                                                    <div class="modal-header">
-                                                                        <h5 class="modal-title fw-bold"><i
-                                                                                class="bi bi-download me-2"></i>Exportar
-                                                                            Composição</h5>
-                                                                        <button type="button" class="btn-close"
-                                                                            data-bs-dismiss="modal"
-                                                                            aria-label="Close"></button>
-                                                                    </div>
-                                                                    <div class="modal-body text-center p-4">
-                                                                        <p class="mb-4">Escolha o formato desejado para
-                                                                            o
-                                                                            relatório:</p>
-                                                                        <div class="d-grid gap-3 col-10 mx-auto">
-                                                                            <button
-                                                                                class="btn btn-outline-danger py-2 fw-bold shadow-sm"
-                                                                                onclick="exportarComposicao('PDF')">
-                                                                                <i
-                                                                                    class="bi bi-file-earmark-pdf-fill me-2 fs-5"></i>BAIXAR
-                                                                                EM PDF
-                                                                            </button>
-                                                                            <button
-                                                                                class="btn btn-outline-primary py-2 fw-bold shadow-sm"
-                                                                                onclick="exportarComposicao('DOCX')">
-                                                                                <i
-                                                                                    class="bi bi-file-earmark-word-fill me-2 fs-5"></i>BAIXAR
-                                                                                EM DOCX
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
+                                                    </div>
+                                    </div>
+                                    <!-- Obs: o modal "Exportar Composição" já existe como #modalExportarComposicao
+                                         (banco de composições); a duplicata que existia aqui foi removida. -->
 
-
-
-                                                                    <!-- MODAL VISUALIZAR RELATÓRIO DA COMPOSIÇÃO (SOP) -->
+                                    <!-- MODAL VISUALIZAR RELATÓRIO DA COMPOSIÇÃO (SOP) -->
                                                                     <div class="modal fade" id="modalDetalheComposicao"
                                                                         tabindex="-1">
                                                                         <div

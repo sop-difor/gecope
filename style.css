@@ -1779,6 +1779,29 @@
             box-shadow: 0 0 0 0.15rem rgba(0, 143, 61, 0.15);
         }
 
+        /* Botão nativo "Escolher arquivo" dos <input type="file">: o padrão do
+           navegador destoa do restante dos controles do sistema (fonte, cor, borda).
+           Estiliza o pseudo-elemento do botão para seguir a identidade visual (verde SOP). */
+        input[type="file"].form-control::file-selector-button,
+        input[type="file"].form-control::-webkit-file-upload-button {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.3rem 0.7rem;
+            margin: -0.25rem 0.6rem -0.25rem -0.5rem;
+            border: none;
+            border-right: 1px solid #CED4DA;
+            border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+            background-color: var(--sop-green);
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        input[type="file"].form-control::file-selector-button:hover,
+        input[type="file"].form-control::-webkit-file-upload-button:hover {
+            background-color: var(--sop-green-dark);
+        }
+
         .filter-group-compact {
             display: flex;
             flex-wrap: wrap;
@@ -3406,15 +3429,15 @@
             color: rgba(255, 255, 255, 0.92) !important;
         }
 
-        /* Cabeçalho do modal de comentário da Curva ABC: no tema escuro o texto
-           herdava a cor quase-branca do .modal-content sobre o fundo amarelo claro
-           do bg-warning-subtle, ficando praticamente ilegível. */
-        body.theme-dark #modalCvComentario .modal-header {
+        /* Cabeçalhos de modal com bg-warning-subtle (ex.: "Solicitar Revisão/Comentar",
+           comentário da Curva ABC): no tema escuro o texto herdava a cor quase-branca
+           do .modal-content sobre o fundo amarelo claro, ficando praticamente ilegível. */
+        body.theme-dark .modal-header.bg-warning-subtle {
             background-color: #3a2c0d !important;
             color: #ffd479 !important;
         }
 
-        body.theme-dark #modalCvComentario .modal-header .btn-close {
+        body.theme-dark .modal-header.bg-warning-subtle .btn-close {
             filter: invert(1) grayscale(100%) brightness(2);
         }
 
@@ -3574,6 +3597,13 @@
         body.theme-dark .form-select:focus {
             background-color: rgba(255, 255, 255, 0.09) !important;
             color: #ffffff !important;
+        }
+
+        body.theme-dark input[type="file"].form-control::file-selector-button,
+        body.theme-dark input[type="file"].form-control::-webkit-file-upload-button {
+            border-right-color: rgba(255, 255, 255, 0.16);
+            background-color: var(--sop-green-dark);
+            color: #ffffff;
         }
 
         /* Opções do <select> nativo abrem como popup do próprio navegador — a cor de
