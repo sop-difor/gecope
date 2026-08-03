@@ -3574,14 +3574,16 @@
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
                                                             name="chk_comp_propria" id="chk_comp_propria_sim"
-                                                            value="sim">
+                                                            value="sim"
+                                                            onchange="toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
                                                         <label class="form-check-label"
                                                             for="chk_comp_propria_sim">Sim</label>
                                                     </div>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
                                                             name="chk_comp_propria" id="chk_comp_propria_nao"
-                                                            value="nao">
+                                                            value="nao"
+                                                            onchange="toggleChecklistCondicional('chk_comp_propria','chk_comp_analiticas_wrap')">
                                                         <label class="form-check-label"
                                                             for="chk_comp_propria_nao">Não</label>
                                                     </div>
@@ -3597,7 +3599,7 @@
                                                     </div>
 
                                                     <div id="chk_comp_analiticas_wrap"
-                                                        class="mt-3 ps-3 border-start">
+                                                        class="mt-3 ps-3 border-start d-none">
                                                         <label class="form-label small fw-bold d-block">Composições
                                                             Analíticas?</label>
                                                         <div class="form-check form-check-inline">

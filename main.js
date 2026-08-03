@@ -375,7 +375,8 @@ var FISCAIS_LIST = [
     'KENEDDY MAYK',
     'KERLON DIÓGENES',
     'LEANDRO LESSA',
-    'LEONARDI',
+    'LUCAS TEOTONIO',
+    'JOÃO LEONARDI',
     'LUCAS ARAÚJO',
     'LUCIANO DENIZARDY',
     'MANOEL LUCAS',
@@ -1941,7 +1942,6 @@ async function enviarParaPlanilha() {
                     processoStr: numProcesso,
                     processoId: processoIdRecemCriado,
                     descricao: formData.get("DESCRIÇÃO") || "",
-                    statusOriginal: 'AGUAR. APROVAÇÃO',
                     sessionFinalized: false,
                     latestChecklist: null
                 };
@@ -1958,7 +1958,6 @@ let checklistAditivoState = {
     processoStr: null,
     processoId: null,
     descricao: null,
-    statusOriginal: null,
     sessionFinalized: false,
     latestChecklist: null,
     versoes: []
@@ -2055,7 +2054,6 @@ async function abrirDetalhes(processoStr) {
         processoStr: row.processo,
         processoId: row.id,
         descricao: row.descricao || "",
-        statusOriginal: row.status,
         sessionFinalized: false,
         latestChecklist: null
     };
@@ -2183,8 +2181,14 @@ const CHECKLIST_ADITIVO_ITENS = [
     { key: 'chk_art_execucao', campo: 'art_execucao', obsCampo: 'art_execucao_obs', label: 'ART de Execução', obrigatorio: 'primeiro_aditivo' },
     { key: 'chk_portaria', campo: 'portaria_fiscalizacao', obsCampo: 'portaria_fiscalizacao_obs', label: 'Portaria de Fiscalização', obrigatorio: 'primeiro_aditivo' },
     { key: 'chk_curva_abc', campo: 'curva_abc', obsCampo: 'curva_abc_obs', label: 'Curva ABC', obrigatorio: 'sempre' },
-    { key: 'chk_comp_propria', campo: 'composicao_propria', obsCampo: 'composicao_propria_obs', label: 'Composição Própria (CXXXX)', obrigatorio: 'sempre' },
-    { key: 'chk_comp_analiticas', campo: 'composicoes_analiticas', obsCampo: 'composicoes_analiticas_obs', label: 'Composições Analíticas', obrigatorio: 'sempre' },
+    // pendenciaSeNao: false -> "Não" aqui só significa que a Composição Própria não foi
+    // aprovada neste aditivo (nada a providenciar), então não conta como pendência nem
+    // gera a observação automática de documento indispensável.
+    { key: 'chk_comp_propria', campo: 'composicao_propria', obsCampo: 'composicao_propria_obs', label: 'Composição Própria (CXXXX)', obrigatorio: 'sempre', pendenciaSeNao: false },
+    // Sub-pergunta condicional: só é obrigatória (e só aparece no formulário) quando
+    // composicao_propria = true — se não houve Composição Própria aprovada, não faz
+    // sentido perguntar se as composições estão de forma analítica.
+    { key: 'chk_comp_analiticas', campo: 'composicoes_analiticas', obsCampo: 'composicoes_analiticas_obs', label: 'Composições Analíticas', obrigatorio: 'comp_propria' },
     { key: 'chk_docs_assinados', campo: 'docs_assinados_fiscalizacao', obsCampo: 'docs_assinados_fiscalizacao_obs', label: 'Documentos assinados pela Fiscalização', obrigatorio: 'sempre' }
 ];
 
@@ -2192,6 +2196,10 @@ function onChangeStatusDetalhes(selectEl) {
     aplicarCorStatusSelect(selectEl);
     if (!selectEl || selectEl.value !== 'AGUAR. APROVAÇÃO') return;
     if (getCurrentUserRole() !== 'admin') return;
+    // Só força a abertura (e o reset) do checklist quando ele realmente precisar ser
+    // refeito — evita interromper/limpar o formulário à toa quando já existe um
+    // checklist válido para o processo (ver checklistValidoParaSalvar).
+    if (checklistValidoParaSalvar(selectEl.value)) return;
     checklistAditivoState.sessionFinalized = false;
     abrirModalChecklistAditivo();
 }
@@ -2261,7 +2269,7 @@ async function carregarChecklistAditivo(processoStr, processoId) {
         // o checklist corrente quanto ver o resultado — sem duplicar informação.
         elResumo.innerHTML = '';
         const registro = data[0];
-        const totalObsDocumental = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false).length
+        const totalObsDocumental = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === false && item.pendenciaSeNao !== false).length
             + CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]).length;
         atualizarBadgeAba('gp-badge-documental', totalObsDocumental);
 
@@ -2336,7 +2344,7 @@ function gerarRelatorioChecklistAditivo(checklistId) {
     const dtConferencia = dt.toLocaleDateString('pt-BR') + ', ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
     const itensAplicaveis = CHECKLIST_ADITIVO_ITENS.filter(item => registro[item.campo] !== null && registro[item.campo] !== undefined);
-    const pendencias = itensAplicaveis.filter(item => registro[item.campo] === false);
+    const pendencias = itensAplicaveis.filter(item => registro[item.campo] === false && item.pendenciaSeNao !== false);
     const inconsistencias = itensAplicaveis.filter(item => registro[item.campo] === true && item.obsCampo && registro[item.obsCampo]);
     const totalObservacoes = pendencias.length + inconsistencias.length;
 
@@ -2532,6 +2540,7 @@ function resetarFormChecklistAditivo() {
     form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; r.disabled = false; });
     form.querySelectorAll('textarea').forEach(t => { t.value = ''; t.disabled = false; });
     document.getElementById('chk_grupo_primeiro_aditivo').classList.add('d-none');
+    document.getElementById('chk_comp_analiticas_wrap').classList.add('d-none');
     CHECKLIST_ADITIVO_ITENS.forEach(item => {
         const wrap = document.getElementById(`${item.key}_obs_wrap`);
         if (wrap) wrap.classList.add('d-none');
@@ -2608,6 +2617,7 @@ function preencherFormChecklist(registro, desabilitar) {
             if (btn) btn.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Remover observação';
         }
     });
+    toggleChecklistCondicional('chk_comp_propria', 'chk_comp_analiticas_wrap');
 
     setRadio('chk_outros', registro.outros_flag);
     const outros = document.getElementById('chk_outros_obs');
@@ -2653,8 +2663,16 @@ async function salvarChecklistAditivo() {
 
     for (const item of CHECKLIST_ADITIVO_ITENS) {
         const ehCondicionalPrimeiroAditivo = item.obrigatorio === 'primeiro_aditivo';
+        const ehCondicionalCompPropria = item.obrigatorio === 'comp_propria';
 
         if (ehCondicionalPrimeiroAditivo && !ehPrimeiroAditivo) {
+            payload[item.campo] = null;
+            if (item.obsCampo) payload[item.obsCampo] = null;
+            continue;
+        }
+        // "Composições Analíticas" só é obrigatória quando "Composição Própria" = Sim
+        // (já processada neste mesmo laço, pois vem antes no array).
+        if (ehCondicionalCompPropria && payload.composicao_propria !== true) {
             payload[item.campo] = null;
             if (item.obsCampo) payload[item.obsCampo] = null;
             continue;
@@ -2705,12 +2723,24 @@ async function salvarChecklistAditivo() {
     cancelarChecklistAditivo();
 }
 
+// Só exige novo preenchimento do checklist se a documentação já registrada puder estar
+// desatualizada: comparamos a data de "Devolução p/ Correções" do processo com a data em
+// que o último checklist foi salvo. Devolução posterior ao último checklist = documentação
+// pode ter mudado nesse intervalo, exige nova conferência. Sem devolução (ou devolução
+// anterior ao checklist) = o checklist já registrado continua válido, mesmo que o Status
+// tenha mudado para chegar em AGUAR. APROVAÇÃO/APROVADO.
 function checklistValidoParaSalvar(statusFinal) {
     if (statusFinal !== 'AGUAR. APROVAÇÃO' && statusFinal !== 'APROVADO') return true;
     if (checklistAditivoState.sessionFinalized) return true;
-    const statusMudou = (statusFinal !== checklistAditivoState.statusOriginal);
-    if (!statusMudou && checklistAditivoState.latestChecklist) return true;
-    return false;
+    if (!checklistAditivoState.latestChecklist) return false;
+
+    const elDevolucao = document.getElementById('det_data_devolucao');
+    const isoDevolucao = elDevolucao ? dataParaISO(elDevolucao.value.trim()) : null;
+    if (!isoDevolucao) return true;
+
+    const dtDevolucao = isoParaDate(isoDevolucao);
+    const dtChecklist = new Date(checklistAditivoState.latestChecklist.created_at);
+    return !(dtDevolucao > dtChecklist);
 }
 
 async function executarAcaoDetalhes(actionType) {
