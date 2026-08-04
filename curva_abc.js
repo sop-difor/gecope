@@ -418,7 +418,7 @@
   }
 
   function colunasAnalise(x) {
-    if (!x.dbId) return '<td class="cv-col-analise"></td><td class="cv-col-analise"></td>';
+    if (!x.dbId) return '<td class="cv-col-analise"></td><td class="cv-col-analise cv-col-comentario"></td>';
     var podeEditar = cvPodeEscrever() && !state.somenteLeitura;
     var disabledAttr = podeEditar ? "" : "disabled";
     var okOn = x.statusAnalise === "ok" ? "on" : "";
@@ -428,7 +428,7 @@
       + '<button type="button" class="cv-status-ok ' + okOn + '" data-db-id="' + x.dbId + '" data-status="ok" ' + disabledAttr + ' title="OK"><i class="bi bi-check-lg"></i></button>'
       + '<button type="button" class="cv-status-inc ' + incOn + '" data-db-id="' + x.dbId + '" data-status="inconsistencia" ' + disabledAttr + ' title="Inconsistência"><i class="bi bi-x-lg"></i></button>'
       + '</div></td>'
-      + '<td class="cv-col-analise cv-center"><button type="button" class="cv-btn-comentario ' + (temComentario ? "tem" : "") + '" data-comentario-id="' + x.dbId + '" title="' + (temComentario ? "Ver comentário" : "Adicionar comentário") + '"><i class="bi ' + (temComentario ? "bi-chat-left-text-fill" : "bi-chat-left") + '"></i></button></td>';
+      + '<td class="cv-col-analise cv-col-comentario cv-center"><button type="button" class="cv-btn-comentario ' + (temComentario ? "tem" : "") + '" data-comentario-id="' + x.dbId + '" title="' + (temComentario ? "Ver comentário" : "Adicionar comentário") + '"><i class="bi ' + (temComentario ? "bi-chat-left-text-fill" : "bi-chat-left") + '"></i></button></td>';
   }
 
   function montarColunasTabela() {
@@ -459,7 +459,7 @@
     var colunas = montarColunasTabela();
     var header = '<tr>' + colunas.filter(function (col) { return col.mostrar; }).map(function (col) {
       return '<th class="' + col.cls + '">' + col.title + '</th>';
-    }).join("") + '</tr>';
+    }).join("") + (state.processoVinculado ? '<th class="cv-col-analise cv-center">Análise</th><th class="cv-col-analise cv-col-comentario cv-center">Comentário</th>' : "") + '</tr>';
     $("cv-thead").innerHTML = header;
   }
 

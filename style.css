@@ -1680,6 +1680,11 @@
                 page-break-before: always !important;
                 margin-top: 2cm !important;
             }
+
+            /* Coluna de comentário da Curva ABC não é essencial no PDF */
+            .cv-col-comentario {
+                display: none !important;
+            }
         }
 
         .panel-subheader-title {
