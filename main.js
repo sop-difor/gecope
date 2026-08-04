@@ -331,6 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Ensure FISCAIS_LIST exists (avoid TDZ) and Performance tweak: optionally silence verbose console logs in production
 var FISCAIS_LIST = [
     'ÁGABE SOUSA',
+    'ALEXANDRE CÁSSIO',
     'ALEXANDRE HORTÊNCIO',
     'ANTÔNIO EDSON',
     'ANTÔNIO ELDER',
