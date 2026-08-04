@@ -168,13 +168,13 @@
     partes.push('<p style="margin:0 0 1.5em 0">Após análise da Curva ABC deste processo, resolve-se retornar o processo à Fiscalização com os seguintes apontamentos:</p>');
     comentados.forEach(function (x, i) {
       partes.push('<p style="margin:0 0 0.4em 0"><strong>' + (i + 1) + '. ITEM ' + esc(x.conta) + ' - ' + esc(x.descricao) + ':</strong></p>');
-      /* mesmo padrão do editor do comentário (Montserrat 11pt, entrelinha 1,5,
+      /* mesmo padrão do editor do comentário (Montserrat 10pt, entrelinha 1,5,
          justificado, parágrafos com recuo na 1ª linha e sem linha em branco entre
          eles — ver .cv-coment-editor em style.css), aplicado aqui de novo porque
          o container do relatório inteiro usa 10pt (ver acima) — o comentário em
          si sempre sai no tamanho em que foi escrito, mesmo que o resto do
          relatório mude. */
-      partes.push('<div class="coment-corpo" style="margin:0 0 1.5em 0; font-family:\'Montserrat\',sans-serif; font-size:11pt; line-height:1.5; text-align:justify">' + sanitizeRichHTML(x.comentario) + '</div>');
+      partes.push('<div class="coment-corpo" style="margin:0 0 1.5em 0; font-family:\'Montserrat\',sans-serif; font-size:10pt; line-height:1.5; text-align:justify">' + sanitizeRichHTML(x.comentario) + '</div>');
     });
     partes.push('</div>');
 

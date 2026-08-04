@@ -3487,12 +3487,12 @@
         }
         /* Formato padrão do texto do comentário (herdado por qualquer parágrafo
            novo, a menos que o usuário escolha outro alinhamento/tamanho pra um
-           trecho específico): Montserrat, 11pt, entrelinha 1,5, justificado —
+           trecho específico): Montserrat, 10pt, entrelinha 1,5, justificado —
            o mesmo padrão replicado no relatório de análise técnica gerado a
            partir destes comentários (ver gerarRelatorioTecnicoDoProcesso). */
         .cv-coment-editor {
             font-family: 'Montserrat', sans-serif;
-            font-size: 11pt;
+            font-size: 10pt;
             line-height: 1.5;
             text-align: justify;
             width: 100%;
