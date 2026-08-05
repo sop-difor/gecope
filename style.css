@@ -2914,6 +2914,15 @@
             top: 35%;
         }
 
+        /* Cor do rótulo do botão multi-select: antes era pintada via JS com
+           hex fixo (inline style), o que ficava ilegível no tema escuro
+           (ex.: #333 quase invisível sobre o fundo verde-escuro do card).
+           Agora é por classe, com override abaixo para body.theme-dark. */
+        .multiselect-btn .ms-label-all { color: #777; font-weight: 400; }
+        .multiselect-btn .ms-label-none { color: #dc3545; font-weight: 600; }
+        .multiselect-btn .ms-label-single { color: #333; font-weight: 400; }
+        .multiselect-btn .ms-label-multi { color: #008F3D; font-weight: 600; }
+
         .multiselect-dropdown {
             width: 100%;
             min-width: 200px;
@@ -3656,6 +3665,21 @@
         body.theme-dark .multiselect-option:hover {
             background-color: rgba(255, 255, 255, 0.08) !important;
             color: #ffffff !important;
+        }
+        /* Rótulo do botão fechado (Todos/Nenhum/valor único/N selecionados):
+           os tons claros (#333, #777) ficavam quase invisíveis sobre o fundo
+           verde-escuro (#142e22) do botão. */
+        body.theme-dark .multiselect-btn .ms-label-all {
+            color: rgba(255, 255, 255, 0.55) !important;
+        }
+        body.theme-dark .multiselect-btn .ms-label-none {
+            color: #ff6b6b !important;
+        }
+        body.theme-dark .multiselect-btn .ms-label-single {
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+        body.theme-dark .multiselect-btn .ms-label-multi {
+            color: #4ade80 !important;
         }
         /* Seta do botão fechado (::after com border-color fixo #333) some contra
            o fundo escuro do próprio botão. */
