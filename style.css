@@ -3473,6 +3473,14 @@
         .cv-coment-toolbar button.cv-coment-tb-btn:hover {
             background: #e9ecef;
         }
+        .cv-coment-toolbar button.cv-coment-tb-btn.ativo {
+            background: #ffc107;
+            border-color: #e0a800;
+            color: #212529;
+        }
+        .cv-coment-editor.pincel-ativo {
+            cursor: crosshair;
+        }
         .cv-coment-tb-sep {
             width: 1px;
             height: 20px;
@@ -3580,6 +3588,11 @@
         }
         body.theme-dark .cv-coment-toolbar button.cv-coment-tb-btn:hover {
             background: rgba(255, 255, 255, 0.12);
+        }
+        body.theme-dark .cv-coment-toolbar button.cv-coment-tb-btn.ativo {
+            background: #ffc107;
+            border-color: #e0a800;
+            color: #212529;
         }
         body.theme-dark .cv-coment-editor[contenteditable="false"] {
             background: rgba(255, 255, 255, 0.03) !important;

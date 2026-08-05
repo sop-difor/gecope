@@ -174,7 +174,7 @@
          o container do relatório inteiro usa 10pt (ver acima) — o comentário em
          si sempre sai no tamanho em que foi escrito, mesmo que o resto do
          relatório mude. */
-      partes.push('<div class="coment-corpo" style="margin:0 0 1.5em 0; font-family:\'Montserrat\',sans-serif; font-size:10pt; line-height:1.5; text-align:justify">' + sanitizeRichHTML(x.comentario) + '</div>');
+      partes.push('<div class="coment-corpo" style="margin:0 0 1.5em 0; font-family:\'Montserrat\',sans-serif; font-size:10pt; line-height:1.5; text-align:justify; white-space:pre-wrap">' + sanitizeRichHTML(x.comentario) + '</div>');
     });
     partes.push('</div>');
 

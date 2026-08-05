@@ -1003,6 +1003,7 @@
     var ed = $("cv-coment-texto");
     ed.innerHTML = sanitizeRichHTML(item.comentario || "");
     ed.contentEditable = "false"; /* sempre abre em modo leitura; só edita depois de clicar em "Editar" */
+    cvDesarmarPincel();
     cvAtualizarToolbarComentario(false);
     $("cv-ruler-firstline").style.left = "0px";
     $("cv-ruler-leftindent").style.left = "0px";
@@ -1074,6 +1075,7 @@
       var btn = e.target.closest("button[data-cmd]");
       if (!btn) return;
       var cmd = btn.getAttribute("data-cmd");
+      if (cmd === "pincel") { cvCliquePincel(); return; }
       /* sem o try/catch, um execCommand não suportado lançava exceção e pulava o
          focus() logo abaixo — o cursor "sumia" do editor e o próximo clique num
          botão parecia não fazer nada (o comando corria sem seleção nenhuma) */
@@ -1083,6 +1085,14 @@
       } catch (ex) { /* comando indisponível neste navegador: ignora e mantém o foco */ }
       $("cv-coment-texto").focus();
     });
+    var btnPincel = $("cv-coment-btnPincel");
+    if (btnPincel) {
+      btnPincel.addEventListener("dblclick", function (e) {
+        e.preventDefault();
+        if (cvPincelTimer) { clearTimeout(cvPincelTimer); cvPincelTimer = null; }
+        cvAcionarPincel(true);
+      });
+    }
   }
 
   /* execCommand("justifyX") é inconsistente em contenteditable simples (texto sem
@@ -1227,6 +1237,110 @@
       });
     });
   }
+
+  /* ---------- pincel de formatação (igual ao do Word) ----------
+     Copia negrito/itálico/sublinhado, alinhamento, recuo e tamanho de fonte de um
+     trecho selecionado e aplica no próximo trecho selecionado. Clique único aplica
+     1 vez só; duplo clique deixa "grudado" pra aplicar em vários trechos seguidos,
+     até apertar Esc ou clicar de novo no botão. */
+  var cvPincelFormato = null, cvPincelPersistente = false, cvPincelTimer = null;
+
+  function cvCapturarFormatoAtual() {
+    var editor = $("cv-coment-texto");
+    var bloco = cvBlocoAtual();
+    var estiloBloco = (bloco && bloco !== editor) ? bloco.style : null;
+    var sel = window.getSelection();
+    var node = sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+    if (node && node.nodeType === 3) node = node.parentNode;
+    /* tamanho de fonte não tem um "queryCommandState" direto — sobe a árvore a
+       partir do início da seleção até achar o primeiro font-size explícito */
+    var fontSize = null;
+    while (node && node !== editor) {
+      if (node.style && node.style.fontSize) { fontSize = node.style.fontSize; break; }
+      node = node.parentNode;
+    }
+    return {
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+      align: estiloBloco ? estiloBloco.textAlign : "",
+      textIndent: estiloBloco ? estiloBloco.textIndent : "",
+      marginLeft: estiloBloco ? estiloBloco.marginLeft : "",
+      fontSize: fontSize
+    };
+  }
+
+  function cvDesarmarPincel() {
+    cvPincelFormato = null;
+    cvPincelPersistente = false;
+    var btn = $("cv-coment-btnPincel");
+    if (btn) btn.classList.remove("ativo");
+    var editor = $("cv-coment-texto");
+    if (editor) editor.classList.remove("pincel-ativo");
+  }
+
+  function cvAcionarPincel(sticky) {
+    if (cvPincelFormato) { cvDesarmarPincel(); return; } /* clicar de novo no pincel já armado cancela */
+    var sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return; /* precisa de um trecho de origem selecionado */
+    cvPincelFormato = cvCapturarFormatoAtual();
+    cvPincelPersistente = !!sticky;
+    $("cv-coment-btnPincel").classList.add("ativo");
+    $("cv-coment-texto").classList.add("pincel-ativo");
+  }
+
+  /* clique único espera um instante pra ver se vira duplo clique (que cuida de
+     tudo sozinho, com sticky=true) — sem essa espera, o clique único já armava o
+     pincel e o segundo clique do dblclick caía no cvAcionarPincel de novo,
+     desarmando na hora em vez de deixar "grudado" */
+  function cvCliquePincel() {
+    if (cvPincelTimer) { clearTimeout(cvPincelTimer); cvPincelTimer = null; return; }
+    cvPincelTimer = setTimeout(function () {
+      cvPincelTimer = null;
+      cvAcionarPincel(false);
+    }, 220);
+  }
+
+  function cvAplicarFormatoNaSelecao(fmt) {
+    var editor = $("cv-coment-texto");
+    editor.focus();
+    try { document.execCommand("removeFormat", false, null); } catch (ex) { /* comando indisponível neste navegador */ }
+    try {
+      if (fmt.bold) document.execCommand("bold", false, null);
+      if (fmt.italic) document.execCommand("italic", false, null);
+      if (fmt.underline) document.execCommand("underline", false, null);
+    } catch (ex) { /* comando indisponível neste navegador */ }
+    if (fmt.fontSize) {
+      try {
+        document.execCommand("fontSize", false, "7");
+        editor.querySelectorAll('font[size="7"]').forEach(function (f) {
+          f.removeAttribute("size");
+          f.style.fontSize = fmt.fontSize;
+        });
+      } catch (ex) { /* comando indisponível neste navegador */ }
+    }
+    var bloco = cvBlocoAtual();
+    if (bloco && bloco !== editor) {
+      bloco.style.textAlign = fmt.align || "";
+      bloco.style.textIndent = fmt.textIndent || "";
+      bloco.style.marginLeft = fmt.marginLeft || "";
+    }
+  }
+
+  if (comentEditor) {
+    comentEditor.addEventListener("mouseup", function () {
+      if (!cvPincelFormato) return;
+      var sel = window.getSelection();
+      if (!sel.rangeCount || sel.isCollapsed) return;
+      cvAplicarFormatoNaSelecao(cvPincelFormato);
+      if (!cvPincelPersistente) cvDesarmarPincel();
+    });
+  }
+
+  /* Esc cancela o pincel armado, igual ao Word */
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && cvPincelFormato) cvDesarmarPincel();
+  });
 
   /* chamada de fora (do card "CURVA ABC" em Gerenciar Processo) para abrir esta aba já
      carregada com a curva de um processo específico — ver curva_abc_processo.js */
