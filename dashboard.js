@@ -247,21 +247,49 @@
     // Calcula o nível de revisão da GECOPE processo a processo (não pelo agregado),
     // para que contratos de alto valor não mascarem o quanto os demais processos
     // foram de fato alterados. Retorna média, mediana e a taxa de processos alterados.
+    // "alterados" usa tolerância de 1 centavo para não contar ruído de ponto flutuante
+    // como alteração real.
     function calcularIndiceRevisao(rows, fiscalKey, gecopeKey) {
         const variacoes = [];
         let alterados = 0;
+        let somaFiscalAlterados = 0, somaDiffAlterados = 0;
         rows.forEach(d => {
             const fiscalVal = d[fiscalKey] || 0;
             const gecopeVal = d[gecopeKey] || 0;
-            if (gecopeVal !== fiscalVal) alterados++;
-            if (fiscalVal !== 0) variacoes.push(Math.abs(gecopeVal - fiscalVal) / Math.abs(fiscalVal) * 100);
+            const diff = gecopeVal - fiscalVal;
+            if (Math.abs(diff) > 0.01) {
+                alterados++;
+                somaFiscalAlterados += fiscalVal;
+                somaDiffAlterados += diff;
+            }
+            if (fiscalVal !== 0) variacoes.push(Math.abs(diff) / Math.abs(fiscalVal) * 100);
         });
         variacoes.sort((a, b) => a - b);
         const media = variacoes.length ? variacoes.reduce((a, b) => a + b, 0) / variacoes.length : 0;
         const mid = Math.floor(variacoes.length / 2);
         const mediana = variacoes.length ? (variacoes.length % 2 !== 0 ? variacoes[mid] : (variacoes[mid - 1] + variacoes[mid]) / 2) : 0;
         const taxaRevisao = rows.length ? (alterados / rows.length) * 100 : 0;
-        return { media, mediana, taxaRevisao, alterados, total: rows.length };
+        // Corte médio restrito aos processos que a GECOPE efetivamente alterou:
+        // "quando a GECOPE age, corta em média X%".
+        const corteMedioAlterados = somaFiscalAlterados !== 0 ? (somaDiffAlterados / Math.abs(somaFiscalAlterados)) * 100 : 0;
+        return { media, mediana, taxaRevisao, alterados, total: rows.length, corteMedioAlterados };
+    }
+
+    // Redução agregada: soma tudo primeiro, depois divide.
+    // É o número que reconcilia com a "Diferença Total" em reais (diferente da
+    // média simples de calcularIndiceRevisao, que dá peso igual a processos de
+    // qualquer valor).
+    function calcularReducaoAgregada(rows, fiscalKey, gecopeKey) {
+        let somaFiscal = 0, somaGecope = 0;
+        rows.forEach(d => {
+            somaFiscal += d[fiscalKey] || 0;
+            somaGecope += d[gecopeKey] || 0;
+        });
+        const reducaoAbs = somaGecope - somaFiscal; // negativo = GECOPE cortou
+        const reducaoPerc = somaFiscal !== 0
+            ? (reducaoAbs / Math.abs(somaFiscal)) * 100
+            : 0;
+        return { reducaoAbs, reducaoPerc, somaFiscal, somaGecope };
     }
 
     function renderKPIsFinanceiro(rows) {
@@ -273,6 +301,7 @@
         else if (metric === "acresc") { diffAbs = diffAcresc; fiscalKey = "acrescFiscal"; gecopeKey = "acrescGecope"; }
         else if (metric === "supress") { diffAbs = diffSupress; fiscalKey = "supressFiscal"; gecopeKey = "supressGecope"; }
         const indice = calcularIndiceRevisao(rows, fiscalKey, gecopeKey);
+        const reducao = calcularReducaoAgregada(rows, fiscalKey, gecopeKey);
         document.getElementById("kpi-acresc-fiscal").textContent = window.formatCompact ? window.formatCompact(t.acrescFiscal) : String(t.acrescFiscal);
         document.getElementById("kpi-supress-fiscal").textContent = window.formatCompact ? window.formatCompact(t.supressFiscal) : String(t.supressFiscal);
         document.getElementById("kpi-reperc-fiscal").textContent = window.formatCompact ? window.formatCompact(t.repercFiscal) : String(t.repercFiscal);
@@ -287,6 +316,12 @@
         if (taxaEl) taxaEl.textContent = window.formatPercentage ? window.formatPercentage(indice.taxaRevisao) : String(indice.taxaRevisao);
         const taxaSubEl = document.getElementById("kpi-taxa-revisao-sub");
         if (taxaSubEl) taxaSubEl.textContent = `${indice.alterados} de ${indice.total} processos alterados`;
+        const taxaCorteEl = document.getElementById("kpi-taxa-revisao-corte");
+        if (taxaCorteEl) taxaCorteEl.textContent = "Corte médio entre alterados: " + (window.formatPercentage ? window.formatPercentage(indice.corteMedioAlterados) : String(indice.corteMedioAlterados));
+        const reducaoPercEl = document.getElementById("kpi-reducao-perc");
+        if (reducaoPercEl) reducaoPercEl.textContent = window.formatPercentage ? window.formatPercentage(reducao.reducaoPerc) : String(reducao.reducaoPerc);
+        const reducaoAbsEl = document.getElementById("kpi-reducao-abs");
+        if (reducaoAbsEl) reducaoAbsEl.textContent = window.formatCompact ? window.formatCompact(reducao.reducaoAbs) : String(reducao.reducaoAbs);
     }
 
     function renderContadorFinanceiro(rows) {

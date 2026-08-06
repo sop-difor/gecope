@@ -1205,7 +1205,18 @@
                             <span class="fin-section-heading-desc">Diferença entre Fiscalização e GECOPE</span>
                         </div>
                         <div class="row g-3">
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-3">
+                                <div class="kpi-card kpi-reducao-agregada">
+                                    <div class="kpi-header">
+                                        <div class="kpi-icon" style="background:rgba(0,143,61,0.16);color:var(--sop-green-dark);"><i
+                                                class="bi bi-percent"></i></div>
+                                        <div class="kpi-label">Redução sobre a repercussão</div>
+                                    </div>
+                                    <div class="kpi-value" id="kpi-reducao-perc">0,0%</div>
+                                    <div class="kpi-sub" id="kpi-reducao-abs">R$ 0,00</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-3">
                                 <div class="kpi-card kpi-diff-abs">
                                     <div class="kpi-header">
                                         <div class="kpi-icon" style="background:rgba(142,68,173,0.18);color:#8e44ad;"><i
@@ -1224,12 +1235,12 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-3">
                                 <div class="kpi-card kpi-diff-perc">
                                     <div class="kpi-header">
                                         <div class="kpi-icon" style="background:rgba(192,57,43,0.18);color:#c0392b;"><i
                                                 class="bi bi-percent"></i></div>
-                                        <div class="kpi-label">Índice Médio de Revisão</div>
+                                        <div class="kpi-label">Variação Média por Processo</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-diff-perc">0,0%</div>
                                     <div class="d-flex justify-content-between">
@@ -1238,7 +1249,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-md-3">
                                 <div class="kpi-card kpi-taxa-revisao">
                                     <div class="kpi-header">
                                         <div class="kpi-icon" style="background:rgba(1,138,189,0.16);color:var(--sop-blue);"><i
@@ -1247,6 +1258,7 @@
                                     </div>
                                     <div class="kpi-value" id="kpi-taxa-revisao">0,0%</div>
                                     <div class="kpi-sub" id="kpi-taxa-revisao-sub">0 de 0 processos alterados</div>
+                                    <div class="kpi-sub" id="kpi-taxa-revisao-corte">Corte médio entre alterados: 0,0%</div>
                                 </div>
                             </div>
                         </div>
