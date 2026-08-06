@@ -4,6 +4,11 @@
 // consulta o SUITE internamente para cada processo ativo, aplica as regras de negócio do
 // StatusSync e grava sigla + data de chegada + status na tabela `processos`.
 //
+// Processos ARQUIVADOS não são ignorados para sempre: são rechecados 1x/dia (campo
+// `arquivado_check_em`) só para detectar se voltaram a tramitar no SUITE. Quando isso
+// acontece, o status volta ao valor salvo em `status_pre_arquivamento` (o que o processo
+// tinha antes de ser arquivado) — ver bloco `eraArquivado` no handler.
+//
 // -> 1 invocação de Edge Function por rodada (as consultas ao SUITE são fetch de saída = egress).
 //
 // Deploy sugerido:  supabase functions deploy sincronizar-suite --no-verify-jwt
@@ -100,24 +105,42 @@ serve(async (req) => {
 
   const inicio = Date.now()
 
-  // Carrega processos ativos (pula os já arquivados — terminais)
+  // Carrega todos os processos. Os arquivados não são pulados por completo: são
+  // checados no SUITE com frequência reduzida (1x/dia) só para detectar reativação.
   const { data: processos, error } = await supabase
     .from('processos')
-    .select('id, processo, status, suite, analista, created_at, suite_data_chegada')
+    .select('id, processo, status, suite, analista, created_at, suite_data_chegada, status_pre_arquivamento, arquivado_check_em')
 
   if (error) {
     return new Response(JSON.stringify({ erro: error.message }), { status: 500 })
   }
 
-  const ativos = (processos || []).filter(
-    (p) => String(p.status || '').toUpperCase().trim() !== 'ARQUIVADO'
-  )
+  const UM_DIA_MS = 24 * 60 * 60 * 1000
+  const agora = Date.now()
 
-  let atualizados = 0, semMudanca = 0, naoEncontrados = 0
+  const alvos = (processos || []).filter((p) => {
+    const isArquivado = String(p.status || '').toUpperCase().trim() === 'ARQUIVADO'
+    if (!isArquivado) return true
+    // Arquivado: só entra na rodada se nunca foi checado, ou já passou 1 dia da última checagem
+    if (!p.arquivado_check_em) return true
+    return (agora - new Date(p.arquivado_check_em).getTime()) >= UM_DIA_MS
+  })
 
-  await emLotes(ativos, 6, async (p) => {
+  let atualizados = 0, semMudanca = 0, naoEncontrados = 0, reativados = 0
+
+  await emLotes(alvos, 6, async (p) => {
+    const statusAtual = String(p.status || '').toUpperCase().trim()
+    const eraArquivado = statusAtual === 'ARQUIVADO'
+
     const info = await consultarProcesso(p.processo)
-    if (!info.sucesso) { naoEncontrados++; return }
+    if (!info.sucesso) {
+      naoEncontrados++
+      // Mesmo sem sucesso, marca a tentativa para não martelar o SUITE a cada rodada
+      if (eraArquivado) {
+        await supabase.from('processos').update({ arquivado_check_em: new Date().toISOString() }).eq('id', p.id)
+      }
+      return
+    }
 
     const siglaSuite = String(info.sigla || '').toUpperCase().trim()
     const patch: Record<string, any> = {}
@@ -130,12 +153,29 @@ serve(async (req) => {
       patch.suite_data_chegada = info.data_chegada_unidade
     }
 
-    // Regra de negócio: eventual mudança de status
-    const novo = decidirNovoStatus(p, siglaSuite)
-    if (novo && novo !== String(p.status || '').toUpperCase().trim()) {
-      patch.status = novo
-      patch.atualizado_por = 'AUTOMAÇÃO SUITE'
-      patch.ultima_atualizacao = new Date().toISOString()
+    if (eraArquivado) {
+      patch.arquivado_check_em = new Date().toISOString()
+
+      if (siglaSuite !== 'ARQUIVADO') {
+        // Desarquivado no SUITE -> volta pro status que o processo tinha antes de arquivar
+        patch.status = p.status_pre_arquivamento || 'EM ANÁLISE'
+        patch.status_pre_arquivamento = null
+        patch.atualizado_por = 'AUTOMAÇÃO SUITE'
+        patch.ultima_atualizacao = new Date().toISOString()
+        reativados++
+      }
+    } else {
+      // Regra de negócio: eventual mudança de status
+      const novo = decidirNovoStatus(p, siglaSuite)
+      if (novo && novo !== statusAtual) {
+        patch.status = novo
+        patch.atualizado_por = 'AUTOMAÇÃO SUITE'
+        patch.ultima_atualizacao = new Date().toISOString()
+        // Guarda de onde veio, para poder restaurar se for desarquivado depois
+        if (novo === 'ARQUIVADO') {
+          patch.status_pre_arquivamento = p.status
+        }
+      }
     }
 
     if (Object.keys(patch).length === 0) { semMudanca++; return }
@@ -146,8 +186,9 @@ serve(async (req) => {
 
   const resumo = {
     ok: true,
-    total_ativos: ativos.length,
+    total_processados: alvos.length,
     atualizados,
+    reativados,
     sem_mudanca: semMudanca,
     nao_encontrados: naoEncontrados,
     duracao_ms: Date.now() - inicio,

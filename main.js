@@ -2847,6 +2847,15 @@ async function executarAcaoDetalhes(actionType) {
 
         if (statusMudou) {
             updates.ultima_atualizacao = new Date().toISOString(); // Reinicia o contador de dias se o status mudar
+
+            // Mantém `status_pre_arquivamento` consistente também quando o arquivamento/
+            // desarquivamento é feito manualmente por aqui (não só pelo job sincronizar-suite):
+            // guarda de onde veio ao arquivar, limpa ao sair do arquivado.
+            if (novoStatus === 'ARQUIVADO') {
+                updates.status_pre_arquivamento = registroOriginal.status || null;
+            } else if (statusAntigo === 'ARQUIVADO') {
+                updates.status_pre_arquivamento = null;
+            }
         }
 
         if (statusMudou || dataDevMudou) {
