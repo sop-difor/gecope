@@ -769,84 +769,42 @@ async function salvarAlertaRetornoComentario() {
     alert('Comentário registrado com sucesso!');
 }
 
-// Executa `tarefa` para cada item de `items`, respeitando no máximo `limite` chamadas
-// simultâneas (padrão "worker pool"). Usado nas duas integrações com a Edge Function
-// consultar-suite (atualizarTabelaSuite e varrerRiscoDiligenciaSegundoPlano) para limitar
-// a carga na API sem escalonar sequencialmente (o escalonamento antigo, 150ms × índice,
-// fazia o tempo total crescer linearmente com o número de processos).
-async function executarComPool(items, limite, tarefa) {
-    const fila = items.slice();
-    const workers = Array.from({ length: Math.min(limite, fila.length) }, async () => {
-        while (fila.length) {
-            const item = fila.shift();
-            await tarefa(item);
-        }
-    });
-    await Promise.all(workers);
-}
-
 // Varredura em segundo plano: verifica TODOS os processos APROVADO no SUITE, mesmo que a
 // aba "Aprovados" não esteja aberta na tela, para que o alerta apareça antes de o usuário
-// precisar navegar até lá. Respeita o mesmo cache de 5 min usado pela tabela (window.suiteCache).
+// precisar navegar até lá. Lê a sigla direto de window.allData (sem chamadas de rede).
 let varreduraDiligenciaEmAndamento = false;
 async function varrerRiscoDiligenciaSegundoPlano() {
-    if (varreduraDiligenciaEmAndamento || !sbClient) return;
+    if (varreduraDiligenciaEmAndamento) return;
     varreduraDiligenciaEmAndamento = true;
     try {
         const candidatos = (window.allData || []).filter(d => (d.status || '').toString().toUpperCase().trim() === 'APROVADO');
         if (!candidatos.length) return;
 
-        // Monta o mapa numero->tr uma única vez (1 varredura do DOM), em vez de um
-        // querySelector('tr[data-numero=...]') por candidato — antes era O(candidatos × linhas
-        // da tabela), repetido a cada 5 min para todos os processos "APROVADO".
         const trPorNumero = new Map();
         document.querySelectorAll('tr[data-numero]').forEach(tr => {
             trPorNumero.set(tr.getAttribute('data-numero'), tr);
         });
 
-        const processarCandidato = async (d) => {
-            const num = d.processo;
-            const cached = window.suiteCache[num];
-            const cacheValido = cached && (Date.now() - cached.timestamp < 5 * 60 * 1000);
-            let data;
-
-            try {
-                if (cacheValido) {
-                    data = cached.data;
-                } else {
-                    const { data: res, error } = await sbClient.functions.invoke('consultar-suite', { body: { numero: num } });
-                    if (error) return;
-                    data = res;
-                    window.suiteCache[num] = { data, timestamp: Date.now() };
-                }
-            } catch (e) {
-                return;
-            }
-
-            if (data && data.sucesso) {
-                const tr = trPorNumero.get(num);
-                const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
-                aplicarAlertaPreDiligencia(d, tr, alertaIcone, data.sigla, d.status);
-            }
-        };
-
-        // Mesmo pool de concorrência de atualizarTabelaSuite (no máximo 6 simultâneas) — antes
-        // escalonava 150ms por candidato não cacheado, o que podia levar dezenas de segundos
-        // para todos os alertas aparecerem numa varredura com muitos processos "APROVADO".
-        await executarComPool(candidatos, 6, processarCandidato);
-        persistSuiteCache();
+        // Lê a sigla já vinda da tabela `processos` (mantida pelo job central sincronizar-suite).
+        // Zero chamadas à Edge Function.
+        candidatos.forEach(d => {
+            const sigla = d.suite ? String(d.suite).toUpperCase().trim() : null;
+            if (!sigla) return;
+            const tr = trPorNumero.get(d.processo);
+            const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
+            aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, d.status);
+        });
     } catch (e) {
-        console.error('[Alerta Pré-Diligência] erro na varredura em segundo plano:', e);
+        console.error('[Alerta Pré-Diligência] erro na varredura:', e);
     } finally {
         varreduraDiligenciaEmAndamento = false;
     }
 }
 
-let varreduraDiligenciaIntervalId = null;
 function iniciarVarreduraRiscoDiligencia() {
     varrerRiscoDiligenciaSegundoPlano();
-    if (varreduraDiligenciaIntervalId) return;
-    varreduraDiligenciaIntervalId = setInterval(varrerRiscoDiligenciaSegundoPlano, 5 * 60 * 1000);
+    // Polling removido: a sigla do SUITE vem da tabela `processos`, atualizada pelo
+    // job central sincronizar-suite. Sem chamadas à Edge Function no cliente.
 }
 
 // NOTE: Supabase client initialization moved to database.js (loaded before main.js)
@@ -1450,6 +1408,8 @@ function mapProcessoRow(r) {
         repercGecope: Number(r.reperc_gecope) || 0,
         prioritario: r.prioritario || false,
         avisoAtrasoEnviado: r.aviso_atraso_enviado || false,
+        suite: r.suite || null,
+        suite_data_chegada: r.suite_data_chegada || null,
         criador: r.criador,
         created_at: isoParaDate(r.created_at),
         atualizado_por: r.atualizado_por,
@@ -1619,8 +1579,6 @@ async function carregarDadosSupabase() {
 
                     const metaDate = calcularDataMeta(base, dias);
                     if (metaDate) {
-                        const isoMeta = metaDate.toISOString().substring(0, 10);
-
                         // Se não tem meta, estabelece automaticamente
                         const isoAtual = row.dataCompromissoFiscal ? (row.dataCompromissoFiscal instanceof Date ? row.dataCompromissoFiscal.toISOString().substring(0, 10) : new Date(row.dataCompromissoFiscal).toISOString().substring(0, 10)) : null;
 
@@ -2159,7 +2117,7 @@ async function carregarHistoricoPrioridades(processoStr) {
             return `
                 <div class="mb-2 pb-2 border-bottom border-light">
                     <div class="d-flex align-items-center mb-1">
-                        ${icon} <span class="fw-bold text-dark">${registro.usuario}</span>
+                        ${icon} <span class="fw-bold text-dark">${escapeHTML(registro.usuario)}</span>
                     </div>
                     <div class="ps-3 text-muted" style="font-size: 0.65rem;">
                         ${actionText} em ${dt}
@@ -2935,7 +2893,11 @@ async function executarAcaoDetalhes(actionType) {
             msg.innerHTML = ' Dados atualizados!';
 
             // Gravar log no historico_metas se a meta mudou ou foi zerada
-            const dataLimiteOriginal = registroOriginal.data_compromisso_fiscal || null;
+            // registroOriginal vem de window.allData (mapProcessoRow), que expõe a data como
+            // Date em dataCompromissoFiscal — não existe campo data_compromisso_fiscal aqui.
+            const dataLimiteOriginal = registroOriginal.dataCompromissoFiscal
+                ? registroOriginal.dataCompromissoFiscal.toISOString().substring(0, 10)
+                : null;
             const dataLimiteNova = updates.data_compromisso_fiscal || null;
 
             if (dataLimiteNova !== dataLimiteOriginal) {
@@ -4044,7 +4006,7 @@ function updateReuniao() {
                                 `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">Zerada</span>`
                             }
                                                     </td>
-                                                    <td class="fw-semibold">${autor}</td>
+                                                    <td class="fw-semibold">${escapeHTML(autor)}</td>
                                                 </tr>
                                             `;
                     }).join('')}
@@ -4139,42 +4101,17 @@ function updateReuniao() {
     atualizarTabelaSuite(rows);
 }
 
-// Cache de consultas ao SUITE, persistido em sessionStorage para sobreviver a recarregamentos
-// de página — sem isso, cada F5 refazia a consulta de todos os processos, mesmo dentro da
-// janela de 5 min em que os dados já são considerados atuais (checagem de frescor continua
-// nos pontos de uso, esta hidratação só evita começar sempre do zero).
-window.suiteCache = window.suiteCache || (() => {
-    try {
-        return JSON.parse(sessionStorage.getItem('sop_suite_cache') || '{}');
-    } catch (e) {
-        return {};
-    }
-})();
+// Zero chamadas à Edge Function: renderiza a partir dos dados já vindos da tabela `processos`.
+function atualizarTabelaSuite(rows) {
+    if (!rows || rows.length === 0) return;
 
-function persistSuiteCache() {
-    try {
-        sessionStorage.setItem('sop_suite_cache', JSON.stringify(window.suiteCache));
-    } catch (e) {
-        console.warn('Não foi possível persistir suiteCache:', e);
-    }
-}
-
-async function atualizarTabelaSuite(rows) {
-    if (rows.length === 0) {
-        return;
-    }
-
-    // Monta o mapa numero->tr uma única vez (1 varredura do DOM) em vez de um
-    // querySelector('tr[data-numero=...]') por linha — antes era O(linhas × linhas),
-    // repetido a cada refresh da tabela.
     const trPorNumero = new Map();
     document.querySelectorAll('tr[data-numero]').forEach(tr => {
         trPorNumero.set(tr.getAttribute('data-numero'), tr);
     });
 
-    const processarLinha = async (d) => {
-        const num = escapeHTML(d.processo);
-        const tr = trPorNumero.get(num);
+    rows.forEach(d => {
+        const tr = trPorNumero.get(escapeHTML(d.processo));
         if (!tr) return;
 
         const suiteCell = tr.querySelector('.suite-badge-container');
@@ -4182,123 +4119,28 @@ async function atualizarTabelaSuite(rows) {
         const suiteTimeText = tr.querySelector('.suite-time-text');
         const alertaIcone = tr.querySelector('.alerta-icone');
         const stTxt = (d.status || "").toUpperCase();
+        const sigla = d.suite ? String(d.suite).toUpperCase().trim() : null;
 
-        const renderData = (data) => {
-            if (data && data.sucesso) {
-                const badgeSigla = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color: #f8f9fa !important; color: #212529 !important;">${escapeHTML(data.sigla)}</span>`;
-                suiteCell.innerHTML = badgeSigla;
-
-                if (data.data_chegada_unidade) {
-                    // Armazena no objeto da tabela atual
-                    d.suite_data_chegada = data.data_chegada_unidade;
-
-                    // Armazena no window.allData global para futuras re-ordenações nativas sem delay de DOM
-                    if (window.allData) {
-                        const globalRow = window.allData.find(x => x.processo === d.processo);
-                        if (globalRow) globalRow.suite_data_chegada = data.data_chegada_unidade;
-                    }
-
-                    const diffMs = new Date().getTime() - new Date(data.data_chegada_unidade).getTime();
-                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                    suiteTimeText.textContent = diffDays > 0 ? `${diffDays} dia${diffDays > 1 ? 's' : ''}` : "Hoje";
-                    suiteTime.style.display = 'block';
-                }
-
-                const ehFiscal = stTxt.includes('ANÁLISE FISCAL') || stTxt.includes('REANÁLISE FISCAL');
-                if (data.esta_no_gecop && ehFiscal) {
-                    tr.classList.add('tr-alerta-fiscal');
-                    suiteTime.innerHTML += ` <span class="badge-tramitado-pulse">Tramitado</span>`;
-                }
-
-                // Alerta de pré-diligência: processo já APROVADO tramitando em setor de risco
-                aplicarAlertaPreDiligencia(d, tr, alertaIcone, data.sigla, stTxt);
-            } else {
-                suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-muted border badge-custom-size">Não enc.</span>`;
-            }
-        };
-
-        // Otimização: Cache de 5 minutos
-        const cached = window.suiteCache[num];
-        if (cached && (new Date().getTime() - cached.timestamp < 5 * 60 * 1000)) {
-            renderData(cached.data);
+        if (!sigla) {
+            suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-muted border badge-custom-size">—</span>`;
             return;
         }
 
-        try {
-            const { data, error } = await sbClient.functions.invoke('consultar-suite', {
-                body: { numero: d.processo }
-            });
+        suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-dark border badge-custom-size" style="background-color:#f8f9fa !important;color:#212529 !important;">${escapeHTML(sigla)}</span>`;
 
-            if (error) throw error;
+        if (d.suite_data_chegada) {
+            const diffDays = Math.floor((Date.now() - new Date(d.suite_data_chegada).getTime()) / 86400000);
+            suiteTimeText.textContent = diffDays > 0 ? `${diffDays} dia${diffDays > 1 ? 's' : ''}` : "Hoje";
+            suiteTime.style.display = 'block';
 
-            // Determina sigla anterior (se houver) antes de atualizar o cache
-            const prevSigla = window.suiteCache[num] && window.suiteCache[num].data ? String(window.suiteCache[num].data.sigla || '').toUpperCase().trim() : null;
-            // Atualiza Cache
-            window.suiteCache[num] = { data: data, timestamp: new Date().getTime() };
-
-            renderData(data);
-
-            if (window.StatusSync && data && data.sucesso) {
-                window.StatusSync.verificarEAtualizarStatus(d, {
-                    status_suite: data.sigla,
-                    sigla: data.sigla,
-                    prevSigla: prevSigla,
-                    historico: data.historico || data.tramites || data.movimentacoes || []
-                }).then(res => {
-                    if (res && res.changed && res.data) {
-                        const novoStatus = res.data.status;
-                        const statusBadge = tr.querySelector('td:nth-child(5) .badge');
-                        if (statusBadge) {
-                            statusBadge.textContent = formatStatusDisplay(novoStatus);
-                            // Determina classe do badge dinamicamente
-                            let newCls = 'text-bg-light';
-                            const stUpper = novoStatus.toUpperCase();
-                            if (stUpper.includes("AGUAR")) {
-                                newCls = stUpper.includes("REAN") ? 'badge-status-aguar-reanalise' : 'badge-status-light-blue';
-                            } else if (stUpper.includes("ARQUIVADO")) {
-                                newCls = 'badge-status-aprovado';
-                            } else if (stUpper.includes("DILIG")) {
-                                newCls = 'badge-status-diligencia';
-                            }
-                            statusBadge.className = `badge rounded-pill badge-custom-size ${newCls}`;
-                        }
-                        const timerText = tr.querySelector('td:nth-child(5) .text-muted');
-                        if (timerText) timerText.innerHTML = '';
-                        if (window.showToast) window.showToast(`Processo ${d.processo} atualizado para ${novoStatus}!`, 'success');
-                    }
-                }).catch(err => console.error("[Automação] Erro:", err));
+            const ehFiscal = stTxt.includes('ANÁLISE FISCAL') || stTxt.includes('REANÁLISE FISCAL');
+            if (['GECOPE', 'GECOP'].includes(sigla) && ehFiscal) {
+                tr.classList.add('tr-alerta-fiscal');
+                suiteTime.innerHTML += ` <span class="badge-tramitado-pulse">Tramitado</span>`;
             }
-        } catch (e) {
-            console.error("Erro na integração SUITE:", e);
-            suiteCell.innerHTML = `<span class="badge rounded-pill bg-light text-danger border badge-custom-size">Erro Cloud</span>`;
+            aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxt);
         }
-    };
-
-    // No máximo 6 requisições simultâneas à Edge Function consultar-suite (linhas já
-    // cacheadas resolvem na hora, sem rede, e liberam a vaga quase imediatamente) — substitui
-    // o escalonamento sequencial (150ms × índice) que fazia o tempo total da coluna Suíte
-    // crescer linearmente com o número de processos na tela.
-    await executarComPool(rows, 6, processarLinha);
-    persistSuiteCache();
-
-    // Após finalizar o fetch do SUITE, reordena o DOM para a página de ARQUIVADOS apenas
-    // se houve alguma atualização nova (o cache alimenta o sort inicial, evitando o pulo)
-    if (window.currentProcessesTab === 'arquivados') {
-        const tbody = document.getElementById("meetingTableBody");
-        if (tbody) {
-            const trs = Array.from(tbody.querySelectorAll("tr.tr-processo-row"));
-            trs.sort((trA, trB) => {
-                const numA = trA.getAttribute('data-numero');
-                const numB = trB.getAttribute('data-numero');
-                const rowA = rows.find(r => r.processo === numA);
-                const rowB = rows.find(r => r.processo === numB);
-                const tA = (rowA && rowA.suite_data_chegada) ? new Date(rowA.suite_data_chegada).getTime() : 0;
-                const tB = (rowB && rowB.suite_data_chegada) ? new Date(rowB.suite_data_chegada).getTime() : 0;
-                return tB - tA; // mais recente (menor qtde de dias) primeiro
-            });
-            trs.forEach(tr => tbody.appendChild(tr));
-        }
-    }
+    });
 }
 
 function fillCommonStatusFilters() {
@@ -4748,46 +4590,6 @@ function canDeleteComposition(item) {
 }
 
 /**
- * Verifica se o usuário pode fazer upload de composição
- * Regra: Apenas Admin
- */
-function canUploadComposition() {
-    return getCurrentUserRole() === 'admin';
-}
-
-/**
- * Verifica se o usuário pode criar novo orçamento
- * Regra: Apenas Admin
- */
-function canCreateBudget() {
-    return getCurrentUserRole() === 'admin';
-}
-
-/**
- * Verifica se o usuário pode criar nova versão de orçamento
- * Regra: Apenas Admin
- */
-function canCreateBudgetVersion() {
-    return getCurrentUserRole() === 'admin';
-}
-
-/**
- * Verifica se o usuário pode deletar um orçamento
- * Regra: Apenas Admin
- */
-function canDeleteBudget() {
-    return getCurrentUserRole() === 'admin';
-}
-
-/**
- * Verifica se o usuário pode visualizar abas de Painel Financeiro/Gerencial/Prazos
- * e se os dados devem ser filtrados por fiscal responsável
- */
-function shouldFilterDataByFiscal() {
-    return getCurrentUserRole() === 'fiscal';
-}
-
-/**
  * Verifica se o usuário pode ver ações em processos (botões de ação)
  * Regra: Apenas Admin e Gerente. Fiscal e Externo não podem ver
  */
@@ -4934,7 +4736,7 @@ function buildModuleSelector() {
         document.querySelectorAll('.module-checkbox').forEach(cb => {
             const target = cb.dataset.target; const key = `mod${target.replace('#', '')}`;
             localStorage.setItem(key, cb.checked ? 'true' : 'false');
-            const tabBtn = document.querySelector(`[data - bs - target= "${target}"]`);
+            const tabBtn = document.querySelector(`[data-bs-target="${target}"]`);
             if (tabBtn) tabBtn.parentElement.style.display = cb.checked ? '' : 'none';
         });
         const modal = bootstrap.Modal.getInstance(document.getElementById('modalModuleSelector'));
@@ -5020,7 +4822,7 @@ async function salvarNovoOrcamento() {
         const arquivoNomePath = limparStringParaPath(arquivo.name);
 
         // Caminho seguro: ESCOLAS/ENSINO_MEDIO/EEM_10_SALAS/V1_ARQUIVO.PDF
-        const storagePath = `${catPath} /${subPath}/${obraPath}/V1_${arquivoNomePath}`;
+        const storagePath = `${catPath}/${subPath}/${obraPath}/V1_${arquivoNomePath}`;
 
         // 3. Upload para o Supabase Storage
         const { data: uploadData, error: uploadError } = await sbClient
@@ -5964,7 +5766,7 @@ async function prepararComentarioComposicao(id) {
 
         chat.innerHTML = comments.length ? comments.map(c => `
                             <div class="mb-2 border-bottom pb-1">
-                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.7rem">${new Date(c.data).toLocaleDateString()}</span></div>
+                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.7rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
                                 <div style="font-size:0.8rem">${escapeHTML(c.mensagem)}</div>
                                 ${c.arquivo ? `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
                             </div>`).join('') : '<em class="text-muted">Sem mensagens.</em>';
@@ -6860,25 +6662,31 @@ function adicionarItemComposicao(item) {
         return;
     }
 
-    // Auto-Detect Group based on Category, Type or Source
-    let grupo = 'MATERIAL'; // Default
-    const catUpper = (item.categoria || '').toUpperCase();
-    const tipoUpper = (item.tipo || item.tipo_item || '').toUpperCase();
+    // Auto-Detect Group based on Category, Type or Source — só quando o chamador não
+    // já informou um grupo explicitamente (ex: itens de cotação de mercado sempre vêm
+    // com grupo: 'MATERIAL' e não devem ser reclassificados).
+    if (!item.grupo) {
+        let grupo = 'MATERIAL'; // Default
+        const catUpper = (item.categoria || '').toUpperCase();
+        const tipoUpper = (item.tipo || item.tipo_item || '').toUpperCase();
+        // \bMO\b (limite de palavra) evita falso positivo em substrings como "INSUMO"
+        const temMO = /\bMO\b/.test(catUpper) || /\bMO\b/.test(tipoUpper);
 
-    if (catUpper.includes('MO') || catUpper.includes('MAO') ||
-        tipoUpper.includes('MO') || tipoUpper.includes('MAO') ||
-        tipoUpper.includes('SERVENTE') || tipoUpper.includes('PEDREIRO')) {
-        grupo = 'MAO_DE_OBRA';
-    } else if (catUpper.includes('EQUIP') || tipoUpper.includes('EQUIP') ||
-        tipoUpper.includes('CAMINHAO') || tipoUpper.includes('BETONEIRA')) {
-        grupo = 'EQUIPAMENTOS';
-    } else if (catUpper.includes('SERV') || tipoUpper.includes('SERV')) {
-        grupo = 'SERVICO';
-    } else if (item.fonte === 'SINAPI' && (item.tipo_item === 'COMPOSICAO' || item.tipo === 'COMPOSICAO')) {
-        grupo = 'MATERIAL';
+        if (temMO || catUpper.includes('MAO') ||
+            tipoUpper.includes('MAO') ||
+            tipoUpper.includes('SERVENTE') || tipoUpper.includes('PEDREIRO')) {
+            grupo = 'MAO_DE_OBRA';
+        } else if (catUpper.includes('EQUIP') || tipoUpper.includes('EQUIP') ||
+            tipoUpper.includes('CAMINHAO') || tipoUpper.includes('BETONEIRA')) {
+            grupo = 'EQUIPAMENTOS';
+        } else if (catUpper.includes('SERV') || tipoUpper.includes('SERV')) {
+            grupo = 'SERVICO';
+        } else if (item.fonte === 'SINAPI' && (item.tipo_item === 'COMPOSICAO' || item.tipo === 'COMPOSICAO')) {
+            grupo = 'MATERIAL';
+        }
+
+        item.grupo = grupo;
     }
-
-    item.grupo = grupo;
 
 
     currentCompositionItems.push(item);
@@ -6889,11 +6697,6 @@ function adicionarItemComposicao(item) {
 function removerItemComposicao(index) {
     currentCompositionItems.splice(index, 1);
     renderizarItensComposicao();
-    atualizarCalculosComposicao();
-}
-
-function atualizarGrupo(index, novoGrupo) {
-    currentCompositionItems[index].grupo = novoGrupo;
     atualizarCalculosComposicao();
 }
 
@@ -6943,25 +6746,12 @@ function renderizarItensComposicao() {
 
         let subTotal = 0;
 
-        const elBdi = document.getElementById('comp-bdi');
-        const elDesc = document.getElementById('comp-desconto');
-
-        const parseBrl = (val) => {
-            if (!val) return 0;
-            return parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0;
-        };
-
-        const bdi = parseBrl(elBdi.value);
-        const desc = parseBrl(elDesc.value);
-        const bdiVal = bdi / 100;
-        const descVal = desc / 100;
-
         list.forEach(({ item, index }) => {
             const precoEfetivo = item.preco;
             const totalRow = precoEfetivo * item.coeficiente;
             subTotal += totalRow;
 
-            const refShort = (item.referencia || '').toLowerCase().includes('desonerada') ? 'Desonerada' : (item.referencia === 'COTAO' ? 'COTAO' : 'Onerada');
+            const refShort = (item.referencia || '').toLowerCase().includes('desonerada') ? 'Desonerada' : 'Onerada';
             const verShort = (item.versao || '').replace('Tabela ', '');
 
             let sourceDisplay = '';
@@ -6983,7 +6773,7 @@ function renderizarItensComposicao() {
                             <tr>
                                 <td class="small text-muted text-center" style="font-size: 0.75rem;">${sourceDisplay}</td>
                                 <td class="small fw-bold text-center">${item.codigo}</td>
-                                <td class="small text-truncate" style="max-width: 550px;" title="${item.descricao}">${item.descricao}</td>
+                                <td class="small text-truncate" style="max-width: 550px;" title="${escapeHTML(item.descricao)}">${escapeHTML(item.descricao)}</td>
                                 <td class="small text-center">${item.unidade}</td>
                                 <td class="text-center">
                                     <input type="number" class="form-control form-control-sm text-center p-0 border-0 bg-transparent mx-auto" 
@@ -7025,11 +6815,6 @@ function atualizarCoeficiente(index, valor) {
     const val = parseFloat(valor);
     if (isNaN(val) || val < 0) return;
     currentCompositionItems[index].coeficiente = val;
-    const elBdi = document.getElementById('comp-bdi');
-    const elDesc = document.getElementById('comp-desconto');
-    const parseBrl = (val) => val ? parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0 : 0;
-    const bdiVal = parseBrl(elBdi ? elBdi.value : 0) / 100;
-    const descVal = parseBrl(elDesc ? elDesc.value : 0) / 100;
     const item = currentCompositionItems[index];
     const precoEfetivo = item.preco;
     document.getElementById(`total-linha-${index}`).textContent = `${(precoEfetivo * item.coeficiente).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -7358,7 +7143,6 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
     const footerExtra = document.getElementById('footer-extra-actions');
     if (footerExtra) footerExtra.innerHTML = '';
 
-    const formatCurrency = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const formatDecimal = (v, d = 3) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
     const codigo = dadosPai.codigo || 'N/A';
@@ -7371,13 +7155,11 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
 
     // Agrupamento por tipo (Insumo/Composição)
     const grupos = {};
-    let totalGeral = 0;
 
     dadosPai.composicao.forEach(item => {
         const tipo = (item.tipo_item || 'INSUMO').toUpperCase().replace('COMPOSICAO', 'COMPOSIÇÃO');
         if (!grupos[tipo]) grupos[tipo] = [];
         const subtotal = (parseFloat(item.coeficiente) || 0) * (parseFloat(item.preco_unitario) || 0);
-        totalGeral += subtotal;
         grupos[tipo].push({ ...item, total: subtotal });
     });
 
@@ -7499,7 +7281,6 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                         </a>`;
     }
 
-    const formatCurrency = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const formatDecimal = (v, d = 3) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 
     const codigo = dadosPai.codigo || 'N/A';
@@ -8020,7 +7801,7 @@ const formatarVersao = (texto) => {
 
     // Mapa de nomes completos para abreviações
     const mesesMap = {
-        'JANEIRO': 'Jan', 'FEVEREIRO': 'Fev', 'MARO': 'Mar', 'ABRIL': 'Abr',
+        'JANEIRO': 'Jan', 'FEVEREIRO': 'Fev', 'MARÇO': 'Mar', 'ABRIL': 'Abr',
         'MAIO': 'Mai', 'JUNHO': 'Jun', 'JULHO': 'Jul', 'AGOSTO': 'Ago',
         'SETEMBRO': 'Set', 'OUTUBRO': 'Out', 'NOVEMBRO': 'Nov', 'DEZEMBRO': 'Dez'
     };
@@ -8376,7 +8157,6 @@ async function visualizarComposicao(id, url, options = {}) {
                                 </div>
                             `;
             let docData = null;
-            let sourceSOP = false;
 
             // 1. Caso 1: Composição Analítica elaborada no sistema (Direto do Banco)
             if (!url || url === 'undefined' || url === 'null' || url === '') {
@@ -8384,7 +8164,6 @@ async function visualizarComposicao(id, url, options = {}) {
                 if (error || !data) throw new Error("Documento não encontrado no banco.");
 
                 if (data.itens) {
-                    sourceSOP = false;
                     docData = data; // Passamos o objeto completo
                 } else {
                     url = data.arquivo_url;
@@ -8405,7 +8184,6 @@ async function visualizarComposicao(id, url, options = {}) {
 
                 const json = await response.json();
                 const meta = json.meta || {};
-                sourceSOP = true;
                 docData = {
                     ...json, // Mantém todos os campos originais
                     codigo: meta.codigo || 'S/C',
