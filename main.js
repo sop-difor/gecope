@@ -6429,6 +6429,38 @@ window.adicionarItemMercadoManual = function () {
     bootstrap.Modal.getInstance(document.getElementById('modalBuscarItemComposicao')).hide();
 }
 
+// Descobre quais meses (referencia) realmente existem numa tabela SINAPI/ORSE,
+// percorrendo do mês mais antigo ao mais recente carregado no banco. Antes o
+// código só verificava os últimos 12 meses a partir da data de hoje, então uma
+// tabela antiga recém-carregada pelo administrador (ex.: ORSE de Jan/2025 com o
+// sistema já em Ago/2026) nunca aparecia no seletor de versão.
+async function obterMesesDisponiveis(tabela) {
+    const [{ data: antigo }, { data: recente }] = await Promise.all([
+        sbClient.from(tabela).select('referencia').not('referencia', 'is', null).order('referencia', { ascending: true }).limit(1),
+        sbClient.from(tabela).select('referencia').not('referencia', 'is', null).order('referencia', { ascending: false }).limit(1)
+    ]);
+    if (!antigo?.length || !recente?.length) return [];
+
+    const [anoIni, mesIni] = antigo[0].referencia.split('-').map(Number);
+    const [anoFim, mesFim] = recente[0].referencia.split('-').map(Number);
+    const tmIni = anoIni * 12 + mesIni;
+    const tmFim = anoFim * 12 + mesFim;
+
+    const candidatos = [];
+    for (let tm = tmFim; tm >= tmIni; tm--) {
+        const ano = Math.floor((tm - 1) / 12);
+        const mes = tm - ano * 12; // 1..12
+        candidatos.push({ ano, mes, dbDate: `${ano}-${String(mes).padStart(2, '0')}-01` });
+    }
+
+    const checks = await Promise.all(candidatos.map(async c => {
+        const { count } = await sbClient.from(tabela).select('*', { count: 'exact', head: true }).eq('referencia', c.dbDate);
+        return { ...c, count: count || 0 };
+    }));
+
+    return checks.filter(c => c.count > 0);
+}
+
 async function atualizarVersoesBusca() {
     const fonte = document.getElementById('busca-item-fonte').value;
     const elVersao = document.getElementById('busca-item-versao');
@@ -6455,22 +6487,10 @@ async function atualizarVersoesBusca() {
         let options = [];
         elVersao.innerHTML = '<option value="">Verificando...</option>';
 
-        // Define candidates to check against DB (Dynamic 12 months)
-        const mapMes = { 'JAN': '01', 'FEV': '02', 'MAR': '03', 'ABR': '04', 'MAI': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08', 'SET': '09', 'OUT': '10', 'NOV': '11', 'DEZ': '12' };
         const mapMesLabels = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
-        let candidates = [];
         if (fonte === 'SEINFRA') {
-            candidates = ["30", "29", "28", "27", "26"];
-        } else {
-            const now = new Date();
-            for (let i = 0; i < 12; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                candidates.push(`${mapMesLabels[d.getMonth()]}/${d.getFullYear()}`);
-            }
-        }
-
-        if (fonte === 'SEINFRA') {
+            const candidates = ["30", "29", "28", "27", "26"];
             const results = await Promise.all(candidates.map(async v => {
                 const { count } = await sbClient.from('seinfra_itens').select('*', { count: 'exact', head: true }).eq('referencia', v);
                 return { v, count: count || 0 };
@@ -6479,23 +6499,8 @@ async function atualizarVersoesBusca() {
             if (options.length === 0) options = ['28', '27'];
         }
         else if (fonte === 'SINAPI' || fonte === 'ORSE') {
-            options = [];
-            // Parallel checks for speed
-            const checks = candidates.map(async (label) => {
-                const parts = label.split('/');
-                const mes = mapMes[parts[0].toUpperCase()];
-                const dbDate = `${parts[1]}-${mes}-01`;
-
-                const { count } = await sbClient
-                    .from(tabela)
-                    .select('*', { count: 'exact', head: true })
-                    .eq('referencia', dbDate); // Check if THIS version exists
-
-                return { label, count: count || 0 };
-            });
-
-            const results = await Promise.all(checks);
-            options = results.filter(r => r.count > 0).map(r => r.label);
+            const disponiveis = await obterMesesDisponiveis(tabela);
+            options = disponiveis.map(r => `${mapMesLabels[r.mes - 1]}/${r.ano}`);
 
             // Fallback if DB empty or query fails (prevents empty dropdown)
             if (options.length === 0) options = ['DEZ/2025'];
@@ -7670,36 +7675,17 @@ async function atualizarSelectVersao() {
             const tabela = (fonte === 'SINAPI') ? 'sinapi_itens' : 'orse_itens';
             const mapMesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-            const now = new Date();
-            const candidates = [];
-
-            // Verifica os últimos 12 meses para encontrar versões disponíveis no banco
-            // Isso garante que se o administrador carregar nov/2025, o sistema detecta sozinho
-            for (let i = 0; i < 12; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const mesIdx = d.getMonth();
-                const ano = d.getFullYear();
-                const mesStr = String(mesIdx + 1).padStart(2, '0');
-
-                candidates.push({
-                    label: `${mapMesLabels[mesIdx]}/${ano}`,
-                    dbDate: `${ano}-${mesStr}-01`,
-                    sinapiVal: `${mesStr}${ano}`, // Formato MMYYYY esperado pela busca
-                    orseVal: `${mesStr}/${ano}`   // Formato MM/YYYY esperado pela busca
-                });
-            }
-
-            const checks = await Promise.all(candidates.map(async c => {
-                const { count } = await sbClient.from(tabela).select('*', { count: 'exact', head: true }).eq('referencia', c.dbDate);
-                return { ...c, count: count || 0 };
-            }));
+            // Verifica todos os meses realmente presentes na tabela (do mais antigo
+            // ao mais recente), em vez de só os últimos 12 a partir de hoje.
+            const disponiveis = await obterMesesDisponiveis(tabela);
 
             selectVersao.innerHTML = '';
-            const valids = checks.filter(r => r.count > 0);
-            if (valids.length > 0) {
-                valids.forEach(r => {
-                    const val = (fonte === 'SINAPI') ? r.sinapiVal : r.orseVal;
-                    selectVersao.add(new Option(r.label, val));
+            if (disponiveis.length > 0) {
+                disponiveis.forEach(r => {
+                    const mesStr = String(r.mes).padStart(2, '0');
+                    const label = `${mapMesLabels[r.mes - 1]}/${r.ano}`;
+                    const val = (fonte === 'SINAPI') ? `${mesStr}${r.ano}` : `${mesStr}/${r.ano}`;
+                    selectVersao.add(new Option(label, val));
                 });
             } else {
                 // Fallback se a internet/banco falhar
