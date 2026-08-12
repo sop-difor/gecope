@@ -1,0 +1,18 @@
+{
+  "name": "consulta-contratos-proxy",
+  "version": "1.0.0",
+  "description": "Proxy que consulta o Ceara Transparente (contratos publicos) usando um Chromium headless para passar pelo desafio JS do AWS WAF, e devolve os dados ja estruturados em JSON.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "playwright": "1.62.1"
+  }
+}
