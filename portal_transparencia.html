@@ -6,8 +6,12 @@
 <title>Portal da Transparência · GECOPE</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--ng:#2FE6A0;--amber:#F6B255;--red:#F26D6D}
+  :root{--ng:#2FE6A0;--amber:#F6B255;--red:#F26D6D;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
   *{box-sizing:border-box}
+  *::-webkit-scrollbar{width:6px;height:6px}
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background-color:rgba(255,255,255,.22);border-radius:999px}
+  *::-webkit-scrollbar-thumb:hover{background-color:rgba(255,255,255,.4)}
   html,body{margin:0;min-height:100%}
   body{font-family:Montserrat,system-ui,sans-serif;color:#CFE3D9;background:#071310;
        font-feature-settings:"tnum" 1,"lnum" 1;-webkit-font-smoothing:antialiased}
