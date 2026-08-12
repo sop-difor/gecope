@@ -3926,7 +3926,50 @@ function updateReuniao() {
         return timeA - timeB;
     });
 
-    mt.body.innerHTML = rows.map(d => {
+    // Contagem de processos por grupo de status, para exibir no cabeçalho de cada bloco
+    const statusGroupCounts = {};
+    rows.forEach(d => {
+        const label = formatStatusDisplay(d.status) || "SEM STATUS";
+        statusGroupCounts[label] = (statusGroupCounts[label] || 0) + 1;
+    });
+    let lastStatusGroup = null;
+    const groupedHTML = [];
+
+    // Cor de destaque do cabeçalho de grupo, na mesma família de cor do badge de status da linha
+    // — tons mais escuros/dessaturados que os do badge, para não pesar visualmente
+    const groupAccentColor = {
+        "badge-status-devolvido": "#a33a44",
+        "badge-status-diligencia": "#a33a44",
+        "badge-status-light-blue": "#3d68a3",
+        "badge-status-em-reanalise": "#3f7d5c",
+        "badge-status-em-analise": "#a1801f",
+        "badge-status-aguar-reanalise": "#a1801f",
+        "badge-status-fiscal": "#6c757d",
+        "badge-status-dark-blue": "#3d68a3",
+        "badge-status-aprovado": "#3f7d5c",
+        "badge-status-contratante": "#8a9200",
+        "badge-status-arquivado": "#7c8ba1",
+    };
+    // Fundo do cabeçalho: tingimento translúcido bem suave da cor de destaque, para se
+    // diferenciar do fundo da tabela sem competir visualmente com o conteúdo das linhas
+    const groupBgColor = {
+        "badge-status-devolvido": "rgba(163, 58, 68, 0.10)",
+        "badge-status-diligencia": "rgba(163, 58, 68, 0.10)",
+        "badge-status-light-blue": "rgba(61, 104, 163, 0.10)",
+        "badge-status-em-reanalise": "rgba(63, 125, 92, 0.10)",
+        "badge-status-em-analise": "rgba(161, 128, 31, 0.10)",
+        "badge-status-aguar-reanalise": "rgba(161, 128, 31, 0.10)",
+        "badge-status-fiscal": "rgba(108, 117, 125, 0.10)",
+        "badge-status-dark-blue": "rgba(61, 104, 163, 0.10)",
+        "badge-status-aprovado": "rgba(63, 125, 92, 0.10)",
+        "badge-status-contratante": "rgba(138, 146, 0, 0.10)",
+        "badge-status-arquivado": "rgba(124, 139, 161, 0.10)",
+    };
+    // Fundo das próprias linhas do grupo: um único tom neutro para todas, independente
+    // do status — só o cabeçalho de cada bloco carrega a cor de destaque
+    const groupRowBgColor = "rgba(255, 255, 255, 0.035)";
+
+    rows.forEach(d => {
         const mIso = getMetaDate(d)?.toISOString().substring(0, 10) || "";
         const mSt = getMetaSt(d);
         let mCls = "badge-meta-sem";
@@ -3949,6 +3992,25 @@ function updateReuniao() {
         else if (stTxt.startsWith("EM") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-em-analise"; }
         else if (stTxt.includes("APROVADO") || stTxt === "SEDUC") { stCls = "badge-status-aprovado"; }
         else if (stTxt.includes("ARQUIVADO")) { stCls = "badge-status-arquivado"; }
+
+        // Cabeçalho de grupo: insere uma linha divisória sempre que o status muda,
+        // mantendo a ordenação já aplicada (mesma regra de data de abertura dentro do grupo)
+        const statusGroupLabel = formatStatusDisplay(d.status) || "SEM STATUS";
+        if (statusGroupLabel !== lastStatusGroup) {
+            const accentColor = groupAccentColor[stCls] || "#94a3b8";
+            const bgColor = groupBgColor[stCls] || "rgba(148, 163, 184, 0.16)";
+            groupedHTML.push(`
+        <tr class="tr-status-group-header">
+            <td colspan="${columns.length}" style="background: ${bgColor}; padding: 9px 16px; border-top: 1px solid var(--sop-slate-200, #e2e8f0); border-left: 4px solid ${accentColor};">
+                <span class="d-inline-flex align-items-center" style="gap: 7px;">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: ${accentColor}; flex-shrink: 0;"></span>
+                    <span class="text-uppercase" style="font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-heading);">${statusGroupLabel}</span>
+                    <span class="text-muted" style="font-size: 0.74rem; font-weight: 500;">${statusGroupCounts[statusGroupLabel]} processo${statusGroupCounts[statusGroupLabel] === 1 ? '' : 's'}</span>
+                </span>
+            </td>
+        </tr>`);
+            lastStatusGroup = statusGroupLabel;
+        }
 
         const abert = dateParaInput(d.dataAbertura);
         const dias = (d.dataAbertura instanceof Date) ? Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)) : "";
@@ -3976,9 +4038,8 @@ function updateReuniao() {
         // em setor de risco (DIFOR/GEFOE/DIRED/GEDOP) — ver isSetorRiscoDiligencia()
         const temAlertaDiligencia = !!(d.alerta_pre_diligencia || d.alerta_retorno_resolvido);
         const alertaIconeHTML = temAlertaDiligencia ? montarAlertaIconeHTML(d) : '';
-
-        return `
-        <tr style="vertical-align: middle;" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${d.alerta_pre_diligencia ? ' tr-alerta-pre-diligencia' : ''}">
+        groupedHTML.push(`
+        <tr style="vertical-align: middle; --bs-table-bg: ${groupRowBgColor};" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${d.alerta_pre_diligencia ? ' tr-alerta-pre-diligencia' : ''}">
             <td class="text-center">
                 <div class="d-flex flex-column gap-1 align-items-center">
                     ${btnDetalhes}
@@ -4008,8 +4069,9 @@ function updateReuniao() {
             </td>
             <td style="max-width: 200px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4;">${escapeHTML(d.contratada)}</td>
             <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: justify;">${escapeHTML(d.descricao)}</td>
-        </tr>`;
-    }).join("");
+        </tr>`);
+    });
+    mt.body.innerHTML = groupedHTML.join("");
 
     // SweetAlert para definir Meta
     window.abrirModalMeta = async function (processo, dataAtual) {
