@@ -528,6 +528,7 @@
         .home-action-icon.bg-purple { background: #6f42c1; box-shadow: 0 4px 10px -2px #6f42c1; }
         .home-action-icon.bg-teal { background: #0d9488; box-shadow: 0 4px 10px -2px #0d9488; }
         .home-action-icon.bg-slate { background: #475569; box-shadow: 0 4px 10px -2px #475569; }
+        .home-action-icon.bg-indigo { background: #4338ca; box-shadow: 0 4px 10px -2px #4338ca; }
 
         .home-action-text h3 {
             font-size: 1.25rem;

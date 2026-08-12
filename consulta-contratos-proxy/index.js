@@ -77,14 +77,28 @@ async function getHtml(url, extraHeaders = {}) {
 
 // --- parsing (mesmo formato validado em consulta_contratos/ceara_transparente.py) ---
 
+// Entidades nomeadas ISO-8859-1 usadas pelo Licitaweb (app JSF/Seam antiga que
+// serializa acentos como &ccedil;/&atilde;/etc. em vez de UTF-8 puro).
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  aacute: 'á', Aacute: 'Á', agrave: 'à', Agrave: 'À', acirc: 'â', Acirc: 'Â', atilde: 'ã', Atilde: 'Ã', auml: 'ä', Auml: 'Ä',
+  eacute: 'é', Eacute: 'É', egrave: 'è', Egrave: 'È', ecirc: 'ê', Ecirc: 'Ê', euml: 'ë', Euml: 'Ë',
+  iacute: 'í', Iacute: 'Í', igrave: 'ì', Igrave: 'Ì', icirc: 'î', Icirc: 'Î', iuml: 'ï', Iuml: 'Ï',
+  oacute: 'ó', Oacute: 'Ó', ograve: 'ò', Ograve: 'Ò', ocirc: 'ô', Ocirc: 'Ô', otilde: 'õ', Otilde: 'Õ', ouml: 'ö', Ouml: 'Ö',
+  uacute: 'ú', Uacute: 'Ú', ugrave: 'ù', Ugrave: 'Ù', ucirc: 'û', Ucirc: 'Û', uuml: 'ü', Uuml: 'Ü',
+  ccedil: 'ç', Ccedil: 'Ç', ntilde: 'ñ', Ntilde: 'Ñ',
+  ordm: 'º', ordf: 'ª', deg: '°', sect: '§', middot: '·',
+  sup1: '¹', sup2: '²', sup3: '³',
+};
+
 function decodeEntities(s) {
-  return s
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+  return s.replace(/&(#x?[0-9a-fA-F]+|\w+);/g, (full, ent) => {
+    if (ent[0] === '#') {
+      const code = ent[1] === 'x' || ent[1] === 'X' ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCharCode(code) : full;
+    }
+    return NAMED_ENTITIES[ent] ?? full;
+  });
 }
 
 function stripTags(html) {
@@ -98,7 +112,14 @@ function extrairCampos(html) {
   let m;
   while ((m = re.exec(html)) !== null) {
     const label = stripTags(m[1]);
-    const valor = stripTags(m[2]);
+    const rawValor = m[2];
+    let valor = stripTags(rawValor);
+    // campos como "Íntegra do contrato" só têm um ícone dentro do <a>, sem texto;
+    // nesse caso o valor útil é o href do link, não o texto (que fica vazio).
+    if (!valor) {
+      const linkMatch = /<a[^>]+href=["']([^"']+)["']/i.exec(rawValor);
+      if (linkMatch) valor = linkMatch[1];
+    }
     campos[label] = valor || 'N/A';
   }
   return campos;
@@ -195,6 +216,8 @@ async function buscarContratoPorId(id) {
     Valor_Pago: campo('Valor pago'),
     Descricao_Edital: campo('Descrição edital'),
     Modalidade_Licitacao: campo('Modalidade de licitação'),
+    Integra_Contrato: campo('Íntegra do contrato'),
+    Ver_Edital: campo('Ver edital'),
     Aditivos: extrairTabela(html, 'aditivos'),
     Ajustes: extrairTabela(html, 'ajustes'),
     URL: url,
@@ -236,6 +259,91 @@ async function resolverIdPorSacc(sacc) {
   return { ok: true, id: idsEncontrados[0] };
 }
 
+// --- Licitaweb (S2GPR/Sefaz-CE) — página do edital linkada em "Ver edital" ---
+// Sistema JSF/Seam antigo, sem WAF; os campos ficam em blocos
+// <div class="prop"><div class="name">Label</div><div class="value">Valor</div></div>
+// e as tabelas (Dotação Orçamentária, Documentos) são <table id="...">.
+
+function extrairPropsLicitaweb(html) {
+  const campos = {};
+  const re =
+    /<div class="prop"[^>]*>\s*<div class="name[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<div class="value[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const label = stripTags(m[1]).replace(/:\s*$/, '').trim();
+    const valor = stripTags(m[2]).trim();
+    if (label) campos[label] = valor || 'N/A';
+  }
+  return campos;
+}
+
+function extrairTabelaPorId(html, idSubstr) {
+  const tableRe = new RegExp(`<table[^>]*id=["'][^"']*${idSubstr}[^"']*["'][^>]*>([\\s\\S]*?)<\\/table>`, 'i');
+  const tableMatch = tableRe.exec(html);
+  if (!tableMatch) return [];
+  const tableHtml = tableMatch[1];
+
+  const theadMatch = /<thead[^>]*>([\s\S]*?)<\/thead>/i.exec(tableHtml);
+  const cabecalhos = [];
+  if (theadMatch) {
+    const thRe = /<th[^>]*>([\s\S]*?)<\/th>/g;
+    let th;
+    while ((th = thRe.exec(theadMatch[1])) !== null) cabecalhos.push(stripTags(th[1]));
+  }
+
+  const tbodyMatch = /<tbody[^>]*>([\s\S]*?)<\/tbody>/i.exec(tableHtml);
+  if (!tbodyMatch) return [];
+
+  const linhas = [];
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+  let tr;
+  while ((tr = trRe.exec(tbodyMatch[1])) !== null) {
+    const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/g;
+    const celulas = [];
+    let td;
+    while ((td = tdRe.exec(tr[1])) !== null) celulas.push(stripTags(td[1]));
+    if (celulas.length === 0) continue;
+
+    const registro = {};
+    celulas.forEach((texto, i) => {
+      const chave = cabecalhos[i] || `Coluna_${i}`;
+      registro[chave] = texto || 'N/A';
+    });
+    linhas.push(registro);
+  }
+  return linhas;
+}
+
+async function buscarLicitaweb(url) {
+  await ensureContext();
+  const resp = await context.request.get(url);
+  if (resp.status() !== 200) {
+    return { ok: false, status: 'error', message: `Licitaweb respondeu HTTP ${resp.status()}` };
+  }
+  // A página declara ISO-8859-1; decodificar os bytes crus como latin1 preserva
+  // eventuais acentos "soltos" (não vêm todos como entidade &xxx;).
+  const buf = await resp.body();
+  const html = buf.toString('latin1');
+
+  const campos = extrairPropsLicitaweb(html);
+  const dotacao = extrairTabelaPorId(html, 'tabelaClassificacaoOrcamentaria');
+  const documentos = extrairTabelaPorId(html, 'arquivoProcessoTable').map((linha) => {
+    // primeira coluna é só o checkbox de seleção (sem cabeçalho) — descarta
+    const { Coluna_0, ...resto } = linha;
+    return resto;
+  });
+
+  return {
+    ok: true,
+    edital: {
+      Campos: campos,
+      Dotacao_Orcamentaria: dotacao,
+      Documentos: documentos,
+      URL: url,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // HTTP
 // ---------------------------------------------------------------------------
@@ -271,6 +379,37 @@ app.post('/consulta', async (req, res) => {
     return res.json(resultado);
   } catch (e) {
     console.error('consulta error', e);
+    return res.status(500).json({ ok: false, message: String(e?.message || e) });
+  }
+});
+
+app.post('/edital', async (req, res) => {
+  if (API_KEY && req.headers['x-api-key'] !== API_KEY) {
+    return res.status(401).json({ ok: false, message: 'x-api-key inválida ou ausente' });
+  }
+
+  try {
+    const url = req.body?.url ? String(req.body.url).trim() : '';
+    if (!url) {
+      return res.status(400).json({ ok: false, message: "Informe 'url'." });
+    }
+    // só aceita o host do Licitaweb: o endpoint busca a URL recebida do cliente
+    // no servidor, então precisa ficar restrito para não virar proxy aberto (SSRF).
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return res.status(400).json({ ok: false, message: "'url' inválida." });
+    }
+    if (parsed.hostname !== 's2gpr.sefaz.ce.gov.br') {
+      return res.status(400).json({ ok: false, message: "'url' deve ser do domínio s2gpr.sefaz.ce.gov.br." });
+    }
+
+    const resultado = await buscarLicitaweb(parsed.toString());
+    if (!resultado.ok) return res.status(502).json(resultado);
+    return res.json(resultado);
+  } catch (e) {
+    console.error('edital error', e);
     return res.status(500).json({ ok: false, message: String(e?.message || e) });
   }
 });
