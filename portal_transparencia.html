@@ -141,7 +141,7 @@
     <div class="hint">Consulta o portal público Ceará Transparente pelo número SACC do contrato ou pelo ID interno da página.</div>
 
     <div class="state loading" id="stateLoading">
-      <span class="spinner"><span class="dot"></span> Consultando o Ceará Transparente…</span>
+      <span class="spinner"><span class="dot"></span> Consultando o Ceará Transparente… (a primeira consulta após um tempo sem uso pode levar até 1 minuto, pois o serviço "acorda")</span>
     </div>
     <div class="state error" id="stateError"></div>
   </div>
@@ -214,9 +214,9 @@
 </main>
 
 <script>
-// URL do proxy consulta-contratos-proxy (Node/Playwright). Ainda roda apenas local
-// neste ambiente — trocar pela URL de produção assim que o serviço for publicado.
-const PROXY_URL = 'http://localhost:3000';
+// URL do proxy consulta-contratos-proxy (Node/Playwright), publicado no Render
+// (plano free) para funcionar em qualquer computador, não só na máquina local.
+const PROXY_URL = 'https://consulta-contratos-proxy.onrender.com';
 const PROXY_API_KEY = ''; // preencher se CONSULTA_API_KEY estiver configurada no proxy
 
 function prefetchPagina(url){
