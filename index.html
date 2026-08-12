@@ -1899,7 +1899,8 @@
                         </div>
 
                         <div class="proc-kpi-grid mb-2">
-                            <div class="proc-kpi-card accent-green">
+                            <div class="proc-kpi-card accent-green" style="cursor:pointer;" title="Ver distribuição por fiscal"
+                                onclick="abrirBreakdownFiscal(null, 'Processos', 'bi-pin-angle-fill')">
                                 <div class="proc-kpi-icon bg-green"><i class="bi bi-pin-angle-fill"></i></div>
                                 <div class="proc-kpi-text">
                                     <span class="proc-kpi-label">Processos</span>
@@ -1907,7 +1908,8 @@
                                     <div class="proc-kpi-sub">Filtrado na tela</div>
                                 </div>
                             </div>
-                            <div class="proc-kpi-card accent-orange">
+                            <div class="proc-kpi-card accent-orange" style="cursor:pointer;" title="Ver distribuição por fiscal"
+                                onclick="abrirBreakdownFiscal('AGUAR. ANÁLISE', 'Aguardando Análise', 'bi-hourglass-split')">
                                 <div class="proc-kpi-icon bg-orange"><i class="bi bi-hourglass-split"></i></div>
                                 <div class="proc-kpi-text">
                                     <span class="proc-kpi-label">Aguardando Análise</span>
@@ -1915,7 +1917,8 @@
                                     <div class="proc-kpi-sub">Status = AGUAR. ANÁLISE</div>
                                 </div>
                             </div>
-                            <div class="proc-kpi-card accent-green">
+                            <div class="proc-kpi-card accent-green" style="cursor:pointer;" title="Ver distribuição por fiscal"
+                                onclick="abrirBreakdownFiscal('ANÁLISE FISCAL', 'Análise Fiscal', 'bi-check2-circle')">
                                 <div class="proc-kpi-icon bg-green"><i class="bi bi-check2-circle"></i></div>
                                 <div class="proc-kpi-text">
                                     <span class="proc-kpi-label">Análise Fiscal</span>
@@ -1923,7 +1926,8 @@
                                     <div class="proc-kpi-sub">Status = ANÁLISE FISCAL</div>
                                 </div>
                             </div>
-                            <div class="proc-kpi-card accent-purple">
+                            <div class="proc-kpi-card accent-purple" style="cursor:pointer;" title="Ver distribuição por fiscal"
+                                onclick="abrirBreakdownFiscal('DEVOLVIDO P/ REANÁLISE FISCAL', 'Reanálise Fiscal', 'bi-calendar-event')">
                                 <div class="proc-kpi-icon bg-purple"><i class="bi bi-calendar-event"></i></div>
                                 <div class="proc-kpi-text">
                                     <span class="proc-kpi-label">Reanálise Fiscal</span>
@@ -4007,6 +4011,26 @@
                                             <button type="button" class="btn btn-success px-4" id="btn-salvar"
                                                 onclick="enviarParaPlanilha()"><i class="bi bi-check-lg"></i>
                                                 SALVAR</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modal de Distribuição por Fiscal (drill-down dos cards de KPI de Processos) -->
+                            <div class="modal fade" id="modalKpiBreakdown" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="kpiBreakdownTitulo"></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div id="kpiBreakdownConteudo"></div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary btn-sm"
+                                                data-bs-dismiss="modal">Fechar</button>
                                         </div>
                                     </div>
                                 </div>

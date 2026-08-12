@@ -18,27 +18,44 @@
   header.top:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
              background:linear-gradient(90deg,transparent,rgba(47,230,160,.6),transparent)}
   .brand{display:flex;align-items:center;gap:13px}
-  .mark{width:37px;height:37px;border-radius:10px;background:linear-gradient(135deg,#2FE6A0,#12907E);
-        display:grid;place-items:center;font-family:Montserrat,sans-serif;font-weight:800;color:#04170F;font-size:15px;flex:none;
-        box-shadow:0 0 0 1px rgba(47,230,160,.35),0 0 20px rgba(47,230,160,.35)}
+  .mark{display:grid;place-items:center;flex:none}
+  .mark img{height:44px;width:auto;object-fit:contain;
+        filter:drop-shadow(0 3px 8px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(76,193,124,.3))}
   .top h1{font-family:Montserrat,sans-serif;font-size:15.5px;font-weight:800;margin:0;letter-spacing:.15px;color:#EAF3EE}
   .top .sub{font-family:Montserrat,sans-serif;font-size:10px;color:#6FA891;font-weight:700;margin-top:3px;letter-spacing:1.3px;text-transform:uppercase}
-  .badge{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
-         background:rgba(47,230,160,.10);color:#9FE9C9;padding:7px 13px;border-radius:999px;border:1px solid rgba(47,230,160,.25)}
+  .top .sub .formal{color:#4B7565;font-weight:600;text-transform:none;letter-spacing:.2px}
+  .top .sub .sep{margin:0 6px;opacity:.5}
+  .top-meta{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .synctime{display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-family:Montserrat,sans-serif}
+  .synctime .l{font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5F8674}
+  .synctime .v{font-size:11px;font-weight:700;color:#BFE1D0;font-variant-numeric:tabular-nums}
+  .badge{display:flex;align-items:center;gap:7px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+         background:rgba(47,230,160,.10);color:#9FE9C9;padding:7px 13px;border-radius:999px;border:1px solid rgba(47,230,160,.25);flex:none}
   .badge .d{width:6px;height:6px;border-radius:50%;background:#2FE6A0;box-shadow:0 0 8px #2FE6A0;animation:pulse 1.6s infinite;flex:none}
   .badge.demo{background:rgba(246,178,85,.10);color:#F6C98A;border-color:rgba(246,178,85,.28)}
   .badge.demo .d{background:#F6B255;box-shadow:0 0 8px #F6B255}
-  .btn-voltar{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);
+  .btn-voltar,.btn-present{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);
         color:#CFE3D9;border-radius:10px;padding:8px 13px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;
         cursor:pointer;flex:none;transition:.15s}
-  .btn-voltar:hover{border-color:rgba(47,230,160,.4);color:#EAFBF3;background:rgba(47,230,160,.08)}
+  .btn-voltar:hover,.btn-present:hover{border-color:rgba(47,230,160,.4);color:#EAFBF3;background:rgba(47,230,160,.08)}
+  .btn-present.on{border-color:rgba(47,230,160,.5);color:#8EF0C4;background:rgba(47,230,160,.14)}
+  /* ---- Modo Apresentação (layout padrão fixo desta página) ---- */
+  body.presentation header.top{padding:19px 30px}
+  body.presentation .top h1{font-size:17px}
+  body.presentation .top .sub{font-size:10.5px}
+  body.presentation .badge{font-size:10.5px;padding:8px 15px}
+  body.presentation .kpi .k{font-size:10px}
+  body.presentation .kpi .v{font-size:25px}
+  body.presentation aside{padding:22px 20px 28px}
+  body.presentation .crumb{font-size:13.5px;padding:9px 18px}
+  body.presentation .obra .ob{font-size:13px}
   main{display:grid;grid-template-columns:1fr 384px;height:calc(100% - 59px);transition:grid-template-columns .35s ease}
   main.aside-collapsed{grid-template-columns:1fr 0}
   main.aside-collapsed aside{padding:0;border-left:0;overflow:hidden}
   @media (max-width:860px){main.aside-collapsed{grid-template-rows:1fr 0}}
   #map{width:100%;height:100%;background:#071310;outline:none}
-  #mapWrap{opacity:0;transition:opacity 2.1s cubic-bezier(.16,.8,.2,1)}
-  #mapWrap.in{opacity:1}
+  #mapWrap{opacity:0;transform:scale(1.045);transition:opacity 2.8s cubic-bezier(.16,.8,.2,1),transform 2.8s cubic-bezier(.16,.8,.2,1)}
+  #mapWrap.in{opacity:1;transform:scale(1)}
   .aside-toggle{position:absolute;z-index:650;top:14px;right:14px;display:flex;align-items:center;gap:8px;
         background:rgba(8,18,14,.92);backdrop-filter:blur(9px);border:1px solid rgba(47,230,160,.22);color:#CFE3D9;
         border-radius:11px;padding:9px 12px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;
@@ -114,7 +131,7 @@
 
   .mun-label,.grp-label,.state-label{background:none;border:0;box-shadow:none;pointer-events:none;width:0!important;height:0!important;overflow:visible}
   .state-label span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;
-                    font-size:var(--stfs,20px);font-weight:800;letter-spacing:4px;color:#BFF3DC;text-transform:uppercase;
+                    font-size:var(--stfs,32px);font-weight:800;letter-spacing:4px;color:#BFF3DC;text-transform:uppercase;
                     text-shadow:0 0 14px rgba(47,230,160,.5)}
   .mun-label .lbl,.grp-label .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-50%);
                   display:flex;flex-direction:column;align-items:center;white-space:nowrap;gap:1px}
@@ -141,10 +158,22 @@
   .kpi .k{font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#7FB8A2}
   .kpi .v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#EAFBF3;margin-top:6px;line-height:1;text-shadow:0 0 18px rgba(47,230,160,.28)}
   .kpi.wide{grid-column:1/-1}
-  .kpi.alert::before{background:linear-gradient(#F6B255,#B4531A)}
-  .kpi.alert .v{color:#FFDCB0;text-shadow:0 0 18px rgba(246,178,85,.3)}
+  .kpi.alert::before{background:linear-gradient(#D03B3B,#7A1F1F)}
+  .kpi.alert .v{color:#FFC9C0;text-shadow:0 0 18px rgba(208,59,59,.32)}
   .scope{font-size:11.5px;color:#7FB8A2;margin:18px 0 10px;font-weight:600;letter-spacing:.3px}
   .scope b{color:#EAFBF3}
+
+  .statwrap{margin-top:4px}
+  .stackbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.05)}
+  .stackbar>i{display:block;height:100%;flex:0 0 auto}
+  .stackbar>i:not(:last-child){margin-right:2px}
+  .stackbar>i:first-child{border-radius:5px 0 0 5px}
+  .stackbar>i:last-child{border-radius:0 5px 5px 0}
+  .stackbar>i:only-child{border-radius:5px}
+  .statleg{display:flex;flex-wrap:wrap;gap:7px 16px;margin-top:11px}
+  .statleg .sit{display:flex;align-items:center;gap:6px;font-size:11px;color:#9FBBB0;font-weight:600}
+  .statleg .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .statleg .sit b{color:#EAFBF3;font-family:'Space Grotesk',sans-serif;font-weight:700}
   .sec-h{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#6FA891;margin:16px 0 9px;display:flex;justify-content:space-between}
 
   .rrow{cursor:pointer;border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:10px 12px;margin-bottom:7px;
@@ -170,6 +199,9 @@
   .chip{font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:#BFD8CC}
   .chip.tram{color:#FFC98A;background:rgba(246,178,85,.12);border-color:rgba(246,178,85,.3)}
   .chip.mun{color:#8EF0C4;background:rgba(47,230,160,.10);border-color:rgba(47,230,160,.28)}
+  .chip.mun.locate{cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:.15s}
+  .chip.mun.locate svg{flex:none}
+  .chip.mun.locate:hover{background:rgba(47,230,160,.22);border-color:rgba(47,230,160,.55);color:#EAFBF3}
   .obra .info{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:11px;padding-top:11px;border-top:1px dashed rgba(255,255,255,.12)}
   .obra .info .l{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:#6FA891}
   .obra .info .d{font-size:12px;color:#E4F2EB;font-weight:600;margin-top:2px}
@@ -210,19 +242,27 @@
 <body>
 <header class="top">
   <button class="btn-voltar" id="btnVoltar" onmouseenter="prefetchPagina('index.html')"
-      onclick="window.location.href='index.html'" title="Voltar para o Painel Principal">
+      onclick="window.location.href='index.html'" title="Sair do módulo de Contratos e voltar ao Painel Principal">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-    Voltar
+    Sair
   </button>
   <div class="brand">
-    <div class="mark">G</div>
+    <div class="mark"><img src="brasao.png" alt="Brasão do Estado do Ceará"></div>
     <div>
       <h1>Mapa de Obras Fiscalizadas — Ceará</h1>
-      <div class="sub">GECOPE · DIFOR · SOP-CE</div>
+      <div class="sub">GECOPE · DIFOR · SOP-CE<span class="sep">•</span><span class="formal">Painel executivo de acompanhamento de contratos</span></div>
     </div>
   </div>
-  <div class="badge demo"><span class="d"></span><span id="badgeTxt">Dados de demonstração</span></div>
+  <div class="top-meta">
+    <div class="synctime"><span class="l">Base atualizada em</span><span class="v" id="syncTime">—</span></div>
+    <button class="btn-present" id="btnPresent" title="Alternar tela cheia real do navegador">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+      <span id="btnPresentTxt">Tela cheia</span>
+    </button>
+    <div class="badge demo"><span class="d"></span><span id="badgeTxt">Dados de demonstração</span></div>
+  </div>
 </header>
 
 <main class="aside-collapsed">
@@ -271,6 +311,14 @@
       <div class="kpi"><div class="k">Obras</div><div class="v" id="kObras">–</div></div>
       <div class="kpi alert"><div class="k">Paralisadas</div><div class="v" id="kPar">–</div></div>
       <div class="kpi wide"><div class="k">Valor total dos contratos</div><div class="v" id="kValor">–</div></div>
+      <div class="kpi wide"><div class="k">Valor médio por obra</div><div class="v" id="kMedio">–</div></div>
+      <div class="kpi wide"><div class="k">Municípios atendidos</div><div class="v" id="kMun">–</div></div>
+      <div class="kpi wide"><div class="k">Total em aditivos contratuais</div><div class="v" id="kAdit">–</div></div>
+    </div>
+    <div class="statwrap">
+      <div class="sec-h"><span>Situação das obras</span></div>
+      <div class="stackbar" id="statBar"></div>
+      <div class="statleg" id="statLeg"></div>
     </div>
     <div class="scope" id="scope"></div>
     <div id="body"></div>
@@ -504,6 +552,21 @@ function classifyComissao(tipoRaw){
   if(t.includes('MEMBRO')) return {label:'MEMBRO', rank:0};
   return {label: tipoRaw ? String(tipoRaw).toUpperCase() : 'MEMBRO', rank:-1};
 }
+// classificação da situação da obra em 4 estados fixos, cada um com cor reservada
+// (nunca a mesma paleta usada nos distritos/regiões do mapa, para não confundir os dois canais de cor)
+const STATUS_STATES=[
+  {key:'exec', label:'Em execução',  color:'#3C87C9'},
+  {key:'ok',   label:'Concluída/encerrada', color:'#189E6E'},
+  {key:'wait', label:'Aguardando OS', color:'#FAB219'},
+  {key:'stop', label:'Paralisada',   color:'#D03B3B'},
+];
+function statusBucket(rawStatus){
+  const s=normTxt(rawStatus);
+  if(s.includes('PARALIS')) return 'stop';
+  if(s.includes('AGUARDANDO')) return 'wait';
+  if(s.includes('ENCERRADO')||s.includes('CONCLU')) return 'ok';
+  return 'exec';
+}
 function num(x){const n=parseFloat(x);return isFinite(n)?n:0;}
 function mapRow(r){
   const ano=r.data_assinatura?+String(r.data_assinatura).slice(0,4):(r.data_inicio_real?+String(r.data_inicio_real).slice(0,4):null);
@@ -543,6 +606,8 @@ function setStatus(txt,ok){
   if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); d.style.background=ok?'#2FE6A0':'#F6B255'; d.style.boxShadow='0 0 10px '+(ok?'#2FE6A0':'#F6B255');}
   const b=document.querySelector('.badge');
   if(b){ b.classList.toggle('demo',!ok); const t=document.getElementById('badgeTxt'); if(t) t.textContent = ok?'Supabase · ao vivo':'Demonstração'; }
+  const syncEl=document.getElementById('syncTime');
+  if(syncEl) syncEl.textContent = ok ? new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '— (demonstração)';
 }
 async function loadData(){
   for(const c in DB.municipios) DB.municipios[c].obras=[];
@@ -694,12 +759,20 @@ function fitFull(){
   if(!fullBounds) return;
   if(_firstFit){
     _firstFit=false;
-    map.flyToBounds(fullBounds,{padding:[24,24],duration:2.1,easeLinearity:.12});
-    map.once('moveend',()=>{ _entranceDone=true; });
+    // o rótulo "CEARÁ" some durante o voo da câmera: texto dentro de um marcador
+    // sendo escalado continuamente pela animação de zoom do Leaflet treme/borra —
+    // reaparece só quando o mapa se assenta (moveend)
+    setLayer(stateLbl,false);
+    map.flyToBounds(fullBounds,{padding:[24,24],duration:2.8,easeLinearity:.06});
+    map.once('moveend',()=>{ _entranceDone=true; updateLabels(); });
     return;
   }
   if(!_entranceDone) return;
-  map.fitBounds(fullBounds,{padding:[24,24]});
+  // reenquadramentos depois da entrada (resize, orientação, entrar/sair da tela
+  // cheia) também animam — evita o "salto" instantâneo quando o viewport muda
+  setLayer(stateLbl,false);
+  map.flyToBounds(fullBounds,{padding:[24,24],duration:.9,easeLinearity:.2});
+  map.once('moveend',()=>{ updateLabels(); });
 }
 function fitGroup(){ const b=boundsOfIds(idsOfGroup(st.group)); if(b) map.fitBounds(b,{padding:[40,40],maxZoom:10}); }
 function fitCity(){ const b=boundsOfIds([st.city]); if(b) map.fitBounds(b,{padding:[60,60],maxZoom:11}); }
@@ -818,7 +891,7 @@ function declutter(items,fs,H,pad,filt,prioFn){
     el.style.display=hit?'none':''; if(!hit)placed.push(bx);
   }
 }
-function lblFS(){const t=zt();return {grp:9.5+3*t, mun:8+2.5*t, st:20};}
+function lblFS(){const t=zt();return {grp:9.5+3*t, mun:8+2.5*t, st:32};}
 function applyLabelSizes(){const s=lblFS(),r=document.documentElement.style;
   r.setProperty('--grpfs',s.grp.toFixed(1)+'px');r.setProperty('--munfs',s.mun.toFixed(1)+'px');r.setProperty('--stfs',s.st+'px');return s;}
 function refreshMapCounts(){
@@ -852,9 +925,31 @@ function scopeIds(){
   if(st.level===2) return idsOfGroup(st.group);
   return [st.city];
 }
+function statusBreakdown(ids){
+  const c={exec:0,ok:0,wait:0,stop:0}; let total=0;
+  ids.forEach(id=>obrasOf(id).forEach(o=>{ c[statusBucket(o.statusObra)]++; total++; }));
+  return {c,total};
+}
+function renderStatusChart(ids){
+  const {c,total}=statusBreakdown(ids);
+  const bar=document.getElementById('statBar'), leg=document.getElementById('statLeg');
+  if(!total){ bar.innerHTML=''; leg.innerHTML='<div class="empty" style="padding:2px 0">Sem obras neste recorte.</div>'; return; }
+  bar.innerHTML=STATUS_STATES.filter(s=>c[s.key]>0).map(s=>{
+    const pct=c[s.key]/total*100;
+    return `<i style="width:${pct}%;background:${s.color}" title="${s.label}: ${NUM.format(c[s.key])} obras (${pct.toFixed(0)}%)"></i>`;
+  }).join('');
+  leg.innerHTML=STATUS_STATES.filter(s=>c[s.key]>0).map(s=>{
+    const pct=Math.round(c[s.key]/total*100);
+    return `<span class="sit"><span class="dot" style="background:${s.color}"></span>${s.label} <b>${NUM.format(c[s.key])}</b> (${pct}%)</span>`;
+  }).join('');
+}
 function setKPIs(){
-  const a=aggIds(scopeIds());
+  const ids=scopeIds(); const a=aggIds(ids);
   kObras.textContent=NUM.format(a.obras); kValor.textContent=BRL.format(a.valor); kPar.textContent=NUM.format(a.par);
+  kMedio.textContent=a.obras?BRL.format(a.valor/a.obras):'—';
+  kMun.textContent=NUM.format(ids.filter(id=>obrasOf(id).length>0).length);
+  kAdit.textContent=BRL.format(a.adit);
+  renderStatusChart(ids);
 }
 function rankRows(entries,onClick){
   const max=Math.max(1,...entries.map(e=>e.v));
@@ -864,11 +959,17 @@ function rankRows(entries,onClick){
      <div class="rbar${amber}"><i style="width:${Math.max(4,e.v/max*100)}%"></i></div></div>`).join('');
 }
 let CUROBRAS=[];
+const PIN_SVG='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.58 7-12A7 7 0 0 0 5 10c0 4.42 7 12 7 12z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 function obraCard(o,i){
+  const cod=NAMEIDX[normTxt(o.municipioTxt)];
+  const munChip=o.municipioTxt
+    ? (cod ? `<span class="chip mun locate" data-cod="${cod}" title="Ver ${o.municipioTxt} no mapa">${PIN_SVG}${o.municipioTxt}</span>`
+           : `<span class="chip mun">${o.municipioTxt}</span>`)
+    : '';
   return `<div class="obra" data-oid="${i}">
     <div class="r1"><span class="ct">${o.contrato}</span><span class="vl">${BRL.format(o.valor)}</span></div>
     <div class="ob just">${o.objeto}</div>
-    <div class="chips"><span class="chip">${o.status}</span>${o.tipo?`<span class="chip">${o.tipo}</span>`:''}${o.municipioTxt?`<span class="chip mun">${o.municipioTxt}</span>`:''}</div>
+    <div class="chips"><span class="chip">${o.status}</span>${o.tipo?`<span class="chip">${o.tipo}</span>`:''}${munChip}</div>
     <div class="info">
       <div><div class="l">Contratada</div><div class="d">${o.contratada}</div></div>
       <div><div class="l">Contratante</div><div class="d">${o.contratante}</div></div>
@@ -980,11 +1081,19 @@ function openModal(o){
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
 document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+function hasActiveFilter(){ return !!st.f.q || FILTER_DEFS.some(d=>st.f[d.key].size>0); }
 function renderPanel(){
   setKPIs();
   const scope=document.getElementById('scope'), body=document.getElementById('body');
   const methodName=st.method==='do'?'Distritos Operacionais':'Regiões';
-  if(st.level<=1){
+  if(st.level<=1 && hasActiveFilter()){
+    // busca/filtro ativo com o mapa ainda no nível Estado/Distritos: mostra os
+    // contratos encontrados direto (em vez do ranking por distrito), cada um com
+    // o município clicável — sem precisar descer manualmente até lá
+    const cards=obrasCards(allIds), n=CUROBRAS.length;
+    scope.innerHTML=`<b>${NUM.format(n)}</b> contrato${n===1?'':'s'} encontrado${n===1?'':'s'} — clique no município do card para localizar no mapa`;
+    body.innerHTML=`<div class="sec-h"><span>Resultados da busca</span><span>${NUM.format(n)}</span></div>`+cards;
+  } else if(st.level<=1){
     if(st.level===1 && st.hoverGroup!=null){
       const g=grpById(st.hoverGroup); const ids=idsOfGroup(st.hoverGroup);
       scope.innerHTML=`Região destacada — <b>clique para abrir os municípios</b>`;
@@ -1099,7 +1208,7 @@ _fHost.addEventListener('change',e=>{
   const cb=e.target.closest('.msel-opt input'); if(!cb) return;
   const key=cb.closest('.msel').dataset.key;
   if(cb.checked) st.f[key].add(cb.value); else st.f[key].delete(cb.value);
-  updateMselBtn(key); render();
+  updateMselBtn(key); render(); autoLocateSearch();
 });
 document.addEventListener('click',e=>{
   if(!e.target.closest('.msel')) document.querySelectorAll('.msel.on').forEach(x=>{x.classList.remove('on'); mselResetQuery(x);});
@@ -1113,13 +1222,29 @@ document.addEventListener('keydown',e=>{
   else return;
   clearTimeout(mselQueryTimer); mselQueryTimer=setTimeout(()=>mselResetQuery(m),2500);
 });
-document.getElementById('fSearch').addEventListener('input',e=>{ st.f.q=e.target.value.trim().toLowerCase(); render(); });
+// busca/filtro move a câmera sozinha: 1 município encontrado → o mapa voa até
+// lá; vários municípios → a câmera se ajusta para enquadrar todos eles, sem
+// exigir que o usuário clique no chip do card manualmente
+let _searchNav=false; // true quando o nível "cidade" atual foi aberto pela busca (não por clique)
+function autoLocateSearch(){
+  const matchIds=hasActiveFilter() ? allIds.filter(id=>obrasOf(id).length>0) : [];
+  if(matchIds.length===1){
+    if(st.city!==matchIds[0] || st.level!==3){ _searchNav=true; goCity(matchIds[0]); }
+    return;
+  }
+  if(_searchNav && st.level===3){ _searchNav=false; st.city=null; st.group=null; st.level=0; render(); }
+  if(matchIds.length>1 && st.level<=1){
+    const b=boundsOfIds(matchIds);
+    if(b) map.flyToBounds(b,{padding:[60,60],maxZoom:10,duration:1.1,easeLinearity:.15});
+  }
+}
+document.getElementById('fSearch').addEventListener('input',e=>{ st.f.q=e.target.value.trim().toLowerCase(); render(); autoLocateSearch(); });
 document.getElementById('clearF').onclick=()=>{
   FILTER_DEFS.forEach(d=>st.f[d.key].clear());
   st.f.q=''; document.getElementById('fSearch').value='';
   document.querySelectorAll('.msel-opt input').forEach(cb=>cb.checked=false);
   document.querySelectorAll('.msel').forEach(m=>{updateMselBtn(m.dataset.key); m.classList.remove('on'); mselResetQuery(m);});
-  render();
+  render(); autoLocateSearch();
 };
 
 // painel de filtros recolhível (recolhido por padrão)
@@ -1129,7 +1254,7 @@ _ctrlT.onclick=()=>openCtrl(true);
 document.getElementById('ctrlClose').onclick=()=>openCtrl(false);
 openCtrl(false);
 
-// painel lateral (KPIs/ranking) recolhível — recolhido por padrão, deixando só o mapa à mostra
+// painel lateral (KPIs/ranking) recolhível — aberto por padrão (ver modo apresentação abaixo)
 const _mainEl=document.querySelector('main'), _asideT=document.getElementById('asideToggle');
 function openAside(o){
   _mainEl.classList.toggle('aside-collapsed',!o); _asideT.style.display=o?'none':'';
@@ -1137,7 +1262,43 @@ function openAside(o){
 }
 _asideT.onclick=()=>openAside(true);
 document.getElementById('asideClose').onclick=()=>openAside(false);
+
+// modo apresentação: layout padrão fixo desta página (tipografia maior) —
+// pensado para projetar em reunião (ex.: conselho deliberativo). O painel
+// lateral de KPIs começa recolhido (só o mapa à mostra); "Sair" (topo
+// esquerdo) sai do módulo; "Filtros" e "Painel" continuam disponíveis.
+// O botão "Tela cheia" só liga/desliga a tela cheia real do navegador.
+document.body.classList.add('presentation');
+openCtrl(false);
 openAside(false);
+
+const _btnPresent=document.getElementById('btnPresent'), _btnPresentTxt=document.getElementById('btnPresentTxt');
+function syncFullscreenBtn(){
+  const on=!!document.fullscreenElement;
+  _btnPresent.classList.toggle('on',on);
+  _btnPresentTxt.textContent = on ? 'Sair da tela cheia' : 'Tela cheia';
+}
+function requestRealFullscreen(){
+  const root=document.documentElement;
+  if(!document.fullscreenElement && root.requestFullscreen) return root.requestFullscreen().catch(()=>{});
+  return Promise.resolve();
+}
+_btnPresent.addEventListener('click',()=>{
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  else requestRealFullscreen();
+});
+document.addEventListener('fullscreenchange',syncFullscreenBtn);
+
+// nenhum navegador permite tela cheia automática no carregamento (exige gesto do
+// usuário, por segurança) — como aproximação, entra sozinho no 1º clique/tecla
+// na página, sem depender de a pessoa achar o botão "Tela cheia"
+function autoFullscreenOnFirstGesture(){
+  document.removeEventListener('pointerdown',autoFullscreenOnFirstGesture);
+  document.removeEventListener('keydown',autoFullscreenOnFirstGesture);
+  requestRealFullscreen();
+}
+document.addEventListener('pointerdown',autoFullscreenOnFirstGesture);
+document.addEventListener('keydown',autoFullscreenOnFirstGesture);
 
 // prefetch leve da página de destino ao passar o mouse no botão "Voltar"
 function prefetchPagina(url){
@@ -1163,6 +1324,10 @@ document.getElementById('crumb').addEventListener('click',e=>{
 document.getElementById('body').addEventListener('click',e=>{
   const rr=e.target.closest('.rrow');
   if(rr){ if(rr.dataset.kind==='group')goGroup(rr.dataset.k); else goCity(rr.dataset.k); return; }
+  // chip de município do card do contrato: leva direto até ele no mapa,
+  // em vez de precisar descer Estado → Distrito → Cidade manualmente
+  const loc=e.target.closest('.chip.mun.locate');
+  if(loc){ goCity(loc.dataset.cod); return; }
   const ob=e.target.closest('.obra'); if(ob){ const o=CUROBRAS[+ob.dataset.oid]; if(o) openModal(o); }
 });
 map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabels(); });

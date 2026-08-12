@@ -2570,6 +2570,31 @@
         .proc-kpi-icon.bg-blue { background: #0d6efd; box-shadow: 0 4px 10px -2px #0d6efd; }
         .proc-kpi-icon.bg-red { background: var(--filetype-pdf-fg); box-shadow: 0 4px 10px -2px var(--filetype-pdf-fg); }
 
+        /* Lista de fiscais do modal de distribuição por KPI (aba Processos) —
+           barra de rolagem fina e discreta em vez do scrollbar padrão do SO. */
+        .kpi-breakdown-legend {
+            padding-right: 6px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+        }
+        .kpi-breakdown-legend::-webkit-scrollbar { width: 6px; }
+        .kpi-breakdown-legend::-webkit-scrollbar-track { background: transparent; }
+        .kpi-breakdown-legend::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.22);
+            border-radius: 999px;
+        }
+        .kpi-breakdown-legend::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.4); }
+
+        body.theme-dark .kpi-breakdown-legend {
+            scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+        }
+        body.theme-dark .kpi-breakdown-legend::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.22);
+        }
+        body.theme-dark .kpi-breakdown-legend::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+
         /* Cabeçalho de seção — mesmo espírito dos cards de KPI (ícone colorido + título),
            usado para substituir os headers de acordeão antigos na aba Administração */
         .admin-section-header {

@@ -3613,6 +3613,104 @@ function getSortIcon(columnKey) {
 }
 window.getSortIcon = getSortIcon;
 
+// Paleta categórica validada (contraste/CVD) para os cards de KPI de Processos —
+// ver skill de dataviz. Índice 0 é o fiscal com mais processos, e assim por diante.
+const KPI_BREAKDOWN_CORES = {
+    light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'],
+    dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9']
+};
+const KPI_BREAKDOWN_CINZA = { light: '#c3c2b7', dark: '#5c5c58' };
+
+// Abre o modal de distribuição por fiscal ao clicar num dos cards de KPI da aba
+// Processos. statusFiltro=null usa todas as linhas atualmente filtradas na tela
+// (mesmo conjunto exibido pelo card "Processos").
+function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
+    const todasLinhas = window.currentVisibleRows || [];
+    const linhas = statusFiltro
+        ? todasLinhas.filter(d => (d.status || "").toUpperCase() === statusFiltro)
+        : todasLinhas;
+
+    const contagem = new Map();
+    linhas.forEach(d => {
+        const nome = (d.fiscal || "").trim() || "Não informado";
+        contagem.set(nome, (contagem.get(nome) || 0) + 1);
+    });
+    let entradas = Array.from(contagem.entries()).sort((a, b) => b[1] - a[1]);
+
+    const total = linhas.length;
+    const isDark = document.body.classList.contains('theme-dark');
+    const paleta = isDark ? KPI_BREAKDOWN_CORES.dark : KPI_BREAKDOWN_CORES.light;
+    const cinza = isDark ? KPI_BREAKDOWN_CINZA.dark : KPI_BREAKDOWN_CINZA.light;
+
+    // Mais de 7 fiscais: mantém os 7 maiores e agrupa o resto em "Outros" para
+    // não estourar o teto de cores categoricamente seguras (ver dataviz skill).
+    let fatias = entradas;
+    if (entradas.length > 8) {
+        const principais = entradas.slice(0, 7);
+        const somaOutros = entradas.slice(7).reduce((acc, [, qtd]) => acc + qtd, 0);
+        fatias = [...principais, ["Outros", somaOutros]];
+    }
+
+    const titleEl = document.getElementById('kpiBreakdownTitulo');
+    titleEl.innerHTML = `<i class="bi ${iconClass || 'bi-pie-chart'} me-2"></i>${escapeHTML(titulo)} por fiscal`;
+
+    const conteudo = document.getElementById('kpiBreakdownConteudo');
+    if (total === 0) {
+        conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Nenhum processo neste status.</div>`;
+    } else {
+        const r = 70, cx = 90, cy = 90, sw = 26;
+        const circ = 2 * Math.PI * r;
+        let acc = 0;
+        const arcosSVG = fatias.map(([nome, qtd], i) => {
+            const frac = qtd / total;
+            const len = frac * circ;
+            const dashoffset = -acc;
+            acc += len;
+            const cor = nome === "Outros" ? cinza : paleta[i % paleta.length];
+            const pct = Math.round(frac * 1000) / 10;
+            return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cor}" stroke-width="${sw}"
+                stroke-dasharray="${len} ${circ - len}" stroke-dashoffset="${dashoffset}"
+                transform="rotate(-90 ${cx} ${cy})"><title>${escapeHTML(nome)}: ${qtd} (${pct}%)</title></circle>`;
+        }).join('');
+
+        // A lista abaixo mostra TODOS os fiscais (não só os que viraram fatia
+        // colorida própria no gráfico) — quem caiu dentro de "Outros" na rosca
+        // aparece aqui com o mesmo cinza, mas com nome e quantidade individuais.
+        const legendaHTML = entradas.map(([nome, qtd], i) => {
+            const cor = i < 7 ? paleta[i % paleta.length] : cinza;
+            const pct = Math.round((qtd / total) * 1000) / 10;
+            return `<div class="d-flex align-items-center justify-content-between py-1" style="font-size:0.85rem;">
+                <div class="d-flex align-items-center gap-2" style="min-width:0;">
+                    <span style="width:10px;height:10px;border-radius:2px;background:${cor};flex:none;"></span>
+                    <span class="text-truncate" style="color:var(--text-heading);">${escapeHTML(nome)}</span>
+                </div>
+                <span class="fw-bold ms-2" style="color:var(--text-heading);white-space:nowrap;">${qtd} <span class="fw-normal" style="color:var(--text-muted);">(${pct}%)</span></span>
+            </div>`;
+        }).join('');
+
+        conteudo.innerHTML = `
+            <div class="d-flex flex-column flex-sm-row align-items-center gap-4">
+                <div style="position:relative;flex:none;">
+                    <svg width="180" height="180" viewBox="0 0 180 180">${arcosSVG}</svg>
+                    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                        <div style="font-size:1.6rem;font-weight:800;color:var(--text-heading);line-height:1;">${total}</div>
+                        <div style="font-size:0.68rem;color:var(--text-muted);">processo${total === 1 ? '' : 's'}</div>
+                    </div>
+                </div>
+                <div class="kpi-breakdown-legend" style="flex:1;min-width:0;width:100%;max-height:260px;overflow-y:auto;">${legendaHTML}</div>
+            </div>`;
+    }
+
+    const modalEl = document.getElementById('modalKpiBreakdown');
+    // O HTML deste projeto tem divs não fechadas em vários trechos, o que faz
+    // modais definidos mais abaixo no arquivo herdarem um ancestral errado
+    // (às vezes um outro .modal com display:none, colapsando para 0x0). O
+    // mesmo padrão de correção já é usado em outros modais do sistema.
+    if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+    new bootstrap.Modal(modalEl).show();
+}
+window.abrirBreakdownFiscal = abrirBreakdownFiscal;
+
 function updateReuniaoFilters(rows) { mtBase = rows; updateReuniao(); }
 
 function updateReuniao() {
