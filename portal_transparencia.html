@@ -214,10 +214,16 @@
 </main>
 
 <script>
-// URL do proxy consulta-contratos-proxy (Node/Playwright), publicado no Render
-// (plano free) para funcionar em qualquer computador, não só na máquina local.
-const PROXY_URL = 'https://consulta-contratos-proxy.onrender.com';
+// URL do proxy consulta-contratos-proxy (Node/Playwright). Roda numa máquina da SOP
+// (IP residencial/corporativo, aceito pelo WAF do Ceará Transparente) e é exposto
+// publicamente via túnel ngrok, com domínio fixo grátis da conta.
+const PROXY_URL = 'https://babied-average-mulch.ngrok-free.dev';
 const PROXY_API_KEY = ''; // preencher se CONSULTA_API_KEY estiver configurada no proxy
+
+// Necessário para chamadas programáticas via túnel ngrok (plano free): sem esse
+// header, o ngrok intercepta a requisição com uma página HTML de aviso em vez de
+// repassar pro proxy, e o fetch quebra ao tentar interpretar a resposta como JSON.
+const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' };
 
 function prefetchPagina(url){
   if(document.querySelector(`link[rel="prefetch"][href="${url}"]`)) return;
@@ -418,7 +424,7 @@ async function carregarEdital(url) {
   editalCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   try {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json', ...NGROK_HEADERS };
     if (PROXY_API_KEY) headers['x-api-key'] = PROXY_API_KEY;
 
     const resp = await fetch(`${PROXY_URL}/edital`, {
@@ -463,7 +469,7 @@ async function buscar() {
   setLoading(true);
 
   try {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json', ...NGROK_HEADERS };
     if (PROXY_API_KEY) headers['x-api-key'] = PROXY_API_KEY;
 
     const resp = await fetch(`${PROXY_URL}/consulta`, {
