@@ -16,6 +16,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="database.js"></script>
+<!-- Sanitiza o HTML rico do campo "Observações" da tarefa (#t-obs, contenteditable com
+     negrito/itálico/alinhamento) antes de salvar/exibir — mesmo padrão já usado para o
+     comentário rich-text da Curva ABC (utils.js/sanitizeRichHTML). -->
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
 <style>
 :root {
   /* Unificado com os tokens de style.css (--sop-*) do app principal.
@@ -321,14 +325,6 @@ main {
 .badge.rotina     { background: rgba(237,233,254,.9); color: #5b21b6; }
 
 .card-analista-body { padding: 14px 16px; min-height: 60px; }
-.card-analista-footer {
-  padding: 10px 16px 14px;
-  border-top: 1px solid var(--slate-100);
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  background: var(--slate-50);
-}
 
 /* ── TAREFAS ── */
 .tarefa {
@@ -410,26 +406,11 @@ main {
 .vazio { color: #9ca3af; font-size: .88rem; padding: 22px 16px; text-align: center; font-weight: 500; }
 
 /* ── ROTINAS ── */
-.rotina-item {
-  border: 1px solid #e5e9e7;
-  border-radius: 10px;
-  padding: 9px 12px;
-  margin-bottom: 7px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: #fafafa;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  transition: box-shadow .15s;
-}
-.rotina-item:hover { box-shadow: 0 3px 8px rgba(0,0,0,.08); }
 .rotina-freq { font-size: .72rem; font-weight: 800; padding: 4px 11px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; letter-spacing: .3px; }
 .rotina-freq.diaria   { background: #dbeafe; color: var(--rotina-diaria); }
 .rotina-freq.semanal  { background: #ede9fe; color: var(--rotina-semanal); }
 .rotina-freq.mensal   { background: #cffafe; color: var(--rotina-mensal); }
 .rotina-freq.eventual { background: #fef3c7; color: var(--rotina-eventual); }
-.rotina-desc { font-size: .88rem; flex: 1; line-height: 1.6; font-weight: 500; }
-.rotina-acoes { display: flex; gap: 4px; }
 
 /* ── SECÇÃO RECOLHIDA (tarefas não-ativas) ── */
 .tarefas-recolhidas {
@@ -796,57 +777,6 @@ main {
 .mh-lt-detalhe.retomada   { border-left-color: #86efac; background: #f0fdf4; }
 .mh-lt-detalhe strong { color: #111827; }
 
-.hist-wrap { margin-top: 4px; }
-.hist-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-  font-size: .72rem;
-  font-weight: 700;
-  color: #6b7280;
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 3px 6px;
-  border-radius: 6px;
-  font-family: 'Montserrat', sans-serif;
-  transition: background .12s, color .12s;
-}
-.hist-toggle:hover { background: #f3f4f6; color: #374151; }
-.hist-toggle.aberto { background: #f3f4f6; color: #374151; }
-.hist-toggle .hist-arrow { font-size: .6rem; transition: transform .2s; }
-.hist-toggle .hist-arrow.aberto { transform: rotate(180deg); }
-.hist-corpo { display: none; margin-top: 6px; }
-.hist-corpo.aberto { display: block; }
-.hist-linha {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 7px 0;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: .78rem;
-}
-.hist-linha:last-child { border-bottom: none; }
-.hist-linha-esq { display: flex; flex-direction: column; align-items: center; gap: 3px; flex-shrink: 0; width: 80px; }
-.hist-data { font-size: .67rem; color: #9ca3af; font-weight: 600; text-align: center; }
-.hist-tipo {
-  font-size: .66rem;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 99px;
-  white-space: nowrap;
-  text-align: center;
-}
-.hist-tipo.criada      { background: #dcfce7; color: #166534; }
-.hist-tipo.paralisada  { background: #fee2e2; color: #991b1b; }
-.hist-tipo.retomada    { background: #dcfce7; color: #166534; }
-.hist-tipo.prazo       { background: #dbeafe; color: #1e40af; }
-.hist-tipo.editada     { background: #f3f4f6; color: #4b5563; }
-.hist-tipo.concluida   { background: #f3f4f6; color: #374151; }
-.hist-nota { color: #374151; line-height: 1.5; flex: 1; }
-.hist-nota em { color: #6b7280; font-style: italic; }
-
 /* Modal revisão de datas ao ativar */
 .rev-aviso {
   background: #fffbeb;
@@ -946,25 +876,6 @@ main {
 }
 
 /* ── RELATÓRIO ── */
-/* ── TOGGLE LISTA / CALENDÁRIO ── */
-.rel-view-toggle {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 16px;
-}
-.rel-view-btn {
-  padding: 7px 16px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 8px;
-  background: white;
-  font-size: .78rem;
-  font-weight: 700;
-  color: #6b7280;
-  cursor: pointer;
-  font-family: 'Montserrat', sans-serif;
-  transition: all .15s;
-}
-.rel-view-btn.ativo { background: var(--verde); color: white; border-color: var(--verde); }
 
 /* ── CALENDÁRIO ── */
 .cal-nav {
@@ -1164,57 +1075,6 @@ main {
 .cal-evento-badge.badge-execucao { background: #2563eb; color: #fff; }
 .cal-evento-badge.badge-fim      { background: #e11d48; color: #fff; }
 
-/* Popup detalhe do dia */
-#cal-popup {
-  display: none;
-  position: fixed;
-  z-index: 9998;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.18);
-  width: 340px;
-  max-height: 480px;
-  overflow: hidden;
-  flex-direction: column;
-  border: 1px solid #e5e7eb;
-}
-#cal-popup.aberto { display: flex; }
-.cp-header {
-  background: var(--verde-escuro);
-  color: white;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-.cp-header-titulo { font-size: .85rem; font-weight: 800; }
-.cp-fechar { background: none; border: none; color: white; font-size: 1rem; cursor: pointer; }
-.cp-corpo { overflow-y: auto; padding: 12px 16px 16px; }
-.cp-secao-titulo {
-  font-size: .65rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  margin: 10px 0 5px;
-  padding: 3px 8px;
-  border-radius: 4px;
-}
-.cp-secao-titulo.inicio   { background: #dcfce7; color: #166534; }
-.cp-secao-titulo.execucao { background: #dbeafe; color: #1e40af; }
-.cp-secao-titulo.fim      { background: #fee2e2; color: #991b1b; }
-.cp-item {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 6px 0;
-  border-bottom: 1px solid #f3f4f6;
-  font-size: .77rem;
-}
-.cp-item:last-child { border-bottom: none; }
-.cp-item-nome { font-weight: 600; color: #111827; flex: 1; line-height: 1.4; }
-.cp-item-analista { font-size: .67rem; color: #9ca3af; }
-.cp-vazio { color: #9ca3af; font-size: .8rem; text-align: center; padding: 16px 0; }
 
 .rel-card-resumo {
   background: white;
@@ -1384,8 +1244,7 @@ tbody td { padding: 10px 15px; vertical-align: top; }
 }
 
 @media print {
-  .nav-wrapper, .barra-acoes, .tarefa-acoes, .btn,
-  .rotina-acoes, .card-analista-footer { display: none !important; }
+  .nav-wrapper, .barra-acoes, .tarefa-acoes, .btn { display: none !important; }
   body { background: white; }
   .card-analista, table, .rotinas-card { box-shadow: none !important; border: 1px solid #ccc !important; transform: none !important; }
 }
@@ -1438,7 +1297,6 @@ body.theme-dark .card-resumo .num {
 
 body.theme-dark .btn-verde,
 body.theme-dark .btn-vermelho,
-body.theme-dark .rel-view-btn,
 body.theme-dark .cal-periodo-btn,
 body.theme-dark .cal-periodo-input,
 body.theme-dark .cal-nav-btn {
@@ -1463,10 +1321,8 @@ body.theme-dark .conc-card {
 }
 
 /* Contêineres com borda fixa (sem acento de status) — pode sobrescrever tudo */
-body.theme-dark .rotina-item,
 body.theme-dark .cron-modal,
 body.theme-dark #modal-historico,
-body.theme-dark #cal-popup,
 body.theme-dark .cal-dia {
   background-color: #142e22 !important;
   color: rgba(255, 255, 255, 0.9) !important;
@@ -1560,10 +1416,6 @@ body.theme-dark .mh-lt-detalhe {
 body.theme-dark .mh-lt-detalhe.paralisada { background-color: rgba(220, 38, 38, 0.12) !important; border-left-color: #fca5a5 !important; }
 body.theme-dark .mh-lt-detalhe.prazo { background-color: rgba(37, 99, 235, 0.12) !important; border-left-color: #93c5fd !important; }
 body.theme-dark .mh-lt-detalhe.retomada { background-color: rgba(22, 163, 74, 0.12) !important; border-left-color: #86efac !important; }
-body.theme-dark .hist-toggle:hover,
-body.theme-dark .hist-toggle.aberto { background-color: rgba(255, 255, 255, 0.08) !important; }
-body.theme-dark .hist-linha,
-body.theme-dark .cp-item { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
 body.theme-dark .tarefa-obs {
   background-color: rgba(255, 255, 255, 0.04) !important;
   border-left-color: rgba(255, 255, 255, 0.15) !important;
@@ -1585,8 +1437,6 @@ body.theme-dark .mh-ri-valor,
 body.theme-dark .mh-lt-dia,
 body.theme-dark .mh-lt-evento,
 body.theme-dark .mh-lt-detalhe strong,
-body.theme-dark .hist-nota,
-body.theme-dark .cp-item-nome,
 body.theme-dark .cal-dia-num,
 body.theme-dark .tarefa-conc-titulo,
 body.theme-dark .rotina-linha-desc {
@@ -1596,8 +1446,6 @@ body.theme-dark .tarefa-meta,
 body.theme-dark .cal-filtro-label,
 body.theme-dark .rel-card-resumo .rc-label,
 body.theme-dark .card-cfg .info small,
-body.theme-dark .hist-toggle,
-body.theme-dark .hist-nota em,
 body.theme-dark .tarefa-conc-data {
   color: rgba(255, 255, 255, 0.62) !important;
 }
@@ -1605,9 +1453,6 @@ body.theme-dark .vazio,
 body.theme-dark .mh-ri-label,
 body.theme-dark .mh-vazio,
 body.theme-dark .mh-lt-hora,
-body.theme-dark .hist-data,
-body.theme-dark .cp-item-analista,
-body.theme-dark .cp-vazio,
 body.theme-dark .cal-dow,
 body.theme-dark .rotina-linha-extra,
 body.theme-dark .rotinas-card-vazio,
@@ -1838,15 +1683,6 @@ body.theme-dark .tarefa-conc-meta {
     </div>
     <div class="cal-grid" id="cal-grid"></div>
   </div>
-</div>
-
-<!-- Popup detalhe do dia -->
-<div id="cal-popup">
-  <div class="cp-header">
-    <span class="cp-header-titulo" id="cp-titulo"></span>
-    <button class="cp-fechar" onclick="fecharCalPopup()"><i class="bi bi-x-lg"></i></button>
-  </div>
-  <div class="cp-corpo" id="cp-corpo"></div>
 </div>
 
 <!-- ══════════════════ ABA ANALISTAS ══════════════════ -->
@@ -2113,6 +1949,23 @@ let editandoRotina = null;
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
+// Escapa texto livre (descrição/obs/processo/nota de histórico, nome/cargo/matrícula de
+// analista) antes de injetar via innerHTML — nenhum desses campos era sanitizado até
+// esta revisão, apesar de virem de formulários preenchidos por qualquer usuário com
+// acesso ao Cronograma (mesma classe de XSS armazenado já corrigida em main.js/admin.js).
+function escHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+
+// t.obs vem de um <div contenteditable> (negrito/itálico/alinhamento via document.execCommand)
+// — não dá para usar escHtml() nele sem perder a formatação. Usa DOMPurify com a mesma
+// allowlist já usada para o comentário rich-text da Curva ABC (utils.js/sanitizeRichHTML).
+function sanitizeRich(html) {
+  if (typeof DOMPurify === 'undefined') return escHtml(html);
+  return DOMPurify.sanitize(String(html || ''), {
+    ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 'font', 'span', 'div', 'p', 'br', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: ['style'],
+  });
+}
+
 // ── Conversão entre o formato usado no app (camelCase) e as colunas do Supabase (snake_case) ──
 function analistaFromRow(row) { return { id: row.id, nome: row.nome, matricula: row.matricula || '', cargo: row.cargo || '' }; }
 function analistaToRow(a)     { return { id: a.id, nome: a.nome, matricula: a.matricula || '', cargo: a.cargo || '' }; }
@@ -2325,7 +2178,7 @@ function renderPainel() {
     card.innerHTML = `
       <div class="card-analista-header">
         <div>
-          <h3><i class="bi bi-person-fill"></i> ${an.nome}<span class="analista-sub-inline">· ${an.cargo||'Analista'}${an.matricula?' · Matr. '+an.matricula:''}</span></h3>
+          <h3><i class="bi bi-person-fill"></i> ${escHtml(an.nome)}<span class="analista-sub-inline">· ${escHtml(an.cargo||'Analista')}${an.matricula?' · Matr. '+escHtml(an.matricula):''}</span></h3>
         </div>
         <div class="badges">
           ${ativas     ? `<span class="badge ativa">${ativas} em execução</span>` : ''}
@@ -2366,22 +2219,13 @@ function renderPainel() {
   });
 }
 
-function htmlRotinaCompacto(r) {
-  const labels = {diaria:'Diária',semanal:'Semanal',mensal:'Mensal',eventual:'Eventual'};
-  return `
-    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:5px">
-      <span class="rotina-freq ${r.freq}" style="font-size:.62rem">${labels[r.freq]||r.freq}</span>
-      <span style="font-size:.78rem;color:#374151;flex:1">${r.desc}</span>
-    </div>`;
-}
-
 function htmlTarefa(t, pos, total) {
   const hoje  = new Date(); hoje.setHours(0,0,0,0);
   const prazo = t.prazo ? new Date(t.prazo+'T00:00:00') : null;
   const vencido = prazo && prazo < hoje && t.status !== 'concluida';
   const dias  = prazo ? Math.ceil((prazo - hoje) / 86400000) : null;
   const prio  = t.prioridade==='urgente'?'<i class="bi bi-fire" style="color:#dc2626"></i> ':t.prioridade==='alta'?'<i class="bi bi-lightning-fill" style="color:#d97706"></i> ':'';
-  const setorLabel = t.setor==='EXTERNO' ? `<i class="bi bi-building"></i> ${t.setorNome||'Ext.'}` : '<i class="bi bi-folder-fill"></i> GECOPE';
+  const setorLabel = t.setor==='EXTERNO' ? `<i class="bi bi-building"></i> ${escHtml(t.setorNome||'Ext.')}` : '<i class="bi bi-folder-fill"></i> GECOPE';
   const posicao = typeof pos === 'number' ? pos + 1 : '–';
   const prioClasse = t.prioridade==='urgente'?'urgente':t.prioridade==='alta'?'alta':'';
   const isFirst = pos === 0;
@@ -2415,21 +2259,21 @@ function htmlTarefa(t, pos, total) {
   const labelStatusExibido = (t.origemSync && t.status === 'ativa' && t.statusProcesso)
     ? t.statusProcesso
     : labelStatus(statusVisual);
-  const tituloSync = t.origemSync ? `Sincronizado automaticamente com o processo ${t.processo}` : '';
+  const tituloSync = t.origemSync ? `Sincronizado automaticamente com o processo ${escHtml(t.processo)}` : '';
 
   return `
   <div class="tarefa ${statusVisual}">
     <div class="tarefa-topo">
       <span class="tarefa-num ${prioClasse}" title="Posição na fila de execução">${posicao}º</span>
-      <div class="tarefa-titulo">${prio}${t.origemSync?'<i class="bi bi-link-45deg" title="'+tituloSync+'"></i> ':''}${t.descricao||'(sem descrição)'}<button class="btn-hist-info" onclick="abrirHistorico('${t.id}',event)" title="Ver histórico da atividade">?</button></div>
+      <div class="tarefa-titulo">${prio}${t.origemSync?'<i class="bi bi-link-45deg" title="'+tituloSync+'"></i> ':''}${escHtml(t.descricao)||'(sem descrição)'}<button class="btn-hist-info" onclick="abrirHistorico('${t.id}',event)" title="Ver histórico da atividade">?</button></div>
       <span class="tarefa-status ${statusVisual}" title="${tituloSync}">${labelStatusExibido}${atrasado?' <i class="bi bi-exclamation-triangle-fill"></i>':''}</span>
     </div>
     <div class="tarefa-meta">
-      ${t.processo?`<span><i class="bi bi-hash"></i> ${t.processo}</span>`:''}
+      ${t.processo?`<span><i class="bi bi-hash"></i> ${escHtml(t.processo)}</span>`:''}
       <span>${setorLabel}</span>
       ${prazoHtml?`<span>${prazoHtml}</span>`:''}
     </div>
-    ${t.obs?`<div class="tarefa-obs"><span class="obs-icone"><i class="bi bi-chat-left-text-fill"></i></span><span class="obs-conteudo">${t.obs}</span></div>`:''}
+    ${t.obs?`<div class="tarefa-obs"><span class="obs-icone"><i class="bi bi-chat-left-text-fill"></i></span><span class="obs-conteudo">${sanitizeRich(t.obs)}</span></div>`:''}
     <div class="tarefa-acoes">
       <button class="btn-fila" onclick="moverOrdem('${t.id}','up')" ${isFirst?'disabled':''} title="Subir na fila"><i class="bi bi-chevron-up"></i></button>
       <button class="btn-fila" onclick="moverOrdem('${t.id}','down')" ${isLast?'disabled':''} title="Descer na fila"><i class="bi bi-chevron-down"></i></button>
@@ -2473,7 +2317,7 @@ function abrirHistorico(id, evt) {
   document.getElementById('mh-resumo').innerHTML = `
     <div class="mh-resumo-item">
       <div class="mh-ri-label"><i class="bi bi-person-fill"></i> Analista</div>
-      <div class="mh-ri-valor">${analista ? analista.nome : '—'}</div>
+      <div class="mh-ri-valor">${analista ? escHtml(analista.nome) : '—'}</div>
     </div>
     <div class="mh-resumo-item">
       <div class="mh-ri-label"><i class="bi bi-bar-chart-fill"></i> Status</div>
@@ -2502,7 +2346,7 @@ function abrirHistorico(id, evt) {
       // Montar detalhe conforme tipo
       let detalhe = '';
       if (h.tipo === 'paralisada' && h.nota) {
-        detalhe = `<div class="mh-lt-detalhe paralisada"><strong>Motivo:</strong> ${h.nota}</div>`;
+        detalhe = `<div class="mh-lt-detalhe paralisada"><strong>Motivo:</strong> ${escHtml(h.nota)}</div>`;
       } else if (h.tipo === 'prazo' && h.nota) {
         // nota: "De X para Y — motivo" ou "De X para Y"
         const partes = h.nota.split(' — ');
@@ -2512,15 +2356,15 @@ function abrirHistorico(id, evt) {
         const match = datas.match(/para (.+)$/);
         const prazoNovo = match ? match[1] : datas;
         detalhe = `<div class="mh-lt-detalhe prazo">
-          <strong>Fim:</strong> ${prazoNovo}<br>
-          ${motivo ? `<strong>Motivo:</strong> ${motivo}` : `<span style="color:#9ca3af;font-style:italic">Sem justificativa registrada</span>`}
+          <strong>Fim:</strong> ${escHtml(prazoNovo)}<br>
+          ${motivo ? `<strong>Motivo:</strong> ${escHtml(motivo)}` : `<span style="color:#9ca3af;font-style:italic">Sem justificativa registrada</span>`}
         </div>`;
       } else if (h.tipo === 'retomada') {
         detalhe = `<div class="mh-lt-detalhe retomada">Atividade retomada.</div>`;
       } else if (h.tipo === 'concluida') {
         detalhe = `<div class="mh-lt-detalhe" style="border-left-color:#9ca3af">Atividade marcada como concluída.</div>`;
       } else if (h.nota) {
-        detalhe = `<div class="mh-lt-detalhe">${h.nota}</div>`;
+        detalhe = `<div class="mh-lt-detalhe">${escHtml(h.nota)}</div>`;
       }
 
       return `<div class="mh-linha-tempo">
@@ -2737,8 +2581,8 @@ function renderRotinasGlobal() {
       <div class="rotinas-card-header">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
-            <div class="rotinas-card-header-nome"><i class="bi bi-person-fill"></i> ${an.nome}</div>
-            <div class="rotinas-card-header-cargo">${an.cargo||'Analista'} · ${rots.length} rotina${rots.length!==1?'s':''} cadastrada${rots.length!==1?'s':''}</div>
+            <div class="rotinas-card-header-nome"><i class="bi bi-person-fill"></i> ${escHtml(an.nome)}</div>
+            <div class="rotinas-card-header-cargo">${escHtml(an.cargo||'Analista')} · ${rots.length} rotina${rots.length!==1?'s':''} cadastrada${rots.length!==1?'s':''}</div>
           </div>
           <button class="btn btn-pequeno" style="background:rgba(255,255,255,.2);color:white;flex-shrink:0" onclick="abrirModalRotina('${an.id}')"><i class="bi bi-plus-lg"></i> Rotina</button>
         </div>
@@ -2752,10 +2596,10 @@ function renderRotinasGlobal() {
                 <span class="rotina-freq ${r.freq}">${labels[r.freq]||r.freq}</span>
               </div>
               <div class="rotina-linha-corpo">
-                <div class="rotina-linha-desc">${r.desc}</div>
+                <div class="rotina-linha-desc">${escHtml(r.desc)}</div>
                 <div class="rotina-linha-extra">
                   ${r.setor==='EXTERNO'?'<span><i class="bi bi-building"></i> Intersetorial</span>':'<span><i class="bi bi-folder-fill"></i> GECOPE</span>'}
-                  ${r.obs?`<span><i class="bi bi-pin-angle-fill"></i> ${r.obs}</span>`:''}
+                  ${r.obs?`<span><i class="bi bi-pin-angle-fill"></i> ${escHtml(r.obs)}</span>`:''}
                 </div>
               </div>
               <div class="rotina-linha-acoes">
@@ -2804,7 +2648,7 @@ function editarTarefa(id) {
   document.getElementById('t-inicio').value     = t.inicio||'';
   document.getElementById('t-prazo').value      = t.prazo||'';
   document.getElementById('t-status').value     = t.status||'ativa';
-  document.getElementById('t-obs').innerHTML    = t.obs||'';
+  document.getElementById('t-obs').innerHTML    = sanitizeRich(t.obs||'');
   document.getElementById('t-prioridade').value = t.prioridade||'normal';
   document.getElementById('t-justificativa').value = '';
   document.getElementById('campo-justificativa').style.display = 'none'; // só abre ao MUDAR status para paralisada
@@ -2825,7 +2669,7 @@ function salvarTarefa() {
   const desc      = document.getElementById('t-descricao').value.trim();
   const status    = document.getElementById('t-status').value;
   const obsEl     = document.getElementById('t-obs');
-  const obsHtml   = obsEl.innerHTML.trim();
+  const obsHtml   = sanitizeRich(obsEl.innerHTML.trim());
   const justEl    = document.getElementById('t-justificativa');
   const justText  = justEl.value.trim();
   const aditEl    = document.getElementById('t-aditamento');
@@ -3167,16 +3011,6 @@ let _calMes  = new Date().getMonth(); // 0-based
 let _calFiltroIni = null; // string YYYY-MM-DD ou null
 let _calFiltroFim = null; // string YYYY-MM-DD ou null
 
-function setRelView(view) {
-  _relView = view;
-  document.getElementById('rel-view-lista').style.display      = view === 'lista'      ? '' : 'none';
-  document.getElementById('rel-view-calendario').style.display = view === 'calendario' ? '' : 'none';
-  document.getElementById('btn-view-lista').classList.toggle('ativo', view === 'lista');
-  document.getElementById('btn-view-cal').classList.toggle('ativo', view === 'calendario');
-  if (view === 'calendario') renderCalendario();
-  else renderRelatorio();
-}
-
 function calPeriodoPreset(tipo) {
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   // Achar segunda-feira da semana atual
@@ -3418,19 +3252,22 @@ function renderCalendario() {
       const badgeMap = { inicio: 'Em Início', execucao: 'Em Execução', fim: 'Em Conclusão' };
       const badges = tiposArr.map(tp => `<span class="cal-evento-badge badge-${tp}">${badgeMap[tp]}</span>`).join(' ');
       const metaParts = [];
-      if (an) metaParts.push(`<i class="bi bi-person-fill"></i> ${an.nome}`);
-      if (t.processo) metaParts.push(`<i class="bi bi-hash"></i> ${t.processo}`);
+      if (an) metaParts.push(`<i class="bi bi-person-fill"></i> ${escHtml(an.nome)}`);
+      if (t.processo) metaParts.push(`<i class="bi bi-hash"></i> ${escHtml(t.processo)}`);
       let obsTexto = '';
       if (t.obs) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = t.obs;
-        obsTexto = (tmp.textContent || tmp.innerText || '').trim();
+        // Antes usava um <div> "descartável" (tmp.innerHTML=t.obs) só para extrair o
+        // texto puro via textContent — mas setar innerHTML com HTML não confiável já
+        // executa handlers/carrega recursos (ex.: <img onerror>) mesmo em elemento fora
+        // do DOM, antes mesmo de ler o textContent de volta. Troca por um strip de tags
+        // via regex, que nunca interpreta o conteúdo como HTML.
+        obsTexto = String(t.obs).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       }
-      if (t.setor === 'EXTERNO' && t.setorNome) metaParts.push(`<i class="bi bi-building"></i> ${t.setorNome}`);
+      if (t.setor === 'EXTERNO' && t.setorNome) metaParts.push(`<i class="bi bi-building"></i> ${escHtml(t.setorNome)}`);
       return `<div class="cal-evento ${classeVisual}">
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:2px;">${badges}</div>
-        <span class="cal-evento-nome">${t.descricao||'(sem descrição)'}</span>
-        ${obsTexto ? `<span class="cal-evento-obs">${obsTexto.slice(0,120)}${obsTexto.length>120?'…':''}</span>` : ''}
+        <span class="cal-evento-nome">${escHtml(t.descricao)||'(sem descrição)'}</span>
+        ${obsTexto ? `<span class="cal-evento-obs">${escHtml(obsTexto.slice(0,120))}${obsTexto.length>120?'…':''}</span>` : ''}
         ${metaParts.length ? `<span class="cal-evento-meta">${metaParts.join(' · ')}</span>` : ''}
       </div>`;
     };
@@ -3460,58 +3297,6 @@ function renderCalendario() {
 
   document.getElementById('cal-grid').innerHTML = html;
 }
-
-function abrirCalPopup(dStr, evt) {
-  evt.stopPropagation();
-  const data    = new Date(dStr+'T00:00:00');
-  const dtLabel = data.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  const filtroAn = document.getElementById('rel-filtro-analista') ? document.getElementById('rel-filtro-analista').value : '';
-
-  let tfAll = tarefas.filter(t => t.status !== 'concluida' && (t.inicio || t.prazo));
-  if (filtroAn) tfAll = tfAll.filter(t => t.analistaId === filtroAn);
-
-  const tInicio   = tfAll.filter(t => t.inicio === dStr);
-  const tFim      = tfAll.filter(t => t.prazo  === dStr);
-  const tExecucao = tfAll.filter(t => {
-    if (!t.inicio || !t.prazo) return false;
-    const ini = new Date(t.inicio+'T00:00:00');
-    const fim = new Date(t.prazo+'T00:00:00');
-    return data > ini && data < fim && t.status === 'ativa';
-  });
-
-  const itemHtml = (t) => {
-    const an = analistas.find(a => a.id === t.analistaId);
-    return `<div class="cp-item">
-      <div>
-        <div class="cp-item-nome">${t.descricao||'(sem descrição)'}</div>
-        <div class="cp-item-analista"><i class="bi bi-person-fill"></i> ${an?an.nome:'—'}${t.processo?' · <i class="bi bi-hash"></i> '+t.processo:''}</div>
-      </div>
-    </div>`;
-  };
-
-  let corpo = '';
-  if (tInicio.length)   corpo += `<div class="cp-secao-titulo inicio"><i class="bi bi-play-fill"></i> Início neste dia (${tInicio.length})</div>${tInicio.map(itemHtml).join('')}`;
-  if (tExecucao.length) corpo += `<div class="cp-secao-titulo execucao"><i class="bi bi-gear-fill"></i> Em Execução (${tExecucao.length})</div>${tExecucao.map(itemHtml).join('')}`;
-  if (tFim.length)      corpo += `<div class="cp-secao-titulo fim"><i class="bi bi-flag-fill"></i> Prazo / Fim neste dia (${tFim.length})</div>${tFim.map(itemHtml).join('')}`;
-  if (!corpo)           corpo  = '<div class="cp-vazio">Nenhuma atividade neste dia.</div>';
-
-  document.getElementById('cp-titulo').textContent = dtLabel.charAt(0).toUpperCase() + dtLabel.slice(1);
-  document.getElementById('cp-corpo').innerHTML = corpo;
-
-  const popup = document.getElementById('cal-popup');
-  popup.style.top       = '50%';
-  popup.style.left      = '50%';
-  popup.style.transform = 'translate(-50%, -50%)';
-  popup.classList.add('aberto');
-}
-
-function fecharCalPopup() {
-  document.getElementById('cal-popup').classList.remove('aberto');
-}
-document.addEventListener('click', e => {
-  const p = document.getElementById('cal-popup');
-  if (p && p.classList.contains('aberto') && !p.contains(e.target)) fecharCalPopup();
-});
 
 function renderRelatorio() {
   const selAn = document.getElementById('rel-filtro-analista');
@@ -3600,7 +3385,7 @@ function renderRelatorio() {
     html += `
     <div class="rel-analista-bloco">
       <div class="rel-analista-header">
-        <strong><i class="bi bi-person-fill"></i> ${an.nome}${an.cargo?' · '+an.cargo:''}</strong>
+        <strong><i class="bi bi-person-fill"></i> ${escHtml(an.nome)}${an.cargo?' · '+escHtml(an.cargo):''}</strong>
         <div class="rel-badges">
           ${exec?`<span class="rel-badge"><i class="bi bi-circle-fill" style="font-size:.5rem;color:#16a34a"></i> ${exec} em execução</span>`:''}
           ${agu ?`<span class="rel-badge"><i class="bi bi-circle-fill" style="font-size:.5rem;color:#d97706"></i> ${agu} em fila</span>`:''}
@@ -3627,13 +3412,13 @@ function renderRelatorio() {
           const sv = atrasado ? 'atrasado' : t.status;
           return `<tr>
             <td style="text-align:center;font-weight:800;color:var(--verde);font-size:.82rem">${i+1}</td>
-            <td><strong style="font-size:.84rem">${t.descricao||''}</strong>${t.processo?`<br><small style="color:#6b7280"><i class="bi bi-hash"></i> ${t.processo}</small>`:''}</td>
-            <td style="font-size:.8rem">${t.setor==='EXTERNO'?`<i class="bi bi-building"></i> ${t.setorNome||'Ext.'}`:'<i class="bi bi-folder-fill"></i> GECOPE'}</td>
+            <td><strong style="font-size:.84rem">${escHtml(t.descricao)}</strong>${t.processo?`<br><small style="color:#6b7280"><i class="bi bi-hash"></i> ${escHtml(t.processo)}</small>`:''}</td>
+            <td style="font-size:.8rem">${t.setor==='EXTERNO'?`<i class="bi bi-building"></i> ${escHtml(t.setorNome||'Ext.')}`:'<i class="bi bi-folder-fill"></i> GECOPE'}</td>
             <td style="font-size:.8rem">${{urgente:'Urgente',alta:'Alta',normal:'Normal'}[t.prioridade]||'Normal'}</td>
             <td style="font-size:.8rem">${iDate?iDate.toLocaleDateString('pt-BR'):'—'}</td>
             <td style="font-size:.8rem;${vencido?'color:var(--paralisada);font-weight:700':''}">${pDate?pDate.toLocaleDateString('pt-BR')+(vencido?' <i class="bi bi-exclamation-triangle-fill"></i>':''):'—'}</td>
             <td><span class="status-pill ${sv}">${labelStatus(sv)}</span></td>
-            <td style="max-width:160px;font-size:.76rem;color:#4b5563">${t.obs||'—'}</td>
+            <td style="max-width:160px;font-size:.76rem;color:#4b5563">${t.obs?sanitizeRich(t.obs):'—'}</td>
           </tr>`;
         }).join('')}
         </tbody>
@@ -3692,21 +3477,21 @@ function renderConcluidas() {
     card.className = 'conc-card';
     card.innerHTML = `
       <div class="conc-card-header">
-        <h3><i class="bi bi-person-fill"></i> ${an.nome}</h3>
+        <h3><i class="bi bi-person-fill"></i> ${escHtml(an.nome)}</h3>
         <span class="conc-count"><i class="bi bi-check2-circle"></i> ${concl.length} concluída${concl.length!==1?'s':''}</span>
       </div>
       <div class="conc-card-body">
         ${concl.map(t => {
-          const setorLabel = t.setor==='EXTERNO' ? `<i class="bi bi-building"></i> ${t.setorNome||'Ext.'}` : '<i class="bi bi-folder-fill"></i> GECOPE';
+          const setorLabel = t.setor==='EXTERNO' ? `<i class="bi bi-building"></i> ${escHtml(t.setorNome||'Ext.')}` : '<i class="bi bi-folder-fill"></i> GECOPE';
           const prio = t.prioridade==='urgente'?'<i class="bi bi-fire" style="color:#dc2626"></i> ':t.prioridade==='alta'?'<i class="bi bi-lightning-fill" style="color:#d97706"></i> ':'';
           const dataConc = t.atualizadoEm
             ? new Date(t.atualizadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})
             : '—';
           return `
           <div class="tarefa-conc">
-            <div class="tarefa-conc-titulo">${prio}${t.descricao||'(sem descrição)'}</div>
+            <div class="tarefa-conc-titulo">${prio}${escHtml(t.descricao)||'(sem descrição)'}</div>
             <div class="tarefa-conc-meta">
-              ${t.processo?`<span><i class="bi bi-hash"></i> ${t.processo}</span>`:''}
+              ${t.processo?`<span><i class="bi bi-hash"></i> ${escHtml(t.processo)}</span>`:''}
               <span>${setorLabel}</span>
             </div>
             <div class="tarefa-conc-data"><i class="bi bi-check2-circle"></i> Concluída em ${dataConc}</div>
@@ -3754,10 +3539,10 @@ function renderAnalistas() {
     const rot = rotinas.filter(r=>r.analistaId===an.id).length;
     return `
     <div class="card-cfg">
-      <div class="avatar">${an.nome.charAt(0).toUpperCase()}</div>
+      <div class="avatar">${escHtml(an.nome.charAt(0).toUpperCase())}</div>
       <div class="info">
-        <strong>${an.nome}</strong>
-        <small>${an.cargo||'Analista'}${an.matricula?' · Matr. '+an.matricula:''} · ${em} tarefa${em!==1?'s':''} em aberto · ${rot} rotina${rot!==1?'s':''}</small>
+        <strong>${escHtml(an.nome)}</strong>
+        <small>${escHtml(an.cargo||'Analista')}${an.matricula?' · Matr. '+escHtml(an.matricula):''} · ${em} tarefa${em!==1?'s':''} em aberto · ${rot} rotina${rot!==1?'s':''}</small>
       </div>
       <button class="btn btn-cinza btn-pequeno" onclick="editarAnalista('${an.id}')"><i class="bi bi-pencil-fill"></i> Editar</button>
       <button class="btn btn-vermelho btn-pequeno" onclick="excluirAnalista('${an.id}')"><i class="bi bi-trash-fill"></i></button>

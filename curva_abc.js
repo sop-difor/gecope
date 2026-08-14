@@ -50,6 +50,17 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
   function erro(msg) { var e = $("cv-err"); e.innerHTML = msg; e.classList.add("on"); }
   function limpaErro() { $("cv-err").classList.remove("on"); }
+  /* debounce local (PERFORMANCE): não reaproveita window.debounce de main.js porque
+     este arquivo carrega antes de main.js (ver ordem de <script src> em index.html) —
+     nesse ponto do carregamento a função ainda não existe no escopo global. */
+  function cvDebounce(fn, wait) {
+    var t;
+    return function () {
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, wait);
+    };
+  }
 
   /* janelas de aviso/confirmação: usa o SweetAlert2 já carregado pelo index.html
      (mesma biblioteca usada no resto do GECOPE) em vez do alert()/confirm()
@@ -939,7 +950,7 @@
   });
   $("cv-cutA").addEventListener("change", calcular);
   $("cv-cutB").addEventListener("change", calcular);
-  $("cv-busca").addEventListener("input", desenhaTabela);
+  $("cv-busca").addEventListener("input", cvDebounce(desenhaTabela, 200));
   $("cv-selQtd").addEventListener("change", function () {
     $("cv-ctlQtd").style.display = $("cv-selQtd").value === "custom" ? "" : "none";
     calcular();

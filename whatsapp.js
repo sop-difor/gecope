@@ -1,36 +1,19 @@
                                                                         // Todas as chamadas à Evolution API passam por aqui — sem timeout, uma API
                                                                         // travada deixava o spinner/texto "Consultando..." pendurado indefinidamente.
+                                                                        // Também é o único ponto de saída para a Evolution API neste arquivo, então é
+                                                                        // aqui que barramos a chamada quando o recurso está pausado (sem EVO_API_KEY/
+                                                                        // EVO_API_URL configurados) — evita disparar requisições com credenciais em
+                                                                        // branco contra uma instância que pode nem existir mais.
                                                                         async function fetchComTimeout(url, options = {}, timeoutMs = 15000) {
+                                                                            if (!window.EVO_API_KEY || !window.EVO_API_URL) {
+                                                                                throw new Error('Disparo de WhatsApp está pausado no momento (integração com a Evolution API desativada). Contate o administrador para mais informações.');
+                                                                            }
                                                                             const controller = new AbortController();
                                                                             const timer = setTimeout(() => controller.abort(), timeoutMs);
                                                                             try {
                                                                                 return await fetch(url, { ...options, signal: controller.signal });
                                                                             } finally {
                                                                                 clearTimeout(timer);
-                                                                            }
-                                                                        }
-
-                                                                        async function notificarAtualizacaoTabelas() {
-                                                                            const fonte = document.getElementById('busca-fonte').value;
-                                                                            const versao = document.getElementById('busca-versao').value;
-                                                                            const ref = document.getElementById('busca-ref').value;
-
-                                                                            const { isConfirmed } = await Swal.fire({
-                                                                                title: 'Notificar Todos?',
-                                                                                text: `Deseja enviar um comunicado via WhatsApp para TODOS os usuários informando que a tabela ${fonte} (${versao}) foi atualizada?`,
-                                                                                icon: 'question',
-                                                                                showCancelButton: true,
-                                                                                confirmButtonText: 'Sim, disparar!',
-                                                                                cancelButtonText: 'Cancelar'
-                                                                            });
-
-                                                                            if (isConfirmed) {
-                                                                                processarNotificacao('atualizacao_tabelas', {
-                                                                                    TABELA_NOME: fonte,
-                                                                                    VERSAO: versao,
-                                                                                    MES_REFERENCIA: ref.toUpperCase()
-                                                                                });
-                                                                                Swal.fire('Disparo Iniciado', 'As mensagens estão sendo enviadas em segundo plano (com delay de segurança).', 'success');
                                                                             }
                                                                         }
 
@@ -714,25 +697,20 @@
                                                                                     return `
                         <tr>
                             <td class="small text-muted">${new Date(log.created_at).toLocaleString('pt-BR')}</td>
-                            <td><span class="badge bg-light text-dark" style="font-size:0.6rem">${log.evento}</span></td>
-                            <td class="fw-bold small text-truncate" style="max-width: 120px;">${log.destinatario_nome || '-'}</td>
-                            <td class="small">${log.destinatario}</td>
-                            <td class="small text-muted">${nupExibicao}</td>
-                            <td class="small text-truncate" style="max-width: 150px;" title="${objetoExibicao}">${objetoExibicao}</td>
+                            <td><span class="badge bg-light text-dark" style="font-size:0.6rem">${escapeHTML(log.evento)}</span></td>
+                            <td class="fw-bold small text-truncate" style="max-width: 120px;">${escapeHTML(log.destinatario_nome) || '-'}</td>
+                            <td class="small">${escapeHTML(log.destinatario)}</td>
+                            <td class="small text-muted">${escapeHTML(nupExibicao)}</td>
+                            <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(objetoExibicao)}">${escapeHTML(objetoExibicao)}</td>
                             <td>
                                 <span class="badge ${statusColor}" style="font-size:0.65rem">
-                                    ${log.status.toUpperCase()}
+                                    ${escapeHTML(log.status.toUpperCase())}
                                 </span>
                             </td>
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center">
                                     <button class="btn btn-xs btn-outline-danger p-0 px-1" title="Ver Detalhes do Erro"
-                                        onclick="Swal.fire({
-                                            title: 'Dificuldade no Envio', 
-                                            html: \`<div class='text-start small'><b>O que ocorreu?</b><br><span class='text-danger'>${erroFormatado}</span><br><br><b>Destinatário:</b> ${log.destinatario_nome || 'Não identificado'}<br><b>Telefone:</b> ${log.destinatario}<br><hr><i class='text-muted'>Erro técnico: ${log.erro_detalhe || 'sem detalhes'}</i></div>\`, 
-                                            icon: 'error',
-                                            confirmButtonText: 'Entendido'
-                                        })">
+                                        onclick="verDetalheErroWhatsApp('${log.id}')">
                                         <i class="bi bi-search"></i>
                                     </button>
                                     <button class="btn btn-xs btn-primary p-0 px-1" title="Tentar Reenviar Agora"
@@ -751,6 +729,27 @@
                                                                             } catch (err) {
                                                                                 console.error("Erro ao carregar logs:", err);
                                                                                 tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-3">Erro ao carregar logs.</td></tr>';
+                                                                            }
+                                                                        }
+
+                                                                        // Busca o log pelo id e monta o Swal.fire em JS (sem passar pelo atributo
+                                                                        // onclick="..." como antes) — o HTML antigo interpolava erro/destinatário
+                                                                        // direto dentro de um onclick com aspas duplas: qualquer aspa dupla nesses
+                                                                        // campos (ex.: eco de texto de erro da Evolution API) quebrava o atributo
+                                                                        // e injetava HTML/JS arbitrário na tela de logs do WhatsApp (visível a admins).
+                                                                        async function verDetalheErroWhatsApp(logId) {
+                                                                            try {
+                                                                                const { data: log, error } = await sbClient.from('whatsapp_logs').select('*').eq('id', logId).single();
+                                                                                if (error || !log) throw new Error("Log não encontrado.");
+                                                                                const erroFormatado = formatarErroWhatsApp(log.erro_detalhe);
+                                                                                Swal.fire({
+                                                                                    title: 'Dificuldade no Envio',
+                                                                                    html: `<div class='text-start small'><b>O que ocorreu?</b><br><span class='text-danger'>${escapeHTML(erroFormatado)}</span><br><br><b>Destinatário:</b> ${escapeHTML(log.destinatario_nome || 'Não identificado')}<br><b>Telefone:</b> ${escapeHTML(log.destinatario)}<hr><i class='text-muted'>Erro técnico: ${escapeHTML(log.erro_detalhe || 'sem detalhes')}</i></div>`,
+                                                                                    icon: 'error',
+                                                                                    confirmButtonText: 'Entendido'
+                                                                                });
+                                                                            } catch (err) {
+                                                                                Swal.fire({ icon: 'error', title: 'Erro', text: 'Não foi possível carregar os detalhes deste log.' });
                                                                             }
                                                                         }
 
@@ -790,53 +789,6 @@
                                                                                 carregarLogsWhatsApp();
                                                                             } catch (err) {
                                                                                 Swal.fire('Falha no Reenvio', err.message, 'error');
-                                                                            }
-                                                                        }
-
-                                                                        async function consultarStatusWhatsApp(messageId, logId, destinatario) {
-                                                                            try {
-                                                                                Swal.fire({ title: 'Consultando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-                                                                                const jid = destinatario.includes('@') ? destinatario : (destinatario + '@s.whatsapp.net');
-                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/chat/findMessages/${EVO_INSTANCE}`, {
-                                                                                    method: 'POST',
-                                                                                    headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
-                                                                                    body: JSON.stringify({ where: { id: messageId }, remoteJid: jid })
-                                                                                });
-
-                                                                                let msg = null;
-                                                                                if (response.ok) {
-                                                                                    const data = await response.json();
-                                                                                    const messages = data.messages || (Array.isArray(data) ? data : []);
-                                                                                    msg = messages.find(m => m.key?.id === messageId || m.id === messageId);
-                                                                                }
-
-                                                                                if (!msg) {
-                                                                                    Swal.fire({
-                                                                                        title: 'Status: Enviado',
-                                                                                        html: 'A mensagem foi despachada para o WhatsApp. Se você ainda não recebeu, verifique a conexão do celular que faz os disparos.<br><br><small class="text-muted">ID: ' + messageId + '</small>',
-                                                                                        icon: 'success'
-                                                                                    });
-                                                                                    return;
-                                                                                }
-
-                                                                                const statusMap = {
-                                                                                    'PENDING': { t: 'Pendente (Aguardando Internet)', i: 'warning' },
-                                                                                    'SENT': { t: 'Enviado ao Servidor (Um tique)', i: 'success' },
-                                                                                    'DELIVERED': { t: 'Entregue ao Aparelho (Dois tiques)', i: 'success' },
-                                                                                    'READ': { t: 'Lido pelo Destinatário (Azul)', i: 'info' }
-                                                                                };
-
-                                                                                const rawStatus = (msg.status || '').toUpperCase();
-                                                                                const info = statusMap[rawStatus] || { t: 'Enviado com Sucesso', i: 'success' };
-
-                                                                                Swal.fire({
-                                                                                    title: 'Status da Mensagem',
-                                                                                    html: `<b>Situação Atual:</b><br>${info.t}<br><br><small class="text-muted">Rastreador: ${messageId}</small>`,
-                                                                                    icon: info.i
-                                                                                });
-                                                                            } catch (err) {
-                                                                                console.error("Erro no status:", err);
-                                                                                Swal.fire('Erro na Consulta', 'Não foi possível conectar ao rastreio.', 'error');
                                                                             }
                                                                         }
 

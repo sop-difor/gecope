@@ -979,6 +979,15 @@
             font-family: 'Montserrat', sans-serif;
         }
 
+        /* O SweetAlert2 usa z-index ~1060 por padrão, abaixo do .landing-overlay (2100).
+           Sem isso, qualquer Swal.fire() aberto a partir da tela de login/cadastro (ex.:
+           "Esqueci minha senha") renderiza atrás do overlay — fica invisível até o
+           overlay ser escondido, dando a impressão de que a janela só aparece depois
+           da tela de login. */
+        .swal2-container {
+            z-index: 2200 !important;
+        }
+
         /* Camada de fundo isolada: permite que a foto apareça com fade suave
            assim que terminar de carregar, em vez de "estourar" na tela. */
         .landing-bg {
@@ -3064,21 +3073,6 @@
                 grid-template-columns: 1fr;
             }
         }
-
-        /* Estilo do botão de cadeado */
-        .btn-admin-login {
-            background: none;
-            border: none;
-            color: #ccc;
-            transition: color 0.3s;
-        }
-
-        .btn-admin-login:hover,
-        body.is-admin .btn-admin-login {
-            color: var(--sop-green);
-        }
-
-        /* ... seus estilos anteriores ... */
 
         /* --- CONTROLE DE VISIBILIDADE DAS ABAS --- */
 

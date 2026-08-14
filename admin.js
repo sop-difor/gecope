@@ -5,27 +5,12 @@
     const SENHA_MESTRA = "sop2026";
     const USERS = [ { username: 'admin', password: SENHA_MESTRA, isAdmin: true } ];
 
-    function atualizarIconesCadeado(isLocked) {
-        const icones = document.querySelectorAll('.btn-admin-login i');
-        icones.forEach(icon => {
-            if (isLocked) {
-                icon.className = 'bi bi-lock-fill';
-                icon.style.color = '#ccc';
-            } else {
-                icon.className = 'bi bi-unlock-fill';
-                icon.style.color = 'var(--sop-green)';
-            }
-        });
-    }
-
     function verificarAdminSalvo() {
         const isAdm = sessionStorage.getItem('is_admin_gecope');
         if (isAdm === 'true') {
             document.body.classList.add('is-admin');
-            atualizarIconesCadeado(false);
         } else {
             document.body.classList.remove('is-admin');
-            atualizarIconesCadeado(true);
         }
     }
 
@@ -36,7 +21,6 @@
                 sessionStorage.removeItem('is_admin_gecope');
                 sessionStorage.setItem('sop_role', 'guest');
                 if (typeof applyRoleToUI === 'function') applyRoleToUI('guest');
-                atualizarIconesCadeado(true);
                 alert("Modo de visualização ativado.");
                 if (document.querySelector('.modal.show')) location.reload();
             }
@@ -51,7 +35,6 @@
             if (tentativa === SENHA_MESTRA) {
                 document.body.classList.add('is-admin');
                 sessionStorage.setItem('is_admin_gecope', 'true');
-                atualizarIconesCadeado(false);
                 alert(" Modo Administrador Ativado!");
             } else if (tentativa !== null) { alert(" Senha incorreta."); }
         }
@@ -70,7 +53,6 @@
             sessionStorage.setItem('sop_user', user);
             sessionStorage.setItem('sop_role', 'admin');
             if (typeof applyRoleToUI === 'function') applyRoleToUI('admin');
-            atualizarIconesCadeado(false);
             const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalLogin'));
             if (modal) modal.hide();
             alert(" Modo Administrador Ativado!");
@@ -91,7 +73,7 @@
         const pendingTabBadge = document.getElementById('admin-pending-badge-tab');
 
         if (!tbodyActive || !tbodyPending) return;
-        tbodyActive.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Carregando usuários...</td></tr>';
+        tbodyActive.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Carregando usuários...</td></tr>';
 
         try {
             const { data, error } = await sbClient.from('app_users').select('*').order('created_at', { ascending: false });
@@ -278,7 +260,7 @@
 
         } catch (e) {
             console.error('Erro ao listar usuários:', e);
-            tbodyActive.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Erro ao carregar banco de usuários: ${e.message}</td></tr>`;
+            tbodyActive.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Erro ao carregar banco de usuários: ${e.message}</td></tr>`;
         }
     }
 
@@ -481,84 +463,28 @@
                 }
             }
 
-            // 2. Se não encontrou registro existente, tenta via Edge Function (cria novo usuário)
-            let token = null;
-            try {
-                const s = await sbClient.auth.getSession();
-                token = s?.data?.session?.access_token || null;
-            } catch (e) { token = null; }
+            // 2. Não existe registro pendente prévio: cria a linha diretamente. (A Edge
+            // Function "approve-user" e o fallback via endpoint Netlify/Vercel foram
+            // removidos em 2026-08-14 — nunca chegaram a ser implantados neste projeto;
+            // esta inserção direta, protegida pela policy de INSERT de app_users que só
+            // permite escrita de admin para outro e-mail, já cobre o caso sozinha.)
+            const emailToCreate = emailReal || `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`;
+            const payload = {
+                email: emailToCreate,
+                matricula: matricula || null,
+                nome: nome || null,
+                sobrenome: null,
+                role: role || 'externo',
+                created_at: new Date().toISOString()
+            };
 
-            let success = false;
-            let errorMsg = '';
-
-            try {
-                const { data: invokeData, error: invokeErr } = await sbClient.functions.invoke('approve-user', {
-                    body: { notifId, role, matricula, nome, email: emailReal }
-                });
-
-                if (!invokeErr) {
-                    success = true;
-                } else {
-                    errorMsg = `Edge Function: ${invokeErr.message || JSON.stringify(invokeErr)}`;
-                }
-            } catch (invokeErr) {
-                errorMsg = `Edge Function: ${invokeErr.message || String(invokeErr)}`;
+            const { error: insertErr } = await sbClient.from('app_users').insert([payload]);
+            if (insertErr) {
+                throw new Error(`Erro ao criar usuário: ${insertErr.message}`);
             }
 
-            // 3. Fallback: Chamada HTTP ao endpoint configurado (Netlify/Vercel)
-            if (!success) {
-                const endpoint = window.APPROVE_USER_ENDPOINT || '/.netlify/functions/approve-user';
-                const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-                if (window.APPROVE_USER_ENDPOINT || (!window.location.hostname.includes('github.io') && !isLocal)) {
-                    try {
-                        const resp = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                ...(token ? { Authorization: `Bearer ${token}` } : {})
-                            },
-                            body: JSON.stringify({ notifId, role, matricula, nome, email: emailReal })
-                        });
-
-                        if (resp.ok) {
-                            success = true;
-                        } else {
-                            const text = await resp.text();
-                            let body = null;
-                            try { body = JSON.parse(text); } catch (e) { body = text; }
-                            const fetchErr = body?.error || (typeof body === 'string' ? body : null) || `HTTP ${resp.status}`;
-                            errorMsg = errorMsg ? `${errorMsg} | Endpoint alternativo: ${fetchErr}` : `Endpoint alternativo: ${fetchErr}`;
-                        }
-                    } catch (fetchErr) {
-                        const fetchErrStr = fetchErr.message || String(fetchErr);
-                        errorMsg = errorMsg ? `${errorMsg} | Endpoint alternativo: ${fetchErrStr}` : `Endpoint alternativo: ${fetchErrStr}`;
-                    }
-                }
-            }
-
-            // 4. Último fallback: inserção direta
-            if (!success) {
-                console.warn('[ADMIN] Falha ao chamar endpoint/função de aprovação. Tentando inserção direta via sbClient...', errorMsg);
-
-                const emailToCreate = emailReal || `${(nome||'user').replace(/\s+/g,'').toLowerCase()}@gecope.app`;
-                const payload = {
-                    email: emailToCreate,
-                    matricula: matricula || null,
-                    nome: nome || null,
-                    sobrenome: null,
-                    role: role || 'externo',
-                    created_at: new Date().toISOString()
-                };
-
-                const { error: insertErr } = await sbClient.from('app_users').insert([payload]);
-                if (insertErr) {
-                    throw new Error(`Erro na inserção direta (RLS): ${insertErr.message}. Certifique-se de que a Edge Function "approve-user" está implantada no painel do Supabase. (Detalhes: ${errorMsg || 'desconhecido'})`);
-                }
-
-                if (notifId) {
-                    await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
-                }
-                success = true;
+            if (notifId) {
+                await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
             }
 
             alert('Usuário criado e aprovado com sucesso.');
@@ -708,22 +634,7 @@
         }
     }
 
-    async function promoteAdmin99030487() {
-        const targetEmail = '99030487@gecope.app';
-        try {
-            const { data, error } = await sbClient.from('app_users').select('role').eq('email', targetEmail).maybeSingle();
-            if (data && data.role !== 'admin') {
-                const { error: upErr } = await sbClient.from('app_users').update({ role: 'admin' }).eq('email', targetEmail);
-                if (!upErr) {
-                    const current = sessionStorage.getItem('sop_user');
-                    if (current === targetEmail) { sessionStorage.setItem('sop_role', 'admin'); if (typeof applyRoleToUI === 'function') applyRoleToUI('admin'); alert('Sua conta foi promovida para Administrador com sucesso.'); }
-                } else { console.error('[AUTO-ADMIN] Falha ao atualizar:', upErr); }
-            }
-        } catch (e) { console.error('[AUTO-ADMIN] Erro:', e); }
-    }
-
     // Expose to window
-    window.atualizarIconesCadeado = atualizarIconesCadeado;
     window.verificarAdminSalvo = verificarAdminSalvo;
     window.alternarModoAdmin = alternarModoAdmin;
     window.handleLoginSubmit = handleLoginSubmit;
@@ -738,10 +649,8 @@
     window.stopNotificationsPoll = stopNotificationsPoll;
     window.fetchPendingCount = fetchPendingCount;
     window.fetchNotifications = fetchNotifications;
-    window.promoteAdmin99030487 = promoteAdmin99030487;
     window.aprovarFromNotification = aprovarFromNotification;
     window.recusarNotification = recusarNotification;
-    window.diagnosePendingFetch = diagnosePendingFetch;
     window.diagnosePendingFetch = diagnosePendingFetch;
     window.openAdminPendings = openAdminPendings;
 
@@ -749,7 +658,6 @@
     document.addEventListener('DOMContentLoaded', () => {
         // Wire formLogin submit if present (keeps old behavior)
         document.getElementById('formLogin')?.addEventListener('submit', handleLoginSubmit);
-        setTimeout(promoteAdmin99030487, 500);
     });
 
 })(window);

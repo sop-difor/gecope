@@ -287,12 +287,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     // Listeners de Abas
-    const tabComposicoes = document.querySelector('button[data-bs-target="#pane-composicoes"]');
-    if (tabComposicoes) {
-        tabComposicoes.addEventListener('shown.bs.tab', () => {
-            if (typeof carregarComposicoes === 'function') carregarComposicoes();
-        });
-    }
+    // (PERFORMANCE: o listener dedicado que existia aqui chamava carregarComposicoes()
+    // sem checar a flag de cache _composicoesCarregadas, disparando uma consulta completa
+    // ao Supabase toda vez que a aba era reaberta — mesmo já tendo dados em memória. A
+    // função showPane() já cuida do carregamento com cache (linha ~3196), então essa
+    // chamada duplicada foi removida; showPane() é o único caminho que abre essa aba.)
 
     // Inicialização
     if (typeof carregarListaFiscais === 'function') carregarListaFiscais();
@@ -1136,7 +1135,8 @@ function formatPercentage(num) {
 
 function isFiniteNumber(v) { return typeof v === 'number' && isFinite(v); }
 
-function escapeHTML(str) { const s = String(str || ''); return s.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+// escapeHTML() é definida em utils.js (carregado antes deste arquivo) e exposta em
+// window.escapeHTML — não redeclarar aqui para evitar duas cópias idênticas.
 
 /**
  * Calcula de forma inteligente quantos dias o processo está no status atual.
@@ -1432,6 +1432,10 @@ async function carregarDadosFinanceiro() {
         window.financeiroData = data.map(mapProcessoRow);
     } catch (err) {
         console.error('[ERRO] Falha ao carregar dados financeiros:', err);
+        // Sem isso, o painel Financeiro ficava com KPIs zerados sem nenhuma
+        // indicação de que a causa foi uma falha de carregamento (e não
+        // simplesmente "nenhum processo corresponde ao filtro").
+        alert('Não foi possível carregar os dados financeiros. Tente novamente em instantes.\n' + (err && err.message ? err.message : ''));
     }
 }
 
@@ -1644,7 +1648,11 @@ async function carregarDadosSupabase() {
         populateAllTabFilters();
         renderLastUpdate();
         updateDashboard();
-        clearFinanceiro();
+        // Não chamar clearFinanceiro() aqui: isso forçava "Todos" nos filtros do
+        // Financeiro em toda recarga de dados (inclusive após criar/editar/excluir
+        // qualquer processo em outra aba), descartando a seleção manual do usuário.
+        // populateAllTabFilters() já popula/preserva os filtros; clearFinanceiro()
+        // continua disponível só no botão explícito "Limpar filtros".
         updateFinanceiro();
         if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
         iniciarVarreduraRiscoDiligencia();
@@ -3265,6 +3273,11 @@ document.addEventListener('DOMContentLoaded', () => {
     wireEvents();
     applyRBACToPainels();
     verificarAdminSalvo();
+    // PERFORMANCE: marca a flag de cache antes do carregamento inicial — sem isso,
+    // a primeira vez que o usuário abria a aba Orçamentos (showPane, linha ~3191)
+    // disparava uma segunda consulta paginada completa a orcamentos_biblioteca,
+    // idêntica a esta, porque a flag nunca tinha sido setada por este carregamento eager.
+    window._orcamentosCarregados = true;
     carregarOrcamentos();
 });
 
@@ -4025,7 +4038,7 @@ function updateReuniao() {
 
         // Link para o SUITE (NUP apenas números para evitar 404)
         const nupLimpo = escapeHTML(d.processo).replace(/\D/g, '');
-        const btnSuite = `<a href="https://suite.ce.gov.br/consultar-processo/${nupLimpo}" target="_blank" class="btn btn-sm btn-light border" title="Abrir no SUITE"><i class="bi bi-box-arrow-up-right" style="color: var(--sop-green);"></i></a>`;
+        const btnSuite = `<a href="https://suite.ce.gov.br/consultar-processo/${nupLimpo}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-light border" title="Abrir no SUITE"><i class="bi bi-box-arrow-up-right" style="color: var(--sop-green);"></i></a>`;
 
         // Lógica da Meta
         const metaOnclick = `window.abrirModalMeta('${escapeHTML(d.processo)}', '${mIso}')`;
@@ -4117,6 +4130,10 @@ function updateReuniao() {
 
                 if (historico && historico.length > 0) {
                     const totalDiasAcumulado = historico.reduce((sum, h) => sum + (h.dias_estipulados || 0), 0);
+                    // PERFORMANCE: pRow não depende de `h` — é o mesmo processo para toda
+                    // linha do histórico, então é calculado 1x aqui em vez de refazer o
+                    // find() em window.allData a cada iteração do .map() abaixo.
+                    const pRowHistorico = (window.allData || []).find(r => r.processo === processo);
                     historicoHTML = `
                         <div class="mt-4 text-start">
                             <label class="form-label text-muted fw-bold d-flex justify-content-between align-items-center w-100" style="font-size: 0.85rem;">
@@ -4135,7 +4152,7 @@ function updateReuniao() {
                                     </thead>
                                     <tbody>
                                         ${historico.map(h => {
-                        const pRow = (window.allData || []).find(r => r.processo === processo);
+                        const pRow = pRowHistorico;
                         let estDate = h.registros;
                         if (h.autor === 'Sistema' && pRow && !h.registros) {
                             const st = (pRow.status || "").toString().toUpperCase();
@@ -4307,8 +4324,13 @@ function atualizarTabelaSuite(rows) {
                 tr.classList.add('tr-alerta-fiscal');
                 suiteTime.innerHTML += ` <span class="badge-tramitado-pulse">Tramitado</span>`;
             }
-            aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxt);
         }
+        // Independente de haver data de chegada registrada: o alerta de pré-diligência
+        // (usado também por varrerRiscoDiligenciaSegundoPlano, que chama isso sem essa
+        // guarda) depende só de status/sigla, nunca de suite_data_chegada. Mantê-lo preso
+        // ao "if" acima fazia o ícone/contagem da aba Aprovados sumir sempre que a tabela
+        // `processos` ainda não tinha a data de chegada preenchida para aquele processo.
+        aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxt);
     });
 }
 
@@ -4426,6 +4448,14 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
 
         const userId = data?.user?.id;
 
+        // Rastreia se o perfil em app_users ficou de fato com o MESMO e-mail gravado em
+        // auth.users (acima). Se essa gravação falhar silenciosamente (ex.: RLS bloqueando
+        // o UPDATE/INSERT), o usuário tem uma conta de autenticação válida mas nenhum (ou um
+        // desatualizado) perfil correspondente — ao ser "aprovado" pelo admin, o login
+        // continuaria falhando, sem que ninguém percebesse a causa. Ver sql/fix_app_users_email_mismatch.sql
+        // para o reparo de registros já afetados por essa falha no passado.
+        let appUsersSynced = false;
+
         // 2. Buscar se já existe um registro fantasma pela matrícula
         const { data: existingGhost, error: searchError } = await sbClient
             .from('app_users')
@@ -4448,7 +4478,13 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
             if (updateError || !updated || updated.length === 0) {
                 console.warn('[SIGNUP] UPDATE do ghost falhou (RLS?), tentando INSERT com email real:', updateError?.message);
                 const { error: insertFallbackError } = await sbClient.from('app_users').insert([{ ...payload, matricula }]);
-                if (insertFallbackError) console.warn('[SIGNUP] INSERT fallback também falhou:', insertFallbackError.message);
+                if (insertFallbackError) {
+                    console.warn('[SIGNUP] INSERT fallback também falhou:', insertFallbackError.message);
+                } else {
+                    appUsersSynced = true;
+                }
+            } else {
+                appUsersSynced = true;
             }
         } else {
             // Não existe, fazer INSERT de um novo
@@ -4466,12 +4502,22 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
             const { error: insertError } = await sbClient.from('app_users').insert([payload]);
             if (insertError) {
                 console.warn('[SIGNUP] Aviso ao inserir app_users (RLS):', insertError);
+            } else {
+                appUsersSynced = true;
             }
         }
 
         const { error: noteError } = await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}`, email: email }), created_at: new Date().toISOString(), read: false }]);
         if (noteError) {
             console.warn('[SIGNUP] Falha ao inserir notificação:', noteError);
+        }
+
+        if (!appUsersSynced) {
+            // Não mascara o problema com a mensagem de sucesso: a conta de login (Auth) foi
+            // criada, mas o perfil (app_users) não foi gravado/atualizado corretamente — se o
+            // admin aprovar mesmo assim, o acesso continuará falhando por e-mail divergente.
+            alert(`Sua conta de acesso foi criada, mas houve uma falha ao registrar seu perfil no sistema.\n\nPor favor, entre em contato com o administrador informando sua matrícula (${matricula}) e o e-mail usado no cadastro (${email}) para que ele possa concluir seu cadastro manualmente.`);
+            return true;
         }
 
         alert(`Solicitação enviada para a matrícula ${matricula}.\nAguarde aprovação do Admin!`);
@@ -4822,116 +4868,8 @@ function canMarkDateAsMeta() {
     applyRoleToUI(savedRole);
 })();
 
-/* ----------------------------------------------------------------
-   Função: criar administrador inicial (nildeno e 99030487)
-   Observação: agora suporta múltiplos admins iniciais.
----------------------------------------------------------------- */
-/* ----------------------------------------------------------------
-   Função: criar administrador inicial
----------------------------------------------------------------- */
-/* ----------------------------------------------------------------
-   Função: DIAGNSTICO E CORREO DE USUÁRIOS
----------------------------------------------------------------- */
-/* ----------------------------------------------------------------
-/* ----------------------------------------------------------------
-   PROMOO AUTOMÁTICA DE ADMIN (99030487)
----------------------------------------------------------------- */
-async function promoteAdmin99030487() {
-    const targetEmail = '99030487@gecope.app';
-    try {
-        // Check user
-        const { data, error } = await sbClient.from('app_users').select('role').eq('email', targetEmail).maybeSingle();
-
-        if (data && data.role !== 'admin') {
-            console.log('[AUTO-ADMIN] Promovendo 99030487 para ADMIN...');
-            const { error: upErr } = await sbClient.from('app_users').update({ role: 'admin' }).eq('email', targetEmail);
-
-            if (!upErr) {
-                console.log('[AUTO-ADMIN] Sucesso!');
-                // Update session if logged in
-                const current = sessionStorage.getItem('sop_user');
-                if (current === targetEmail) {
-                    sessionStorage.setItem('sop_role', 'admin');
-                    applyRoleToUI('admin');
-                    alert('Sua conta foi promovida para Administrador com sucesso.');
-                }
-            } else {
-                console.error('[AUTO-ADMIN] Falha ao atualizar:', upErr);
-            }
-        }
-    } catch (e) {
-        console.error('[AUTO-ADMIN] Erro:', e);
-    }
-}
-
-// Executa verificação ao carregar
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(promoteAdmin99030487, 500); // Otimizado de 2000ms
-});
-
-/* --------------------------------------------------------------
-   MODAL: SELEO DE MDULOS (PS LOGIN)
--------------------------------------------------------------- */
-
-const modules = [
-    { id: '#pane-financeiro', name: 'Painel Financeiro' },
-    { id: '#pane-curva-abc', name: 'Curva ABC' },
-    { id: '#pane-reuniao', name: 'Processos' },
-    { id: '#pane-orcamentos', name: 'Orçamentos' },
-    { id: '#pane-composicoes', name: 'Composições' },
-    { id: '#pane-tabelas', name: 'Tabelas' }
-];
-
-function buildModuleSelector() {
-    let html = `
-                    < div class= "modal fade" id = "modalModuleSelector" tabindex = "-1" >
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Escolha os módulos</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="list-group">
-                                    `;
-    modules.forEach(m => {
-        const key = `mod${m.id.replace('#', '')}`;
-        const checked = (localStorage.getItem(key) === 'true') ? 'checked' : '';
-        html += `<label class="list-group-item d-flex justify-content-between align-items-center"><span>${m.name}</span><input type="checkbox" data-target="${m.id}" class="module-checkbox" ${checked}></label>`;
-    });
-    html += `</div></div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button><button class="btn btn-primary" id="btn-apply-modules">Aplicar</button></div></div></div></div > `;
-    document.body.insertAdjacentHTML('beforeend', html);
-    document.getElementById('btn-apply-modules').addEventListener('click', () => {
-        document.querySelectorAll('.module-checkbox').forEach(cb => {
-            const target = cb.dataset.target; const key = `mod${target.replace('#', '')}`;
-            localStorage.setItem(key, cb.checked ? 'true' : 'false');
-            const tabBtn = document.querySelector(`[data-bs-target="${target}"]`);
-            if (tabBtn) tabBtn.parentElement.style.display = cb.checked ? '' : 'none';
-        });
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalModuleSelector'));
-        if (modal) modal.hide();
-    });
-}
-
-function openModuleSelector() {
-    // Se ainda não existe, cria
-    if (!document.getElementById('modalModuleSelector')) buildModuleSelector();
-    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalModuleSelector'));
-    modal.show();
-}
-
 // Expose helper to global (for onclick from HTML)
 try { window.hideAdminPendings = hideAdminPendings; } catch (e) { /* ignore */ }
-
-// Botão do cabeçalho agora abre seleção se estiver logado, ou landing se não
-document.getElementById('btn-admin-login')?.addEventListener('click', () => {
-    const user = sessionStorage.getItem('sop_user');
-    if (!user) {
-        toggleLanding(true);
-        return;
-    }
-    openModuleSelector();
-});
 
 // --- FIM DA LGICA ADMINISTRATIVA ---
 
@@ -5345,7 +5283,7 @@ async function carregarOrcamentos() {
                             </div>
                         </div>
                         <div class="orcamento-actions">
-                            <a href="${obra.arquivo_url}" target="_blank" class="btn-action-baixar" title="Baixar Arquivo"><i class="bi bi-download"></i> Baixar</a>
+                            <a href="${escapeHTML(obra.arquivo_url)}" target="_blank" rel="noopener noreferrer" class="btn-action-baixar" title="Baixar Arquivo"><i class="bi bi-download"></i> Baixar</a>
                             <!-- Nova Versão: APENAS ADMIN -->
                             <button class="btn btn-action-icon admin-only" onclick="prepararNovaVersao(${obra.id})" title="Nova Versão"><i class="bi bi-cloud-arrow-up-fill icon-cloud"></i></button>
                             <!-- Comentário: VISÍVEL PARA TODOS -->
@@ -7266,7 +7204,7 @@ function renderTabelaResults(lista) {
 
         if (fonte === 'ORSE') {
             const link = gerarLinkOrse(item.codigo, item.referencia);
-            btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<a href="${link}" target="_blank" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a></div>`;
+            btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<a href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a></div>`;
         } else {
             btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<button class="btn btn-sm btn-light border" onclick="abrirDetalheTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Ver Detalhes"><i class="bi bi-chevron-right"></i></button></div>`;
         }
@@ -7450,7 +7388,7 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
     if (footerExtra) {
         // Prioriza o tipo selecionado na interface para garantir o link correto
         const linkSeinfra = gerarLinkSeinfra(dadosPai.codigo, tipoRef || dadosPai.tipo_encargo);
-        footerExtra.innerHTML = `<a href="${linkSeinfra}" target="_blank" class="btn btn-outline-primary btn-sm fw-bold">
+        footerExtra.innerHTML = `<a href="${escapeHTML(linkSeinfra)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm fw-bold">
                             <i class="bi bi-box-arrow-up-right me-1"></i> SEINFRA
                         </a>`;
     }

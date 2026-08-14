@@ -230,10 +230,6 @@
   @media (max-width:640px){ .modal .mgrid{grid-template-columns:1fr 1fr} }
   .modal .mgrid .l{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:#6FA891;font-family:Montserrat,sans-serif}
   .modal .mgrid .d{font-size:14px;color:#E4F2EB;font-weight:600;margin-top:3px;word-break:break-word;font-family:Montserrat,sans-serif}
-  .modal .mgrid .sac-btn{display:flex;width:fit-content;align-items:center;gap:4px;margin-top:7px;font-size:10.5px;font-weight:700;
-        color:#04170F;background:linear-gradient(135deg,#2FE6A0,#12907E);border-radius:7px;padding:4px 9px;
-        text-decoration:none;white-space:nowrap;transition:.15s}
-  .modal .mgrid .sac-btn:hover{filter:brightness(1.08)}
   .modal .mupd{font-size:10px;color:#5F8674;margin-top:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);font-family:Montserrat,sans-serif}
   .rev{margin-top:11px;font-size:11.5px;color:#AEC7BC;line-height:1.5}
   .rev b{color:#8EF0C4;font-family:'Space Grotesk',sans-serif}
@@ -540,6 +536,11 @@ const SB_COMISSAO='comissao_fiscalizacao';
 const DB={distritos:DISTRITOS, regioes:REGIOES, municipios:{}};
 for(const cod in MUN){ DB.municipios[cod]={nome:MUN[cod].nome, do:MUN[cod].do, reg:MUN[cod].reg, obras:[]}; }
 
+// Escapa texto vindo do banco (contratos_edificacao/comissao_fiscalizacao) antes de
+// injetar via innerHTML \u2014 p\u00e1gina p\u00fablica, sem login, ent\u00e3o qualquer HTML gravado
+// nesses campos (objeto, contratada, contratante, fiscal, status etc.) executaria
+// no navegador de qualquer visitante do Mapa de Obras.
+function escHtml(s){ return String(s??'').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 function normTxt(s){return (s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim();}
 // normaliza mantendo digitos (necessario p/ diferenciar 1o/2o/3o membro)
 function normTxtNum(s){return (s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
@@ -549,10 +550,13 @@ function classifyComissao(tipoRaw){
   const t=normTxtNum(tipoRaw);
   if(t.includes('PRESIDENTE')) return {label:'PRESIDENTE', rank:6};
   if(t.includes('FISCAL')) return {label:'FISCAL', rank:5};
+  // Precisa vir antes dos testes de d\u00edgito: um valor real como "1\u00ba Suplente"
+  // cont\u00e9m "1", ent\u00e3o SUPLENTE tinha que ser checado primeiro \u2014 sen\u00e3o esse
+  // integrante era classificado (e ranqueado) como titular "1\u00ba Membro".
+  if(t.includes('SUPLENTE')) return {label:'SUPLENTE', rank:1};
   if(t.includes('1') || t.includes('PRIMEIRO')) return {label:'1\u00ba MEMBRO', rank:4};
   if(t.includes('2') || t.includes('SEGUNDO')) return {label:'2\u00ba MEMBRO', rank:3};
   if(t.includes('3') || t.includes('TERCEIRO')) return {label:'3\u00ba MEMBRO', rank:2};
-  if(t.includes('SUPLENTE')) return {label:'SUPLENTE', rank:1};
   if(t.includes('MEMBRO')) return {label:'MEMBRO', rank:0};
   return {label: tipoRaw ? String(tipoRaw).toUpperCase() : 'MEMBRO', rank:-1};
 }
@@ -657,8 +661,6 @@ const st={method:'do',metric:'obras',level:0,group:null,city:null,hoverGroup:nul
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
               valor:{label:'Valor total',fmt:v=>BRL.format(v)},
               aditivo:{label:'Aditivos (R$)',fmt:v=>BRL.format(v)}};
-const GCOL=['#33A07A','#3E8FA0','#6FAE6B','#4E93B8','#8FB86A','#2E8C86','#5FA98C','#3FA0B0','#A6BE6E','#4FB58E','#7C9FC0','#3C8F72','#93C08A','#579BA0'];
-
 const BASE='#3E9E70';
 const allIds=Object.keys(DB.municipios);
 function groupsList(){return st.method==='do'?DB.distritos:DB.regioes;}
@@ -676,25 +678,8 @@ function passF(o){const f=st.f;
   return true;
 }
 function obrasOf(id){return DB.municipios[id].obras.filter(passF);}
-function aggIds(ids){let obras=0,valor=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;adit+=o.aditivo;if(o.statusObra==='Paralisada')par++;}));return{obras,valor,par,adit};}
+function aggIds(ids){let obras=0,valor=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;}));return{obras,valor,par,adit};}
 function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:a.obras;}
-
-function hx(c){c=c.replace('#','');return[parseInt(c.slice(0,2),16),parseInt(c.slice(2,4),16),parseInt(c.slice(4,6),16)];}
-function mix(a,b,t){const A=hx(a),B=hx(b);return`rgb(${A.map((x,i)=>Math.round(x+(B[i]-x)*t)).join(',')})`;}
-function gColor(g){return GCOL[((+g)%GCOL.length+GCOL.length)%GCOL.length];}
-
-let cityThr=[];
-function computeCityScale(){
-  const ids=idsOfGroup(st.group);
-  const vals=ids.map(id=>mval(aggIds([id]))).filter(v=>v>0).sort((a,b)=>a-b);
-  cityThr=[]; if(!vals.length){cityThr=[1];return;}
-  for(let i=1;i<=5;i++) cityThr.push(vals[Math.min(vals.length-1,Math.floor((vals.length-1)*i/5))]);
-}
-function cityColor(v){
-  if(v<=0) return '#0E1F19';
-  let b=0; for(;b<cityThr.length;b++) if(v<=cityThr[b]) break;
-  const r=RAMP[st.metric]; return mix(r[0],r[1],Math.max(.22,(b+1)/6));
-}
 
 // ---- mapa ----
 const map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:6,maxZoom:11});
@@ -959,27 +944,28 @@ function rankRows(entries,onClick){
   const max=Math.max(1,...entries.map(e=>e.v));
   const amber=st.metric==='aditivo'?' amber':'';
   return entries.map((e,i)=>`<div class="rrow" data-k="${e.k}" data-kind="${onClick}">
-     <div class="t"><span class="nm">${e.nome} ${e.sub?`<span class="sub2">· ${e.sub}</span>`:''}</span><span class="vv">${METRIC[st.metric].fmt(e.v)}</span></div>
+     <div class="t"><span class="nm">${escHtml(e.nome)} ${e.sub?`<span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${METRIC[st.metric].fmt(e.v)}</span></div>
      <div class="rbar${amber}"><i style="width:${Math.max(4,e.v/max*100)}%"></i></div></div>`).join('');
 }
 let CUROBRAS=[];
 const PIN_SVG='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.58 7-12A7 7 0 0 0 5 10c0 4.42 7 12 7 12z"/><circle cx="12" cy="10" r="2.3"/></svg>';
 function obraCard(o,i){
   const cod=NAMEIDX[normTxt(o.municipioTxt)];
+  const munTxt=escHtml(o.municipioTxt);
   const munChip=o.municipioTxt
-    ? (cod ? `<span class="chip mun locate" data-cod="${cod}" title="Ver ${o.municipioTxt} no mapa">${PIN_SVG}${o.municipioTxt}</span>`
-           : `<span class="chip mun">${o.municipioTxt}</span>`)
+    ? (cod ? `<span class="chip mun locate" data-cod="${cod}" title="Ver ${munTxt} no mapa">${PIN_SVG}${munTxt}</span>`
+           : `<span class="chip mun">${munTxt}</span>`)
     : '';
   return `<div class="obra" data-oid="${i}">
-    <div class="r1"><span class="ct">${o.contrato}</span><span class="vl">${BRL.format(o.valor)}</span></div>
-    <div class="ob just">${o.objeto}</div>
-    <div class="chips"><span class="chip">${o.status}</span>${o.tipo?`<span class="chip">${o.tipo}</span>`:''}${munChip}</div>
+    <div class="r1"><span class="ct">${escHtml(o.contrato)}</span><span class="vl">${BRL.format(o.valor)}</span></div>
+    <div class="ob just">${escHtml(o.objeto)}</div>
+    <div class="chips"><span class="chip">${escHtml(o.status)}</span>${o.tipo?`<span class="chip">${escHtml(o.tipo)}</span>`:''}${munChip}</div>
     <div class="info">
-      <div><div class="l">Contratada</div><div class="d">${o.contratada}</div></div>
-      <div><div class="l">Contratante</div><div class="d">${o.contratante}</div></div>
+      <div><div class="l">Contratada</div><div class="d">${escHtml(o.contratada)}</div></div>
+      <div><div class="l">Contratante</div><div class="d">${escHtml(o.contratante)}</div></div>
       <div><div class="l">Valor original</div><div class="d">${BRL.format(o.valor_original)}</div></div>
       <div><div class="l">Valor atual</div><div class="d">${BRL.format(o.valor)}</div></div>
-      <div class="fis"><div class="l">${o.fiscalTipo||'FISCAL'}</div><div class="d">${o.fiscal||'—'}</div></div>
+      <div class="fis"><div class="l">${escHtml(o.fiscalTipo||'FISCAL')}</div><div class="d">${escHtml(o.fiscal||'—')}</div></div>
     </div>
     <div class="more">Ver todos os dados ↗</div>
   </div>`;
@@ -996,10 +982,10 @@ function obrasCards(ids){
 function fmtContratoExt(v){
   if(v===null||v===undefined||v==='') return '—';
   const s=String(v).trim();
-  if(/\d\/\d{4}/.test(s)) return s;
+  if(/\d\/\d{4}/.test(s)) return escHtml(s);
   const d=s.replace(/\D/g,'');
   if(d.length>4) return `${d.slice(0,-4)}/${d.slice(-4)}`;
-  return s;
+  return escHtml(s);
 }
 function fmtDateBR(v){
   if(!v) return '—';
@@ -1007,7 +993,7 @@ function fmtDateBR(v){
   const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(m) return `${m[3]}/${m[2]}/${m[1]}`;
   const d=new Date(s); if(!isNaN(d)) return d.toLocaleDateString('pt-BR');
-  return s;
+  return escHtml(s);
 }
 function fmtDateTimeBR(v){
   if(!v) return '—';
@@ -1015,13 +1001,13 @@ function fmtDateTimeBR(v){
   const m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
   if(m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
   const d=new Date(s); if(!isNaN(d)) return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  return s;
+  return escHtml(s);
 }
-function fmtVal(v){ return (v===null||v===undefined||v==='') ? '—' : String(v); }
+function fmtVal(v){ return (v===null||v===undefined||v==='') ? '—' : escHtml(String(v)); }
 function fmtCNPJ(v){
   if(v===null||v===undefined||v==='') return '—';
   const d=String(v).replace(/\D/g,'');
-  if(d.length!==14) return String(v);
+  if(d.length!==14) return escHtml(String(v));
   return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
 }
 const NUMBR=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1041,15 +1027,10 @@ function openModal(o){
   const comissao=(o.comissao&&o.comissao.length)
     ? o.comissao.map(m=>[fmtVal(m.tipo).toUpperCase(), fmtVal(m.nome)])
     : [['FISCAL', fmtVal(o.fiscal)]];
-  const sacVal=raw.nr_contrato_sic;
-  const sacTemStr=sacVal!==null&&sacVal!==undefined&&String(sacVal).trim()!=='';
-  const sacBtn=sacTemStr
-    ? `<a class="sac-btn" href="portal_transparencia.html?sacc=${encodeURIComponent(String(sacVal).trim())}" target="_blank" rel="noopener" title="Consultar este contrato no Portal da Transparência">Portal da Transparência ↗</a>`
-    : '';
   const contrato=[
     ['Nº DO CONTRATO', fmtContratoExt(raw.nr_contrato_ext)],
     ['CÓDIGO DA OBRA', fmtVal(raw.codigo_obra)],
-    ['SAC', fmtVal(raw.nr_contrato_sic), sacBtn],
+    ['SAC', fmtVal(raw.nr_contrato_sic)],
     ['INÍCIO REAL', fmtDateBR(raw.data_inicio_real)],
     ['FIM PREVISTO', fmtDateBR(raw.data_fim_previsto)],
     ['FIM DA VIGÊNCIA', fmtDateBR(raw.data_fim_vigencia_contrato)],
@@ -1070,7 +1051,7 @@ function openModal(o){
   document.getElementById('modal').innerHTML=
     `<div class="mh"><div class="mt">DADOS DO CONTRATO Nº ${fmtContratoExt(raw.nr_contrato_ext)}</div><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
      <div class="mbody">
-       <div class="mobj">${o.objeto}</div>
+       <div class="mobj">${escHtml(o.objeto)}</div>
        ${mSection('Dados da obra',obra)}
        ${mSection('Comissão de fiscalização',comissao)}
        ${mSection('Dados do contrato',contrato)}
@@ -1168,7 +1149,7 @@ function fillFilters(){
   host.innerHTML=FILTER_DEFS.map(d=>{
     const set=new Set(); all.forEach(o=>{const v=d.get(o); if(v)set.add(v);});
     const vals=[...set].sort(d.numeric?(a,b)=>b-a:(a,b)=>a.localeCompare(b,'pt-BR'));
-    const opts=vals.map(v=>`<label class="msel-opt"><input type="checkbox" value="${v.replace(/"/g,'&quot;')}">${v}</label>`).join('')
+    const opts=vals.map(v=>`<label class="msel-opt"><input type="checkbox" value="${escHtml(v)}">${escHtml(v)}</label>`).join('')
       || '<div class="msel-empty">Sem opções</div>';
     return `<div class="msel" data-key="${d.key}">
       <button type="button" class="msel-btn" data-label="${d.label}"></button>
@@ -1242,7 +1223,14 @@ function autoLocateSearch(){
     if(b) map.flyToBounds(b,{padding:[60,60],maxZoom:10,duration:1.1,easeLinearity:.15});
   }
 }
-document.getElementById('fSearch').addEventListener('input',e=>{ st.f.q=e.target.value.trim().toLowerCase(); render(); autoLocateSearch(); });
+let _fSearchTimer=null;
+document.getElementById('fSearch').addEventListener('input',e=>{
+  // PERFORMANCE: render() reestiliza toda a camada GeoJSON + roda o algoritmo de
+  // declutter de rótulos a cada chamada — sem debounce isso rodava a cada tecla digitada.
+  st.f.q=e.target.value.trim().toLowerCase();
+  clearTimeout(_fSearchTimer);
+  _fSearchTimer=setTimeout(()=>{ render(); autoLocateSearch(); },150);
+});
 document.getElementById('clearF').onclick=()=>{
   FILTER_DEFS.forEach(d=>st.f[d.key].clear());
   st.f.q=''; document.getElementById('fSearch').value='';

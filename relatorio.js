@@ -84,7 +84,7 @@
                                     let tableRows = '';
                                     const retroativos = [];
 
-                                    const ordemGrupos = ['MO DE OBRA', 'MATERIAL', 'EQUIPAMENTOS', 'SERVIO', 'GERAL'];
+                                    const ordemGrupos = ['MAO DE OBRA', 'MATERIAL', 'EQUIPAMENTOS', 'SERVIO', 'GERAL'];
                                     const gruposOrdenados = Object.keys(itensAgrupados).sort((a, b) => {
                                         const idxA = ordemGrupos.indexOf(a);
                                         const idxB = ordemGrupos.indexOf(b);
@@ -432,7 +432,7 @@
                                     const itens = itensRaw.map(normalizarItemParaPDF);
 
                                     const itensOrdenados = [...itens].sort((a, b) => {
-                                        const ordem = { 'MO DE OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVIO': 4, 'GERAL': 99 };
+                                        const ordem = { 'MAO DE OBRA': 1, 'MATERIAL': 2, 'EQUIPAMENTOS': 3, 'SERVIO': 4, 'GERAL': 99 };
                                         return (ordem[a.grupo] || 99) - (ordem[b.grupo] || 99);
                                     });
 

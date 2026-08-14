@@ -1,6 +1,17 @@
 (function (window) {
     'use strict';
 
+    /* debounce local (PERFORMANCE): dashboard.js carrega antes de main.js (ver ordem de
+       <script src> em index.html), então window.debounce (definido em main.js) ainda não
+       existe quando os listeners abaixo são registrados. */
+    function dashDebounce(fn, wait) {
+        let t;
+        return function (...args) {
+            clearTimeout(t);
+            t = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
     // UI helpers (moved from main.js)
     function getSelectedValues(selectEl) {
         if (!selectEl) return [];
@@ -196,10 +207,40 @@
     // LOGIC: DASHBOARDS
     var fin = { status: document.getElementById("filter-status"), fiscal: document.getElementById("filter-fiscal"), contratada: document.getElementById("filter-contratada"), contratante: document.getElementById("filter-contratante"), ano: document.getElementById("filter-ano"), clear: document.getElementById("btn-clear-filters"), diffMetric: document.getElementById("metric-diff") };
 
+    // Antes desta correção, toda recarga de window.financeiroData (inclusive a
+    // disparada por criar/editar/excluir QUALQUER processo, mesmo em outra aba)
+    // reconstruía as opções via fillSelect(), que sempre marca tudo como
+    // selecionado — jogando um filtro específico do usuário (ex.: só um fiscal)
+    // de volta para "Todos" sem ele pedir. Agora a seleção manual é capturada
+    // antes do rebuild e reaplicada depois, quando ainda fizer sentido.
+    function capturarSelecaoParcial(el) {
+        if (!el) return null;
+        const opts = Array.from(el.options);
+        const selecionados = opts.filter(o => o.selected).map(o => o.value);
+        if (selecionados.length === 0 || selecionados.length === opts.length) return null; // já era "Todos"/"Nenhum"
+        return new Set(selecionados);
+    }
+    function restaurarSelecaoParcial(el, prevSet) {
+        if (!el || !prevSet) return;
+        const opts = Array.from(el.options);
+        const algumaAindaExiste = opts.some(o => prevSet.has(o.value));
+        if (!algumaAindaExiste) return; // nenhuma opção antiga sobreviveu: mantém "Todos" (padrão do fillSelect)
+        opts.forEach(o => { o.selected = prevSet.has(o.value); });
+        renderMultiSelectUI(el);
+    }
+
     function populateFinanceiroFilters() {
         const base = window.financeiroData || [];
+        const prev = { status: capturarSelecaoParcial(fin.status), fiscal: capturarSelecaoParcial(fin.fiscal), contratada: capturarSelecaoParcial(fin.contratada), contratante: capturarSelecaoParcial(fin.contratante), ano: capturarSelecaoParcial(fin.ano) };
+
         fillSelect(fin.status, base.map(d => d.status)); fillSelect(fin.fiscal, base.map(d => d.fiscal)); fillSelect(fin.contratada, base.map(d => d.contratada)); fillSelect(fin.contratante, base.map(d => d.contratante));
-        const anos = Array.from(new Set(base.map(d => d.anoAbertura).filter(v => v))); fillSelect(fin.ano, anos);
+        const anos = Array.from(new Set(base.map(d => d.anoAbertura))); fillSelect(fin.ano, anos);
+
+        restaurarSelecaoParcial(fin.status, prev.status);
+        restaurarSelecaoParcial(fin.fiscal, prev.fiscal);
+        restaurarSelecaoParcial(fin.contratada, prev.contratada);
+        restaurarSelecaoParcial(fin.contratante, prev.contratante);
+        restaurarSelecaoParcial(fin.ano, prev.ano);
     }
 
     function getFinanceiroData() {
@@ -222,7 +263,7 @@
             if (fis.length > 0 && !fis.includes(d.fiscal)) return false;
             if (cts.length > 0 && !cts.includes(d.contratada)) return false;
             if (crs.length > 0 && !crs.includes(d.contratante)) return false;
-            if (ans.length > 0 && !ans.includes(String(d.anoAbertura))) return false;
+            if (ans.length > 0 && !ans.includes(d.anoAbertura != null ? String(d.anoAbertura) : "Não informado")) return false;
             return true;
         });
     }
@@ -318,6 +359,11 @@
         if (taxaSubEl) taxaSubEl.textContent = `${indice.alterados} de ${indice.total} processos alterados`;
         const taxaCorteEl = document.getElementById("kpi-taxa-revisao-corte");
         if (taxaCorteEl) taxaCorteEl.textContent = "Corte médio entre alterados: " + (window.formatPercentage ? window.formatPercentage(indice.corteMedioAlterados) : String(indice.corteMedioAlterados));
+        const reducaoLabelEl = document.getElementById("kpi-reducao-label");
+        if (reducaoLabelEl) {
+            const labelPorMetrica = { reperc: "Redução sobre a repercussão", acresc: "Redução sobre o acréscimo", supress: "Redução sobre a supressão" };
+            reducaoLabelEl.textContent = labelPorMetrica[metric] || labelPorMetrica.reperc;
+        }
         const reducaoPercEl = document.getElementById("kpi-reducao-perc");
         if (reducaoPercEl) reducaoPercEl.textContent = window.formatPercentage ? window.formatPercentage(reducao.reducaoPerc) : String(reducao.reducaoPerc);
         const reducaoAbsEl = document.getElementById("kpi-reducao-abs");
@@ -473,7 +519,10 @@
             const statusTxt = window.formatStatusDisplay ? window.formatStatusDisplay(d.status) : d.status;
             const statusCls = window.classeBadgeStatus ? window.classeBadgeStatus(d.status) : "";
             const diffIcon = d._diff < 0 ? "bi-arrow-down-short" : "bi-arrow-up-short";
-            const diffPercIcon = d._diffPerc < 0 ? "bi-arrow-down-short" : "bi-arrow-up-short";
+            // Sem seta quando o valor é exatamente 0,0% — setas (para cima/para baixo) só
+            // fazem sentido quando há de fato uma diferença a indicar (pedido do usuário,
+            // 2026-08-14).
+            const diffPercIcon = d._diffPerc === 0 ? "" : (d._diffPerc < 0 ? "bi-arrow-down-short" : "bi-arrow-up-short");
             return `
             <tr>
                 <td>${esc(d.processo)}</td>
@@ -487,7 +536,7 @@
                 <td class="fin-td-mono">${finFmtMoney(d.repercFiscal)}</td>
                 <td class="fin-td-mono">${finFmtMoney(d.repercGecope)}</td>
                 <td class="fin-td-mono"><span class="fin-diff-pill ${d._diff < 0 ? "diff-neg" : "diff-pos"}"><i class="bi ${diffIcon}"></i>${finFmtMoney(Math.abs(d._diff))}</span></td>
-                <td class="fin-td-mono"><span class="fin-diff-pill ${d._diffPerc < 0 ? "diff-neg" : "diff-pos"}"><i class="bi ${diffPercIcon}"></i>${Math.abs(d._diffPerc).toFixed(1)}%</span></td>
+                <td class="fin-td-mono"><span class="fin-diff-pill ${d._diffPerc < 0 ? "diff-neg" : "diff-pos"}">${diffPercIcon ? `<i class="bi ${diffPercIcon}"></i>` : ""}${Math.abs(d._diffPerc).toFixed(1)}%</span></td>
             </tr>`;
         }).join("");
     }
@@ -517,10 +566,10 @@
         const searchEl = document.getElementById("fin-drilldown-search");
         const statusEl = document.getElementById("fin-drilldown-status-filter");
         if (searchEl) {
-            searchEl.addEventListener("input", () => {
+            searchEl.addEventListener("input", dashDebounce(() => {
                 finTableSearch = searchEl.value;
                 renderDrilldownFinanceiro(getFinanceiroData());
-            });
+            }, 250));
         }
         if (statusEl) {
             statusEl.addEventListener("change", () => {
