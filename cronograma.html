@@ -1478,9 +1478,9 @@ body.theme-dark .tarefa-conc-meta {
 </script>
 
 <div class="gecope-hero">
-  <div class="gecope-hero-bg" style="background-image:url('hero-ita.jpg')"></div>
-  <div class="gecope-hero-bg" style="background-image:url('hero-huce.jpg')"></div>
-  <div class="gecope-hero-bg" style="background-image:url('hero-obra.jpg')"></div>
+  <div class="gecope-hero-bg" style="background-image:url('assets/hero-ita.jpg')"></div>
+  <div class="gecope-hero-bg" style="background-image:url('assets/hero-huce.jpg')"></div>
+  <div class="gecope-hero-bg" style="background-image:url('assets/hero-obra.jpg')"></div>
   <div class="gecope-hero-overlay"></div>
   <div class="gecope-hero-content">
 <div class="top-bar">PORTAL SOP-CE GOVERNO DO ESTADO DO CEARÁ SISTEMA DE ADITIVOS DE OBRAS</div>
@@ -3619,8 +3619,8 @@ function mascaraProcesso(el) {
 // SINCRONIZAÇÃO AUTOMÁTICA COM A ABA PROCESSOS
 // ══════════════════════════════════════════════════════════
 // Processos com os status abaixo alimentam automaticamente o Painel Geral
-// de Atividades. Cada linha da tabela "processos" vira (ou atualiza) uma
-// tarefa marcada com origemSync=true, vinculada pelo número do processo.
+// de Tarefas (Cronograma). Cada linha da tabela "processos" vira (ou atualiza)
+// uma tarefa marcada com origemSync=true, vinculada pelo número do processo.
 //
 // - DILIGÊNCIA / AGUAR. REANÁLISE            → tarefa em "fila"
 // - EM ANÁLISE / EM REANÁLISE                → tarefa "ativa" (mostrando o
@@ -3631,7 +3631,7 @@ function mascaraProcesso(el) {
 //   tarefa já existia sincronizada, é concluída automaticamente.
 //
 // Mapeamento letra→analista: o campo "analista" em Processos hoje é só uma
-// letra (N, W, P, H, A, F). Como as 6 pessoas cadastradas em Atividades têm
+// letra (N, W, P, H, A, F). Como as 6 pessoas cadastradas no Cronograma têm
 // iniciais distintas, usamos uma tabela fixa. Se um novo analista for
 // cadastrado com uma letra já usada, o mapeamento precisa ser atualizado
 // aqui manualmente.
@@ -3735,7 +3735,7 @@ async function iniciarApp() {
 
   const remoto = await carregarDadosSupabase();
   if (!remoto) {
-    alert('Erro ao carregar os dados do módulo Atividades. Recarregue a página.');
+    alert('Erro ao carregar os dados do Cronograma. Recarregue a página.');
     return;
   }
 
