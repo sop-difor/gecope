@@ -1,0 +1,98 @@
+services:
+  # Evolution API — SEM "ports": só acessível pela rede interna, nunca pela internet.
+  # Nome da imagem confirmado em 2026-08 (doc.evolution-api.com / repo oficial): o projeto
+  # migrou de "atendai/evolution-api" para "evoapicloud/evolution-api" a partir da v2.3.0
+  # — o nome antigo não existe mais no Docker Hub. Path de persistência de sessão Baileys
+  # confirmado como /evolution/instances (volume evolution_instances abaixo) — sem isso,
+  # cada restart do container exige escanear o QR de novo.
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: gecope-evolution-api
+    restart: unless-stopped
+    environment:
+      - AUTHENTICATION_API_KEY=${EVO_API_KEY}
+      - AUTHENTICATION_TYPE=apikey
+      - DATABASE_ENABLED=false
+      - CONFIG_SESSION_PHONE_CLIENT=GECOPE
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    networks:
+      - whatsapp-internal
+
+  whatsapp-proxy-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gecope-whatsapp-proxy-web
+    restart: unless-stopped
+    command: ["node", "web/index.js"]
+    env_file:
+      - .env
+    # Sobrescreve de propósito o EVO_API_URL documentado no .env.example: dentro do
+    # Docker Compose, o hostname resolvido pela rede interna é sempre o nome do serviço
+    # (evolution-api), então esta é a fonte de verdade real — o valor do .env só importa
+    # se algum dia este processo rodar fora do compose.
+    environment:
+      - EVO_API_URL=http://evolution-api:8080
+    # Sem "ports": só o Caddy fala com este serviço, pela rede interna. O único ponto de
+    # entrada público do stack inteiro é o Caddy (portas 80/443 abaixo).
+    depends_on:
+      - evolution-api
+    networks:
+      - whatsapp-internal
+
+  whatsapp-proxy-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gecope-whatsapp-proxy-worker
+    restart: unless-stopped
+    command: ["node", "worker/worker.js"]
+    env_file:
+      - .env
+    environment:
+      - EVO_API_URL=http://evolution-api:8080
+    # O worker não expõe HTTP nenhum (só faz polling ativo) — o HEALTHCHECK herdado do
+    # Dockerfile (que bate em /health na porta 3000) não se aplica aqui, então é desligado.
+    healthcheck:
+      disable: true
+    depends_on:
+      - evolution-api
+    networks:
+      - whatsapp-internal
+
+  # TLS automático (Let's Encrypt, gratuito) na frente do whatsapp-proxy-web — obrigatório:
+  # o front-end envia o JWT de sessão do usuário no header Authorization, que não pode
+  # trafegar em HTTP puro. Requer DOMAIN apontando (registro DNS tipo A) para o IP público
+  # da VM, e as portas 80/443 liberadas no firewall/security group.
+  caddy:
+    image: caddy:2-alpine
+    container_name: gecope-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # Só sobe depois que o healthcheck do proxy (definido no Dockerfile, bate em /health)
+    # reportar "healthy", evitando o Caddy aceitar tráfego antes do backend estar pronto.
+    depends_on:
+      whatsapp-proxy-web:
+        condition: service_healthy
+    networks:
+      - whatsapp-internal
+
+networks:
+  whatsapp-internal:
+    driver: bridge
+
+volumes:
+  evolution_instances:
+  evolution_store:
+  caddy_data:
+  caddy_config:

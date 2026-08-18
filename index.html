@@ -695,14 +695,9 @@
                                                             onclick="verificarStatusEvolution()">
                                                             <i class="bi bi-arrow-clockwise"></i> Atualizar
                                                         </button>
-                                                        <a href="https://evolution-api-production-1522.up.railway.app/manager"
-                                                            target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-info text-white">
-                                                            <i class="bi bi-chat-left-dots"></i> Ver Mensagens (API)
-                                                        </a>
-                                                        <a href="https://evolution-api-production-1522.up.railway.app/manager"
-                                                            target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-success">
-                                                            <i class="bi bi-qr-code-scan"></i> Conectar
-                                                        </a>
+                                                        <button class="btn btn-sm btn-success" onclick="mostrarQrCodeWhatsApp()">
+                                                            <i class="bi bi-qr-code-scan"></i> Conectar (QR Code)
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -835,6 +830,10 @@
                                                                     type="checkbox"><label
                                                                     class="form-check-label small">Geral</label></div>
                                                         </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
+                                                        </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('novo_processo', this.form)">Salvar</button>
                                                         <button type="button"
@@ -851,6 +850,10 @@
                                                                 role="switch">
                                                             <label
                                                                 class="form-check-label fw-bold small">Ativado</label>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
                                                         </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('mudanca_status_processo', this.form)">Salvar</button>
@@ -869,6 +872,10 @@
                                                             <label
                                                                 class="form-check-label fw-bold small">Ativado</label>
                                                         </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
+                                                        </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('novas_metas_processo', this.form)">Salvar</button>
                                                         <button type="button"
@@ -884,6 +891,10 @@
                                                                 role="switch" checked>
                                                             <label
                                                                 class="form-check-label fw-bold small">Ativado</label>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
                                                         </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('analista_designado', this.form)">Salvar</button>
@@ -933,6 +944,10 @@
                                                                     type="checkbox"><label
                                                                     class="form-check-label small">Geral</label></div>
                                                         </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
+                                                        </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('atualizacao_orcamento', this.form)">Salvar</button>
                                                         <button type="button"
@@ -959,6 +974,10 @@
                                                                     class="form-check-input config-dest-geral"
                                                                     type="checkbox"><label
                                                                     class="form-check-label small">Geral</label></div>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
                                                         </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('novo_comentario_orcamento', this.form)">Salvar</button>
@@ -1008,6 +1027,10 @@
                                                                     type="checkbox"><label
                                                                     class="form-check-label small">Geral</label></div>
                                                         </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
+                                                        </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('atualizacao_composicao', this.form)">Salvar</button>
                                                         <button type="button"
@@ -1034,6 +1057,10 @@
                                                                     class="form-check-input config-dest-geral"
                                                                     type="checkbox"><label
                                                                     class="form-check-label small">Geral</label></div>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{NOME_OBRA}}, {{NUP_PROCESSO}}... Deixe em branco para usar o padrão."></textarea>
                                                         </div>
                                                         <button type="button" class="btn btn-xs btn-success fw-bold"
                                                             onclick="WhatsAppConfigManager.save('atualizacao_tabelas', this.form)">Salvar</button>

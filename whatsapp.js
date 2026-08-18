@@ -1,17 +1,26 @@
-                                                                        // Todas as chamadas à Evolution API passam por aqui — sem timeout, uma API
-                                                                        // travada deixava o spinner/texto "Consultando..." pendurado indefinidamente.
-                                                                        // Também é o único ponto de saída para a Evolution API neste arquivo, então é
-                                                                        // aqui que barramos a chamada quando o recurso está pausado (sem EVO_API_KEY/
-                                                                        // EVO_API_URL configurados) — evita disparar requisições com credenciais em
-                                                                        // branco contra uma instância que pode nem existir mais.
+                                                                        // Todas as chamadas de WhatsApp passam por aqui — vão para o proxy próprio
+                                                                        // (server/whatsapp-proxy), nunca mais direto para a Evolution API. Sem
+                                                                        // timeout, uma API travada deixava o spinner/texto "Consultando..."
+                                                                        // pendurado indefinidamente. Também injeta automaticamente o JWT da sessão
+                                                                        // atual como Bearer token — é assim que o proxy sabe quem está chamando,
+                                                                        // sem nenhuma credencial de WhatsApp precisar existir no cliente.
                                                                         async function fetchComTimeout(url, options = {}, timeoutMs = 15000) {
-                                                                            if (!window.EVO_API_KEY || !window.EVO_API_URL) {
-                                                                                throw new Error('Disparo de WhatsApp está pausado no momento (integração com a Evolution API desativada). Contate o administrador para mais informações.');
+                                                                            if (!window.WHATSAPP_PROXY_URL) {
+                                                                                throw new Error('Disparo de WhatsApp está pausado no momento (proxy não configurado). Contate o administrador para mais informações.');
+                                                                            }
+                                                                            const { data: sessionData } = await sbClient.auth.getSession();
+                                                                            const token = sessionData?.session?.access_token;
+                                                                            if (!token) {
+                                                                                throw new Error('Sessão expirada. Faça login novamente para enviar mensagens.');
                                                                             }
                                                                             const controller = new AbortController();
                                                                             const timer = setTimeout(() => controller.abort(), timeoutMs);
                                                                             try {
-                                                                                return await fetch(url, { ...options, signal: controller.signal });
+                                                                                return await fetch(url, {
+                                                                                    ...options,
+                                                                                    headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+                                                                                    signal: controller.signal
+                                                                                });
                                                                             } finally {
                                                                                 clearTimeout(timer);
                                                                             }
@@ -271,7 +280,7 @@
                                                                                     } catch (e) { failCount++; }
                                                                                 }
 
-                                                                                Swal.fire('Broadcast Finalizado', `${successCount} mensagens enviadas com sucesso.${failCount > 0 ? ` ${failCount} falhas ou pulados.` : ''}`, 'success');
+                                                                                Swal.fire('Broadcast Enfileirado', `${successCount} mensagens enfileiradas para envio — acompanhe o resultado no painel de logs.${failCount > 0 ? ` ${failCount} falhas ao enfileirar ou pulados.` : ''}`, 'success');
 
                                                                                 btn.disabled = false;
                                                                                 btn.innerHTML = originalContent;
@@ -329,7 +338,13 @@
                                                                                 MES_REFERENCIA: 'Jan/2026'
                                                                             };
 
-                                                                            const msg = gerarMensagemAmigavel(eventoGatilho, dadosFalsos);
+                                                                            // Reflete o texto que está no campo AGORA (mesmo que ainda não salvo) — mais
+                                                                            // útil para o admin conferir o que está prestes a salvar, mesmo padrão de
+                                                                            // seletor usado em WhatsAppConfigManager.loadAll.
+                                                                            const form = document.querySelector(`form[data-gatilho="${eventoGatilho}"]`);
+                                                                            const textoCustomizado = form?.querySelector('.config-texto')?.value || null;
+
+                                                                            const msg = gerarMensagemAmigavel(eventoGatilho, dadosFalsos, textoCustomizado);
 
                                                                             Swal.fire({
                                                                                 title: 'Pré-visualização (Redação Dinâmica)',
@@ -339,7 +354,7 @@
                                                                             });
                                                                         };
 
-                                                                        function gerarMensagemAmigavel(evento, dados) {
+                                                                        function gerarMensagemAmigavel(evento, dados, textoCustomizado = null) {
                                                                             const conf = NOTIFICATION_MAP[evento] || { titulo: " Notificação", sub: " Processamento" };
 
                                                                             // MOTOR DE SPINNING: Variantes para evitar bloqueio por spam
@@ -402,39 +417,59 @@
                                                                             const objetoTexto = dados.NOME_OBRA || dados.DESCRICAO || 'Obra não informada';
                                                                             const nup = dados.NUP_PROCESSO || 'Não informado';
 
-                                                                            let linhas = [
-                                                                                ` 📑*OBJETO:* ${objetoTexto}`,
-                                                                                ` 📍 Aditivo de Serviços`,
-                                                                                ` 📍*NUP:* ${nup}`
-                                                                            ];
+                                                                            let corpo;
+                                                                            if (textoCustomizado && textoCustomizado.trim()) {
+                                                                                // Texto configurado pelo admin (config_whatsapp.texto_mensagem) substitui o
+                                                                                // corpo fixo do template deste evento. Placeholders {{CAMPO}} são resolvidos
+                                                                                // contra os mesmos nomes de campo usados em dadosDinamicos (ex.: NUP_PROCESSO,
+                                                                                // NOME_OBRA). Saudação/conector/footer continuam variando normalmente por cima
+                                                                                // (motor anti-spam preservado mesmo com corpo customizado).
+                                                                                corpo = textoCustomizado.replace(/\{\{(\w+)\}\}/g, (_, campo) => (dados[campo] ?? `{{${campo}}}`));
+                                                                            } else {
+                                                                                let linhas = [
+                                                                                    ` 📑*OBJETO:* ${objetoTexto}`,
+                                                                                    ` 📍 Aditivo de Serviços`,
+                                                                                    ` 📍*NUP:* ${nup}`
+                                                                                ];
 
-                                                                            // Adiciona campos específicos
-                                                                            if (evento === 'novo_processo') {
-                                                                                linhas.push(` 📊*Status:* Análise Fiscal`);
-                                                                                if (dados.DATA_META) {
-                                                                                    linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
+                                                                                // Adiciona campos específicos
+                                                                                if (evento === 'novo_processo') {
+                                                                                    linhas.push(` 📊*Status:* Análise Fiscal`);
+                                                                                    if (dados.DATA_META) {
+                                                                                        linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
+                                                                                    }
+                                                                                } else if (evento === 'mudanca_status_processo') {
+                                                                                    const stExibicao = (dados.NOVO_STATUS || "Análise Fiscal");
+                                                                                    linhas.push(` 📊*Novo Status:* ${stExibicao}`);
+                                                                                    if (dados.DATA_META) {
+                                                                                        linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
+                                                                                    }
+                                                                                } else if (evento === 'novas_metas_processo') {
+                                                                                    linhas.push(` 🚨*Prazo Final:* Excedido!!!`);
+                                                                                } else if (evento === 'analista_designado') {
+                                                                                    linhas.push(` 📊*Status:* Em Análise`);
                                                                                 }
-                                                                            } else if (evento === 'mudanca_status_processo') {
-                                                                                const stExibicao = (dados.NOVO_STATUS || "Análise Fiscal");
-                                                                                linhas.push(` 📊*Novo Status:* ${stExibicao}`);
-                                                                                if (dados.DATA_META) {
-                                                                                    linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
-                                                                                }
-                                                                            } else if (evento === 'novas_metas_processo') {
-                                                                                linhas.push(` 🚨*Prazo Final:* Excedido!!!`);
-                                                                            } else if (evento === 'analista_designado') {
-                                                                                linhas.push(` 📊*Status:* Em Análise`);
+
+                                                                                const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAÇÃO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";
+                                                                                corpo = linhas.join('\n') + avisoSuite;
                                                                             }
 
-                                                                            const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAÇÃO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";
-
-                                                                            return `*${conf.titulo.trim()}*\n\n${saudacao}\n${conector}\n\n${linhas.join('\n')}${avisoSuite}\n\n${footer}`;
+                                                                            return `*${conf.titulo.trim()}*\n\n${saudacao}\n${conector}\n\n${corpo}\n\n${footer}`;
                                                                         }
 
                                                                         // Cache para evitar disparos duplicados (debounce)
                                                                         const lastNotificationCache = new Map();
 
+                                                                        // Enfileira um envio via proxy (server/whatsapp-proxy) — não fala mais direto com a
+                                                                        // Evolution API. O envio real e a finalização do status ('sucesso'/'falha') do log
+                                                                        // acontecem depois, no worker do proxy (via service role), não aqui — por isso
+                                                                        // o retorno desta função significa "aceito na fila", não "entregue".
+                                                                        // `logRow` é declarado FORA do try (não dentro dele) de propósito: código antigo o
+                                                                        // declarava com `let` dentro do try, invisível no catch irmão (escopo de bloco do
+                                                                        // JS) — isso lançava um ReferenceError sempre que o disparo falhava, silenciosamente
+                                                                        // interrompendo o loop de broadcast de processarNotificacao no primeiro destinatário.
                                                                         async function enviarMensagemIndividual(telefone, texto, nomeDestinatario = "Destinatário", eventoGatilho = "disparo_manual", dadosExtras = {}) {
+                                                                            let logRow = null;
                                                                             try {
                                                                                 let cleanPhone = telefone.replace(/\D/g, '');
                                                                                 if (cleanPhone.length === 10 || cleanPhone.length === 11) cleanPhone = '55' + cleanPhone;
@@ -451,7 +486,6 @@
                                                                                 }
 
                                                                                 // Cria log inicial
-                                                                                let logRow = null;
                                                                                 try {
                                                                                     const { data, error: insertError } = await sbClient.from('whatsapp_logs').insert({
                                                                                         evento: eventoGatilho,
@@ -459,7 +493,7 @@
                                                                                         destinatario_nome: nomeDestinatario,
                                                                                         mensagem: texto,
                                                                                         status: 'processando',
-                                                                                        erro_detalhe: 'Iniciando disparo...',
+                                                                                        erro_detalhe: 'Enfileirando disparo...',
                                                                                         // nup e objeto removidos por não existirem na tabela
                                                                                     }).select('id').single();
 
@@ -471,30 +505,26 @@
                                                                                     console.warn("[WhatsApp] Erro não-crítico ao registrar log inicial:", e);
                                                                                 }
 
-                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/send`, {
                                                                                     method: 'POST',
-                                                                                    headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
+                                                                                    headers: { 'Content-Type': 'application/json' },
                                                                                     body: JSON.stringify({
                                                                                         number: cleanPhone,
                                                                                         text: texto,
-                                                                                        delay: 1200,
-                                                                                        linkPreview: false
+                                                                                        log_id: logRow?.id || null
                                                                                     })
                                                                                 });
 
-                                                                                const resData = await response.json();
-                                                                                const isOk = response.ok;
-                                                                                const statusEnvio = isOk ? 'sucesso' : 'falha';
-                                                                                const detalheErro = isOk ? `ID:${resData.key?.id || resData.id || ''}` : `Erro: ${response.status} - ${resData.response?.message || resData.error || 'Desconhecido'}`;
-
-                                                                                if (logRow) {
+                                                                                if (!response.ok && logRow) {
+                                                                                    // Não foi nem aceito na fila (ex.: proxy fora do ar, sessão inválida) — o worker
+                                                                                    // nunca vai processar este job, então é o cliente quem precisa marcar a falha.
                                                                                     await sbClient.from('whatsapp_logs').update({
-                                                                                        status: statusEnvio,
-                                                                                        erro_detalhe: detalheErro
+                                                                                        status: 'falha',
+                                                                                        erro_detalhe: `Erro ao enfileirar: HTTP ${response.status}`
                                                                                     }).eq('id', logRow.id);
                                                                                 }
 
-                                                                                return isOk;
+                                                                                return response.ok;
                                                                             } catch (err) {
                                                                                 console.error("[WhatsApp] Erro no disparo:", err);
                                                                                 if (logRow && logRow.id) {
@@ -648,7 +678,7 @@
                                                                                     // Loop de envio sequencial com delay anti-bloqueio
                                                                                     for (let i = 0; i < alvosCompletos.length; i++) {
                                                                                         const alvo = alvosCompletos[i];
-                                                                                        const mensagemUnica = gerarMensagemAmigavel(eventoGatilho, dadosDinamicos);
+                                                                                        const mensagemUnica = gerarMensagemAmigavel(eventoGatilho, dadosDinamicos, config.texto_mensagem);
 
                                                                                         console.log(`[WhatsApp] Disparando para: ${alvo.nome} (${alvo.fone})`);
 
@@ -753,38 +783,30 @@
                                                                             }
                                                                         }
 
+                                                                        // O proxy busca telefone/mensagem do próprio log — o cliente só informa o id.
+                                                                        // O envio real acontece no worker de forma assíncrona; um 202 aqui significa
+                                                                        // "reenvio aceito na fila", não "mensagem entregue".
                                                                         async function reenviarMensagemWhatsApp(logId) {
                                                                             try {
-                                                                                const { data: log, error } = await sbClient.from('whatsapp_logs').select('*').eq('id', logId).single();
+                                                                                const { data: log, error } = await sbClient.from('whatsapp_logs').select('destinatario, destinatario_nome').eq('id', logId).single();
                                                                                 if (error || !log) throw new Error("Log não encontrado.");
 
                                                                                 Swal.fire({
-                                                                                    title: 'Reenviando...',
-                                                                                    text: `Tentando para ${log.destinatario_nome || log.destinatario}`,
+                                                                                    title: 'Enfileirando reenvio...',
+                                                                                    text: `Para ${log.destinatario_nome || log.destinatario}`,
                                                                                     allowOutsideClick: false,
                                                                                     didOpen: () => { Swal.showLoading(); }
                                                                                 });
 
-                                                                                let targetNumber = log.destinatario;
-                                                                                if (targetNumber.length === 13 && (targetNumber.startsWith('55889') || targetNumber.startsWith('55859'))) {
-                                                                                    targetNumber = targetNumber.substring(0, 4) + targetNumber.substring(5);
-                                                                                }
-
-                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/message/sendText/${EVO_INSTANCE}`, {
-                                                                                    method: 'POST',
-                                                                                    headers: { 'Content-Type': 'application/json', 'apikey': EVO_API_KEY },
-                                                                                    body: JSON.stringify({ number: targetNumber, text: log.mensagem, delay: 500, linkPreview: false })
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/resend/${logId}`, {
+                                                                                    method: 'POST'
                                                                                 });
 
                                                                                 if (response.ok) {
-                                                                                    await sbClient.from('whatsapp_logs').update({
-                                                                                        status: 'sucesso',
-                                                                                        erro_detalhe: 'Reenviado em ' + new Date().toLocaleString()
-                                                                                    }).eq('id', logId);
-                                                                                    Swal.fire('Sucesso!', 'Mensagem reenviada.', 'success');
+                                                                                    Swal.fire('Reenvio enfileirado', 'Acompanhe o resultado no painel de logs em alguns instantes.', 'success');
                                                                                 } else {
-                                                                                    const errData = await response.json();
-                                                                                    throw new Error(formatarErroWhatsApp(`Erro: ${response.status} - ${errData.response?.message || errData.error || 'Erro'}`));
+                                                                                    const errData = await response.json().catch(() => ({}));
+                                                                                    throw new Error(formatarErroWhatsApp(`Erro: ${response.status} - ${errData.error || 'Erro'}`));
                                                                                 }
                                                                                 carregarLogsWhatsApp();
                                                                             } catch (err) {
@@ -863,62 +885,31 @@
                                                                             });
                                                                         }
 
+                                                                        // O proxy já resolve internamente o caso de instância inexistente (cria
+                                                                        // automaticamente e devolve state:'creating') — o cliente só precisa mapear
+                                                                        // o `state` recebido para o texto exibido, sem orquestrar duas chamadas.
                                                                         async function verificarStatusEvolution() {
                                                                             const statusText = document.getElementById('ws-status-text');
                                                                             if (!statusText) return;
 
                                                                             try {
                                                                                 statusText.innerText = "Consultando instância...";
-                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
-                                                                                    headers: { 'apikey': EVO_API_KEY }
-                                                                                });
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/status`);
+                                                                                const data = await response.json().catch(() => ({}));
+                                                                                const state = data.state || 'unknown';
 
-                                                                                if (response.ok) {
-                                                                                    const data = await response.json();
-                                                                                    const state = data.instance?.state || 'unknown';
-
-                                                                                    if (state === 'open') {
-                                                                                        statusText.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Conectado (SOP)</span>';
-                                                                                    } else if (state === 'connecting' || state === 'close') {
-                                                                                        statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-qr-code"></i> Instância: ${state} (Escaneie o QR)</span>`;
-                                                                                    } else {
-                                                                                        statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> Instância: ${state}</span>`;
-                                                                                    }
-                                                                                } else if (response.status === 404) {
-                                                                                    // Se a instância não existir, tenta criar
-                                                                                    statusText.innerText = "Instância não encontrada. Tentando criar...";
-                                                                                    await criarInstanciaEvolution();
+                                                                                if (state === 'open') {
+                                                                                    statusText.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Conectado (SOP)</span>';
+                                                                                } else if (state === 'connecting' || state === 'close' || state === 'creating') {
+                                                                                    statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-qr-code"></i> Instância: ${state} (Escaneie o QR)</span>`;
+                                                                                } else if (state === 'offline') {
+                                                                                    statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Proxy/API Offline</span>';
                                                                                 } else {
-                                                                                    statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Erro na API</span>';
+                                                                                    statusText.innerHTML = `<span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> Instância: ${state}</span>`;
                                                                                 }
                                                                             } catch (err) {
                                                                                 statusText.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> API Offline</span>';
                                                                                 console.error("[WhatsApp] Erro ao verificar status:", err);
-                                                                            }
-                                                                        }
-
-                                                                        async function criarInstanciaEvolution() {
-                                                                            try {
-                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/instance/create`, {
-                                                                                    method: 'POST',
-                                                                                    headers: {
-                                                                                        'Content-Type': 'application/json',
-                                                                                        'apikey': EVO_API_KEY
-                                                                                    },
-                                                                                    body: JSON.stringify({
-                                                                                        instanceName: EVO_INSTANCE,
-                                                                                        token: EVO_API_KEY,
-                                                                                        integration: "WHATSAPP-BAILEYS",
-                                                                                        qrcode: true
-                                                                                    })
-                                                                                });
-                                                                                if (response.ok) {
-                                                                                    document.getElementById('ws-status-text').innerText = "Instância 'SOP' criada. Conecte-se agora.";
-                                                                                    // Recarrega status após criar
-                                                                                    setTimeout(verificarStatusEvolution, 800); // Optimized from 2000ms
-                                                                                }
-                                                                            } catch (e) {
-                                                                                console.error("Erro ao criar instância:", e);
                                                                             }
                                                                         }
 
@@ -934,24 +925,46 @@
                                                                             showToast("Verificando status da instância...", "info");
 
                                                                             try {
-                                                                                const response = await fetchComTimeout(`${EVO_API_URL}/instance/connectionState/${EVO_INSTANCE}`, {
-                                                                                    method: 'GET',
-                                                                                    headers: { 'apikey': EVO_API_KEY }
-                                                                                });
-
-                                                                                const data = await response.json();
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/status`);
+                                                                                const data = await response.json().catch(() => ({}));
                                                                                 console.log("[WhatsApp] Status da Instância:", data);
 
-                                                                                const state = data.instance?.state || data.state || 'desconhecido';
+                                                                                const state = data.state || 'desconhecido';
 
                                                                                 if (state === 'open') {
                                                                                     Swal.fire('Conectado!', 'A API do WhatsApp está operando normalmente.', 'success');
                                                                                 } else {
-                                                                                    Swal.fire('Instância: ' + state, `O estado atual é "${state}". Para que o sistema funcione, a instância deve estar "open". Verifique no painel da Evolution.`, 'warning');
+                                                                                    Swal.fire('Instância: ' + state, `O estado atual é "${state}". Para que o sistema funcione, a instância deve estar "open". Use o botão "Conectar (QR Code)" se precisar parear novamente.`, 'warning');
                                                                                 }
                                                                             } catch (e) {
                                                                                 console.error(e);
-                                                                                Swal.fire('Erro na Conexão', 'Não foi possível contatar o servidor da API. Verifique a URL e a API Key no código.', 'error');
+                                                                                Swal.fire('Erro na Conexão', 'Não foi possível contatar o proxy de WhatsApp. Verifique se WHATSAPP_PROXY_URL está configurado e a VM está no ar.', 'error');
+                                                                            }
+                                                                        };
+
+                                                                        // Busca o QR code de pareamento no proxy (admin-only no backend) e exibe direto
+                                                                        // no painel do GECOPE — a Evolution API não tem porta pública, então este é o
+                                                                        // único jeito de escanear o QR sem acesso à VM.
+                                                                        window.mostrarQrCodeWhatsApp = async function () {
+                                                                            try {
+                                                                                Swal.fire({ title: 'Buscando QR Code...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/instance/qrcode`);
+                                                                                if (!response.ok) {
+                                                                                    if (response.status === 403) throw new Error('Apenas administradores podem visualizar o QR code.');
+                                                                                    throw new Error('QR code indisponível no momento. Tente novamente em alguns segundos.');
+                                                                                }
+                                                                                const { qrcode } = await response.json();
+                                                                                if (!qrcode) throw new Error('QR code indisponível no momento.');
+
+                                                                                const imgSrc = qrcode.startsWith('data:') ? qrcode : `data:image/png;base64,${qrcode}`;
+                                                                                Swal.fire({
+                                                                                    title: 'Escaneie para conectar',
+                                                                                    html: `<img src="${imgSrc}" alt="QR Code WhatsApp" style="max-width:280px;width:100%;" />`,
+                                                                                    confirmButtonText: 'Fechar'
+                                                                                });
+                                                                            } catch (err) {
+                                                                                Swal.fire('Erro ao buscar QR Code', err.message, 'error');
                                                                             }
                                                                         };
 

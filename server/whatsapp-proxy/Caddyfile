@@ -1,0 +1,3 @@
+{$DOMAIN} {
+	reverse_proxy whatsapp-proxy-web:3000
+}
