@@ -329,16 +329,18 @@
                                                                         // ============================================
                                                                         // MOTOR DE REDACAO DINAMICA (PADRAO CARD GECOPE)
                                                                         // ============================================
+                                                                        // Cada evento usa um emoji próprio no título, sem repetir os emojis já usados
+                                                                        // no corpo da mensagem (📑🏗️📍📊🎯🚨👤📁📝📈🔖🗓️) — ver gerarMensagemAmigavel abaixo.
                                                                         const NOTIFICATION_MAP = {
-                                                                            'novo_processo': { titulo: ' *Novo Processo*', sub: ' Cadastro Inicial' },
-                                                                            'mudanca_status_processo': { titulo: ' *Mudança de Status*', sub: ' Reanálise Solicitada' },
-                                                                            'novas_metas_processo': { titulo: '️ *Alerta de Atraso*', sub: ' Prazo Excedido' },
-                                                                            'atualizacao_composicao': { titulo: ' *Nova Composição*', sub: ' Cadastro de Referência' },
-                                                                            'atualizacao_orcamento': { titulo: ' *Atualização de Orçamento*', sub: ' Revisão de Dados' },
-                                                                            'novo_comentario_orcamento': { titulo: ' *Novo Comentário*', sub: ' Revisão Técnica' },
-                                                                            'novo_comentario_composicao': { titulo: ' *Novo Comentário*', sub: ' Revisão de Composição' },
-                                                                            'atualizacao_tabelas': { titulo: ' *Atualização de Tabelas*', sub: ' Tabelas de Referência' },
-                                                                            'analista_designado': { titulo: ' *Analista Designado*', sub: ' Replanilhamento' }
+                                                                            'novo_processo': { titulo: '🆕 *Novo Processo*', sub: '🗂️ Cadastro Inicial' },
+                                                                            'mudanca_status_processo': { titulo: '🔄 *Mudança de Status*', sub: '📌 Reanálise Solicitada' },
+                                                                            'novas_metas_processo': { titulo: '⏰ *Alerta de Atraso*', sub: '⌛ Prazo Excedido' },
+                                                                            'atualizacao_composicao': { titulo: '🧩 *Nova Composição*', sub: '📚 Cadastro de Referência' },
+                                                                            'atualizacao_orcamento': { titulo: '💰 *Atualização de Orçamento*', sub: '✏️ Revisão de Dados' },
+                                                                            'novo_comentario_orcamento': { titulo: '💬 *Novo Comentário*', sub: '🔍 Revisão Técnica' },
+                                                                            'novo_comentario_composicao': { titulo: '🗨️ *Novo Comentário*', sub: '🔍 Revisão de Composição' },
+                                                                            'atualizacao_tabelas': { titulo: '📘 *Atualização de Tabelas*', sub: '📗 Tabelas de Referência' },
+                                                                            'analista_designado': { titulo: '🧮 *Analista Designado*', sub: '📋 Replanilhamento' }
                                                                         };
 
                                                                         window.testarPreviaMensagem = function (eventoGatilho) {
@@ -465,7 +467,7 @@
                                                                             } else if (ehEventoDeProcesso) {
                                                                                 let linhas = [
                                                                                     ` 📑*OBJETO:* ${objetoTexto}`,
-                                                                                    ` 📍 Aditivo de Serviços`,
+                                                                                    ` 🏗️ Aditivo de Serviços`,
                                                                                     ` 📍*NUP:* ${nup}`
                                                                                 ];
 
@@ -504,7 +506,7 @@
                                                                                 if (autor) linhas.push(` 👤*Autor:* ${autor}`);
                                                                                 if (referencia) linhas.push(` 📁*Referência:* ${referencia}`);
                                                                                 if (dados.DESCRICAO) linhas.push(` 📝*Descrição:* ${dados.DESCRICAO}`);
-                                                                                if (dados.TABELA_NOME) linhas.push(` 📊*Tabela:* ${dados.TABELA_NOME}`);
+                                                                                if (dados.TABELA_NOME) linhas.push(` 📈*Tabela:* ${dados.TABELA_NOME}`);
                                                                                 if (dados.VERSAO) linhas.push(` 🔖*Versão:* ${dados.VERSAO}`);
                                                                                 if (dados.MES_REFERENCIA) linhas.push(` 🗓️*Mês de referência:* ${dados.MES_REFERENCIA}`);
 
@@ -781,11 +783,11 @@
                                                                                     return `
                         <tr>
                             <td class="small text-muted">${new Date(log.created_at).toLocaleString('pt-BR')}</td>
-                            <td><span class="badge bg-light text-dark" style="font-size:0.6rem">${escapeHTML(log.evento)}</span></td>
-                            <td class="fw-bold small text-truncate" style="max-width: 120px;">${escapeHTML(log.destinatario_nome) || '-'}</td>
-                            <td class="small">${escapeHTML(log.destinatario)}</td>
+                            <td class="small text-muted">${escapeHTML(log.evento)}</td>
+                            <td class="small text-muted text-truncate" style="max-width: 120px;">${escapeHTML(log.destinatario_nome) || '-'}</td>
+                            <td class="small text-muted">${escapeHTML(log.destinatario)}</td>
                             <td class="small text-muted">${escapeHTML(nupExibicao)}</td>
-                            <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(objetoExibicao)}">${escapeHTML(objetoExibicao)}</td>
+                            <td class="small text-muted text-truncate" style="max-width: 150px;" title="${escapeHTML(objetoExibicao)}">${escapeHTML(objetoExibicao)}</td>
                             <td>
                                 <span class="badge ${statusColor}" style="font-size:0.65rem">
                                     ${escapeHTML(log.status.toUpperCase())}
@@ -894,6 +896,37 @@
                                                                                     console.error("Erro ao excluir log:", err);
                                                                                     Swal.fire('Erro', 'Não foi possível excluir o log.', 'error');
                                                                                 }
+                                                                            }
+                                                                        }
+
+                                                                        // Apaga de uma vez todos os logs com status 'falha' — mesmo filtro usado por
+                                                                        // carregarLogsWhatsApp, então corresponde exatamente ao que está listado na tela.
+                                                                        async function excluirTodosLogsFalhaWhatsApp() {
+                                                                            const { isConfirmed } = await Swal.fire({
+                                                                                title: 'Limpar todas as falhas?',
+                                                                                text: "Todos os registros de falha listados serão removidos permanentemente. Esta ação não pode ser desfeita.",
+                                                                                icon: 'warning',
+                                                                                showCancelButton: true,
+                                                                                confirmButtonColor: '#d33',
+                                                                                confirmButtonText: 'Sim, limpar tudo!',
+                                                                                cancelButtonText: 'Cancelar'
+                                                                            });
+
+                                                                            if (!isConfirmed) return;
+
+                                                                            try {
+                                                                                const { error } = await sbClient
+                                                                                    .from('whatsapp_logs')
+                                                                                    .delete()
+                                                                                    .eq('status', 'falha');
+
+                                                                                if (error) throw error;
+
+                                                                                showToast("Falhas removidas com sucesso.");
+                                                                                carregarLogsWhatsApp();
+                                                                            } catch (err) {
+                                                                                console.error("Erro ao limpar logs de falha:", err);
+                                                                                Swal.fire('Erro', 'Não foi possível limpar os logs de falha.', 'error');
                                                                             }
                                                                         }
 
