@@ -109,7 +109,8 @@ async function fetchTable(tbl,{select='*',filter=''}={}){
   const firstChunk=await first.json();
   const range=first.headers.get('content-range'); // "0-999/3577"
   const total=range && range.includes('/') ? parseInt(range.split('/')[1],10) : NaN;
-  if(!isFinite(total) || firstChunk.length>=total) return firstChunk;
+  if(!isFinite(total)){ console.warn('Content-Range ausente/inválido em '+tbl+' — assumindo que a 1ª página já é a tabela inteira ('+firstChunk.length+' linhas). Se a tabela tiver mais que isso, os dados vêm truncados.'); return firstChunk; }
+  if(firstChunk.length>=total) return firstChunk;
   const pageReqs=[];
   for(let from=PAGE; from<total; from+=PAGE){
     const to=Math.min(from+PAGE-1,total-1);
@@ -172,6 +173,7 @@ function writeCache(scope,rows,fisc){
 
 async function loadData(){
   for(const c in DB.municipios) DB.municipios[c].obras=[];
+  invalidateAggCache(); // sem isso, um hover no mapa durante o fetch devolveria contagens da era de filtro anterior
   try{
     const scope=st.dataScope;
     const cached=readCache(scope);
