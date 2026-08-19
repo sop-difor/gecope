@@ -18,15 +18,29 @@ try{
 }
 /* ============================================================
    CONEXÃO COM O SUPABASE
-   Requer política RLS de leitura (SELECT) para o papel anon
-   na tabela public.contratos_edificacao. Se o Supabase estiver
-   inacessível, o painel mostra um erro explícito (showDataError) —
-   não há mais um dataset de demonstração.
+   URL/chave vêm de config.js (window.SUPABASE_URL/KEY), a mesma
+   fonte usada pelo resto do GECOPE — carregue config.js antes
+   deste script. Requer política RLS de leitura (SELECT) para o
+   papel anon nas tabelas abaixo. Se o Supabase estiver inacessível,
+   o painel mostra um erro explícito (showDataError) — não há
+   dataset de demonstração.
    ============================================================ */
-const SB_URL='https://qexdnxqmiaarzwwwrcor.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFleGRueHFtaWFhcnp3d3dyY29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDYyNDUsImV4cCI6MjA4NTQyMjI0NX0.RJnLpsXMMzzhcq_YKHI7wObBqubKgdltauvBvGpz4dc';   // <-- cole aqui a chave anon (public) do projeto
+const SB_URL=window.SUPABASE_URL;
+const SB_KEY=window.SUPABASE_KEY;
 const SB_TABLE='contratos_edificacao';
 const SB_COMISSAO='comissao_fiscalizacao';
+// só as colunas realmente usadas em mapRow()/openModal() — evita select=* (35 colunas,
+// 8 delas nunca lidas pelo app) trazendo ~4MB quando ~3,4MB bastam.
+const CONTRATOS_COLS=['id_obra','nr_contrato_sop','codigo_obra','descricao_obra','descricao_tipo_contrato',
+  'contratada','contratante','municipio','status_contrato','status_obra','data_assinatura','data_inicio_real',
+  'valor_atual_contrato','valor_atual','valor_original','total_aditivo','total_reajuste','total_realinhado',
+  'dias_paralisado','data_fim_previsto','distrito_operacional','nr_contrato_ext','nr_contrato_sic',
+  'data_fim_vigencia_contrato','cnpj_contratada','cnpj_contratante','atualizado_em'].join(',');
+const COMISSAO_COLS='id_obra,nome_completo,nome_referencia,tipo';
+// carteira ativa = tudo que não é "concluído/encerrado" (ver statusBucket) — é o recorte
+// que a SOP-CE de fato gerencia; os outros ~90% do histórico só aparecem sob demanda
+// (toggle "Histórico completo"), porque não mudam mais e só diluiriam os KPIs/gráficos.
+const ACTIVE_STATUSES=['Em Execução','Aguardando OS','Paralisada'];
 
 // monta o objeto que o app consome (obras entram depois, no loadData)
 const DB={distritos:DISTRITOS, regioes:REGIOES, municipios:{}};
@@ -82,20 +96,36 @@ function mapRow(r){
     realinhado:num(r.total_realinhado), paralisado:num(r.dias_paralisado),
     assinatura:r.data_assinatura||'', fim_prev:r.data_fim_previsto||'', fiscal:'—', raw:r};
 }
-async function fetchTable(tbl){
-  const out=[], page=1000; let from=0;
-  while(true){
-    const res=await fetch(`${SB_URL}/rest/v1/${tbl}?select=*`,{headers:{
-      apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, Range:`${from}-${from+page-1}`}});
-    if(!res.ok) throw new Error('HTTP '+res.status+' em '+tbl+' — verifique URL/chave/RLS');
-    const chunk=await res.json(); out.push(...chunk);
-    if(chunk.length<page) break; from+=page;
+// Busca uma tabela paginada. A 1ª página pede a contagem total via
+// `Prefer: count=exact` (o servidor devolve em Content-Range: "0-999/N") — a partir
+// daí as páginas restantes são conhecidas de antemão e disparadas todas em paralelo
+// (Promise.all), em vez de um `while` sequencial esperando página a página.
+async function fetchTable(tbl,{select='*',filter=''}={}){
+  const qs=`select=${encodeURIComponent(select)}${filter?'&'+filter:''}`;
+  const headers={apikey:SB_KEY, Authorization:'Bearer '+SB_KEY};
+  const PAGE=1000;
+  const first=await fetch(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`0-${PAGE-1}`, Prefer:'count=exact'}});
+  if(!first.ok) throw new Error('HTTP '+first.status+' em '+tbl+' — verifique URL/chave/RLS');
+  const firstChunk=await first.json();
+  const range=first.headers.get('content-range'); // "0-999/3577"
+  const total=range && range.includes('/') ? parseInt(range.split('/')[1],10) : NaN;
+  if(!isFinite(total) || firstChunk.length>=total) return firstChunk;
+  const pageReqs=[];
+  for(let from=PAGE; from<total; from+=PAGE){
+    const to=Math.min(from+PAGE-1,total-1);
+    pageReqs.push(fetch(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`${from}-${to}`}})
+      .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status+' em '+tbl); return r.json(); }));
   }
-  return out;
+  const rest=await Promise.all(pageReqs);
+  return firstChunk.concat(...rest);
 }
-// id_obra -> comissão de fiscalização completa (ordenada: Presidente > Fiscal > 1º/2º/3º Membro > Suplente)
-async function fetchFiscais(){
-  const rows=await fetchTable(SB_COMISSAO); const m={};
+// id_obra -> comissão de fiscalização completa (ordenada: Presidente > Fiscal > 1º/2º/3º Membro > Suplente).
+// idFilter restringe às obras já carregadas (só faz sentido na carteira ativa, onde a
+// lista de ids cabe numa query — no histórico completo os ~3.577 ids estourariam a URL,
+// então busca a tabela de comissão inteira, só com as 4 colunas usadas).
+async function fetchFiscais(idFilter){
+  const filter=idFilter&&idFilter.length ? `id_obra=in.(${idFilter.join(',')})` : '';
+  const rows=await fetchTable(SB_COMISSAO,{select:COMISSAO_COLS,filter}); const m={};
   for(const r of rows){
     const k=r.id_obra; if(k==null) continue;
     const nome=r.nome_completo||r.nome_referencia; if(!nome) continue;
@@ -121,13 +151,57 @@ function showDataError(msg){
 const _dataErrorRetryBtn=document.getElementById('dataErrorRetry');
 if(_dataErrorRetryBtn) _dataErrorRetryBtn.onclick=()=>location.reload();
 
+// cache de curta duração (sessionStorage) para não refazer o fetch inteiro a cada
+// F5 durante uma apresentação — 5min é curto o bastante pra nunca mostrar dado
+// visivelmente desatualizado, e longo o bastante pra recarregar/trocar de escopo
+// instantaneamente dentro da mesma sessão.
+const CACHE_TTL_MS=5*60*1000;
+function cacheKey(scope){ return 'gecope_mapa_cache_v1_'+scope; }
+function readCache(scope){
+  try{
+    const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
+    const obj=JSON.parse(raw);
+    if(!obj || (Date.now()-obj.ts)>CACHE_TTL_MS) return null;
+    return obj;
+  }catch{ return null; }
+}
+function writeCache(scope,rows,fisc){
+  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows,fisc})); }
+  catch(e){ /* quota/privacidade — cache é só um bônus de velocidade, ignora e segue sem ele */ }
+}
+
 async function loadData(){
   for(const c in DB.municipios) DB.municipios[c].obras=[];
   try{
-    const rows=await fetchTable(SB_TABLE); let sem=0;
-    let fisc={}; try{ fisc=await fetchFiscais(); }catch(e){ console.warn('comissao_fiscalizacao indisponível:',e.message); }
+    const scope=st.dataScope;
+    const cached=readCache(scope);
+    let rows, fisc;
+    if(cached){
+      rows=cached.rows; fisc=cached.fisc;
+    } else if(scope==='ativa'){
+      // carteira ativa: filtra no servidor (só ~348 linhas) e, com os ids já em mãos,
+      // busca a comissão só desses contratos — evita baixar as ~8.239 linhas inteiras
+      // de comissao_fiscalizacao quando 90% delas são de obras já encerradas.
+      const filter=`status_obra=in.(${ACTIVE_STATUSES.map(s=>`"${s}"`).join(',')})`;
+      rows=await fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter});
+      const ids=[...new Set(rows.map(r=>r.id_obra).filter(v=>v!=null))];
+      try{ fisc=await fetchFiscais(ids); }catch(e){ console.warn('comissao_fiscalizacao indisponível:',e.message); fisc={}; }
+      writeCache(scope,rows,fisc);
+    } else {
+      // histórico completo: os ids não cabem numa query id_obra=in.(...), então busca
+      // as duas tabelas inteiras (só com as colunas usadas) em paralelo.
+      const [rowsR,fiscR]=await Promise.all([
+        fetchTable(SB_TABLE,{select:CONTRATOS_COLS}),
+        fetchFiscais().catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
+      ]);
+      rows=rowsR; fisc=fiscR;
+      writeCache(scope,rows,fisc);
+    }
+    let sem=0;
     for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); const com=fisc[o.id_obra]||[]; o.comissao=com; o.fiscal=com[0]?com[0].nome:'—'; o.fiscalTipo=com[0]?com[0].tipo:'FISCAL'; DB.municipios[cod].obras.push(o); }
-    setStatus(`Supabase · ${rows.length} contratos${sem?` (${sem} sem município no CE)`:''}`, true);
+    invalidateAggCache();
+    const scopeTxt=scope==='ativa'?'carteira ativa':'histórico completo';
+    setStatus(`Supabase · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true);
   }catch(e){
     console.error(e);
     showDataError('Não foi possível carregar os contratos do Supabase: '+e.message);
@@ -138,7 +212,7 @@ async function loadData(){
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
 const NUM=new Intl.NumberFormat('pt-BR');
 
-const st={method:'do',metric:'obras',level:0,group:null,city:null,hoverGroup:null,
+const st={method:'do',metric:'obras',level:0,group:null,city:null,hoverGroup:null,dataScope:'ativa',
   f:{ano:new Set(),status:new Set(),contratada:new Set(),contratante:new Set(),fiscal:new Set(),q:''}};
 
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
@@ -160,7 +234,20 @@ function passF(o){const f=st.f;
   if(f.q){const q=f.q; if(!(((o.contrato||'').toLowerCase().includes(q))||((o.codigo_obra||'').toLowerCase().includes(q))||((o.objeto||'').toLowerCase().includes(q))||((o.contratada||'').toLowerCase().includes(q))||((o.municipioTxt||'').toLowerCase().includes(q)))) return false;}
   return true;
 }
-function obrasOf(id){return DB.municipios[id].obras.filter(passF);}
+// PERFORMANCE: obrasOf() é chamada dezenas de milhares de vezes por frame de pan/zoom
+// do mapa (declutter de rótulos ordena por prioridade chamando-a pra cada item, várias
+// vezes por sort) — sem memoização, cada chamada refiltra o array de obras do zero.
+// O cache vale por uma "época" de filtro: qualquer mudança em st.f (busca, checkbox)
+// ou recarga de dados (loadData) chama invalidateAggCache(), que só zera o Map — o
+// próximo obrasOf(id) recalcula e guarda de novo. Município tem no máximo algumas
+// dezenas de obras, então o custo de popular o cache inteiro é desprezível.
+let _obrasOfCache=new Map();
+function invalidateAggCache(){ _obrasOfCache=new Map(); }
+function obrasOf(id){
+  let hit=_obrasOfCache.get(id);
+  if(hit===undefined){ hit=DB.municipios[id].obras.filter(passF); _obrasOfCache.set(id,hit); }
+  return hit;
+}
 function aggIds(ids){let obras=0,valor=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;}));return{obras,valor,par,adit};}
 function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:a.obras;}
 
@@ -676,7 +763,7 @@ _fHost.addEventListener('change',e=>{
   const cb=e.target.closest('.msel-opt input'); if(!cb) return;
   const key=cb.closest('.msel').dataset.key;
   if(cb.checked) st.f[key].add(cb.value); else st.f[key].delete(cb.value);
-  updateMselBtn(key); render(); autoLocateSearch();
+  updateMselBtn(key); invalidateAggCache(); render(); autoLocateSearch();
 });
 document.addEventListener('click',e=>{
   if(!e.target.closest('.msel')) document.querySelectorAll('.msel.on').forEach(x=>{x.classList.remove('on'); mselResetQuery(x);});
@@ -712,14 +799,14 @@ document.getElementById('fSearch').addEventListener('input',e=>{
   // declutter de rótulos a cada chamada — sem debounce isso rodava a cada tecla digitada.
   st.f.q=e.target.value.trim().toLowerCase();
   clearTimeout(_fSearchTimer);
-  _fSearchTimer=setTimeout(()=>{ render(); autoLocateSearch(); },150);
+  _fSearchTimer=setTimeout(()=>{ invalidateAggCache(); render(); autoLocateSearch(); },150);
 });
 document.getElementById('clearF').onclick=()=>{
   FILTER_DEFS.forEach(d=>st.f[d.key].clear());
   st.f.q=''; document.getElementById('fSearch').value='';
   document.querySelectorAll('.msel-opt input').forEach(cb=>cb.checked=false);
   document.querySelectorAll('.msel').forEach(m=>{updateMselBtn(m.dataset.key); m.classList.remove('on'); mselResetQuery(m);});
-  render(); autoLocateSearch();
+  invalidateAggCache(); render(); autoLocateSearch();
 };
 
 // painel de filtros recolhível (recolhido por padrão)
@@ -781,6 +868,24 @@ function prefetchPagina(url){
   const link=document.createElement('link'); link.rel='prefetch'; link.href=url; document.head.appendChild(link);
 }
 window.prefetchPagina=prefetchPagina;
+
+// alterna entre a carteira ativa (padrão — obras que ainda podem ser geridas) e o
+// histórico completo (todas, incluindo as ~90% já concluídas/encerradas)
+const _btnScope=document.getElementById('btnScope'), _btnScopeTxt=document.getElementById('btnScopeTxt');
+function syncScopeBtn(loading){
+  if(!_btnScopeTxt) return;
+  _btnScopeTxt.textContent = loading ? 'Carregando…' : (st.dataScope==='ativa' ? 'Carteira ativa' : 'Histórico completo');
+  if(_btnScope) _btnScope.classList.toggle('on', st.dataScope==='historico');
+}
+function setDataScope(scope){
+  if(scope===st.dataScope) return;
+  st.dataScope=scope; goState();
+  syncScopeBtn(true);
+  if(_btnScope) _btnScope.disabled=true;
+  loadData().finally(()=>{ syncScopeBtn(false); if(_btnScope) _btnScope.disabled=false; });
+}
+if(_btnScope) _btnScope.addEventListener('click',()=>setDataScope(st.dataScope==='ativa'?'historico':'ativa'));
+syncScopeBtn(false);
 
 document.getElementById('segMethod').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return;

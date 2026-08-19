@@ -25,6 +25,9 @@
   </div>
   <div class="top-meta">
     <div class="synctime"><span class="l">Base atualizada em</span><span class="v" id="syncTime">—</span></div>
+    <button class="btn-present" id="btnScope" title="Alternar entre a carteira ativa (obras em andamento) e o histórico completo de contratos">
+      <span id="btnScopeTxt">Carteira ativa</span>
+    </button>
     <button class="btn-present" id="btnPresent" title="Alternar tela cheia real do navegador">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -108,6 +111,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
 <script src="assets/js/mapa-obras.js" defer></script>
 </body>
 </html>
