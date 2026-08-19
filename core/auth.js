@@ -477,8 +477,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const emailGecopeApp = `${loginInput}@gecope.app`;
             const result = await signInWithEmail(emailGecopeApp, password, { silent: true });
             if (!result) {
-                // Busca email real cadastrado com essa matrícula
-                const { data: userRecord } = await sbClient.from('app_users').select('email').eq('matricula', loginInput).maybeSingle();
+                // Busca email real cadastrado com essa matrícula — via função SECURITY DEFINER
+                // (app_users_lookup_by_matricula), não mais SELECT direto na tabela: antes deste
+                // login sequer acontecer, o usuário ainda não tem sessão, e a tabela app_users não
+                // é mais publicamente legível (só essa função, que devolve apenas id/nome/sobrenome/
+                // email de UMA matrícula, nunca telefone/role/a tabela inteira).
+                const { data: userRecord } = await sbClient.rpc('app_users_lookup_by_matricula', { p_matricula: loginInput }).maybeSingle();
                 if (userRecord?.email && userRecord.email !== emailGecopeApp) {
                     await signInWithEmail(userRecord.email, password);
                 } else {
@@ -537,11 +541,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 try {
-                    // Verificar se a matrícula existe na tabela app_users
+                    // Verificar se a matrícula existe — via função SECURITY DEFINER, ver
+                    // comentário equivalente no handler de login acima.
                     const { data: user, error: userErr } = await sbClient
-                        .from('app_users')
-                        .select('id, nome, sobrenome, email')
-                        .eq('matricula', matricula.trim())
+                        .rpc('app_users_lookup_by_matricula', { p_matricula: matricula.trim() })
                         .maybeSingle();
 
                     if (userErr) throw userErr;

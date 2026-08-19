@@ -1,4 +1,25 @@
 services:
+  # Postgres dedicado da Evolution API — a v2 (diferente da v1) EXIGE um banco de verdade
+  # mesmo só para guardar estado de instância/sessão; "DATABASE_ENABLED=false" não existe
+  # mais como opção que realmente desliga isso (confirmado ao vivo: sem banco, o container
+  # entra em loop de crash com "Error: Database provider invalid."). Configurado enxuto
+  # (poucas conexões, buffers pequenos) para caber na VM de 1GB, e com os DATABASE_SAVE_*
+  # de mensagens/contatos/chats desligados abaixo — só guardamos o necessário para a
+  # instância funcionar, não um histórico completo de conversas.
+  evolution-postgres:
+    image: postgres:15-alpine
+    container_name: gecope-evolution-postgres
+    restart: unless-stopped
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20", "-c", "work_mem=4MB"]
+    environment:
+      - POSTGRES_USER=evolution
+      - POSTGRES_PASSWORD=${EVO_DB_PASSWORD}
+      - POSTGRES_DB=evolution
+    volumes:
+      - evolution_pgdata:/var/lib/postgresql/data
+    networks:
+      - whatsapp-internal
+
   # Evolution API — SEM "ports": só acessível pela rede interna, nunca pela internet.
   # Nome da imagem confirmado em 2026-08 (doc.evolution-api.com / repo oficial): o projeto
   # migrou de "atendai/evolution-api" para "evoapicloud/evolution-api" a partir da v2.3.0
@@ -12,8 +33,19 @@ services:
     environment:
       - AUTHENTICATION_API_KEY=${EVO_API_KEY}
       - AUTHENTICATION_TYPE=apikey
-      - DATABASE_ENABLED=false
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:${EVO_DB_PASSWORD}@evolution-postgres:5432/evolution?schema=public
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=false
+      - DATABASE_SAVE_MESSAGE_UPDATE=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_CHATS=false
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
       - CONFIG_SESSION_PHONE_CLIENT=GECOPE
+    depends_on:
+      - evolution-postgres
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
@@ -94,5 +126,6 @@ networks:
 volumes:
   evolution_instances:
   evolution_store:
+  evolution_pgdata:
   caddy_data:
   caddy_config:

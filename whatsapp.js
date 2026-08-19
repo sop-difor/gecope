@@ -154,6 +154,23 @@
                                                                                     const isAtivo = formElement.querySelector('.config-ativo').checked;
                                                                                     const textoNode = formElement.querySelector('.config-texto');
                                                                                     const textoMensagem = textoNode ? textoNode.value : '';
+
+                                                                                    // Detecta placeholder com sintaxe errada (ex.: [NOME_FISCAL] em vez de
+                                                                                    // {{NOME_FISCAL}}) ANTES de salvar — sem isso o admin só descobre o erro
+                                                                                    // quando um usuário real recebe o texto cru do placeholder no WhatsApp
+                                                                                    // (foi exatamente o que aconteceu com novo_processo/mudanca_status_processo/
+                                                                                    // analista_designado antes desta checagem existir).
+                                                                                    const placeholdersColchete = textoMensagem.match(/\[[A-Z_]{3,}\]/g);
+                                                                                    if (placeholdersColchete && placeholdersColchete.length > 0) {
+                                                                                        const confirmar = confirm(
+                                                                                            `Atenção: o texto usa colchetes (${placeholdersColchete.join(', ')}) em vez de chaves duplas.\n\n` +
+                                                                                            `O formato correto é {{CAMPO}} — ex.: {{NOME_FISCAL}}.\n\n` +
+                                                                                            `Se salvar assim, esse trecho pode ser enviado literalmente ao usuário, sem o dado real.\n\n` +
+                                                                                            `Salvar mesmo assim?`
+                                                                                        );
+                                                                                        if (!confirmar) { btn.disabled = false; btn.innerHTML = textoOriginal; return; }
+                                                                                    }
+
                                                                                     let destinatarios = [];
 
                                                                                     if (formElement.querySelector('.config-dest-geral')?.checked) destinatarios.push('geral');
@@ -319,6 +336,7 @@
                                                                             'atualizacao_composicao': { titulo: ' *Nova Composição*', sub: ' Cadastro de Referência' },
                                                                             'atualizacao_orcamento': { titulo: ' *Atualização de Orçamento*', sub: ' Revisão de Dados' },
                                                                             'novo_comentario_orcamento': { titulo: ' *Novo Comentário*', sub: ' Revisão Técnica' },
+                                                                            'novo_comentario_composicao': { titulo: ' *Novo Comentário*', sub: ' Revisão de Composição' },
                                                                             'atualizacao_tabelas': { titulo: ' *Atualização de Tabelas*', sub: ' Tabelas de Referência' },
                                                                             'analista_designado': { titulo: ' *Analista Designado*', sub: ' Replanilhamento' }
                                                                         };
@@ -332,7 +350,9 @@
                                                                                 ANALISTA: 'Walace',
                                                                                 REF_ORCAMENTO: 'ORC-2026/001',
                                                                                 NOME_USUARIO: 'Nildeno',
+                                                                                AUTOR: 'Nildeno',
                                                                                 CODIGO_COMPOSICAO: 'COMP-001',
+                                                                                DESCRICAO: 'Composição de Referência',
                                                                                 TABELA_NOME: 'SEINFRA 28',
                                                                                 VERSAO: '028',
                                                                                 MES_REFERENCIA: 'Jan/2026'
@@ -414,6 +434,13 @@
                                                                                 footer = `_GECOPE | ${agora}_`;
                                                                             }
 
+                                                                            // Eventos de "processo" (NUP + Aditivo de Serviços) são um domínio diferente
+                                                                            // de eventos de orçamento/composição — antes o corpo padrão era o mesmo para
+                                                                            // todos, então um comentário de orçamento chegava dizendo "📍 Aditivo de
+                                                                            // Serviços" e "NUP: Não informado", que não faz sentido nesse contexto.
+                                                                            const eventosDeProcesso = ['novo_processo', 'mudanca_status_processo', 'novas_metas_processo', 'analista_designado'];
+                                                                            const ehEventoDeProcesso = eventosDeProcesso.includes(evento);
+
                                                                             const objetoTexto = dados.NOME_OBRA || dados.DESCRICAO || 'Obra não informada';
                                                                             const nup = dados.NUP_PROCESSO || 'Não informado';
 
@@ -424,8 +451,18 @@
                                                                                 // contra os mesmos nomes de campo usados em dadosDinamicos (ex.: NUP_PROCESSO,
                                                                                 // NOME_OBRA). Saudação/conector/footer continuam variando normalmente por cima
                                                                                 // (motor anti-spam preservado mesmo com corpo customizado).
-                                                                                corpo = textoCustomizado.replace(/\{\{(\w+)\}\}/g, (_, campo) => (dados[campo] ?? `{{${campo}}}`));
-                                                                            } else {
+                                                                                // Aceita também [CAMPO] como alias de {{CAMPO}} — erro humano comum ao digitar
+                                                                                // o template (aconteceu de verdade em 3 eventos) que antes saía cru pro
+                                                                                // usuário final sem nenhum aviso.
+                                                                                corpo = textoCustomizado.replace(/\{\{(\w+)\}\}|\[([A-Z_]{3,})\]/g, (match, campoChave, campoColchete) => {
+                                                                                    const campo = campoChave || campoColchete;
+                                                                                    if (dados[campo] === undefined || dados[campo] === null) {
+                                                                                        console.warn(`[WhatsApp] Placeholder "${campo}" não encontrado nos dados do evento "${evento}" — enviado sem substituição.`);
+                                                                                        return match;
+                                                                                    }
+                                                                                    return dados[campo];
+                                                                                });
+                                                                            } else if (ehEventoDeProcesso) {
                                                                                 let linhas = [
                                                                                     ` 📑*OBJETO:* ${objetoTexto}`,
                                                                                     ` 📍 Aditivo de Serviços`,
@@ -452,6 +489,28 @@
 
                                                                                 const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAÇÃO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";
                                                                                 corpo = linhas.join('\n') + avisoSuite;
+                                                                            } else {
+                                                                                // Eventos de orçamento/composição: corpo montado só com os campos que o
+                                                                                // chamador realmente enviou, sem herdar o vocabulário de "processo".
+                                                                                let linhas = [];
+
+                                                                                // AUTOR/NOME_USUARIO e REF_ORCAMENTO/CODIGO_COMPOSICAO são aliases do mesmo
+                                                                                // conceito em chamadores diferentes — nunca vêm os dois juntos num disparo
+                                                                                // real, mas a prévia de teste popula ambos ao mesmo tempo para cobrir todos
+                                                                                // os eventos com um único conjunto de dados falsos.
+                                                                                const autor = dados.AUTOR || dados.NOME_USUARIO;
+                                                                                const referencia = dados.REF_ORCAMENTO || dados.CODIGO_COMPOSICAO;
+
+                                                                                if (autor) linhas.push(` 👤*Autor:* ${autor}`);
+                                                                                if (referencia) linhas.push(` 📁*Referência:* ${referencia}`);
+                                                                                if (dados.DESCRICAO) linhas.push(` 📝*Descrição:* ${dados.DESCRICAO}`);
+                                                                                if (dados.TABELA_NOME) linhas.push(` 📊*Tabela:* ${dados.TABELA_NOME}`);
+                                                                                if (dados.VERSAO) linhas.push(` 🔖*Versão:* ${dados.VERSAO}`);
+                                                                                if (dados.MES_REFERENCIA) linhas.push(` 🗓️*Mês de referência:* ${dados.MES_REFERENCIA}`);
+
+                                                                                if (linhas.length === 0) linhas.push(` 📝 Sem detalhes adicionais informados.`);
+
+                                                                                corpo = linhas.join('\n');
                                                                             }
 
                                                                             return `*${conf.titulo.trim()}*\n\n${saudacao}\n${conector}\n\n${corpo}\n\n${footer}`;
@@ -516,27 +575,22 @@
                                                                                 });
 
                                                                                 if (!response.ok && logRow) {
-                                                                                    // Não foi nem aceito na fila (ex.: proxy fora do ar, sessão inválida) — o worker
-                                                                                    // nunca vai processar este job, então é o cliente quem precisa marcar a falha.
-                                                                                    await sbClient.from('whatsapp_logs').update({
-                                                                                        status: 'falha',
-                                                                                        erro_detalhe: `Erro ao enfileirar: HTTP ${response.status}`
-                                                                                    }).eq('id', logRow.id);
+                                                                                    // Não foi aceito na fila (ex.: recipient_not_registered, proxy fora do ar,
+                                                                                    // sessão inválida). O PRÓPRIO SERVIDOR (server/whatsapp-proxy/web/index.js,
+                                                                                    // markLogFailed) já marca este log como 'falha' nesses casos, usando a
+                                                                                    // service role — o cliente não tenta mais gravar isso direto no banco porque
+                                                                                    // whatsapp_logs.UPDATE é admin-only agora (RLS); uma tentativa daqui só
+                                                                                    // falharia silenciosamente sem nenhum ganho.
+                                                                                    console.warn(`[WhatsApp] Envio recusado pelo proxy (HTTP ${response.status}) para log ${logRow.id} — servidor deve ter marcado como falha.`);
                                                                                 }
 
                                                                                 return response.ok;
                                                                             } catch (err) {
-                                                                                console.error("[WhatsApp] Erro no disparo:", err);
-                                                                                if (logRow && logRow.id) {
-                                                                                    try {
-                                                                                        await sbClient.from('whatsapp_logs').update({
-                                                                                            status: 'falha',
-                                                                                            erro_detalhe: `Erro de rede/API: ${err.message || String(err)}`
-                                                                                        }).eq('id', logRow.id);
-                                                                                    } catch (dbErr) {
-                                                                                        console.warn("[WhatsApp] Não foi possível atualizar o log de erro no banco:", dbErr);
-                                                                                    }
-                                                                                }
+                                                                                // Erro de rede/timeout ANTES de qualquer resposta do proxy: neste caso o
+                                                                                // servidor nem chegou a ver a requisição, então não há como ele marcar a
+                                                                                // falha por nós. O log fica em 'processando' até a varredura periódica do
+                                                                                // worker (ver reclaimOrphanLogs em worker.js) encerrá-lo como falha.
+                                                                                console.error("[WhatsApp] Erro no disparo (log ficará para a varredura do worker):", err);
                                                                                 return false;
                                                                             }
                                                                         }

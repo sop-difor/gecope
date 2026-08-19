@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { createAuthMiddleware } = require('./auth-middleware');
@@ -30,8 +31,52 @@ const { requireAuth, requireAdmin } = createAuthMiddleware({
   sb
 });
 
+// Origem do front-end do GECOPE — sem isso, o navegador bloqueia a resposta do proxy por
+// política de CORS antes mesmo do JS conseguir ler o resultado (aparece como "API Offline"
+// na tela, mesmo com o proxy respondendo normalmente). Configurável via env var para não
+// precisar reconstruir a imagem se o domínio do front-end mudar.
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://sop-difor.github.io';
+
 const app = express();
+app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
+
+function normalizeDigits(raw) {
+  return String(raw || '').replace(/\D/g, '');
+}
+
+// Gera as variantes plausíveis de um número BR: com/sem o "55" de país, e com/sem o "9"
+// extra de celular (whatsapp.js tem uma heurística que remove esse "9" para DDDs 85/88 em
+// certas instâncias — ver enviarMensagemIndividual). Usado só para COMPARAR contra números
+// já cadastrados em app_users, nunca para decidir para onde enviar de fato.
+function phoneVariants(raw) {
+  let d = normalizeDigits(raw);
+  if (d.startsWith('55') && (d.length === 12 || d.length === 13)) d = d.slice(2);
+  const variants = new Set([d]);
+  if (d.length === 11) variants.add(d.slice(0, 2) + d.slice(3));
+  if (d.length === 10) variants.add(d.slice(0, 2) + '9' + d.slice(2));
+  return variants;
+}
+
+// Confirma que `number` corresponde a um telefone já cadastrado em app_users antes de
+// enfileirar qualquer envio — sem isso, qualquer conta autenticada (não só admin, já que
+// processarNotificacao roda para ações comuns de negócio) poderia usar este endpoint como
+// uma plataforma de disparo de texto livre para QUALQUER número, dentro ou fora da folha de
+// funcionários, sob a identidade oficial do WhatsApp do SOP-CE.
+async function isKnownRecipient(number) {
+  const incoming = phoneVariants(number);
+  const { data: users, error } = await sb
+    .from('app_users')
+    .select('telefone_whatsapp')
+    .not('telefone_whatsapp', 'is', null);
+  if (error) throw error;
+  return (users || []).some(u => {
+    for (const v of phoneVariants(u.telefone_whatsapp)) {
+      if (incoming.has(v)) return true;
+    }
+    return false;
+  });
+}
 
 // Chama a Evolution API internamente. Nunca repassa `EVO_API_KEY` nem o corpo bruto de
 // erro da Evolution API para o cliente — quem chama esta função decide o que expor.
@@ -72,12 +117,34 @@ app.get('/ready', async (req, res) => {
   }
 });
 
-// Qualquer usuário autenticado pode enfileirar um envio — processarNotificacao (front-end)
-// roda para ações comuns de negócio (criar processo, mudar status, etc.), não só admin.
-app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
+// Marca um log como falha usando o cliente service role (ignora RLS) — desde que
+// whatsapp_logs.UPDATE passou a ser admin-only, o cliente (front-end) não consegue mais
+// gravar essa falha ele mesmo; é o proxy quem precisa fazer isso em toda rejeição que
+// aconteça DEPOIS de o log já existir, senão o registro fica preso em 'processando' para
+// sempre (a mesma classe de bug já limpa uma vez em auditoria — ver whatsapp_logs).
+async function markLogFailed(logId, motivo) {
+  if (!logId) return;
   try {
-    const { number, text, log_id } = req.body || {};
+    await sb.from('whatsapp_logs').update({ status: 'falha', erro_detalhe: motivo }).eq('id', logId);
+  } catch (e) {
+    console.error('[markLogFailed] falha ao gravar status de erro:', e.message || e);
+  }
+}
+
+// Qualquer usuário autenticado pode enfileirar um envio — processarNotificacao (front-end)
+// roda para ações comuns de negócio (criar processo, mudar status, etc.), não só admin. Por
+// isso este endpoint não é requireAdmin: em vez disso, isKnownRecipient() abaixo restringe
+// o destino a números já cadastrados em app_users, para que uma conta comum comprometida não
+// vire uma plataforma de disparo de texto livre a QUALQUER número.
+app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
+  const { number, text, log_id } = req.body || {};
+  try {
     if (!number || !text) return res.status(400).json({ error: 'number_and_text_required' });
+
+    if (!(await isKnownRecipient(number))) {
+      await markLogFailed(log_id, 'Recusado: número não corresponde a nenhum destinatário cadastrado.');
+      return res.status(403).json({ error: 'recipient_not_registered' });
+    }
 
     // Se vier log_id, confirma que aponta para um log real e ainda em 'processando' —
     // evita que o worker sobrescreva o status de um log arbitrário/já finalizado por um
@@ -104,6 +171,7 @@ app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
     if (error) throw error;
     return res.status(202).json({ job_id: data.id });
   } catch (err) {
+    await markLogFailed(log_id, `Erro ao enfileirar: ${err.message || String(err)}`);
     console.error('[send] erro:', err.message || err);
     return res.status(500).json({ error: 'enqueue_failed' });
   }
@@ -112,7 +180,7 @@ app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
 // Reenvio: o proxy busca telefone/mensagem do PRÓPRIO log em whatsapp_logs — nunca aceita
 // telefone/texto arbitrário no body, para impedir que /resend seja usado como um envio
 // livre disfarçado de reenvio.
-app.post('/api/whatsapp/resend/:logId', requireAuth, async (req, res) => {
+app.post('/api/whatsapp/resend/:logId', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { logId } = req.params;
 

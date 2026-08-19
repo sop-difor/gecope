@@ -1038,6 +1038,38 @@
                                                             onclick="testarPreviaMensagem('atualizacao_composicao')"><i
                                                                 class="bi bi-eye me-1"></i>Ver Prévia</button>
                                                     </form>
+                                                    <form id="formConfigCompComentario" class="border-bottom pb-3 mb-3"
+                                                        data-gatilho="novo_comentario_composicao">
+                                                        <h6 class="fw-bold text-danger small">1b. Novo Comentário
+                                                        </h6>
+                                                        <div class="form-check form-switch mb-2">
+                                                            <input class="form-check-input config-ativo" type="checkbox"
+                                                                role="switch">
+                                                            <label
+                                                                class="form-check-label fw-bold small">Ativado</label>
+                                                        </div>
+                                                        <div class="d-flex gap-2 mb-2">
+                                                            <div class="form-check"><input
+                                                                    class="form-check-input config-dest-indiv"
+                                                                    type="checkbox" checked><label
+                                                                    class="form-check-label small">Individual</label>
+                                                            </div>
+                                                            <div class="form-check"><input
+                                                                    class="form-check-input config-dest-geral"
+                                                                    type="checkbox"><label
+                                                                    class="form-check-label small">Geral</label></div>
+                                                        </div>
+                                                        <div class="mb-2">
+                                                            <label class="form-label small text-muted mb-1">Texto customizado (opcional — vazio usa a mensagem padrão)</label>
+                                                            <textarea class="form-control form-control-sm config-texto" rows="2" placeholder="Ex: {{AUTOR}}, {{CODIGO_COMPOSICAO}}... Deixe em branco para usar o padrão."></textarea>
+                                                        </div>
+                                                        <button type="button" class="btn btn-xs btn-success fw-bold"
+                                                            onclick="WhatsAppConfigManager.save('novo_comentario_composicao', this.form)">Salvar</button>
+                                                        <button type="button"
+                                                            class="btn btn-xs btn-outline-primary fw-bold ms-1"
+                                                            onclick="testarPreviaMensagem('novo_comentario_composicao')"><i
+                                                                class="bi bi-eye me-1"></i>Ver Prévia</button>
+                                                    </form>
                                                     <form id="formConfigINCC" data-gatilho="atualizacao_tabelas">
                                                         <h6 class="fw-bold text-danger small">2. Atualização Tabelas
                                                         </h6>

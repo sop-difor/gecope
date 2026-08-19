@@ -47,6 +47,53 @@ async function reclaimStaleJobs() {
     }
 }
 
+// Cobre o caso em que o cliente cria o log ('processando') mas a requisição para
+// /api/whatsapp/send nunca chega a completar (rede caiu, timeout) — nenhum whatsapp_jobs é
+// criado, então reclaimStaleJobs() nunca vê esse registro, e como whatsapp_logs.UPDATE é
+// admin-only (RLS), o cliente também não consegue mais marcar a falha ele mesmo. Sem esta
+// varredura, esses logs ficariam presos em 'processando' para sempre (é a mesma classe de
+// bug já limpa uma vez, manualmente, em auditoria de 2026-08).
+async function reclaimOrphanLogs() {
+    const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+    const { data: staleLogs, error: staleError } = await sb
+        .from('whatsapp_logs')
+        .select('id')
+        .eq('status', 'processando')
+        .lt('created_at', staleBefore);
+
+    if (staleError) {
+        console.error('[reclaim-logs] erro ao buscar logs travados:', staleError.message);
+        return;
+    }
+    if (!staleLogs || staleLogs.length === 0) return;
+
+    const staleIds = staleLogs.map(l => l.id);
+    const { data: linkedJobs, error: jobsError } = await sb
+        .from('whatsapp_jobs')
+        .select('log_id')
+        .in('log_id', staleIds);
+
+    if (jobsError) {
+        console.error('[reclaim-logs] erro ao checar jobs vinculados:', jobsError.message);
+        return;
+    }
+
+    const linkedIds = new Set((linkedJobs || []).map(j => j.log_id));
+    const orphanIds = staleIds.filter(id => !linkedIds.has(id));
+    if (orphanIds.length === 0) return;
+
+    const { error: updateError } = await sb
+        .from('whatsapp_logs')
+        .update({ status: 'falha', erro_detalhe: 'Requisição de envio nunca chegou ao servidor (falha de rede no cliente) — encerrado pela varredura periódica.' })
+        .in('id', orphanIds);
+
+    if (updateError) {
+        console.error('[reclaim-logs] erro ao marcar logs órfãos como falha:', updateError.message);
+        return;
+    }
+    console.log(`[reclaim-logs] ${orphanIds.length} log(s) órfão(s) (sem job correspondente) encerrado(s) como 'falha'.`);
+}
+
 async function claimJob() {
     const { data: jobs, error } = await sb
         .from('whatsapp_jobs')
@@ -162,11 +209,21 @@ async function processJob(job) {
     await updateLinkedLog(job, success, result, lastError);
 }
 
+// reclaimOrphanLogs faz um scan de tabela (sem índice por status+created_at dedicado) — não
+// vale rodar a cada volta do loop (a cada ~POLL_INTERVAL, inclusive quando há fila cheia).
+// Uma vez por minuto já cobre bem o cenário raro que ela existe para pegar.
+const ORPHAN_SWEEP_INTERVAL_MS = 60000;
+let lastOrphanSweep = 0;
+
 async function mainLoop() {
     console.log('Worker iniciado e aguardando jobs...');
     while (!shuttingDown) {
         try {
             await reclaimStaleJobs();
+            if (Date.now() - lastOrphanSweep >= ORPHAN_SWEEP_INTERVAL_MS) {
+                lastOrphanSweep = Date.now();
+                await reclaimOrphanLogs();
+            }
             const job = await claimJob();
             if (job) {
                 await processJob(job);
