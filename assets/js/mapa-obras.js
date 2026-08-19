@@ -603,7 +603,7 @@ function renderLegend(){ document.getElementById('legend').style.display='none';
 function renderFoot(){
   document.getElementById('foot').innerHTML=
     `Fluxo: <b>Ceará → ${st.method==='do'?'Distritos Operacionais':'Regiões'} → cidades</b>. Clique numa área para descer; use a trilha no topo para voltar.
-     Divisão oficial dos 11 D.Os (SOP). Contratos vindos da tabela <b>contratos_edificacao</b> (Supabase) — configure a chave no topo do código; sem chave, abre em demonstração.`;
+     Divisão oficial dos 11 D.Os (SOP). Contratos vindos da tabela <b>contratos_edificacao</b> (Supabase).`;
 }
 
 function render(){
@@ -823,7 +823,7 @@ buildCityState(); rebuildGroupLabels(); buildGroupLayer();
 // aproximação (efeito de entrada suave, tipo câmera chegando no mapa)
 map.fitBounds(fullBounds,{padding:[220,220],animate:false});
 render();
-loadData();   // busca contratos (Supabase) ou usa demonstração
+loadData();   // busca contratos (Supabase); em falha, mostra estado de erro (showDataError)
 
 // mantém o mapa centralizado apesar de fontes, layout e barra de endereço (mobile)
 function refit(){ if(st.level>=3) fitCity(); else if(st.level===2) fitGroup(); else fitFull(); }
