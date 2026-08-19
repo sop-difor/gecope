@@ -1,5 +1,18 @@
 (async function(){
 try{
+// lê os tokens de cor direto do :root (assets/css/mapa-obras.css) — regra da Fase 2:
+// nenhuma cor pode ser hardcoded aqui e também no CSS; o JS só tem a leitura, o CSS
+// é a única fonte da verdade da paleta.
+const _cs=getComputedStyle(document.documentElement);
+const _tok=k=>_cs.getPropertyValue(k).trim();
+const TOKENS={
+  ng:_tok('--ng'), ngRgb:_tok('--ng-rgb'), amber:_tok('--amber'),
+  statusExec:_tok('--status-exec'), statusOk:_tok('--status-ok'), statusWait:_tok('--status-wait'), statusStop:_tok('--status-stop'),
+  mapBase:_tok('--map-base'), mapOpenFill:_tok('--map-open-fill'), mapOpenBorder:_tok('--map-open-border'),
+  mapGroupBorder:_tok('--map-group-border'), mapStateFill:_tok('--map-state-fill'), mapStateHover:_tok('--map-state-hover'),
+  textBrightest:_tok('--text-brightest'),
+};
+
 let GEO, ESTADO, GRP, MUN, DISTRITOS, REGIOES, NAMEIDX;
 try{
   const _fetchJson=u=>fetch(u).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status+' em '+u); return r.json(); });
@@ -73,10 +86,10 @@ function classifyComissao(tipoRaw){
 // classificação da situação da obra em 4 estados fixos, cada um com cor reservada
 // (nunca a mesma paleta usada nos distritos/regiões do mapa, para não confundir os dois canais de cor)
 const STATUS_STATES=[
-  {key:'exec', label:'Em execução',  color:'#3C87C9'},
-  {key:'ok',   label:'Concluída/encerrada', color:'#189E6E'},
-  {key:'wait', label:'Aguardando OS', color:'#FAB219'},
-  {key:'stop', label:'Paralisada',   color:'#D03B3B'},
+  {key:'exec', label:'Em execução',  color:TOKENS.statusExec},
+  {key:'ok',   label:'Concluída/encerrada', color:TOKENS.statusOk},
+  {key:'wait', label:'Aguardando OS', color:TOKENS.statusWait},
+  {key:'stop', label:'Paralisada',   color:TOKENS.statusStop},
 ];
 function statusBucket(rawStatus){
   const s=normTxt(rawStatus);
@@ -138,7 +151,7 @@ async function fetchFiscais(idFilter){
 }
 function setStatus(txt,ok){
   const el=document.getElementById('connStatus');
-  if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); d.style.background=ok?'#2FE6A0':'#F6B255'; d.style.boxShadow='0 0 10px '+(ok?'#2FE6A0':'#F6B255');}
+  if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); const dot=ok?TOKENS.ng:TOKENS.amber; d.style.background=dot; d.style.boxShadow='0 0 10px '+dot;}
   const b=document.querySelector('.badge');
   if(b){ b.classList.toggle('demo',!ok); const t=document.getElementById('badgeTxt'); if(t) t.textContent = ok?'Supabase · ao vivo':'Erro de conexão'; }
   const syncEl=document.getElementById('syncTime');
@@ -220,7 +233,7 @@ const st={method:'do',metric:'obras',level:0,group:null,city:null,hoverGroup:nul
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
               valor:{label:'Valor total',fmt:v=>BRL.format(v)},
               aditivo:{label:'Aditivos (R$)',fmt:v=>BRL.format(v)}};
-const BASE='#3E9E70';
+const BASE=TOKENS.mapBase;
 const allIds=Object.keys(DB.municipios);
 function groupsList(){return st.method==='do'?DB.distritos:DB.regioes;}
 function gidOf(id){const m=DB.municipios[id];return st.method==='do'?m.do:m.reg;}
@@ -269,8 +282,8 @@ function visible(id){
 function styleFeature(f){
   const id=f.properties.id;
   if(!visible(id)) return HID;                    // níveis 0 e 1: municípios escondidos
-  if(st.level===2) return {fillColor:BASE,color:'#BDEED4',weight:0.5+0.7*zt(),fillOpacity:.4,opacity:.85};
-  return {fillColor:'#63C494',color:'#EAFBF3',weight:1.0+1.0*zt(),fillOpacity:.85,opacity:1};  // cidade aberta (nível 3)
+  if(st.level===2) return {fillColor:BASE,color:TOKENS.mapOpenBorder,weight:0.5+0.7*zt(),fillOpacity:.4,opacity:.85};
+  return {fillColor:TOKENS.mapOpenFill,color:TOKENS.textBrightest,weight:1.0+1.0*zt(),fillOpacity:.85,opacity:1};  // cidade aberta (nível 3)
 }
 function applyInteractivity(){
   layer.eachLayer(l=>{ if(l._path) l._path.style.pointerEvents = visible(l.feature.properties.id)?'':'none'; });
@@ -282,7 +295,7 @@ function tipHtml(id){
   const v=mval(aggIds([id]));return `<b>${DB.municipios[id].nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`;
 }
 function onEach(f,l){
-  l.on('mouseover',()=>{ if(!visible(f.properties.id))return; l.setStyle({weight:1.8,color:'#EAFBF3'}); l.bringToFront();
+  l.on('mouseover',()=>{ if(!visible(f.properties.id))return; l.setStyle({weight:1.8,color:TOKENS.textBrightest}); l.bringToFront();
                          tip.setLatLng(l.getBounds().getCenter()).setContent(tipHtml(f.properties.id)).addTo(map); });
   l.on('mouseout',()=>{ layer.resetStyle(l); tip.remove(); });
   l.on('click',()=>onClick(f.properties.id));
@@ -296,8 +309,8 @@ function onClick(id){
 
 // ---- camada de blocos (D.O./Região dissolvidos) ----
 let groupLayer=null;
-function groupStyle(){return {fillColor:BASE,color:'#CDEFDD',weight:gw(),fillOpacity:.5,opacity:.9};}
-function groupHover(){return {fillColor:'#63C494',color:'#EAFBF3',weight:gw()+0.8,fillOpacity:.72};}
+function groupStyle(){return {fillColor:BASE,color:TOKENS.mapGroupBorder,weight:gw(),fillOpacity:.5,opacity:.9};}
+function groupHover(){return {fillColor:TOKENS.mapOpenFill,color:TOKENS.textBrightest,weight:gw()+0.8,fillOpacity:.72};}
 function onGroup(f,l){
   const gid=f.properties.gid;
   l.on('mouseover',()=>{ l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; renderPanel();
@@ -654,7 +667,7 @@ function renderPanel(){
     if(st.level===1 && st.hoverGroup!=null){
       const g=grpById(st.hoverGroup); const ids=idsOfGroup(st.hoverGroup);
       scope.innerHTML=`Região destacada — <b>clique para abrir os municípios</b>`;
-      body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:#EAFBF3;text-shadow:0 0 20px rgba(47,230,160,.22)">${g.nome}</div>`
+      body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:${TOKENS.textBrightest};text-shadow:0 0 20px rgba(${TOKENS.ngRgb},.22)">${g.nome}</div>`
         +`<div class="scope" style="margin-top:8px">${ids.length} municípios neste ${st.method==='do'?'distrito':'recorte'}</div>`;
     } else {
       scope.innerHTML= st.level===0 ? `Visão geral do estado — <b>clique no mapa</b> para dividir em ${methodName.toLowerCase()}`
@@ -668,13 +681,13 @@ function renderPanel(){
     scope.innerHTML=`Distrito/Região selecionado`;
     const ids=idsOfGroup(st.group);
     const ents=ids.map(id=>({k:id,nome:DB.municipios[id].nome,sub:'',v:mval(aggIds([id]))})).filter(e=>e.v>0).sort((a,b)=>b.v-a.v);
-    body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:#EAFBF3;text-shadow:0 0 20px rgba(47,230,160,.22)">${g.nome}</div>`
+    body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:${TOKENS.textBrightest};text-shadow:0 0 20px rgba(${TOKENS.ngRgb},.22)">${g.nome}</div>`
       +`<div class="sec-h"><span>Cidades (${ids.length})</span><span>clique p/ abrir</span></div>`+rankRows(ents,'city')
       +`<div class="sec-h" style="margin-top:20px"><span>Contratos do distrito</span></div>`+obrasCards(ids);
   } else {
     const id=st.city, g=grpById(gidOf(id));
     scope.innerHTML=`Município selecionado · ${g.nome.replace(/^D\.O\.\s*/,'')}`;
-    body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:#EAFBF3;text-shadow:0 0 20px rgba(47,230,160,.22)">${DB.municipios[id].nome}</div>`
+    body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:${TOKENS.textBrightest};text-shadow:0 0 20px rgba(${TOKENS.ngRgb},.22)">${DB.municipios[id].nome}</div>`
       +`<div class="sec-h" style="margin-top:12px"><span>Contratos</span><span>${obrasOf(id).length}</span></div>`+obrasCards([id]);
   }
 }
@@ -919,11 +932,11 @@ map.on('moveend',()=>updateLabels());
 // ---- init ----
 layer=L.geoJSON(GEO,{style:styleFeature,onEachFeature:onEach}).addTo(map);
 fullBounds=layer.getBounds();
-stateShape=L.geoJSON(ESTADO,{style:{fillColor:'#1E7A54',color:'rgba(47,230,160,.42)',weight:1.5,fillOpacity:.96},
+stateShape=L.geoJSON(ESTADO,{style:{fillColor:TOKENS.mapStateFill,color:`rgba(${TOKENS.ngRgb},.42)`,weight:1.5,fillOpacity:.96},
   onEachFeature:(f,l)=>{
     l.on('click',()=>goSub());
-    l.on('mouseover',()=>{l.setStyle({fillColor:'#249066'});tip.setLatLng(l.getBounds().getCenter()).setContent('<b>Ceará</b><br>Clique para dividir').addTo(map);});
-    l.on('mouseout',()=>{l.setStyle({fillColor:'#1E7A54'});tip.remove();});
+    l.on('mouseover',()=>{l.setStyle({fillColor:TOKENS.mapStateHover});tip.setLatLng(l.getBounds().getCenter()).setContent('<b>Ceará</b><br>Clique para dividir').addTo(map);});
+    l.on('mouseout',()=>{l.setStyle({fillColor:TOKENS.mapStateFill});tip.remove();});
   }});
 buildCityState(); rebuildGroupLabels(); buildGroupLayer();
 // posição inicial "afastada" — o refit()/fitFull() logo abaixo anima a
