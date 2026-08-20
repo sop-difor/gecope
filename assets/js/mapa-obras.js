@@ -467,7 +467,7 @@ function buildCityState(){
 }
 // ajustes manuais pontuais de posição de rótulo [Δlat,Δlon], por nome já sem o
 // prefixo "D.O." — ver comentário de uso mais abaixo.
-const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.18]};
+const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.18],'Sertão de Sobral':[0.05,0]};
 function rebuildGroupLabels(){
   if(groupLbl) groupLbl.remove();
   groupItems=[];
@@ -505,8 +505,19 @@ function declutter(items,fs,H,pad,filt,prioFn){
   for(const it of sorted){
     const el=it.mk.getElement(); if(!el)continue;
     if(filt&&!filt(it)){el.style.display='none';continue;}
-    const p=map.latLngToContainerPoint(it.ll), w=it.nome.length*fs+pad;
-    const bx={x1:p.x-w/2,y1:p.y-H/2,x2:p.x+w/2,y2:p.y+H/2};
+    // caixa de colisão vem do tamanho REAL do texto renderizado (getBoundingClientRect
+    // do wrapper .lbl), não de "nº de caracteres × fator estimado". A estimativa por
+    // caractere é sempre uma média — apertar o fator o bastante pra caber rótulos
+    // curtos deixa rótulos longos (ex. "Serra da Ibiapaba"/"Sertão de Sobral", ambos
+    // ~17 caracteres) subestimados o bastante pra colidir de verdade sem o algoritmo
+    // perceber (achado do usuário). Precisa estar visível pra medir — por isso troca
+    // pra '' antes de ler o rect, e só volta pra 'none' se realmente colidir.
+    el.style.display='';
+    const inner=el.querySelector('.lbl');
+    const p=map.latLngToContainerPoint(it.ll);
+    let w=it.nome.length*fs+pad, h=H; // fallback, só usado se .lbl não for encontrado
+    if(inner){ const r=inner.getBoundingClientRect(); w=r.width+pad; h=r.height+2; }
+    const bx={x1:p.x-w/2,y1:p.y-h/2,x2:p.x+w/2,y2:p.y+h/2};
     let hit=false; for(const q of placed){if(bx.x1<q.x2&&bx.x2>q.x1&&bx.y1<q.y2&&bx.y2>q.y1){hit=true;break;}}
     el.style.display=hit?'none':''; if(!hit)placed.push(bx);
   }
@@ -544,7 +555,7 @@ function updateLabels(){
   // grande o bastante pra esconder Quixeramobim (cercado por outros 5 distritos)
   // em janelas não-maximizadas — a fonte renderizada não muda, só a folga usada
   // pra decidir o que colide com o quê.
-  if(st.level===1) declutter(groupItems, s.grp*0.48, s.grp*2.2, 4, null, it=>aggIds(idsOfGroup(it.id)).obras);
+  if(st.level===1) declutter(groupItems, s.grp*0.48, s.grp*2.2, 2, null, it=>aggIds(idsOfGroup(it.id)).obras);
   else if(st.level===2) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>String(gidOf(it.id))===String(st.group), it=>obrasOf(it.id).length);
   else if(st.level===3) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>it.id===st.city, it=>obrasOf(it.id).length);
 }
