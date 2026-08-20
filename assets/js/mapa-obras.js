@@ -760,6 +760,16 @@ function openModal(o){
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
 document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+// Esc também limpa a seleção combinada (Ctrl+clique) — mas só quando não há nada
+// "mais em cima" pra fechar primeiro (modal aberto, dropdown de filtro aberto),
+// senão um só Esc fecharia o modal E perderia a seleção de distritos ao mesmo
+// tempo, o que ninguém pede quando aperta uma tecla só.
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape' || !st.sel) return;
+  if(document.getElementById('modalBg').classList.contains('show')) return;
+  if(document.querySelector('.msel.on')) return;
+  clearSelection();
+});
 function hasActiveFilter(){ return !!st.f.q || FILTER_DEFS.some(d=>st.f[d.key].size>0); }
 function renderPanel(){
   setKPIs();
