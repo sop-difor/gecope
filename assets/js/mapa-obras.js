@@ -553,7 +553,9 @@ function toggleSelection(kind,id){
   if(st.sel.ids.has(id)) st.sel.ids.delete(id); else st.sel.ids.add(id);
   if(!st.sel.ids.size) st.sel=null;
   render();
-  if(st.sel){ const b=boundsOfIds(selectionMunIds()); if(b) map.flyToBounds(b,{padding:[50,50],maxZoom:10,duration:.8,easeLinearity:.2}); }
+  // sem flyToBounds aqui de propósito: cada Ctrl+clique já reenquadraria o mapa,
+  // e enquanto o usuário ainda está compondo a seleção (clicando em vários lugares
+  // em sequência) isso mais atrapalha do que ajuda — pedido do usuário.
 }
 function clearSelection(){ if(st.sel){ st.sel=null; render(); } }
 function statusBreakdown(ids){
