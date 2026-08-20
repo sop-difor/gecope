@@ -231,6 +231,7 @@ const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximum
 const NUM=new Intl.NumberFormat('pt-BR');
 
 const st={method:'do',metric:'obras',level:0,group:null,city:null,hoverGroup:null,dataScope:'ativa',
+  sel:null, // Ctrl+clique em vários distritos/regiões/municípios: {kind:'group'|'city', ids:Set}
   f:{ano:new Set(),status:new Set(),contratada:new Set(),contratante:new Set(),fiscal:new Set(),q:''}};
 
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
@@ -290,6 +291,10 @@ function styleFeature(f){
   const id=f.properties.id;
   if(!visible(id)) return HID;                    // níveis 0 e 1: municípios escondidos
   if(st.level===2){
+    // município na seleção combinada (Ctrl+clique): destaque cheio, sobrepõe a
+    // intensidade coroplética normal — precisa ser visualmente inconfundível com
+    // "só tem muita obra" (que usa a mesma cor base, só mais opaca)
+    if(st.sel&&st.sel.kind==='city'&&st.sel.ids.has(String(id))) return {fillColor:TOKENS.ng,color:TOKENS.textBrightest,weight:1.6+0.8*zt(),fillOpacity:.78,opacity:1};
     // preenchimento varia com a métrica atual (obra/valor/aditivo), não é mais
     // uma cor uniforme — um município com 0 obras e um com o máximo do distrito
     // não podem ser visualmente idênticos (achado da revisão final de design)
@@ -311,10 +316,13 @@ function onEach(f,l){
   l.on('mouseover',()=>{ if(!visible(f.properties.id))return; l.setStyle({weight:1.8,color:TOKENS.textBrightest}); l.bringToFront();
                          tip.setLatLng(l.getBounds().getCenter()).setContent(tipHtml(f.properties.id)).addTo(map); });
   l.on('mouseout',()=>{ layer.resetStyle(l); tip.remove(); });
-  l.on('click',()=>onClick(f.properties.id));
+  l.on('click',e=>onClick(f.properties.id,e));
 }
-function onClick(id){
+function onClick(id,e){
   if(!visible(id)) return;
+  // Ctrl/Cmd+clique num município (nível 2, dentro de um distrito/região aberto)
+  // soma à seleção combinada em vez de abrir aquele município sozinho
+  if(st.level===2 && e && e.originalEvent && (e.originalEvent.ctrlKey||e.originalEvent.metaKey)){ toggleSelection('city',id); return; }
   if(st.level===0) goSub();
   else if(st.level===1) goGroup(gidOf(id));
   else if(st.level===2) goCity(id);
@@ -322,14 +330,20 @@ function onClick(id){
 
 // ---- camada de blocos (D.O./Região dissolvidos) ----
 let groupLayer=null;
-function groupStyle(){return {fillColor:BASE,color:TOKENS.mapGroupBorder,weight:gw(),fillOpacity:.5,opacity:.9};}
+function groupStyle(f){
+  // distrito/região na seleção combinada (Ctrl+clique): mesmo destaque cheio usado
+  // pra município selecionado no nível 2 — consistência visual entre os dois níveis
+  if(f&&st.sel&&st.sel.kind==='group'&&st.sel.ids.has(String(f.properties.gid))) return {fillColor:TOKENS.ng,color:TOKENS.textBrightest,weight:gw()+1.2,fillOpacity:.68,opacity:1};
+  return {fillColor:BASE,color:TOKENS.mapGroupBorder,weight:gw(),fillOpacity:.5,opacity:.9};
+}
 function groupHover(){return {fillColor:TOKENS.mapOpenFill,color:TOKENS.textBrightest,weight:gw()+0.8,fillOpacity:.72};}
 function onGroup(f,l){
   const gid=f.properties.gid;
   l.on('mouseover',()=>{ l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; renderPanel();
     tip.setLatLng(l.getBounds().getCenter()).setContent(`<b>${f.properties.nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(mval(aggIds(idsOfGroup(gid))))}`).addTo(map); });
   l.on('mouseout',()=>{ groupLayer.resetStyle(l); st.hoverGroup=null; renderPanel(); tip.remove(); });
-  l.on('click',()=>goGroup(gid));
+  // Ctrl/Cmd+clique num distrito/região soma à seleção combinada em vez de entrar nele
+  l.on('click',e=>{ if(e.originalEvent&&(e.originalEvent.ctrlKey||e.originalEvent.metaKey)){ toggleSelection('group',gid); return; } goGroup(gid); });
 }
 function buildGroupLayer(){ if(groupLayer) groupLayer.remove(); groupLayer=L.geoJSON(GRP[st.method],{style:groupStyle,onEachFeature:onGroup}); }
 
@@ -365,10 +379,10 @@ function fitGroup(){ const b=boundsOfIds(idsOfGroup(st.group)); if(b) map.fitBou
 function fitCity(){ const b=boundsOfIds([st.city]); if(b) map.fitBounds(b,{padding:[60,60],maxZoom:11}); }
 
 // navegação
-function goState(){st.level=0;st.group=null;st.city=null;render();fitFull();}
-function goSub(){st.level=1;st.group=null;st.city=null;render();fitFull();}
-function goGroup(g){st.group=g;st.level=2;st.city=null;render();fitGroup();}
-function goCity(id){st.city=id;st.level=3;render();fitCity();}
+function goState(){st.sel=null;st.level=0;st.group=null;st.city=null;render();fitFull();}
+function goSub(){st.sel=null;st.level=1;st.group=null;st.city=null;render();fitFull();}
+function goGroup(g){st.sel=null;st.group=g;st.level=2;st.city=null;render();fitGroup();}
+function goCity(id){st.sel=null;st.city=id;st.level=3;render();fitCity();}
 
 // ---- rótulos ----
 // centroide "de área" (não a média dos vértices) — evita rótulo deslocado em
@@ -512,12 +526,36 @@ function updateLabels(){
 }
 
 // ---- painel ----
+// resolve a seleção (Ctrl+clique) pra ids de município, que é a unidade que
+// obrasOf()/aggIds() entendem — kind='group' guarda ids de distrito/região, então
+// precisa "abrir" cada um; kind='city' já são ids de município, direto.
+function selectionMunIds(){
+  if(!st.sel || !st.sel.ids.size) return null;
+  return st.sel.kind==='group' ? [...st.sel.ids].flatMap(idsOfGroup) : [...st.sel.ids];
+}
 function scopeIds(){
+  const sel=selectionMunIds(); if(sel) return sel;
   if(st.level===1 && st.hoverGroup!=null) return idsOfGroup(st.hoverGroup);
   if(st.level<=1) return allIds;
   if(st.level===2) return idsOfGroup(st.group);
   return [st.city];
 }
+// Ctrl+clique em distrito/região (nível 1, kind='group') ou município dentro de
+// um distrito aberto (nível 2, kind='city') soma/remove da seleção combinada.
+// Clique normal em qualquer lugar (goState/goSub/goGroup/goCity) limpa a seleção —
+// ela só existe "pausada" no nível onde foi criada.
+function toggleSelection(kind,id){
+  // gid de distrito/região é numérico no GeoJSON, mas o dataset do chip removível
+  // (data-selid) sempre serializa pra string — sem normalizar aqui, tirar um chip
+  // clicando nele faz Set.has(id) falhar (3 !== "3") e ADICIONA em vez de remover.
+  id=String(id);
+  if(!st.sel || st.sel.kind!==kind) st.sel={kind,ids:new Set()};
+  if(st.sel.ids.has(id)) st.sel.ids.delete(id); else st.sel.ids.add(id);
+  if(!st.sel.ids.size) st.sel=null;
+  render();
+  if(st.sel){ const b=boundsOfIds(selectionMunIds()); if(b) map.flyToBounds(b,{padding:[50,50],maxZoom:10,duration:.8,easeLinearity:.2}); }
+}
+function clearSelection(){ if(st.sel){ st.sel=null; render(); } }
 function statusBreakdown(ids){
   const c={exec:0,ok:0,wait:0,stop:0}; let total=0;
   ids.forEach(id=>obrasOf(id).forEach(o=>{ c[statusBucket(o.statusObra)]++; total++; }));
@@ -727,7 +765,22 @@ function renderPanel(){
   setKPIs();
   const scope=document.getElementById('scope'), body=document.getElementById('body');
   const methodName=st.method==='do'?'Distritos Operacionais':'Regiões';
-  if(st.level<=1 && hasActiveFilter()){
+  if(st.sel && st.sel.ids.size){
+    // seleção combinada (Ctrl+clique em vários distritos/regiões/municípios) tem
+    // prioridade sobre o ranking/busca normais — é um recorte explícito do usuário
+    const kindLabel=st.sel.kind==='group'?(st.method==='do'?'distrito':'região'):'município';
+    const chips=[...st.sel.ids].map(id=>{
+      const nome=st.sel.kind==='group' ? (grpById(id)?grpById(id).nome.replace(/^D\.O\.\s*/,''):id)
+                                        : (DB.municipios[id]?DB.municipios[id].nome:id);
+      return `<span class="chip chip-sel" role="button" tabindex="0" data-selid="${id}" title="Remover ${escHtml(nome)} da seleção">${escHtml(nome)} ✕</span>`;
+    }).join('');
+    const n=st.sel.ids.size;
+    scope.innerHTML=`<b>${n}</b> ${kindLabel}${n===1?'':'s'} selecionado${n===1?'':'s'} — Ctrl+clique pra somar/tirar da seleção`
+      +` <button class="clearf" id="clearSelBtn" style="display:inline-flex;margin-left:8px;padding:3px 10px;font-size:10px">Limpar seleção</button>`;
+    document.getElementById('clearSelBtn').onclick=clearSelection;
+    body.innerHTML=`<div class="chips" style="margin-bottom:14px">${chips}</div>`
+      +`<div class="sec-h"><span>Contratos combinados</span></div>`+obrasCards(selectionMunIds());
+  } else if(st.level<=1 && hasActiveFilter()){
     // busca/filtro ativo com o mapa ainda no nível Estado/Distritos: mostra os
     // contratos encontrados direto (em vez do ranking por distrito), cada um com
     // o município clicável — sem precisar descer manualmente até lá
@@ -770,6 +823,7 @@ function renderCrumb(){
   else if(st.level===1){h=`<a data-nav="state">Ceará</a><span class="sep">›</span><span class="cur">${methodName}</span>`;}
   else if(st.level===2){h=`<a data-nav="state">Ceará</a><span class="sep">›</span><a data-nav="sub">${methodName}</a><span class="sep">›</span><span class="cur">${grpById(st.group).nome.replace(/^D\.O\.\s*/,'')}</span>`;}
   else {h=`<a data-nav="state">Ceará</a><span class="sep">›</span><a data-nav="sub">${methodName}</a><span class="sep">›</span><a data-nav="group">${grpById(gidOf(st.city)).nome.replace(/^D\.O\.\s*/,'')}</a><span class="sep">›</span><span class="cur">${DB.municipios[st.city].nome}</span>`;}
+  if(st.sel && st.sel.ids.size) h+=`<span class="sep">›</span><span class="cur">${st.sel.ids.size} selecionado${st.sel.ids.size===1?'':'s'}</span>`;
   c.innerHTML=h;
 }
 function renderFoot(){
@@ -781,6 +835,7 @@ function renderFoot(){
 function render(){
   if(st.level===2) _levelMax=Math.max(1,...idsOfGroup(st.group).map(id=>mval(aggIds([id]))));
   layer.setStyle(styleFeature); applyInteractivity(); updateLabels();
+  if(groupLayer) groupLayer.setStyle(groupStyle); // reflete seleção (Ctrl+clique) sem esperar o próximo zoomend
   setLayer(stateShape, st.level===0); if(st.level===0 && stateShape) stateShape.bringToFront();
   setLayer(groupLayer, st.level===1); if(st.level===1 && groupLayer) groupLayer.bringToFront();
   renderCrumb(); renderPanel(); renderFoot();
@@ -993,6 +1048,9 @@ document.getElementById('crumb').addEventListener('click',e=>{
   if(n==='state')goState(); else if(n==='sub')goSub(); else if(n==='group')goGroup(gidOf(st.city));
 });
 document.getElementById('body').addEventListener('click',e=>{
+  // chip de item selecionado (Ctrl+clique): clicar nele tira da seleção combinada
+  const sc=e.target.closest('.chip-sel');
+  if(sc){ toggleSelection(st.sel?st.sel.kind:'group',sc.dataset.selid); return; }
   const rr=e.target.closest('.rrow');
   if(rr){ if(rr.dataset.kind==='group')goGroup(rr.dataset.k); else goCity(rr.dataset.k); return; }
   // chip de município do card do contrato: leva direto até ele no mapa,
@@ -1001,13 +1059,13 @@ document.getElementById('body').addEventListener('click',e=>{
   if(loc){ goCity(loc.dataset.cod); return; }
   const ob=e.target.closest('.obra'); if(ob){ const o=CUROBRAS[+ob.dataset.oid]; if(o) openModal(o); }
 });
-// mesmas três ações acima, via teclado (Enter/Espaço) — os cards (.rrow/.obra/
-// .chip.mun.locate) são <div>/<span> com role="button" e tabindex, não elementos
-// <button> nativos, então não recebem ativação por teclado de graça; painel público
-// de órgão estadual precisa ser navegável sem mouse.
+// mesmas ações acima, via teclado (Enter/Espaço) — os cards (.rrow/.obra/
+// .chip.mun.locate/.chip-sel) são <div>/<span> com role="button" e tabindex, não
+// elementos <button> nativos, então não recebem ativação por teclado de graça;
+// painel público de órgão estadual precisa ser navegável sem mouse.
 document.getElementById('body').addEventListener('keydown',e=>{
   if(e.key!=='Enter' && e.key!==' ') return;
-  const target=e.target.closest('.rrow,.obra,.chip.mun.locate');
+  const target=e.target.closest('.rrow,.obra,.chip.mun.locate,.chip-sel');
   if(!target) return;
   e.preventDefault();
   target.click();

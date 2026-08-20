@@ -226,7 +226,7 @@
   /* cards navegáveis por teclado (.rrow/.obra/.chip.mun.locate têm role="button"+
      tabindex no JS, não são <button> nativos) — sem isso o anel de foco do
      navegador ou não aparece ou usa o outline azul padrão, destoando do tema */
-  .rrow:focus-visible,.obra:focus-visible,.chip.mun.locate:focus-visible{
+  .rrow:focus-visible,.obra:focus-visible,.chip.mun.locate:focus-visible,.chip-sel:focus-visible{
     outline:2px solid var(--ng);outline-offset:2px}
   .rrow{cursor:pointer;border:1px solid rgba(var(--white-rgb),.06);border-radius:11px;padding:10px 12px;margin-bottom:7px;
         background:linear-gradient(180deg,rgba(var(--white-rgb),.04),rgba(var(--white-rgb),.015));transition:.15s}
@@ -254,6 +254,11 @@
   .chip.mun.locate{cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:.15s}
   .chip.mun.locate svg{flex:none}
   .chip.mun.locate:hover{background:rgba(var(--ng-rgb),.22);border-color:rgba(var(--ng-rgb),.55);color:var(--text-brightest)}
+  /* chip de item na seleção combinada (Ctrl+clique) — clicável pra tirar da seleção,
+     mesma linguagem visual do chip de município mas com o "✕" deixando a ação óbvia */
+  .chip-sel{cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin:0 6px 6px 0;
+    color:var(--ng-light);background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.35);transition:.15s}
+  .chip-sel:hover{background:rgba(var(--status-stop-rgb),.16);border-color:rgba(var(--status-stop-rgb),.5);color:var(--status-stop-text)}
   .obra .info{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:11px;padding-top:11px;border-top:1px dashed rgba(var(--white-rgb),.12)}
   .obra .info .l{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)}
   .obra .info .d{font-size:12px;color:var(--text-data);font-weight:600;margin-top:2px}
