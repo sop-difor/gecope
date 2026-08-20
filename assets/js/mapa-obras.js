@@ -795,9 +795,12 @@ document.addEventListener('fullscreenchange',()=>{
   // que o usuário queria fechar — limpa e tenta religar a tela cheia. Melhor
   // esforço: alguns navegadores bloqueiam de propósito reentrar em tela cheia
   // logo após um Esc (anti-abuso, pra impedir página de "prender" o usuário);
-  // quando isso acontece, o usuário só precisa clicar em "Tela cheia" de novo —
-  // não é pior do que o comportamento antes deste ajuste.
-  if(st.sel){ clearSelection(); requestRealFullscreen(); }
+  // religar FORA do mesmo tick do evento (setTimeout) ajuda em alguns navegadores
+  // que só bloqueiam a reentrada síncrona-no-mesmo-evento, não a reentrada um
+  // instante depois — ainda dentro da janela de "ativação recente" do usuário.
+  // Quando o navegador bloqueia mesmo assim, o usuário só precisa clicar em
+  // "Tela cheia" de novo — não é pior do que o comportamento antes deste ajuste.
+  if(st.sel){ clearSelection(); setTimeout(requestRealFullscreen,60); }
 });
 function hasActiveFilter(){ return !!st.f.q || FILTER_DEFS.some(d=>st.f[d.key].size>0); }
 function renderPanel(){
