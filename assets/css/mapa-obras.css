@@ -3,7 +3,7 @@
   --ng:#2FE6A0; --ng-light:#8EF0C4; --ng-mid:#4FE0A6; --ng-deep:#12907E; --ng-rgb:47,230,160;
   --amber:#F6B255; --amber-text:#F6C98A; --amber-text-2:#FFC98A; --amber-deep:#B4531A; --amber-rgb:246,178,85;
   --status-exec:#3C87C9; --status-ok:#189E6E; --status-wait:#FAB219;
-  --status-stop:#D03B3B; --status-stop-deep:#7A1F1F; --status-stop-text:#FFC9C0;
+  --status-stop:#D03B3B; --status-stop-deep:#7A1F1F; --status-stop-text:#FFC9C0; --status-stop-rgb:208,59,59;
 
   /* mapa (paleta própria, deliberadamente distinta da de status acima —
      ver STATUS_STATES em mapa-obras.js — para não confundir os dois canais de cor) */
@@ -12,7 +12,7 @@
 
   --bg-base:#071310; --bg-header-1:#07130E; --bg-header-2:#0C2A1E; --bg-header-3:#0A2118;
   --bg-panel:#0B1A14; --bg-panel-2:#081410; --bg-modal:#0C1F17; --bg-modal-2:#081310; --bg-hover:#12271D;
-  --panel-rgb:8,18,14; --white-rgb:255,255,255; --ink-rgb:0,0,0;
+  --panel-rgb:8,18,14; --white-rgb:255,255,255; --ink-rgb:0,0,0; --bg-base-rgb:7,19,16;
   --text-on-light:#0B0B0B; --shadow-ink:#05100C;
 
   --text-base:#CFE3D9; --text-bright:#EAF3EE; --text-brightest:#EAFBF3; --text-value:#BFE1D0;
@@ -177,7 +177,7 @@
   .kpi .v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--text-brightest);margin-top:6px;line-height:1;text-shadow:0 0 18px rgba(var(--ng-rgb),.28)}
   .kpi.wide{grid-column:1/-1}
   .kpi.alert::before{background:linear-gradient(var(--status-stop),var(--status-stop-deep))}
-  .kpi.alert .v{color:var(--status-stop-text);text-shadow:0 0 18px rgba(208,59,59,.32)}
+  .kpi.alert .v{color:var(--status-stop-text);text-shadow:0 0 18px rgba(var(--status-stop-rgb),.32)}
   .scope{font-size:11.5px;color:var(--text-label);margin:18px 0 10px;font-weight:600;letter-spacing:.3px}
   .scope b{color:var(--text-brightest)}
 
@@ -253,7 +253,7 @@
   @media (max-width:860px){main{grid-template-columns:1fr;grid-template-rows:56vh 1fr}aside{border-left:0;border-top:1px solid rgba(var(--ng-rgb),.16)}.crumb{max-width:60%}}
 
 .data-error{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
-  background:rgba(7,19,16,.92);backdrop-filter:blur(2px)}
+  background:rgba(var(--bg-base-rgb),.92);backdrop-filter:blur(2px)}
 .data-error[hidden]{display:none}
 .data-error-box{max-width:420px;padding:28px 32px;border-radius:14px;background:var(--bg-header-2);
   border:1px solid rgba(var(--white-rgb),.08);text-align:center;color:var(--text-bright)}
