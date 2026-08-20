@@ -467,7 +467,19 @@ function buildCityState(){
 }
 // ajustes manuais pontuais de posição de rótulo [Δlat,Δlon], por nome já sem o
 // prefixo "D.O." — ver comentário de uso mais abaixo.
-const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.18],'Sertão de Sobral':[0.05,0]};
+const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.18],'Sertão de Sobral':[0.10,0.10],'Maciço de Baturité':[-0.18,0.10],'Vale do Jaguaribe':[-0.18,0.22]};
+// nome completo (usado em breadcrumb/painel/tooltip) é longo demais pra caber
+// lado a lado no mapa em "Região" (14 itens, vários espremidos no mesmo canto) —
+// tira as preposições de ligação (de/da/do/dos/das) e quebra em até 2 linhas
+// centralizadas. Pedido do usuário: "SERTÃO DE SOBRAL" -> "SERTÃO"/"SOBRAL".
+function shortGroupLabel(nome){
+  const compact=nome.replace(/\s+(de|da|do|dos|das)\s+/gi,' ').trim();
+  const words=compact.split(/\s+/);
+  if(words.length<=1) return {plain:compact, html:escHtml(compact)};
+  const mid=Math.ceil(words.length/2);
+  const l1=words.slice(0,mid).join(' '), l2=words.slice(mid).join(' ');
+  return {plain:compact, html:`${escHtml(l1)}<br>${escHtml(l2)}`};
+}
 function rebuildGroupLabels(){
   if(groupLbl) groupLbl.remove();
   groupItems=[];
@@ -491,9 +503,13 @@ function rebuildGroupLabels(){
     // olho humano" nem sempre coincidem num polígono específico; em vez de
     // afinar o algoritmo geral só por causa de 1 caso, desloca só esse rótulo.
     if(GRP_LABEL_NUDGE[short]){ const [dLa,dLo]=GRP_LABEL_NUDGE[short]; la+=dLa; lo+=dLo; }
-    groupItems.push({id:g.id,ll:L.latLng([la,lo]),nome:short,
+    // rótulo no mapa é só a versão curta/quebrada (sem preposição, em 2 linhas) —
+    // breadcrumb, painel e tooltip continuam usando o nome oficial completo
+    // (grpById/g.nome), essa abreviação existe só pra caber no mapa.
+    const compact=shortGroupLabel(short);
+    groupItems.push({id:g.id,ll:L.latLng([la,lo]),nome:compact.plain,
       mk:L.marker([la,lo],{interactive:false,keyboard:false,icon:L.divIcon({className:'grp-label',iconSize:[0,0],
-        html:`<div class="lbl"><div class="lbl-name">${short}</div><div class="lbl-count"></div></div>`})})});
+        html:`<div class="lbl"><div class="lbl-name">${compact.html}</div><div class="lbl-count"></div></div>`})})});
   });
   groupLbl=L.layerGroup(groupItems.map(i=>i.mk));
 }
@@ -528,6 +544,15 @@ function declutter(items,fs,H,pad,filt,prioFn){
 // de cada rótulo destes mesmos valores (ver chamadas em updateLabels()), então
 // aumentar aqui não desalinha a lógica de "esconder rótulo que colide" — ela
 // escala junto.
+// "Região" tem 14 itens (vs. 11 de "Distrito Op."), muitos deles espremidos no
+// mesmo canto do mapa (litoral/serra no norte) — com a fonte grande pedida pelo
+// usuário, alguns simplesmente não cabem lado a lado, não importa quanto se
+// desloque cada um manualmente (empurrar um pra longe de um vizinho só empurra
+// pra cima do próximo). Reduz um pouco só nesse modo; "Distrito Op." (padrão)
+// mantém o tamanho grande.
+// mesmo tamanho pros dois métodos agora — a quebra em 2 linhas (shortGroupLabel)
+// já resolve o aperto de "Região" (14 itens) sem precisar sacrificar o tamanho
+// da fonte que o usuário pediu maior.
 function lblFS(){const t=zt();return {grp:12+3.5*t, mun:10.5+3*t, st:32};}
 function applyLabelSizes(){const s=lblFS(),r=document.documentElement.style;
   r.setProperty('--grpfs',s.grp.toFixed(1)+'px');r.setProperty('--munfs',s.mun.toFixed(1)+'px');r.setProperty('--stfs',s.st+'px');return s;}
