@@ -856,7 +856,11 @@ function autoLocateSearch(){
     if(st.city!==matchIds[0] || st.level!==3){ _searchNav=true; goCity(matchIds[0]); }
     return;
   }
-  if(_searchNav && st.level===3){ _searchNav=false; st.city=null; st.group=null; st.level=0; render(); }
+  // ao desfazer uma navegação automática (filtro/busca que tinha afunilado pra 1
+  // município só), sem refit() a câmera fica presa no zoom da cidade anterior —
+  // o estado lógico volta pro Estado mas o usuário continua olhando pro mesmo
+  // pedaço ampliado do mapa, agora vazio (achado na verificação da Fase 4)
+  if(_searchNav && st.level===3){ _searchNav=false; st.city=null; st.group=null; st.level=0; render(); refit(); }
   if(matchIds.length>1 && st.level<=1){
     const b=boundsOfIds(matchIds);
     if(b) map.flyToBounds(b,{padding:[60,60],maxZoom:10,duration:1.1,easeLinearity:.15});
