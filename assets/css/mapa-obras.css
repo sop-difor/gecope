@@ -140,12 +140,6 @@
   .crumb .sep{opacity:.45}
   .crumb .cur{color:var(--text-brightest);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  .legend{position:absolute;z-index:600;bottom:16px;left:14px;background:rgba(var(--panel-rgb),.92);backdrop-filter:blur(9px);
-          border:1px solid rgba(var(--ng-rgb),.18);border-radius:12px;padding:11px 13px;box-shadow:0 8px 24px rgba(var(--ink-rgb),.4);
-          font-size:11px;color:var(--text-muted);display:none}
-  .legend .lt{font-weight:700;color:var(--text-bright);margin-bottom:8px}
-  .legrow{display:flex;align-items:center;gap:7px;margin:3px 0}
-  .legsw{width:22px;height:12px;border-radius:3px;border:1px solid rgba(var(--white-rgb),.08)}
 
   .mun-label,.grp-label,.state-label{background:none;border:0;box-shadow:none;pointer-events:none;width:0!important;height:0!important;overflow:visible}
   .state-label span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;
@@ -193,6 +187,16 @@
   .statleg .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
   .statleg .sit b{color:var(--text-brightest);font-family:'Space Grotesk',sans-serif;font-weight:700}
   .sec-h{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-dim);margin:16px 0 9px;display:flex;justify-content:space-between}
+  .ychart{display:block;width:100%;height:56px;overflow:visible}
+  .ychart-lbl{font-size:8px;font-family:Montserrat,sans-serif;fill:var(--text-dim)}
+
+  /* skeleton: pulso sutil nos KPIs/gráficos enquanto a 1ª carga de dados ainda não
+     chegou — troca o "tudo em branco até aparecer de repente" por um sinal de que
+     algo está de fato carregando (ver document.body.classList em mapa-obras.js) */
+  @keyframes skeleton-pulse{0%,100%{opacity:1}50%{opacity:.32}}
+  .boot-loading .kpi .v,.boot-loading .stackbar,.boot-loading .statleg,
+  .boot-loading #aditivoBar,.boot-loading #aditivoLeg,.boot-loading #yearChart{
+    animation:skeleton-pulse 1.3s ease-in-out infinite}
 
   .rrow{cursor:pointer;border:1px solid rgba(var(--white-rgb),.06);border-radius:11px;padding:10px 12px;margin-bottom:7px;
         background:linear-gradient(180deg,rgba(var(--white-rgb),.04),rgba(var(--white-rgb),.015));transition:.15s}

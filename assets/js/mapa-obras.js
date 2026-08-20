@@ -12,6 +12,7 @@ const TOKENS={
   mapGroupBorder:_tok('--map-group-border'), mapStateFill:_tok('--map-state-fill'), mapStateHover:_tok('--map-state-hover'),
   textBrightest:_tok('--text-brightest'),
 };
+document.body.classList.add('boot-loading'); // pulso nos KPIs/gráficos até a 1ª carga de dados terminar (sucesso ou erro)
 
 let GEO, ESTADO, GRP, MUN, DISTRITOS, REGIOES, NAMEIDX;
 try{
@@ -158,6 +159,7 @@ function setStatus(txt,ok){
   if(syncEl) syncEl.textContent = ok ? new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '— (falha na conexão)';
 }
 function showDataError(msg){
+  document.body.classList.remove('boot-loading');
   setStatus('Erro ao carregar dados', false);
   const el=document.getElementById('dataError');
   if(el){ const m=document.getElementById('dataErrorMsg'); if(m) m.textContent=msg; el.hidden=false; }
@@ -222,6 +224,7 @@ async function loadData(){
     showDataError('Não foi possível carregar os contratos do Supabase: '+e.message);
     return;
   }
+  document.body.classList.remove('boot-loading');
   fillFilters(); render(); refit();
 }
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
@@ -263,7 +266,7 @@ function obrasOf(id){
   if(hit===undefined){ hit=DB.municipios[id].obras.filter(passF); _obrasOfCache.set(id,hit); }
   return hit;
 }
-function aggIds(ids){let obras=0,valor=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;}));return{obras,valor,par,adit};}
+function aggIds(ids){let obras=0,valor=0,valorOriginal=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;valorOriginal+=o.valor_original;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;}));return{obras,valor,valorOriginal,par,adit};}
 function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:a.obras;}
 
 // ---- mapa ----
@@ -517,6 +520,39 @@ function renderStatusChart(ids){
     return `<span class="sit"><span class="dot" style="background:${s.color}"></span>${s.label} <b>${NUM.format(c[s.key])}</b> (${pct}%)</span>`;
   }).join('');
 }
+// barra de 2 segmentos (mesma linguagem visual da "Situação das obras" acima) comparando
+// o valor original dos contratos com o total já incorporado em aditivos — pergunta que a
+// cúpula faz na prática: "quanto do valor atual da carteira é aditivo, não orçamento original?"
+function renderAditivoChart(ids){
+  const bar=document.getElementById('aditivoBar'), leg=document.getElementById('aditivoLeg');
+  if(!bar||!leg) return;
+  const a=aggIds(ids), total=a.valorOriginal+a.adit;
+  if(!total){ bar.innerHTML=''; leg.innerHTML='<div class="empty" style="padding:2px 0">Sem valores neste recorte.</div>'; return; }
+  const pctOrig=a.valorOriginal/total*100, pctAdit=100-pctOrig;
+  bar.innerHTML=
+    `<i style="width:${pctOrig}%;background:var(--ng-deep)" title="Valor original: ${BRL.format(a.valorOriginal)} (${pctOrig.toFixed(0)}%)"></i>`
+    +(a.adit>0?`<i style="width:${pctAdit}%;background:var(--amber)" title="Aditivos: ${BRL.format(a.adit)} (${pctAdit.toFixed(0)}%)"></i>`:'');
+  leg.innerHTML=
+    `<span class="sit"><span class="dot" style="background:var(--ng-deep)"></span>Original <b>${BRL.format(a.valorOriginal)}</b></span>`
+    +`<span class="sit"><span class="dot" style="background:var(--amber)"></span>Aditivos <b>${BRL.format(a.adit)}</b> (${pctAdit.toFixed(0)}%)</span>`;
+}
+// mini gráfico de barras (SVG) com a contagem de contratos por ano de assinatura no
+// recorte atual — dá noção de safra/tendência que nenhum KPI isolado mostra.
+function renderYearChart(ids){
+  const host=document.getElementById('yearChart'); if(!host) return;
+  const counts={};
+  ids.forEach(id=>obrasOf(id).forEach(o=>{ if(o.ano) counts[o.ano]=(counts[o.ano]||0)+1; }));
+  const anos=Object.keys(counts).map(Number).sort((a,b)=>a-b);
+  if(!anos.length){ host.innerHTML='<div class="empty" style="padding:2px 0">Sem data de assinatura neste recorte.</div>'; return; }
+  const max=Math.max(...anos.map(a=>counts[a]));
+  const W=anos.length*46, H=64, gap=6, barW=(W-(anos.length-1)*gap)/anos.length;
+  const bars=anos.map((a,i)=>{
+    const h=Math.max(2,counts[a]/max*(H-16)), x=i*(barW+gap), y=H-14-h;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${TOKENS.ng}"><title>${a}: ${NUM.format(counts[a])} contrato${counts[a]===1?'':'s'}</title></rect>`
+      +`<text x="${(x+barW/2).toFixed(1)}" y="${H-3}" text-anchor="middle" class="ychart-lbl">’${String(a).slice(2)}</text>`;
+  }).join('');
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" class="ychart" role="img" aria-label="Contratos por ano de assinatura">${bars}</svg>`;
+}
 function setKPIs(){
   const ids=scopeIds(); const a=aggIds(ids);
   kObras.textContent=NUM.format(a.obras); kValor.textContent=BRL.format(a.valor); kPar.textContent=NUM.format(a.par);
@@ -524,6 +560,8 @@ function setKPIs(){
   kMun.textContent=NUM.format(ids.filter(id=>obrasOf(id).length>0).length);
   kAdit.textContent=BRL.format(a.adit);
   renderStatusChart(ids);
+  renderAditivoChart(ids);
+  renderYearChart(ids);
 }
 function rankRows(entries,onClick){
   const max=Math.max(1,...entries.map(e=>e.v));
@@ -701,7 +739,6 @@ function renderCrumb(){
   else {h=`<a data-nav="state">Ceará</a><span class="sep">›</span><a data-nav="sub">${methodName}</a><span class="sep">›</span><a data-nav="group">${grpById(gidOf(st.city)).nome.replace(/^D\.O\.\s*/,'')}</a><span class="sep">›</span><span class="cur">${DB.municipios[st.city].nome}</span>`;}
   c.innerHTML=h;
 }
-function renderLegend(){ document.getElementById('legend').style.display='none'; }
 function renderFoot(){
   document.getElementById('foot').innerHTML=
     `Fluxo: <b>Ceará → ${st.method==='do'?'Distritos Operacionais':'Regiões'} → cidades</b>. Clique numa área para descer; use a trilha no topo para voltar.
@@ -712,7 +749,7 @@ function render(){
   layer.setStyle(styleFeature); applyInteractivity(); updateLabels();
   setLayer(stateShape, st.level===0); if(st.level===0 && stateShape) stateShape.bringToFront();
   setLayer(groupLayer, st.level===1); if(st.level===1 && groupLayer) groupLayer.bringToFront();
-  renderLegend(); renderCrumb(); renderPanel(); renderFoot();
+  renderCrumb(); renderPanel(); renderFoot();
 }
 
 // ---- filtros / busca (multi-seleção) ----
