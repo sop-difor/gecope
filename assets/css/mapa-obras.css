@@ -66,6 +66,12 @@
      histórico completo (via .on, já herdado de .btn-present.on acima) */
   .btn-scope{border-color:rgba(var(--amber-rgb),.35)}
   .btn-scope:hover{border-color:rgba(var(--amber-rgb),.55);background:rgba(var(--amber-rgb),.10)}
+  /* achado do revisor final: sem isso, passar o mouse no botão já em "Histórico
+     completo" (.on) fazia a borda "piscar" de volta pra âmbar — .btn-scope:hover
+     e .btn-present.on empatam em especificidade e a ordem de declaração decidia
+     o empate a favor do estado errado. Precisa vir depois de .btn-scope:hover
+     para vencer o empate a favor do estado "on" (correto: verde = histórico). */
+  .btn-scope.on:hover{border-color:rgba(var(--ng-rgb),.55);background:rgba(var(--ng-rgb),.14)}
   /* ---- Modo Apresentação (layout padrão fixo desta página) ---- */
   body.presentation header.top{padding:19px 30px}
   body.presentation .top h1{font-size:17px}
