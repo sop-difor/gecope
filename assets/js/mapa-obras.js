@@ -767,40 +767,21 @@ function openModal(o){
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
 document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
-// Esc também limpa a seleção combinada (Ctrl+clique) — mas só quando não há nada
-// "mais em cima" pra fechar primeiro (modal aberto, dropdown de filtro aberto),
-// senão um só Esc fecharia o modal E perderia a seleção de distritos ao mesmo
-// tempo, o que ninguém pede quando aperta uma tecla só.
-//
-// Em tela cheia isso não pode ser resolvido no keydown: o navegador reserva o
-// Esc pra sair da tela cheia e, nesse caso específico, alguns navegadores nem
-// chegam a entregar o keydown pra página (então um "if(e.key==='Escape')" aqui
-// dentro simplesmente não dispara) — não é algo que preventDefault() consiga
-// evitar, é assim de propósito, por segurança. Por isso o caminho da tela cheia
-// não depende de ver a tecla: reage ao 'fullscreenchange' (que sempre dispara,
-// veio do teclado ou não) e distingue "nós mesmos saímos" (botão/clique) de
-// "a tela cheia caiu sozinha" (só pode ter sido Esc) pela flag abaixo.
+// Esc limpa a seleção combinada (Ctrl+clique) — mas só quando não há nada "mais
+// em cima" pra fechar primeiro (modal aberto, dropdown de filtro aberto), senão
+// um só Esc fecharia o modal E perderia a seleção ao mesmo tempo, e só fora de
+// tela cheia: dentro dela o navegador reserva o Esc pra sair da tela cheia (não
+// dá pra bloquear isso por código, é assim de propósito, por segurança — já
+// tentamos religar a tela cheia em seguida e não é confiável, o navegador
+// bloqueia de propósito essa reentrada). Sair da tela cheia (botão OU Esc) nunca
+// mexe na seleção — ela só é limpa clicando em espaço vazio do mapa (ver
+// map.on('click',...) mais abaixo) ou no botão/chip dedicados no painel.
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape' || !st.sel) return;
   if(document.getElementById('modalBg').classList.contains('show')) return;
   if(document.querySelector('.msel.on')) return;
-  if(document.fullscreenElement) return; // deixa o handler de fullscreenchange cuidar
+  if(document.fullscreenElement) return;
   clearSelection();
-});
-let _weExitedFsOnPurpose=false; // setada pelo próprio botão "Tela cheia" antes de chamar exitFullscreen()
-document.addEventListener('fullscreenchange',()=>{
-  if(document.fullscreenElement) return; // só nos interessa quando ela CAI
-  if(_weExitedFsOnPurpose){ _weExitedFsOnPurpose=false; return; } // saída deliberada, não mexe na seleção
-  // saída não-solicitada por nós == só pode ter sido Esc. Se havia seleção, é ela
-  // que o usuário queria fechar — limpa e tenta religar a tela cheia. Melhor
-  // esforço: alguns navegadores bloqueiam de propósito reentrar em tela cheia
-  // logo após um Esc (anti-abuso, pra impedir página de "prender" o usuário);
-  // religar FORA do mesmo tick do evento (setTimeout) ajuda em alguns navegadores
-  // que só bloqueiam a reentrada síncrona-no-mesmo-evento, não a reentrada um
-  // instante depois — ainda dentro da janela de "ativação recente" do usuário.
-  // Quando o navegador bloqueia mesmo assim, o usuário só precisa clicar em
-  // "Tela cheia" de novo — não é pior do que o comportamento antes deste ajuste.
-  if(st.sel){ clearSelection(); setTimeout(requestRealFullscreen,60); }
 });
 function hasActiveFilter(){ return !!st.f.q || FILTER_DEFS.some(d=>st.f[d.key].size>0); }
 function renderPanel(){
@@ -1033,7 +1014,7 @@ function requestRealFullscreen(){
   return Promise.resolve();
 }
 _btnPresent.addEventListener('click',()=>{
-  if(document.fullscreenElement){ _weExitedFsOnPurpose=true; document.exitFullscreen().catch(()=>{ _weExitedFsOnPurpose=false; }); }
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   else requestRealFullscreen();
 });
 document.addEventListener('fullscreenchange',syncFullscreenBtn);
@@ -1114,6 +1095,19 @@ document.getElementById('body').addEventListener('keydown',e=>{
 });
 map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabels(); });
 map.on('moveend',()=>updateLabels());
+// clicar em espaço vazio do mapa (fora de qualquer distrito/região/município)
+// limpa a seleção combinada — caminho alternativo ao Esc que funciona igual
+// dentro e fora de tela cheia, sem depender do navegador (ver histórico de
+// tentativas com Esc: o navegador reserva Esc pra sair da tela cheia e não dá
+// pra garantir que a seleção seja limpa sem sair junto). Clique EM cima de um
+// polígono não conta — quem trata isso é o handler de clique do próprio
+// polígono (onGroup/onClick), que decide entre navegar e Ctrl+selecionar.
+map.on('click',e=>{
+  if(!st.sel) return;
+  const t=e.originalEvent&&e.originalEvent.target;
+  if(t&&t.closest&&t.closest('.leaflet-interactive')) return;
+  clearSelection();
+});
 
 // ---- init ----
 layer=L.geoJSON(GEO,{style:styleFeature,onEachFeature:onEach}).addTo(map);
