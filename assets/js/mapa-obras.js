@@ -520,7 +520,12 @@ function updateLabels(){
   // prioridade por nº de obras: em colisão de rótulos, o município/distrito
   // mais relevante (ex.: Sobral) vence e permanece visível, em vez do primeiro
   // da lista por ordem arbitrária de id.
-  if(st.level===1) declutter(groupItems, s.grp*0.62, s.grp*2.6, 10, null, it=>aggIds(idsOfGroup(it.id)).obras);
+  // fs/pad um pouco mais enxutos que o "esperado" pro tamanho real da fonte: o
+  // aumento de fonte pedido pelo usuário deixou a caixa de colisão estimada
+  // grande o bastante pra esconder Quixeramobim (cercado por outros 5 distritos)
+  // em janelas não-maximizadas — a fonte renderizada não muda, só a folga usada
+  // pra decidir o que colide com o quê.
+  if(st.level===1) declutter(groupItems, s.grp*0.54, s.grp*2.4, 6, null, it=>aggIds(idsOfGroup(it.id)).obras);
   else if(st.level===2) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>String(gidOf(it.id))===String(st.group), it=>obrasOf(it.id).length);
   else if(st.level===3) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>it.id===st.city, it=>obrasOf(it.id).length);
 }
@@ -766,29 +771,33 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 // "mais em cima" pra fechar primeiro (modal aberto, dropdown de filtro aberto),
 // senão um só Esc fecharia o modal E perderia a seleção de distritos ao mesmo
 // tempo, o que ninguém pede quando aperta uma tecla só.
-// o navegador sai da tela cheia sozinho ao apertar Esc — isso não passa pelo JS
-// da página (preventDefault() no keydown não bloqueia, é bloqueado de propósito
-// pelo próprio navegador por segurança) e acontece em paralelo ao clearSelection()
-// abaixo. _escInFs marca que o Esc que limpou a seleção também aconteceu com a
-// tela cheia ligada, pro handler de fullscreenchange logo adiante tentar religar.
-let _escInFs=false;
+//
+// Em tela cheia isso não pode ser resolvido no keydown: o navegador reserva o
+// Esc pra sair da tela cheia e, nesse caso específico, alguns navegadores nem
+// chegam a entregar o keydown pra página (então um "if(e.key==='Escape')" aqui
+// dentro simplesmente não dispara) — não é algo que preventDefault() consiga
+// evitar, é assim de propósito, por segurança. Por isso o caminho da tela cheia
+// não depende de ver a tecla: reage ao 'fullscreenchange' (que sempre dispara,
+// veio do teclado ou não) e distingue "nós mesmos saímos" (botão/clique) de
+// "a tela cheia caiu sozinha" (só pode ter sido Esc) pela flag abaixo.
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape' || !st.sel) return;
   if(document.getElementById('modalBg').classList.contains('show')) return;
   if(document.querySelector('.msel.on')) return;
-  _escInFs=!!document.fullscreenElement;
+  if(document.fullscreenElement) return; // deixa o handler de fullscreenchange cuidar
   clearSelection();
 });
-// melhor esforço: se o Esc acima limpou a seleção enquanto em tela cheia, e o
-// navegador saiu da tela cheia por causa do mesmo Esc, tenta religar na hora —
-// o pedido do usuário foi "só sair da seleção", não da tela cheia também. Alguns
-// navegadores bloqueiam deliberadamente reentrar em tela cheia logo após um Esc
-// (mecanismo anti-abuso pra impedir página de "prender" o usuário em tela cheia),
-// então isso é melhor esforço: religa quando o navegador permite, e se não
-// permitir, o usuário só precisa clicar em "Tela cheia" de novo — não é pior que
-// o comportamento anterior a este ajuste.
+let _weExitedFsOnPurpose=false; // setada pelo próprio botão "Tela cheia" antes de chamar exitFullscreen()
 document.addEventListener('fullscreenchange',()=>{
-  if(_escInFs && !document.fullscreenElement){ _escInFs=false; requestRealFullscreen(); }
+  if(document.fullscreenElement) return; // só nos interessa quando ela CAI
+  if(_weExitedFsOnPurpose){ _weExitedFsOnPurpose=false; return; } // saída deliberada, não mexe na seleção
+  // saída não-solicitada por nós == só pode ter sido Esc. Se havia seleção, é ela
+  // que o usuário queria fechar — limpa e tenta religar a tela cheia. Melhor
+  // esforço: alguns navegadores bloqueiam de propósito reentrar em tela cheia
+  // logo após um Esc (anti-abuso, pra impedir página de "prender" o usuário);
+  // quando isso acontece, o usuário só precisa clicar em "Tela cheia" de novo —
+  // não é pior do que o comportamento antes deste ajuste.
+  if(st.sel){ clearSelection(); requestRealFullscreen(); }
 });
 function hasActiveFilter(){ return !!st.f.q || FILTER_DEFS.some(d=>st.f[d.key].size>0); }
 function renderPanel(){
@@ -1021,7 +1030,7 @@ function requestRealFullscreen(){
   return Promise.resolve();
 }
 _btnPresent.addEventListener('click',()=>{
-  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  if(document.fullscreenElement){ _weExitedFsOnPurpose=true; document.exitFullscreen().catch(()=>{ _weExitedFsOnPurpose=false; }); }
   else requestRealFullscreen();
 });
 document.addEventListener('fullscreenchange',syncFullscreenBtn);
