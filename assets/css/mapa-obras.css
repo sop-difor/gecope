@@ -190,12 +190,22 @@
   .ychart{display:block;width:100%;height:56px;overflow:visible}
   .ychart-lbl{font-size:8px;font-family:Montserrat,sans-serif;fill:var(--text-dim)}
 
-  /* skeleton: pulso sutil nos KPIs/gráficos enquanto a 1ª carga de dados ainda não
-     chegou — troca o "tudo em branco até aparecer de repente" por um sinal de que
-     algo está de fato carregando (ver document.body.classList em mapa-obras.js) */
+  /* skeleton: placeholder neutro nos KPIs/gráficos enquanto a 1ª carga de dados ainda
+     não chegou — troca o "tudo em branco até aparecer de repente" por um sinal de que
+     algo está de fato carregando (ver document.body.classList em mapa-obras.js).
+     Importante: o render() inicial roda ANTES do fetch terminar (mapa precisa
+     aparecer na hora), com todo obras[] vazio — sem isso, o skeleton pulsaria o
+     conteúdo real do estado "sem dados" (KPIs em "0"/"R$ 0", legendas "Sem obras
+     neste recorte") em vez de um placeholder neutro, e leria como "vazio piscando"
+     em vez de "carregando". Por isso os números/mensagens ficam com opacity:0 e um
+     bloco neutro pulsa no lugar deles. */
   @keyframes skeleton-pulse{0%,100%{opacity:1}50%{opacity:.32}}
-  .boot-loading .kpi .v,.boot-loading .stackbar,.boot-loading .statleg,
-  .boot-loading #aditivoBar,.boot-loading #aditivoLeg,.boot-loading #yearChart{
+  .boot-loading .empty{opacity:0}
+  .boot-loading .kpi .v{color:transparent;position:relative}
+  .boot-loading .kpi .v::after{content:'';position:absolute;left:0;right:24%;top:4px;bottom:4px;
+    border-radius:4px;background:rgba(var(--white-rgb),.10)}
+  .boot-loading #yearChart{min-height:56px;border-radius:6px;background:rgba(var(--white-rgb),.05)}
+  .boot-loading .kpi .v::after,.boot-loading .stackbar,.boot-loading #yearChart{
     animation:skeleton-pulse 1.3s ease-in-out infinite}
 
   .rrow{cursor:pointer;border:1px solid rgba(var(--white-rgb),.06);border-radius:11px;padding:10px 12px;margin-bottom:7px;

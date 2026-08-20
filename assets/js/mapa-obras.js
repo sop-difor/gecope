@@ -528,13 +528,18 @@ function renderAditivoChart(ids){
   if(!bar||!leg) return;
   const a=aggIds(ids), total=a.valorOriginal+a.adit;
   if(!total){ bar.innerHTML=''; leg.innerHTML='<div class="empty" style="padding:2px 0">Sem valores neste recorte.</div>'; return; }
-  const pctOrig=a.valorOriginal/total*100, pctAdit=100-pctOrig;
+  const pctAditReal=a.adit/total*100, pctOrigReal=100-pctAditReal;
+  // largura mínima visível pro segmento de aditivo quando ele existe mas é pequeno
+  // (ex.: 2%) — mesmo tratamento que rankRows() já dá às barras de ranking
+  // (Math.max(4,...)), senão o segmento fica fino a ponto de sumir visualmente e a
+  // única informação real vira o texto da legenda, não o gráfico em si.
+  const pctAdit=a.adit>0?Math.max(3,pctAditReal):0, pctOrig=100-pctAdit;
   bar.innerHTML=
-    `<i style="width:${pctOrig}%;background:var(--ng-deep)" title="Valor original: ${BRL.format(a.valorOriginal)} (${pctOrig.toFixed(0)}%)"></i>`
-    +(a.adit>0?`<i style="width:${pctAdit}%;background:var(--amber)" title="Aditivos: ${BRL.format(a.adit)} (${pctAdit.toFixed(0)}%)"></i>`:'');
+    `<i style="width:${pctOrig}%;background:var(--ng-deep)" title="Valor original: ${BRL.format(a.valorOriginal)} (${pctOrigReal.toFixed(0)}%)"></i>`
+    +(a.adit>0?`<i style="width:${pctAdit}%;background:var(--amber)" title="Aditivos: ${BRL.format(a.adit)} (${pctAditReal.toFixed(0)}%)"></i>`:'');
   leg.innerHTML=
     `<span class="sit"><span class="dot" style="background:var(--ng-deep)"></span>Original <b>${BRL.format(a.valorOriginal)}</b></span>`
-    +`<span class="sit"><span class="dot" style="background:var(--amber)"></span>Aditivos <b>${BRL.format(a.adit)}</b> (${pctAdit.toFixed(0)}%)</span>`;
+    +(a.adit>0?`<span class="sit"><span class="dot" style="background:var(--amber)"></span>Aditivos <b>${BRL.format(a.adit)}</b> (${pctAditReal.toFixed(0)}%)</span>`:'');
 }
 // mini gráfico de barras (SVG) com a contagem de contratos por ano de assinatura no
 // recorte atual — dá noção de safra/tendência que nenhum KPI isolado mostra.
@@ -545,13 +550,25 @@ function renderYearChart(ids){
   const anos=Object.keys(counts).map(Number).sort((a,b)=>a-b);
   if(!anos.length){ host.innerHTML='<div class="empty" style="padding:2px 0">Sem data de assinatura neste recorte.</div>'; return; }
   const max=Math.max(...anos.map(a=>counts[a]));
-  const W=anos.length*46, H=64, gap=6, barW=(W-(anos.length-1)*gap)/anos.length;
+  // viewBox de largura FIXA (não cresce com o nº de anos) — no modo "Histórico
+  // completo" o recorte pode ter ~17 anos distintos; se a largura do viewBox
+  // escalasse com anos.length, o aspect ratio real (largura:altura) se distanciaria
+  // muito do aspect ratio do container (width:100%/height fixa em CSS), e o SVG
+  // encolhia por letterboxing vertical até sobrar mais espaço em branco que gráfico.
+  // Com largura fixa, só a largura de cada barra individual muda — o gráfico como
+  // um todo sempre preenche o container por igual, com 1 ano ou com 20.
+  const W=300, H=64, gap=Math.min(6,W/anos.length*0.18), barW=(W-(anos.length-1)*gap)/anos.length;
   const bars=anos.map((a,i)=>{
     const h=Math.max(2,counts[a]/max*(H-16)), x=i*(barW+gap), y=H-14-h;
     return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${TOKENS.ng}"><title>${a}: ${NUM.format(counts[a])} contrato${counts[a]===1?'':'s'}</title></rect>`
       +`<text x="${(x+barW/2).toFixed(1)}" y="${H-3}" text-anchor="middle" class="ychart-lbl">’${String(a).slice(2)}</text>`;
   }).join('');
-  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" class="ychart" role="img" aria-label="Contratos por ano de assinatura">${bars}</svg>`;
+  // preserveAspectRatio="none": o container tem largura fluida (painel lateral) e
+  // altura fixa (CSS); mesmo com viewBox de largura fixa, o aspect ratio do
+  // container varia com o layout. "none" garante que o gráfico sempre preenche o
+  // espaço exatamente, sem letterboxing — o leve esticamento não distorce a leitura
+  // de um gráfico de barras (ao contrário de uma imagem/foto).
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="ychart" role="img" aria-label="Contratos por ano de assinatura">${bars}</svg>`;
 }
 function setKPIs(){
   const ids=scopeIds(); const a=aggIds(ids);
