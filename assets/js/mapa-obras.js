@@ -465,6 +465,9 @@ function buildCityState(){
   stateItem={ll:L.latLng(stateC),mk:L.marker(stateC,{interactive:false,keyboard:false,icon:L.divIcon({className:'state-label',iconSize:[0,0],html:'<span>Ceará</span>'})})};
   stateLbl=L.layerGroup([stateItem.mk]);
 }
+// ajustes manuais pontuais de posição de rótulo [Δlat,Δlon], por nome já sem o
+// prefixo "D.O." — ver comentário de uso mais abaixo.
+const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.18]};
 function rebuildGroupLabels(){
   if(groupLbl) groupLbl.remove();
   groupItems=[];
@@ -483,6 +486,11 @@ function rebuildGroupLabels(){
     if(feat){ [la,lo]=centroidOf(feat.geometry); }
     else{ const ms=ids.map(id=>munC[id]); la=ms.reduce((s,x)=>s+x[0],0)/ms.length; lo=ms.reduce((s,x)=>s+x[1],0)/ms.length; }
     const short=g.nome.replace(/^D\.O\.\s*/,'');
+    // ajuste manual fino pontual (pedido do usuário) — centroidOf() acerta a
+    // grande maioria, mas "certo matematicamente" e "parece bem posicionado pro
+    // olho humano" nem sempre coincidem num polígono específico; em vez de
+    // afinar o algoritmo geral só por causa de 1 caso, desloca só esse rótulo.
+    if(GRP_LABEL_NUDGE[short]){ const [dLa,dLo]=GRP_LABEL_NUDGE[short]; la+=dLa; lo+=dLo; }
     groupItems.push({id:g.id,ll:L.latLng([la,lo]),nome:short,
       mk:L.marker([la,lo],{interactive:false,keyboard:false,icon:L.divIcon({className:'grp-label',iconSize:[0,0],
         html:`<div class="lbl"><div class="lbl-name">${short}</div><div class="lbl-count"></div></div>`})})});
@@ -536,7 +544,7 @@ function updateLabels(){
   // grande o bastante pra esconder Quixeramobim (cercado por outros 5 distritos)
   // em janelas não-maximizadas — a fonte renderizada não muda, só a folga usada
   // pra decidir o que colide com o quê.
-  if(st.level===1) declutter(groupItems, s.grp*0.54, s.grp*2.4, 6, null, it=>aggIds(idsOfGroup(it.id)).obras);
+  if(st.level===1) declutter(groupItems, s.grp*0.48, s.grp*2.2, 4, null, it=>aggIds(idsOfGroup(it.id)).obras);
   else if(st.level===2) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>String(gidOf(it.id))===String(st.group), it=>obrasOf(it.id).length);
   else if(st.level===3) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>it.id===st.city, it=>obrasOf(it.id).length);
 }
