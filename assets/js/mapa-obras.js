@@ -478,7 +478,13 @@ function declutter(items,fs,H,pad,filt,prioFn){
     el.style.display=hit?'none':''; if(!hit)placed.push(bx);
   }
 }
-function lblFS(){const t=zt();return {grp:9.5+3*t, mun:8+2.5*t, st:32};}
+// tamanhos base dos rótulos do mapa (nome do distrito/município + contador de
+// obras) — aumentados a pedido: legibilidade em tela de projeção importa mais
+// aqui do que caber mais texto por rótulo. declutter() deriva a caixa de colisão
+// de cada rótulo destes mesmos valores (ver chamadas em updateLabels()), então
+// aumentar aqui não desalinha a lógica de "esconder rótulo que colide" — ela
+// escala junto.
+function lblFS(){const t=zt();return {grp:12+3.5*t, mun:10.5+3*t, st:32};}
 function applyLabelSizes(){const s=lblFS(),r=document.documentElement.style;
   r.setProperty('--grpfs',s.grp.toFixed(1)+'px');r.setProperty('--munfs',s.mun.toFixed(1)+'px');r.setProperty('--stfs',s.st+'px');return s;}
 function refreshMapCounts(){

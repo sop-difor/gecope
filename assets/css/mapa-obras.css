@@ -163,11 +163,11 @@
   .mun-label .lbl,.grp-label .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-50%);
                   display:flex;flex-direction:column;align-items:center;white-space:nowrap;gap:1px}
   .mun-label .lbl-name{font-size:var(--munfs,9px);font-weight:600;color:var(--text-data);text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink),0 1px 2px var(--shadow-ink)}
-  .mun-label .lbl-count{font-size:calc(var(--munfs,9px)*.76);font-weight:600;color:var(--ng-light);letter-spacing:.2px;
+  .mun-label .lbl-count{font-size:calc(var(--munfs,9px)*.82);font-weight:700;color:var(--ng-light);letter-spacing:.2px;
                   text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
   .grp-label .lbl-name{font-size:var(--grpfs,10px);font-weight:700;letter-spacing:.3px;color:var(--text-brightest);text-transform:uppercase;
                   text-shadow:0 0 3px var(--shadow-ink),0 0 6px rgba(var(--ng-rgb),.32)}
-  .grp-label .lbl-count{font-size:calc(var(--grpfs,10px)*.7);font-weight:700;letter-spacing:.3px;color:var(--ng-light);text-transform:none;
+  .grp-label .lbl-count{font-size:calc(var(--grpfs,10px)*.8);font-weight:700;letter-spacing:.3px;color:var(--ng-light);text-transform:none;
                   text-shadow:0 0 3px var(--shadow-ink),0 0 8px rgba(var(--ng-rgb),.35)}
 
   aside{position:relative;height:100%;overflow-y:auto;padding:18px 16px 24px;color:var(--text-base);
