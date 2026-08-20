@@ -154,7 +154,7 @@ function setStatus(txt,ok){
   const el=document.getElementById('connStatus');
   if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); const dot=ok?TOKENS.ng:TOKENS.amber; d.style.background=dot; d.style.boxShadow='0 0 10px '+dot;}
   const b=document.querySelector('.badge');
-  if(b){ b.classList.toggle('demo',!ok); const t=document.getElementById('badgeTxt'); if(t) t.textContent = ok?'Supabase · ao vivo':'Erro de conexão'; }
+  if(b){ b.classList.toggle('demo',!ok); const t=document.getElementById('badgeTxt'); if(t) t.textContent = ok?'Base de dados · ao vivo':'Erro de conexão'; }
   const syncEl=document.getElementById('syncTime');
   if(syncEl) syncEl.textContent = ok ? new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '— (falha na conexão)';
 }
@@ -218,10 +218,10 @@ async function loadData(){
     for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); const com=fisc[o.id_obra]||[]; o.comissao=com; o.fiscal=com[0]?com[0].nome:'—'; o.fiscalTipo=com[0]?com[0].tipo:'FISCAL'; DB.municipios[cod].obras.push(o); }
     invalidateAggCache();
     const scopeTxt=scope==='ativa'?'carteira ativa':'histórico completo';
-    setStatus(`Supabase · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true);
+    setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true);
   }catch(e){
     console.error(e);
-    showDataError('Não foi possível carregar os contratos do Supabase: '+e.message);
+    showDataError('Não foi possível carregar os contratos: '+e.message);
     return;
   }
   document.body.classList.remove('boot-loading');
@@ -282,10 +282,20 @@ function visible(id){
   if(st.level===2) return String(gidOf(id))===String(st.group);
   return id===st.city;
 }
+// intensidade coroplética do nível 2 (municípios dentro do distrito/região aberto):
+// recalculado 1x por render() em vez de 1x por município, já que styleFeature() é
+// chamado 184x por layer.setStyle() — ver render() logo abaixo.
+let _levelMax=1;
 function styleFeature(f){
   const id=f.properties.id;
   if(!visible(id)) return HID;                    // níveis 0 e 1: municípios escondidos
-  if(st.level===2) return {fillColor:BASE,color:TOKENS.mapOpenBorder,weight:0.5+0.7*zt(),fillOpacity:.4,opacity:.85};
+  if(st.level===2){
+    // preenchimento varia com a métrica atual (obra/valor/aditivo), não é mais
+    // uma cor uniforme — um município com 0 obras e um com o máximo do distrito
+    // não podem ser visualmente idênticos (achado da revisão final de design)
+    const t=Math.min(1,mval(aggIds([id]))/_levelMax);
+    return {fillColor:BASE,color:TOKENS.mapOpenBorder,weight:0.5+0.7*zt(),fillOpacity:.10+.62*t,opacity:.85};
+  }
   return {fillColor:TOKENS.mapOpenFill,color:TOKENS.textBrightest,weight:1.0+1.0*zt(),fillOpacity:.85,opacity:1};  // cidade aberta (nível 3)
 }
 function applyInteractivity(){
@@ -583,7 +593,7 @@ function setKPIs(){
 function rankRows(entries,onClick){
   const max=Math.max(1,...entries.map(e=>e.v));
   const amber=st.metric==='aditivo'?' amber':'';
-  return entries.map((e,i)=>`<div class="rrow" data-k="${e.k}" data-kind="${onClick}">
+  return entries.map((e,i)=>`<div class="rrow" role="button" tabindex="0" data-k="${e.k}" data-kind="${onClick}">
      <div class="t"><span class="nm">${escHtml(e.nome)} ${e.sub?`<span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${METRIC[st.metric].fmt(e.v)}</span></div>
      <div class="rbar${amber}"><i style="width:${Math.max(4,e.v/max*100)}%"></i></div></div>`).join('');
 }
@@ -593,10 +603,10 @@ function obraCard(o,i){
   const cod=NAMEIDX[normTxt(o.municipioTxt)];
   const munTxt=escHtml(o.municipioTxt);
   const munChip=o.municipioTxt
-    ? (cod ? `<span class="chip mun locate" data-cod="${cod}" title="Ver ${munTxt} no mapa">${PIN_SVG}${munTxt}</span>`
+    ? (cod ? `<span class="chip mun locate" role="button" tabindex="0" data-cod="${cod}" title="Ver ${munTxt} no mapa">${PIN_SVG}${munTxt}</span>`
            : `<span class="chip mun">${munTxt}</span>`)
     : '';
-  return `<div class="obra" data-oid="${i}">
+  return `<div class="obra" role="button" tabindex="0" aria-label="Ver todos os dados do contrato ${escHtml(o.contrato)}" data-oid="${i}">
     <div class="r1"><span class="ct">${escHtml(o.contrato)}</span><span class="vl">${BRL.format(o.valor)}</span></div>
     <div class="ob just">${escHtml(o.objeto)}</div>
     <div class="chips"><span class="chip">${escHtml(o.status)}</span>${o.tipo?`<span class="chip">${escHtml(o.tipo)}</span>`:''}${munChip}</div>
@@ -759,10 +769,11 @@ function renderCrumb(){
 function renderFoot(){
   document.getElementById('foot').innerHTML=
     `Fluxo: <b>Ceará → ${st.method==='do'?'Distritos Operacionais':'Regiões'} → cidades</b>. Clique numa área para descer; use a trilha no topo para voltar.
-     Divisão oficial dos 11 D.Os (SOP). Contratos vindos da tabela <b>contratos_edificacao</b> (Supabase).`;
+     Divisão oficial dos 11 D.Os (SOP). Dados oficiais da base de contratos de obras da SOP-CE.`;
 }
 
 function render(){
+  if(st.level===2) _levelMax=Math.max(1,...idsOfGroup(st.group).map(id=>mval(aggIds([id]))));
   layer.setStyle(styleFeature); applyInteractivity(); updateLabels();
   setLayer(stateShape, st.level===0); if(st.level===0 && stateShape) stateShape.bringToFront();
   setLayer(groupLayer, st.level===1); if(st.level===1 && groupLayer) groupLayer.bringToFront();
@@ -983,6 +994,17 @@ document.getElementById('body').addEventListener('click',e=>{
   const loc=e.target.closest('.chip.mun.locate');
   if(loc){ goCity(loc.dataset.cod); return; }
   const ob=e.target.closest('.obra'); if(ob){ const o=CUROBRAS[+ob.dataset.oid]; if(o) openModal(o); }
+});
+// mesmas três ações acima, via teclado (Enter/Espaço) — os cards (.rrow/.obra/
+// .chip.mun.locate) são <div>/<span> com role="button" e tabindex, não elementos
+// <button> nativos, então não recebem ativação por teclado de graça; painel público
+// de órgão estadual precisa ser navegável sem mouse.
+document.getElementById('body').addEventListener('keydown',e=>{
+  if(e.key!=='Enter' && e.key!==' ') return;
+  const target=e.target.closest('.rrow,.obra,.chip.mun.locate');
+  if(!target) return;
+  e.preventDefault();
+  target.click();
 });
 map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabels(); });
 map.on('moveend',()=>updateLabels());

@@ -57,6 +57,15 @@
         cursor:pointer;flex:none;transition:.15s}
   .btn-voltar:hover,.btn-present:hover{border-color:rgba(var(--ng-rgb),.4);color:var(--text-brightest);background:rgba(var(--ng-rgb),.08)}
   .btn-present.on{border-color:rgba(var(--ng-rgb),.5);color:var(--ng-light);background:rgba(var(--ng-rgb),.14)}
+  /* diferencia visualmente do botão de tela cheia ao lado — os dois usam a mesma
+     forma de "pill", mas este controla o ESCOPO DOS DADOS (carteira ativa vs.
+     histórico completo), então um clique errado numa apresentação ao vivo troca
+     o que a plateia está vendo, não só o modo de exibição. Cor âmbar (mesma
+     linguagem já usada para "atenção/estado não-padrão" no resto do painel)
+     enquanto no modo padrão (carteira ativa); vira verde quando alternado para
+     histórico completo (via .on, já herdado de .btn-present.on acima) */
+  .btn-scope{border-color:rgba(var(--amber-rgb),.35)}
+  .btn-scope:hover{border-color:rgba(var(--amber-rgb),.55);background:rgba(var(--amber-rgb),.10)}
   /* ---- Modo Apresentação (layout padrão fixo desta página) ---- */
   body.presentation header.top{padding:19px 30px}
   body.presentation .top h1{font-size:17px}
@@ -208,6 +217,11 @@
   .boot-loading .kpi .v::after,.boot-loading .stackbar,.boot-loading #yearChart{
     animation:skeleton-pulse 1.3s ease-in-out infinite}
 
+  /* cards navegáveis por teclado (.rrow/.obra/.chip.mun.locate têm role="button"+
+     tabindex no JS, não são <button> nativos) — sem isso o anel de foco do
+     navegador ou não aparece ou usa o outline azul padrão, destoando do tema */
+  .rrow:focus-visible,.obra:focus-visible,.chip.mun.locate:focus-visible{
+    outline:2px solid var(--ng);outline-offset:2px}
   .rrow{cursor:pointer;border:1px solid rgba(var(--white-rgb),.06);border-radius:11px;padding:10px 12px;margin-bottom:7px;
         background:linear-gradient(180deg,rgba(var(--white-rgb),.04),rgba(var(--white-rgb),.015));transition:.15s}
   .rrow:hover{border-color:rgba(var(--ng-rgb),.35);box-shadow:0 0 0 1px rgba(var(--ng-rgb),.15)}
