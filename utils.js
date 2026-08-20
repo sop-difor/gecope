@@ -254,6 +254,15 @@
 
     function formatCurrencyValue(val) { return val.toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
 
+    function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        };
+    }
+
     // Expor no escopo global (conforme diretriz: anexar ao objeto window)
     window.montarCabecalhoLogosRelatorio = montarCabecalhoLogosRelatorio;
     window.montarIdentificacaoRelatorio = montarIdentificacaoRelatorio;
@@ -277,5 +286,6 @@
     window.formatStatusDisplay = formatStatusDisplay;
     window.parseMoneyInput = parseMoneyInput;
     window.formatCurrencyValue = formatCurrencyValue;
+    window.debounce = debounce;
 
 })(window);

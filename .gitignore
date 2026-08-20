@@ -10,3 +10,6 @@ coverage/
 *.local
 *.log
 supabase/.temp/
+server/whatsapp-proxy/chaves-vm-gecope/
+*.key
+*.key.pub
