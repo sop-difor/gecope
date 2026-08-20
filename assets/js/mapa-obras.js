@@ -467,7 +467,7 @@ function buildCityState(){
 }
 // ajustes manuais pontuais de posição de rótulo [Δlat,Δlon], por nome já sem o
 // prefixo "D.O." — ver comentário de uso mais abaixo.
-const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.18],'Sertão de Sobral':[0.10,0.10],'Maciço de Baturité':[-0.18,0.10],'Vale do Jaguaribe':[-0.18,0.22]};
+const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.10],'Sertão de Sobral':[0.10,0.10],'Maciço de Baturité':[-0.05,0.05],'Vale do Jaguaribe':[-0.05,0.05]};
 // nome completo (usado em breadcrumb/painel/tooltip) é longo demais pra caber
 // lado a lado no mapa em "Região" (14 itens, vários espremidos no mesmo canto) —
 // tira as preposições de ligação (de/da/do/dos/das) e quebra em até 2 linhas
