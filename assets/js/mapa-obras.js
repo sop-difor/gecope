@@ -766,11 +766,29 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 // "mais em cima" pra fechar primeiro (modal aberto, dropdown de filtro aberto),
 // senão um só Esc fecharia o modal E perderia a seleção de distritos ao mesmo
 // tempo, o que ninguém pede quando aperta uma tecla só.
+// o navegador sai da tela cheia sozinho ao apertar Esc — isso não passa pelo JS
+// da página (preventDefault() no keydown não bloqueia, é bloqueado de propósito
+// pelo próprio navegador por segurança) e acontece em paralelo ao clearSelection()
+// abaixo. _escInFs marca que o Esc que limpou a seleção também aconteceu com a
+// tela cheia ligada, pro handler de fullscreenchange logo adiante tentar religar.
+let _escInFs=false;
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape' || !st.sel) return;
   if(document.getElementById('modalBg').classList.contains('show')) return;
   if(document.querySelector('.msel.on')) return;
+  _escInFs=!!document.fullscreenElement;
   clearSelection();
+});
+// melhor esforço: se o Esc acima limpou a seleção enquanto em tela cheia, e o
+// navegador saiu da tela cheia por causa do mesmo Esc, tenta religar na hora —
+// o pedido do usuário foi "só sair da seleção", não da tela cheia também. Alguns
+// navegadores bloqueiam deliberadamente reentrar em tela cheia logo após um Esc
+// (mecanismo anti-abuso pra impedir página de "prender" o usuário em tela cheia),
+// então isso é melhor esforço: religa quando o navegador permite, e se não
+// permitir, o usuário só precisa clicar em "Tela cheia" de novo — não é pior que
+// o comportamento anterior a este ajuste.
+document.addEventListener('fullscreenchange',()=>{
+  if(_escInFs && !document.fullscreenElement){ _escInFs=false; requestRealFullscreen(); }
 });
 function hasActiveFilter(){ return !!st.f.q || FILTER_DEFS.some(d=>st.f[d.key].size>0); }
 function renderPanel(){
