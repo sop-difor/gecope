@@ -468,9 +468,20 @@ function buildCityState(){
 function rebuildGroupLabels(){
   if(groupLbl) groupLbl.remove();
   groupItems=[];
+  // rótulo de distrito/região usa o mesmo centroidOf() (área + pólo de
+  // inacessibilidade em formas côncavas) já usado pros municípios — aplicado à
+  // forma REAL dissolvida do distrito (GRP), não a uma média simples dos
+  // centros dos municípios membros. A média simples empurra o rótulo pro lado
+  // onde há mais municípios pequenos agrupados, mesmo que a forma do distrito
+  // como um todo seja bem diferente disso — daí rótulos nitidamente fora do
+  // centro visual em distritos irregulares (achado do usuário).
+  const feats=(GRP[st.method]&&GRP[st.method].features)||[];
   groupsList().forEach(g=>{
-    const ms=idsOfGroup(g.id).map(id=>munC[id]); if(!ms.length)return;
-    const la=ms.reduce((s,x)=>s+x[0],0)/ms.length, lo=ms.reduce((s,x)=>s+x[1],0)/ms.length;
+    const ids=idsOfGroup(g.id); if(!ids.length)return;
+    const feat=feats.find(f=>String(f.properties.gid)===String(g.id));
+    let la,lo;
+    if(feat){ [la,lo]=centroidOf(feat.geometry); }
+    else{ const ms=ids.map(id=>munC[id]); la=ms.reduce((s,x)=>s+x[0],0)/ms.length; lo=ms.reduce((s,x)=>s+x[1],0)/ms.length; }
     const short=g.nome.replace(/^D\.O\.\s*/,'');
     groupItems.push({id:g.id,ll:L.latLng([la,lo]),nome:short,
       mk:L.marker([la,lo],{interactive:false,keyboard:false,icon:L.divIcon({className:'grp-label',iconSize:[0,0],
