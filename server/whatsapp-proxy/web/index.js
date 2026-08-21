@@ -184,30 +184,45 @@ app.post('/api/whatsapp/resend/:logId', requireAuth, requireAdmin, async (req, r
   try {
     const { logId } = req.params;
 
-    const { data: log, error: logError } = await sb
+    // Compare-and-swap: só transiciona falha -> processando se o log AINDA estiver em
+    // 'falha' no momento exato deste UPDATE — usa o `status` da própria linha como o
+    // "cadeado". Duplo clique no botão, ou duas abas/admins clicando quase ao mesmo tempo,
+    // fazem duas requisições chegarem aqui: a primeira encontra 'falha' e o Postgres marca
+    // a linha para ela; a segunda, na mesma fração de segundo, já não encontra mais uma
+    // linha com status='falha' para casar (0 linhas afetadas) e recebe 409 sem enfileirar
+    // nada — sem isso, ambas passavam e o destinatário recebia o reenvio em duplicidade.
+    const { data: log, error: casError } = await sb
       .from('whatsapp_logs')
-      .select('id, destinatario, mensagem')
+      .update({ status: 'processando', erro_detalhe: 'Reenviando...' })
       .eq('id', logId)
+      .eq('status', 'falha')
+      .select('id, destinatario, mensagem')
       .maybeSingle();
 
-    if (logError) throw logError;
-    if (!log) return res.status(404).json({ error: 'log_not_found' });
+    if (casError) throw casError;
+    if (!log) {
+      // Ou o log não existe, ou (mais comum) já não estava mais em 'falha' — outro reenvio
+      // já está em andamento ou já foi concluído. Diferencia as duas causas na resposta.
+      const { data: existing } = await sb.from('whatsapp_logs').select('id, status').eq('id', logId).maybeSingle();
+      if (!existing) return res.status(404).json({ error: 'log_not_found' });
+      return res.status(409).json({ error: 'resend_already_in_progress', status: existing.status });
+    }
 
-    // Ordem importa: insere o job PRIMEIRO. Se isso falhar, o log simplesmente continua
-    // com o status que já tinha (estado consistente). Se atualizássemos o log para
-    // 'processando' antes e o insert do job falhasse depois, o log ficaria preso em
-    // 'processando' para sempre — nada mais existiria para finalizá-lo.
+    // Se o insert do job falhar agora, o log já ficou em 'processando' — devolve para
+    // 'falha' explicitamente para não deixá-lo preso (mesma preocupação de
+    // reclaimOrphanLogs, mas resolvida na hora em vez de esperar a varredura periódica).
     const { data: job, error: jobError } = await sb
       .from('whatsapp_jobs')
       .insert({ number: log.destinatario, text: log.mensagem, log_id: log.id, status: 'pending' })
       .select('id')
       .single();
 
-    if (jobError) throw jobError;
-
-    await sb.from('whatsapp_logs')
-      .update({ status: 'processando', erro_detalhe: 'Reenviando...' })
-      .eq('id', logId);
+    if (jobError) {
+      await sb.from('whatsapp_logs')
+        .update({ status: 'falha', erro_detalhe: `Erro ao enfileirar reenvio: ${jobError.message}` })
+        .eq('id', logId);
+      throw jobError;
+    }
 
     return res.status(202).json({ job_id: job.id });
   } catch (err) {

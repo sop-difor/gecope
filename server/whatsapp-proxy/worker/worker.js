@@ -29,21 +29,55 @@ process.on('SIGINT', () => { shuttingDown = true; });
 // Se o worker morrer no meio de um job (ex.: container reiniciado), o job fica preso em
 // 'processing' para sempre — devolve para 'pending' qualquer job travado há mais de
 // STALE_PROCESSING_MS antes de tentar reivindicar um novo.
+//
+// CUIDADO COM DUPLICIDADE (2026-08-21): job.attempts é a diferença entre "seguro reenviar"
+// e "risco real de mandar a mensagem duas vezes". Um job com attempts=0 travado em
+// 'processing' nunca chegou a chamar sendToEvolution (o worker morreu antes disso) —
+// devolver para 'pending' é seguro. Já um job com attempts>0 pode ter travado DEPOIS de
+// sendToEvolution ter succeeded de verdade (ex.: finalizeJobStatus falhou 3x seguidas ao
+// gravar o status — ver finalizeJobStatus abaixo) — resetá-lo para 'pending' faria o
+// worker reenviar e o destinatário receberia a mensagem em duplicidade. Por isso esses
+// vão para 'failed' com um motivo explícito, não para 'pending', e o log vinculado (se
+// houver) é marcado para revisão manual em vez de reentrar na fila sozinho.
 async function reclaimStaleJobs() {
     const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
-    const { data, error } = await sb
-        .from('whatsapp_jobs')
-        .update({ status: 'pending' })
-        .eq('status', 'processing')
-        .lt('started_at', staleBefore)
-        .select('id');
 
-    if (error) {
-        console.error('[reclaim] erro ao recuperar jobs travados:', error.message);
+    const { data: stuck, error: stuckError } = await sb
+        .from('whatsapp_jobs')
+        .select('id, attempts, log_id')
+        .eq('status', 'processing')
+        .lt('started_at', staleBefore);
+
+    if (stuckError) {
+        console.error('[reclaim] erro ao buscar jobs travados:', stuckError.message);
         return;
     }
-    if (data && data.length > 0) {
-        console.log(`[reclaim] ${data.length} job(s) travado(s) em 'processing' devolvido(s) para 'pending'.`);
+    if (!stuck || stuck.length === 0) return;
+
+    const neverAttempted = stuck.filter(j => !j.attempts);
+    const alreadyAttempted = stuck.filter(j => j.attempts > 0);
+
+    if (neverAttempted.length > 0) {
+        const ids = neverAttempted.map(j => j.id);
+        const { error } = await sb.from('whatsapp_jobs').update({ status: 'pending' }).in('id', ids);
+        if (error) console.error('[reclaim] erro ao devolver jobs nunca tentados para pending:', error.message);
+        else console.log(`[reclaim] ${ids.length} job(s) travado(s) sem nenhuma tentativa devolvido(s) para 'pending'.`);
+    }
+
+    if (alreadyAttempted.length > 0) {
+        const ids = alreadyAttempted.map(j => j.id);
+        const motivo = 'Job travado em processing após já ter tentado enviar — não reenviado automaticamente para evitar duplicidade. Verificar manualmente se a mensagem chegou antes de reenviar.';
+        const { error } = await sb.from('whatsapp_jobs').update({ status: 'failed', result: { error: motivo } }).in('id', ids);
+        if (error) console.error('[reclaim] erro ao marcar jobs travados-com-tentativa como failed:', error.message);
+        else console.warn(`[reclaim] ${ids.length} job(s) travado(s) APÓS tentativa de envio marcado(s) como 'failed' (revisão manual) — NÃO reenfileirados.`);
+
+        const logIds = alreadyAttempted.map(j => j.log_id).filter(Boolean);
+        if (logIds.length > 0) {
+            const { error: logErr } = await sb.from('whatsapp_logs')
+                .update({ status: 'falha', erro_detalhe: motivo })
+                .in('id', logIds);
+            if (logErr) console.error('[reclaim] erro ao marcar logs vinculados como falha:', logErr.message);
+        }
     }
 }
 
@@ -53,8 +87,14 @@ async function reclaimStaleJobs() {
 // admin-only (RLS), o cliente também não consegue mais marcar a falha ele mesmo. Sem esta
 // varredura, esses logs ficariam presos em 'processando' para sempre (é a mesma classe de
 // bug já limpa uma vez, manualmente, em auditoria de 2026-08).
+// Limiar próprio (bem mais curto que STALE_PROCESSING_MS): um log órfão, por definição,
+// nunca teve nenhum whatsapp_jobs criado — não existe tentativa de envio para duplicar,
+// então não há motivo de segurança para esperar 5 minutos como no reclaim de jobs travados.
+// Esperar menos aqui só significa o admin ver a falha mais cedo no painel.
+const ORPHAN_LOG_STALE_MS = parseInt(process.env.ORPHAN_LOG_STALE_MS || '90000', 10); // 90s
+
 async function reclaimOrphanLogs() {
-    const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
+    const staleBefore = new Date(Date.now() - ORPHAN_LOG_STALE_MS).toISOString();
     const { data: staleLogs, error: staleError } = await sb
         .from('whatsapp_logs')
         .select('id')
@@ -151,13 +191,18 @@ async function sendToEvolution(job) {
 // a mensagem no WhatsApp do destinatário. As retentativas cobrem falhas transitórias de
 // rede; se mesmo assim falhar, loga com destaque para investigação manual.
 async function finalizeJobStatus(jobId, fields) {
-    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    // 6 tentativas com backoff crescente (1s..~16s, ~30s no total) em vez das 3 tentativas
+    // rápidas de antes — esta escrita é a única coisa que impede reclaimStaleJobs de tratar
+    // um job JÁ ENVIADO como travado e reenviá-lo (ver reclaimStaleJobs acima). Vale gastar
+    // mais tempo tentando gravar do que arriscar duplicidade real no WhatsApp do destinatário.
+    const MAX_TENTATIVAS = 6;
+    for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
         const { error } = await sb.from('whatsapp_jobs').update(fields).eq('id', jobId);
         if (!error) return true;
-        console.error(`[finalize] tentativa ${tentativa} falhou ao gravar status final do job ${jobId}:`, error.message);
-        if (tentativa < 3) await new Promise(r => setTimeout(r, 1000));
+        console.error(`[finalize] tentativa ${tentativa}/${MAX_TENTATIVAS} falhou ao gravar status final do job ${jobId}:`, error.message);
+        if (tentativa < MAX_TENTATIVAS) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, tentativa - 1)));
     }
-    console.error(`[finalize] FALHA DEFINITIVA ao gravar status final do job ${jobId} — ele pode ser reenviado por engano quando reclamado como travado.`);
+    console.error(`[finalize] FALHA DEFINITIVA ao gravar status final do job ${jobId} — reclaimStaleJobs vai marcá-lo para revisão manual (não reenviar automaticamente) quando expirar.`);
     return false;
 }
 

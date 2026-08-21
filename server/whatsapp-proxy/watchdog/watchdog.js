@@ -25,6 +25,13 @@ const DEGRADED_GRACE_MS = parseInt(process.env.WATCHDOG_DEGRADED_GRACE_MS || '12
 // resolve (ex.: sessão realmente deslogada no celular) faria o watchdog reiniciar em loop
 // a cada ciclo, sem ganho nenhum.
 const RESTART_COOLDOWN_MS = parseInt(process.env.WATCHDOG_RESTART_COOLDOWN_MS || '300000', 10);
+// Cooldown BEM menor, só para pedidos manuais — evita que um clique duplicado no botão
+// "Reiniciar Conexão" dispare dois restarts seguidos, mas sem herdar o cooldown de 5min do
+// restart automático. Sem isso, um admin que clicasse o botão minutos depois de o watchdog
+// já ter reiniciado sozinho por degradação teria o pedido silenciosamente ignorado por
+// `cooldownOk` (ver tick() abaixo) — a UI mostrava "pedido enviado" e nada acontecia, sem
+// nenhum sinal de que o clique não teve efeito nenhum.
+const MANUAL_RESTART_COOLDOWN_MS = parseInt(process.env.WATCHDOG_MANUAL_RESTART_COOLDOWN_MS || '30000', 10);
 const FAILURE_WINDOW_MS = parseInt(process.env.WATCHDOG_FAILURE_WINDOW_MS || '600000', 10);
 const FAILURE_THRESHOLD = parseInt(process.env.WATCHDOG_FAILURE_THRESHOLD || '2', 10);
 
@@ -97,7 +104,8 @@ async function updateControlRow(fields) {
   if (error) console.error('[watchdog] erro ao atualizar whatsapp_control:', error.message);
 }
 
-let lastRestartAt = 0;
+let lastAutoRestartAt = 0;
+let lastManualRestartAt = 0;
 // Espelha degraded_since do banco em memória para não precisar reler a cada ciclo só para
 // saber "desde quando" — evita uma corrida boba de leitura/escrita no mesmo ciclo.
 let degradedSinceMemory = null;
@@ -122,17 +130,31 @@ async function tick() {
     (!control.last_restarted_at || new Date(control.restart_requested_at) > new Date(control.last_restarted_at));
   const sustainedBad = !!degradedSinceMemory &&
     (Date.now() - new Date(degradedSinceMemory).getTime() >= DEGRADED_GRACE_MS);
-  const cooldownOk = (Date.now() - lastRestartAt) >= RESTART_COOLDOWN_MS;
 
-  if ((manualRequest || sustainedBad) && cooldownOk) {
-    console.log(`[watchdog] Reiniciando ${EVO_CONTAINER_NAME} (motivo: ${manualRequest ? 'pedido manual' : 'degradado sustentado'}).`);
+  // Cooldowns independentes: um pedido manual só é barrado por cliques manuais recentes
+  // demais (MANUAL_RESTART_COOLDOWN_MS), nunca pelo cooldown de 5min do restart automático
+  // — antes os dois caíam no mesmo `cooldownOk`, e um restart automático recente podia
+  // engolir silenciosamente o clique de um admin em "Reiniciar Conexão" logo em seguida.
+  const manualCooldownOk = (Date.now() - lastManualRestartAt) >= MANUAL_RESTART_COOLDOWN_MS;
+  const autoCooldownOk = (Date.now() - lastAutoRestartAt) >= RESTART_COOLDOWN_MS;
+
+  const shouldRestartManual = manualRequest && manualCooldownOk;
+  const shouldRestartAuto = !manualRequest && sustainedBad && autoCooldownOk;
+
+  if (shouldRestartManual || shouldRestartAuto) {
+    console.log(`[watchdog] Reiniciando ${EVO_CONTAINER_NAME} (motivo: ${shouldRestartManual ? 'pedido manual' : 'degradado sustentado'}).`);
     try {
       await restartEvolutionContainer();
-      lastRestartAt = Date.now();
+      const now = Date.now();
+      if (shouldRestartManual) lastManualRestartAt = now; else lastAutoRestartAt = now;
       await updateControlRow({ last_restarted_at: new Date().toISOString() });
     } catch (err) {
       console.error('[watchdog] falha ao reiniciar container:', err.message);
     }
+  } else if (manualRequest && !manualCooldownOk) {
+    // Pedido manual existe mas foi barrado pelo cooldown — loga para não ficar invisível
+    // (o admin só via "pedido enviado" no front-end e nada acontecia, sem rastro nenhum).
+    console.warn(`[watchdog] Pedido manual de restart ignorado por cooldown (${Math.ceil((MANUAL_RESTART_COOLDOWN_MS - (Date.now() - lastManualRestartAt)) / 1000)}s restantes).`);
   }
 }
 

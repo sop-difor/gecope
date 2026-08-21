@@ -842,7 +842,18 @@
                                                                         // O proxy busca telefone/mensagem do próprio log — o cliente só informa o id.
                                                                         // O envio real acontece no worker de forma assíncrona; um 202 aqui significa
                                                                         // "reenvio aceito na fila", não "mensagem entregue".
+                                                                        //
+                                                                        // Guard de duplo clique: a garantia de verdade contra reenvio duplicado é o
+                                                                        // compare-and-swap no servidor (POST /api/whatsapp/resend/:logId só transiciona
+                                                                        // falha->processando uma vez, ver server/whatsapp-proxy/web/index.js), mas sem
+                                                                        // nada aqui um segundo clique enquanto a primeira requisição ainda está em voo
+                                                                        // gerava uma segunda chamada à toa (e, antes da correção no servidor, um
+                                                                        // reenvio de verdade em duplicidade). `reenviosEmAndamento` ignora cliques
+                                                                        // repetidos para o mesmo log enquanto o primeiro ainda não terminou.
+                                                                        const reenviosEmAndamento = new Set();
                                                                         async function reenviarMensagemWhatsApp(logId) {
+                                                                            if (reenviosEmAndamento.has(logId)) return;
+                                                                            reenviosEmAndamento.add(logId);
                                                                             try {
                                                                                 const { data: log, error } = await sbClient.from('whatsapp_logs').select('destinatario, destinatario_nome').eq('id', logId).single();
                                                                                 if (error || !log) throw new Error("Log não encontrado.");
@@ -860,6 +871,8 @@
 
                                                                                 if (response.ok) {
                                                                                     Swal.fire('Reenvio enfileirado', 'Acompanhe o resultado no painel de logs em alguns instantes.', 'success');
+                                                                                } else if (response.status === 409) {
+                                                                                    Swal.fire('Reenvio já em andamento', 'Este log já está sendo reenviado (ou outra pessoa acabou de reenviá-lo). Aguarde o resultado no painel de logs.', 'info');
                                                                                 } else {
                                                                                     const errData = await response.json().catch(() => ({}));
                                                                                     throw new Error(formatarErroWhatsApp(`Erro: ${response.status} - ${errData.error || 'Erro'}`));
@@ -867,6 +880,8 @@
                                                                                 carregarLogsWhatsApp();
                                                                             } catch (err) {
                                                                                 Swal.fire('Falha no Reenvio', err.message, 'error');
+                                                                            } finally {
+                                                                                reenviosEmAndamento.delete(logId);
                                                                             }
                                                                         }
 
@@ -935,6 +950,9 @@
 
                                                                             const erro = String(erroBruto).toUpperCase();
 
+                                                                            if (erro.includes("NÃO REENVIADO AUTOMATICAMENTE") || erro.includes("VERIFICAR MANUALMENTE SE A MENSAGEM CHEGOU")) {
+                                                                                return "O envio travou depois de já ter tentado enviar ao WhatsApp — por segurança, NÃO foi reenviado automaticamente (poderia duplicar a mensagem). Confirme com o destinatário se a mensagem já chegou antes de usar 'Reenviar'.";
+                                                                            }
                                                                             if (erro.includes("500") || erro.includes("CONNECTION CLOSED")) {
                                                                                 return "O servidor do WhatsApp está temporariamente fora de área ou a conexão caiu. Tente novamente em alguns minutos.";
                                                                             }
@@ -1006,6 +1024,9 @@
                                                                         // WhatsApp está fora do ar. Some sozinho quando a conexão volta ao normal
                                                                         // (reflete whatsapp_control.degraded_since, mantido pelo watchdog no
                                                                         // servidor — ver server/whatsapp-proxy/watchdog/watchdog.js).
+                                                                        // Contador de falhas reais consecutivas ao checar o badge — ver uso abaixo.
+                                                                        let falhasConsecutivasBadge = 0;
+
                                                                         async function atualizarBadgeStatusWhatsApp() {
                                                                             if (typeof getCurrentUserRole !== 'function' || getCurrentUserRole() !== 'admin') return;
                                                                             const badge = document.getElementById('badge-alerta-whatsapp');
@@ -1013,6 +1034,7 @@
                                                                             try {
                                                                                 const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/status`);
                                                                                 const data = await response.json().catch(() => ({}));
+                                                                                falhasConsecutivasBadge = 0;
                                                                                 if (data.degraded) {
                                                                                     badge.title = 'A conexão do WhatsApp está com problema. Abra Administração > Gestão Integrada de Notificações para reiniciar.';
                                                                                     badge.style.display = 'inline-flex';
@@ -1020,8 +1042,22 @@
                                                                                     badge.style.display = 'none';
                                                                                 }
                                                                             } catch (err) {
-                                                                                // Falha ao checar (ex.: sessão ainda não pronta) não deve acender alarme
-                                                                                // falso — mantém o badge como estava até a próxima tentativa.
+                                                                                // BUG CORRIGIDO (2026-08-21): antes este catch era vazio de propósito
+                                                                                // "para não acender alarme falso" — mas isso também escondia um outage
+                                                                                // REAL para sempre: se o badge já estava oculto (saudável) na última
+                                                                                // checagem e o proxy/VM caiu de vez, toda checagem seguinte cai aqui e
+                                                                                // o admin nunca via nenhum sinal, nem no badge discreto do dashboard.
+                                                                                // "Sessão expirada" é o único caso que continua sendo ignorado (não é
+                                                                                // sinal de outage — é a sessão do navegador ainda não estar pronta ou
+                                                                                // ter sido renovada); qualquer OUTRO erro (proxy fora do ar, timeout,
+                                                                                // rede) conta como falha real, e só acende o alarme após 2 falhas
+                                                                                // seguidas — evita piscar o badge por causa de um blip isolado.
+                                                                                if (err && err.message === 'Sessão expirada. Faça login novamente para enviar mensagens.') return;
+                                                                                falhasConsecutivasBadge++;
+                                                                                if (falhasConsecutivasBadge >= 2) {
+                                                                                    badge.title = 'Não foi possível checar a conexão do WhatsApp (proxy/VM pode estar fora do ar). Abra Administração > Gestão Integrada de Notificações.';
+                                                                                    badge.style.display = 'inline-flex';
+                                                                                }
                                                                             }
                                                                         }
 

@@ -1,7 +1,17 @@
 (function (window) {
     'use strict';
 
-    // Storage guard: mantém sessão ativa apenas enquanto existir o cookie de sessão
+    // Storage guard: mantém sessão ativa apenas enquanto existir o cookie de sessão.
+    // BUG CORRIGIDO (2026-08-21): o cookie era gravado sem Max-Age, ou seja, um cookie de
+    // sessão do navegador — some ao fechar o navegador, mesmo que o token do Supabase em
+    // localStorage (persistSession:true) continuasse perfeitamente válido. Resultado: todo
+    // usuário que reiniciava o navegador (ou o SO hibernava/reiniciava) caía num
+    // "getItem" sem cookie, que APAGAVA o token válido do localStorage e forçava
+    // "Sessão expirada" — inclusive derrubando silenciosamente as checagens de status do
+    // WhatsApp, que dependiam desse token (ver fetchComTimeout em whatsapp.js). Agora o
+    // cookie ganha o mesmo prazo alvo da sessão (30 dias) e é renovado a cada setItem
+    // (login/refresh de token), então ele só expira quando a sessão realmente deveria.
+    const SESSION_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 30; // 30 dias
     const cookieGuardStorage = {
         getItem: (key) => {
             const sessionActive = document.cookie.split(';').some((item) => item.trim().startsWith('gecope_session_active='));
@@ -12,10 +22,13 @@
             return localStorage.getItem(key);
         },
         setItem: (key, value) => {
-            document.cookie = "gecope_session_active=true; path=/; SameSite=Lax";
+            document.cookie = `gecope_session_active=true; path=/; max-age=${SESSION_COOKIE_MAX_AGE_S}; SameSite=Lax`;
             localStorage.setItem(key, value);
         },
         removeItem: (key) => {
+            // Limpa também o cookie no logout — sem isso, um novo login no mesmo navegador
+            // (outro usuário na mesma máquina) herdava o cookie do usuário anterior.
+            document.cookie = "gecope_session_active=; path=/; max-age=0; SameSite=Lax";
             localStorage.removeItem(key);
         }
     };
