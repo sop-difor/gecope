@@ -26,6 +26,18 @@
                                                                             }
                                                                         }
 
+                                                                        // Contatos fantasma (sop-ghost.internal) guardam o nome original no próprio
+                                                                        // e-mail interno (contato_fulano_de_tal@..., criado em savePhoneForUser) —
+                                                                        // serve de fallback para quando full_name está vazio no banco (caso real de
+                                                                        // todos os contatos fantasma hoje, ver processarNotificacao e prepareDirectMsg).
+                                                                        function nomeDeContatoFantasma(email) {
+                                                                            return (email || '')
+                                                                                .replace(/@sop-ghost\.internal$/i, '')
+                                                                                .replace(/^contato_/i, '')
+                                                                                .replace(/_/g, ' ')
+                                                                                .trim();
+                                                                        }
+
                                                                         async function verificarNotificacoesAtraso() {
                                                                             try {
                                                                                 // JITTER ANTI-CORRIDA: Espera otimizada para evitar corrida simultânea
@@ -206,9 +218,14 @@
                                                                                     const uniqueUsersMap = new Map();
                                                                                     if (users) {
                                                                                         users.forEach(u => {
-                                                                                            const name = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '').toUpperCase();
-                                                                                            if (!name) return;
                                                                                             const isGhost = u.email && u.email.includes('@sop-ghost.internal');
+                                                                                            // BUG CORRIGIDO (2026-08-21): contatos fantasma com full_name vazio no
+                                                                                            // banco (todos, hoje) caíam aqui com name="" e eram descartados por este
+                                                                                            // `if (!name) return` — sumiam da lista de destinatários do disparo
+                                                                                            // manual sem nenhum aviso. Usa o nome recuperado do e-mail interno como
+                                                                                            // último recurso antes de desistir.
+                                                                                            const name = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || (isGhost ? nomeDeContatoFantasma(u.email) : '')).toUpperCase();
+                                                                                            if (!name) return;
 
                                                                                             if (!uniqueUsersMap.has(name) || (uniqueUsersMap.get(name).isGhost && !isGhost)) {
                                                                                                 uniqueUsersMap.set(name, { ...u, name, isGhost });
@@ -312,10 +329,22 @@
                                                                                         // Atualiza usuário existente
                                                                                         await sbClient.from('app_users').update({ telefone_whatsapp: cleanPhone }).eq('email', email);
                                                                                     } else {
-                                                                                        // Cria um "contato fantasma" para futuras comunicações
+                                                                                        // Cria um "contato fantasma" para futuras comunicações.
+                                                                                        // BUG CORRIGIDO (2026-08-21): só se mandava `full_name` aqui, mas
+                                                                                        // app_users tem um trigger (trg_force_uppercase_names) que SOBRESCREVE
+                                                                                        // full_name em todo INSERT/UPDATE com upper(nome + ' ' + sobrenome) — como
+                                                                                        // nome/sobrenome nunca eram enviados, todo contato fantasma nascia com
+                                                                                        // full_name vazio, sempre, silenciosamente. Isso quebrava o casamento por
+                                                                                        // nome em processarNotificacao (whatsapp.js) — foi assim que uma
+                                                                                        // notificação do fiscal FRANCISCO GOIANA saiu no WhatsApp de outro contato
+                                                                                        // fantasma qualquer. Agora nome/sobrenome vão junto, o trigger calcula
+                                                                                        // full_name certo, e o contato passa a ser encontrado de verdade.
+                                                                                        const partesNome = name.trim().split(/\s+/);
                                                                                         const dummyEmail = `contato_${name.toLowerCase().replace(/\s+/g, '_')}@sop-ghost.internal`;
                                                                                         await sbClient.from('app_users').upsert({
                                                                                             email: dummyEmail,
+                                                                                            nome: partesNome[0],
+                                                                                            sobrenome: partesNome.slice(1).join(' ') || null,
                                                                                             full_name: name,
                                                                                             telefone_whatsapp: cleanPhone,
                                                                                             role: 'fiscal',
@@ -678,14 +707,25 @@
                                                                                             const realUsers = users.filter(u => !u.email.includes('@sop-ghost.internal'));
                                                                                             const ghostUsers = users.filter(u => u.email.includes('@sop-ghost.internal'));
 
+                                                                                            // BUG CORRIGIDO (2026-08-21): quando dbName vem vazio (full_name em branco,
+                                                                                            // caso real de todos os contatos fantasma hoje), `search.includes('')` é
+                                                                                            // SEMPRE verdadeiro em JS — o find() abaixo não comparava nome nenhum,
+                                                                                            // devolvia o primeiro contato da lista pra QUALQUER busca. Foi assim que uma
+                                                                                            // notificação do FRANCISCO GOIANA saiu no WhatsApp do LUCIANO DENIZARDY (os
+                                                                                            // dois só existem como contato fantasma, ambos com full_name vazio). A trava
+                                                                                            // abaixo bloqueia esse falso-positivo; nomeDeContatoFantasma (definida mais
+                                                                                            // acima no arquivo) tenta recuperar o nome de verdade a partir do e-mail
+                                                                                            // interno, então o match volta a funcionar mesmo sem rodar um reparo de dados.
                                                                                             let found = realUsers.find(u => {
                                                                                                 const dbName = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '').toUpperCase();
+                                                                                                if (!dbName) return false;
                                                                                                 return dbName === search || dbName.includes(search) || search.includes(dbName);
                                                                                             });
 
                                                                                             if (!found) {
                                                                                                 found = ghostUsers.find(u => {
-                                                                                                    const dbName = (u.full_name || '').toUpperCase();
+                                                                                                    const dbName = (u.full_name || nomeDeContatoFantasma(u.email) || '').toUpperCase();
+                                                                                                    if (!dbName) return false;
                                                                                                     return dbName === search || dbName.includes(search) || search.includes(dbName);
                                                                                                 });
                                                                                             }
