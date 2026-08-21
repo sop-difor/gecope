@@ -94,6 +94,38 @@ services:
     networks:
       - whatsapp-internal
 
+  # Observa a saúde real da conexão do WhatsApp (não só o estado em cache que a Evolution
+  # API reporta) e reinicia o container evolution-api sozinho quando necessário — tanto por
+  # pedido manual (botão "Reiniciar Conexão" no painel do GECOPE, aba Administração) quanto
+  # automaticamente após degradação sustentada. É o ÚNICO serviço deste stack com acesso ao
+  # socket do Docker (equivalente a root na VM); para isso nunca virar risco de segurança:
+  # (a) sem "ports" nenhuma — nada aponta tráfego de fora para cá; (b) o Caddy nunca
+  # encaminha nada para este serviço; (c) ele só abre conexões PARA FORA (Supabase,
+  # Evolution, socket local), nunca aceita conexão de ninguém. Roda como root só porque o
+  # socket do Docker já equivale a root de qualquer forma — não amplia o que o acesso ao
+  # socket já concede.
+  whatsapp-watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gecope-whatsapp-watchdog
+    user: root
+    restart: unless-stopped
+    command: ["node", "watchdog/watchdog.js"]
+    env_file:
+      - .env
+    environment:
+      - EVO_API_URL=http://evolution-api:8080
+      - EVO_CONTAINER_NAME=gecope-evolution-api
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      disable: true
+    depends_on:
+      - evolution-api
+    networks:
+      - whatsapp-internal
+
   # TLS automático (Let's Encrypt, gratuito) na frente do whatsapp-proxy-web — obrigatório:
   # o front-end envia o JWT de sessão do usuário no header Authorization, que não pode
   # trafegar em HTTP puro. Requer DOMAIN apontando (registro DNS tipo A) para o IP público

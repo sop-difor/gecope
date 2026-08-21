@@ -216,26 +216,62 @@ app.post('/api/whatsapp/resend/:logId', requireAuth, requireAdmin, async (req, r
   }
 });
 
+// `degraded` reflete whatsapp_control.degraded_since, mantido pelo watchdog (serviço
+// separado, ver watchdog/watchdog.js) — é o sinal que pega o caso deste incidente real: a
+// Evolution API respondendo state:"open" enquanto o envio de fato falha com "Connection
+// Closed", porque o watchdog cruza isso com falhas recentes em whatsapp_jobs, não só o
+// estado em cache que este endpoint também consulta.
+async function getDegradedFlag() {
+  try {
+    const { data } = await sb.from('whatsapp_control').select('degraded_since').eq('id', 1).maybeSingle();
+    return !!data?.degraded_since;
+  } catch (err) {
+    console.error('[status] erro ao ler whatsapp_control:', err.message || err);
+    return false;
+  }
+}
+
 app.get('/api/whatsapp/status', requireAuth, async (req, res) => {
+  const degraded = await getDegradedFlag();
   try {
     const result = await callEvolution(`/instance/connectionState/${EVO_INSTANCE}`);
 
     if (result.ok) {
       const state = result.data?.instance?.state || 'unknown';
-      return res.json({ state });
+      return res.json({ state, degraded });
     }
 
     if (result.status === 404) {
       // Instância ainda não existe — cria automaticamente, como o front-end fazia antes.
       const created = await createInstance();
-      if (created.ok) return res.json({ state: 'creating' });
-      return res.status(502).json({ state: 'error' });
+      if (created.ok) return res.json({ state: 'creating', degraded });
+      return res.status(502).json({ state: 'error', degraded });
     }
 
-    return res.status(502).json({ state: 'error' });
+    return res.status(502).json({ state: 'error', degraded });
   } catch (err) {
     console.error('[status] erro:', err.message || err);
-    return res.status(503).json({ state: 'offline' });
+    return res.status(503).json({ state: 'offline', degraded });
+  }
+});
+
+// Não reinicia nada diretamente — este container nunca tem acesso ao Docker por design
+// (é o único ponto do stack exposto a requisições vindas da internet, via Caddy). Só grava
+// o pedido; quem executa de fato é o whatsapp-watchdog (serviço isolado, sem porta nenhuma
+// exposta, rodando com o socket do Docker) ao notar restart_requested_at mais recente que
+// last_restarted_at no próximo ciclo de verificação (até WATCHDOG_POLL_MS de atraso).
+app.post('/api/whatsapp/instance/restart-request', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await sb.from('whatsapp_control').update({
+      restart_requested_at: new Date().toISOString(),
+      restart_requested_by: req.user.email,
+      updated_at: new Date().toISOString()
+    }).eq('id', 1);
+    if (error) throw error;
+    return res.status(202).json({ requested: true });
+  } catch (err) {
+    console.error('[restart-request] erro:', err.message || err);
+    return res.status(500).json({ requested: false });
   }
 });
 

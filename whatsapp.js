@@ -1000,10 +1000,67 @@
                                                                             }
                                                                         }
 
+                                                                        // Badge discreto ao lado de "Administração" (home) — roda para todo admin
+                                                                        // logado, independente de estar com o painel de Administração aberto, para
+                                                                        // avisar antes de alguém precisar abrir a aba e descobrir por acaso que o
+                                                                        // WhatsApp está fora do ar. Some sozinho quando a conexão volta ao normal
+                                                                        // (reflete whatsapp_control.degraded_since, mantido pelo watchdog no
+                                                                        // servidor — ver server/whatsapp-proxy/watchdog/watchdog.js).
+                                                                        async function atualizarBadgeStatusWhatsApp() {
+                                                                            if (typeof getCurrentUserRole !== 'function' || getCurrentUserRole() !== 'admin') return;
+                                                                            const badge = document.getElementById('badge-alerta-whatsapp');
+                                                                            if (!badge) return;
+                                                                            try {
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/status`);
+                                                                                const data = await response.json().catch(() => ({}));
+                                                                                if (data.degraded) {
+                                                                                    badge.title = 'A conexão do WhatsApp está com problema. Abra Administração > Gestão Integrada de Notificações para reiniciar.';
+                                                                                    badge.style.display = 'inline-flex';
+                                                                                } else {
+                                                                                    badge.style.display = 'none';
+                                                                                }
+                                                                            } catch (err) {
+                                                                                // Falha ao checar (ex.: sessão ainda não pronta) não deve acender alarme
+                                                                                // falso — mantém o badge como estava até a próxima tentativa.
+                                                                            }
+                                                                        }
+
+                                                                        // Pede ao servidor para reiniciar o container evolution-api sem precisar
+                                                                        // entrar na VM por SSH. Quem executa de fato é um serviço isolado (o
+                                                                        // whatsapp-watchdog), então o reinício pode levar até WATCHDOG_POLL_MS
+                                                                        // (~30s por padrão) para acontecer — daí o aviso de espera abaixo.
+                                                                        window.reiniciarConexaoWhatsApp = async function () {
+                                                                            const { isConfirmed } = await Swal.fire({
+                                                                                title: 'Reiniciar conexão do WhatsApp?',
+                                                                                text: 'Isso derruba e reconecta a sessão no servidor. Pode levar até 1 minuto para normalizar.',
+                                                                                icon: 'warning',
+                                                                                showCancelButton: true,
+                                                                                confirmButtonText: 'Sim, reiniciar',
+                                                                                cancelButtonText: 'Cancelar'
+                                                                            });
+                                                                            if (!isConfirmed) return;
+
+                                                                            try {
+                                                                                const response = await fetchComTimeout(`${window.WHATSAPP_PROXY_URL}/api/whatsapp/instance/restart-request`, {
+                                                                                    method: 'POST'
+                                                                                });
+                                                                                if (!response.ok) throw new Error(`Status ${response.status}`);
+
+                                                                                showToast('Pedido de reinício enviado. Aguardando o servidor aplicar...', 'info');
+                                                                                setTimeout(verificarStatusEvolution, 35000);
+                                                                                setTimeout(atualizarBadgeStatusWhatsApp, 35000);
+                                                                            } catch (err) {
+                                                                                console.error('[WhatsApp] Erro ao pedir reinício:', err);
+                                                                                Swal.fire('Erro', 'Não foi possível enviar o pedido de reinício. Tente novamente.', 'error');
+                                                                            }
+                                                                        };
+
                                                                         // Inicia verificação ao carregar se estiver na aba de config
                                                                         document.addEventListener('DOMContentLoaded', () => {
                                                                             // Pequeno delay para garantir que o DOM está pronto e estilos aplicados
                                                                             setTimeout(verificarStatusEvolution, 800); // Optimized from 2000ms
+                                                                            setTimeout(atualizarBadgeStatusWhatsApp, 1500);
+                                                                            setInterval(atualizarBadgeStatusWhatsApp, 60000);
                                                                         });
 
                                                                         window.testarConexaoWhatsApp = async function (event) {

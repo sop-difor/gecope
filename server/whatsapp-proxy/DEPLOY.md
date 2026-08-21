@@ -80,3 +80,28 @@ Aguardar o container voltar e checar o status no painel do GECOPE — se pedir Q
 novo, os volumes (`evolution_instances`/`evolution_store`) não estão persistindo
 corretamente para a versão da imagem usada; ajustar os paths no `docker-compose.yml`
 conforme a documentação da versão fixada da `atendai/evolution-api`.
+
+## 8. Aplicar a migração do `whatsapp_control` (uma vez)
+
+No SQL Editor do Supabase, rode o trecho novo de `supabase.sql` (tabela `whatsapp_control`)
+se o projeto já existia antes dela ser adicionada — sem isso, `/api/whatsapp/status` e o
+watchdog abaixo vão logar erro ao tentar ler/gravar nela.
+
+## 9. Subir o `whatsapp-watchdog` (uma vez)
+
+A partir daqui, reiniciar a conexão do WhatsApp não exige mais entrar na VM: existe um
+botão "Reiniciar Conexão" na aba Administração do GECOPE, e um badge discreto ao lado de
+"Administração" acende sozinho quando a conexão degrada. Isso é feito por um serviço à
+parte (`whatsapp-watchdog`, ver `docker-compose.yml`) que só ele tem acesso ao Docker da
+VM — nunca o `whatsapp-proxy-web`, que é o único exposto à internet. Subir (ou atualizar)
+esse serviço ainda exige SSH, mas só nesta única vez:
+
+```bash
+cd whatsapp-proxy   # ou o caminho onde está o docker-compose.yml na VM
+git pull            # ou como quer que o código chegue na VM
+docker compose up -d --build whatsapp-watchdog
+docker compose logs -f whatsapp-watchdog
+```
+
+Confirmar que o log mostra `[watchdog] iniciado`. Dali em diante, qualquer reinício de
+rotina (conexão caiu, sessão travada) pode ser feito direto pelo painel, sem SSH.

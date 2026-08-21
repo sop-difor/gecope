@@ -449,7 +449,9 @@
                             <!-- Administração -->
                             <div class="home-list-row" data-pane="pane-admin" onclick="showPane('pane-admin')">
                                 <div class="home-action-icon bg-slate"><i class="bi bi-shield-lock"></i></div>
-                                <div class="home-list-row-title">Administração</div>
+                                <div class="home-list-row-title">Administração<span id="badge-alerta-whatsapp"
+                                        class="badge-alerta-aba" style="display:none;" title=""><i
+                                            class="bi bi-exclamation-triangle-fill"></i> WhatsApp</span></div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Composições -->
@@ -694,6 +696,10 @@
                                                         <button class="btn btn-sm btn-outline-primary"
                                                             onclick="verificarStatusEvolution()">
                                                             <i class="bi bi-arrow-clockwise"></i> Atualizar
+                                                        </button>
+                                                        <button class="btn btn-sm btn-warning" onclick="reiniciarConexaoWhatsApp()"
+                                                            title="Reinicia o servidor de WhatsApp na VM sem precisar acessar por SSH">
+                                                            <i class="bi bi-power"></i> Reiniciar Conexão
                                                         </button>
                                                         <button class="btn btn-sm btn-success" onclick="mostrarQrCodeWhatsApp()">
                                                             <i class="bi bi-qr-code-scan"></i> Conectar (QR Code)
