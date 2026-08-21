@@ -150,13 +150,17 @@ async function fetchFiscais(idFilter){
   for(const k in m) m[k].sort((a,b)=>b.rank-a.rank);
   return m;
 }
-function setStatus(txt,ok){
+// `lastSync` é o maior `atualizado_em` dos contratos carregados (ver chamada em loadData),
+// não o horário em que o navegador buscou os dados — "Base atualizada em" precisa refletir
+// quando a BASE mudou de fato, não quando a página foi recarregada (antes usava
+// `new Date()`, então mostrava "agora" mesmo em bases paradas há dias).
+function setStatus(txt,ok,lastSync){
   const el=document.getElementById('connStatus');
   if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); const dot=ok?TOKENS.ng:TOKENS.amber; d.style.background=dot; d.style.boxShadow='0 0 10px '+dot;}
   const b=document.querySelector('.badge');
   if(b){ b.classList.toggle('demo',!ok); const t=document.getElementById('badgeTxt'); if(t) t.textContent = ok?'Base de dados · ao vivo':'Erro de conexão'; }
   const syncEl=document.getElementById('syncTime');
-  if(syncEl) syncEl.textContent = ok ? new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '— (falha na conexão)';
+  if(syncEl) syncEl.textContent = ok ? (lastSync ? fmtDateTimeBR(lastSync) : '—') : '— (falha na conexão)';
 }
 function showDataError(msg){
   document.body.classList.remove('boot-loading');
@@ -218,7 +222,11 @@ async function loadData(){
     for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); const com=fisc[o.id_obra]||[]; o.comissao=com; o.fiscal=com[0]?com[0].nome:'—'; o.fiscalTipo=com[0]?com[0].tipo:'FISCAL'; DB.municipios[cod].obras.push(o); }
     invalidateAggCache();
     const scopeTxt=scope==='ativa'?'carteira ativa':'histórico completo';
-    setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true);
+    // Comparação por string funciona porque `atualizado_em` vem do Postgres em ISO
+    // (YYYY-MM-DD...), que ordena lexicograficamente igual a cronologicamente.
+    let lastSync=null;
+    for(const r of rows){ if(r.atualizado_em && (!lastSync || r.atualizado_em>lastSync)) lastSync=r.atualizado_em; }
+    setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true, lastSync);
   }catch(e){
     console.error(e);
     showDataError('Não foi possível carregar os contratos: '+e.message);
@@ -467,7 +475,11 @@ function buildCityState(){
 }
 // ajustes manuais pontuais de posição de rótulo [Δlat,Δlon], por nome já sem o
 // prefixo "D.O." — ver comentário de uso mais abaixo.
-const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.10],'Sertão de Sobral':[0.10,0.10],'Maciço de Baturité':[-0.05,0.05],'Vale do Jaguaribe':[-0.05,0.05]};
+const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.10],'Sertão de Sobral':[0.10,0.10],'Maciço de Baturité':[-0.05,0.05],'Vale do Jaguaribe':[-0.05,0.05],'RM Fortaleza':[0.12,0]};
+// nomes curtos o bastante pra caber numa linha só, mesmo com 2+ palavras — pedido
+// pontual do usuário pra "Santa Quitéria" (a quebra em 2 linhas do shortGroupLabel()
+// é pensada pra nomes longos tipo "Sertão de Sobral", não faz sentido aqui).
+const GRP_LABEL_ONE_LINE=new Set(['Santa Quitéria']);
 // nome completo (usado em breadcrumb/painel/tooltip) é longo demais pra caber
 // lado a lado no mapa em "Região" (14 itens, vários espremidos no mesmo canto) —
 // tira as preposições de ligação (de/da/do/dos/das) e quebra em até 2 linhas
@@ -475,7 +487,7 @@ const GRP_LABEL_NUDGE={'Aracoiaba':[0,0.10],'Sertão de Sobral':[0.10,0.10],'Mac
 function shortGroupLabel(nome){
   const compact=nome.replace(/\s+(de|da|do|dos|das)\s+/gi,' ').trim();
   const words=compact.split(/\s+/);
-  if(words.length<=1) return {plain:compact, html:escHtml(compact)};
+  if(words.length<=1 || GRP_LABEL_ONE_LINE.has(nome)) return {plain:compact, html:escHtml(compact)};
   const mid=Math.ceil(words.length/2);
   const l1=words.slice(0,mid).join(' '), l2=words.slice(mid).join(' ');
   return {plain:compact, html:`${escHtml(l1)}<br>${escHtml(l2)}`};
