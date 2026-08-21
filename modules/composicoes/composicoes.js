@@ -340,9 +340,17 @@ async function deletarItemHistoricoComposicao(id, index) {
 }
 
 // 1.2 CARREGAR COMPOSIÇÕES (CORRIGIDO)
+// O grupo SOP (OFICIAL) concentra milhares de registros (~2.800), então ele NUNCA é
+// carregado por inteiro: só buscamos a contagem total (para o badge) e, quando o
+// usuário digita um termo de busca, os itens filtrados diretamente no banco (server-side).
+// Os demais grupos (composições próprias e de outros usuários) somam poucas dezenas de
+// itens e continuam sendo carregados por completo, como antes.
+const SOP_SEARCH_MIN_CHARS = 2;
+const SOP_RESULT_LIMIT = 300;
+
 async function carregarComposicoes() {
     const container = document.getElementById('accordionComposicoes');
-    const termoBusca = document.getElementById('comp-search').value.toLowerCase();
+    const termoBusca = document.getElementById('comp-search').value.trim().toLowerCase();
     const role = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
     const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
     const userEmail = sessionStorage.getItem('sop_user');
@@ -363,6 +371,7 @@ async function carregarComposicoes() {
             const { data: bData, error } = await sbClient
                 .from('composicoes_biblioteca')
                 .select('*')
+                .neq('usuario', 'SOP')
                 .order('usuario', { ascending: true })
                 .order('subcategoria', { ascending: true })
                 .order('descricao', { ascending: true })
@@ -390,7 +399,40 @@ async function carregarComposicoes() {
             return;
         }
 
-        console.log(`[DEBUG] Composições carregadas: ${data?.length || 0} registros.`);
+        // SOP: apenas a contagem total (rápida, "head only") + busca filtrada no banco
+        // quando há termo digitado. Nunca traz os ~2.800 registros de uma vez.
+        const { count: sopTotalCount, error: sopCountError } = await sbClient
+            .from('composicoes_biblioteca')
+            .select('*', { count: 'exact', head: true })
+            .eq('usuario', 'SOP');
+
+        if (sopCountError) console.error('[ERRO Contagem SOP]', sopCountError);
+        // Se a contagem falhar, usamos '?' no badge em vez de deixá-lo implicitamente
+        // virar 0 (o que passaria a falsa impressão de que o grupo SOP está vazio).
+        const sopCountDisplay = sopCountError ? '?' : (sopTotalCount ?? 0);
+
+        const sopSearched = termoBusca.length >= SOP_SEARCH_MIN_CHARS;
+        let sopItens = [];
+        let sopTruncated = false;
+
+        if (sopSearched) {
+            const { data: sopData, error: sopError } = await sbClient
+                .from('composicoes_biblioteca')
+                .select('*')
+                .eq('usuario', 'SOP')
+                .or(`descricao.ilike.%${termoBusca}%,codigo.ilike.%${termoBusca}%`)
+                .order('descricao', { ascending: true })
+                .limit(SOP_RESULT_LIMIT + 1);
+
+            if (sopError) {
+                console.error('[ERRO Busca SOP]', sopError);
+            } else if (sopData) {
+                sopTruncated = sopData.length > SOP_RESULT_LIMIT;
+                sopItens = sopTruncated ? sopData.slice(0, SOP_RESULT_LIMIT) : sopData;
+            }
+        }
+
+        console.log(`[DEBUG] Composições carregadas: ${data?.length || 0} (outros) + ${sopItens.length} (SOP, de ${sopTotalCount || 0} no total).`);
 
         const arvore = {};
         data.forEach(item => {
@@ -408,6 +450,9 @@ async function carregarComposicoes() {
                 console.error('[ERRO Item Composicao]', e, item);
             }
         });
+
+        // SOP entra sempre na árvore (mesmo vazia) para o grupo continuar visível.
+        arvore['SOP'] = sopItens;
 
         const sortedUsers = Object.keys(arvore).sort((a, b) => {
             if (a === 'SOP') return -1;
@@ -536,11 +581,29 @@ async function carregarComposicoes() {
                                 </div>`;
             });
 
+            // SOP não carrega tudo de uma vez: sem termo de busca (mín. 2 caracteres),
+            // mostra um convite para buscar em vez da lista completa; com busca sem
+            // resultado, avisa; com resultado truncado, avisa que há mais itens.
+            if (isSop && itens.length === 0) {
+                itensHtml = sopSearched
+                    ? `<div class="text-center text-muted py-4 small">Nenhuma composição SOP encontrada para "${escapeHTML(termoBusca)}".</div>`
+                    : `<div class="text-center text-muted py-4 small"><i class="bi bi-search me-1"></i> Utilize o campo de busca acima (mínimo ${SOP_SEARCH_MIN_CHARS} caracteres) para consultar as ${sopTotalCount ? sopTotalCount.toLocaleString('pt-BR') + ' ' : ''}composições oficiais da SOP.${sopCountError ? ' (Não foi possível carregar a contagem total agora.)' : ''}</div>`;
+            } else if (isSop && sopTruncated) {
+                itensHtml += `<div class="text-center text-muted small py-2 border-top mt-2"><i class="bi bi-info-circle me-1"></i> Exibindo os primeiros ${SOP_RESULT_LIMIT} resultados. Refine a busca para itens mais específicos.</div>`;
+            }
+
+            // Sem busca: badge mostra o total da biblioteca SOP (convite a explorar).
+            // Com busca: badge mostra o nº de resultados encontrados (como nos demais
+            // grupos), não mais o total — senão o badge nunca refletia o filtro aplicado.
+            const badgeCount = isSop
+                ? (sopSearched ? (sopTruncated ? `${SOP_RESULT_LIMIT}+` : itens.length) : sopCountDisplay)
+                : itens.length;
+
             html += `
                             <div class="accordion-custom-item">
                                 <h2 class="accordion-header">
                                     <button class="accordion-button accordion-custom-button collapsed ${accordionClass}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                                        <i class="${iconClassHeader}"></i> ${titleLabel} <span class="badge bg-white text-dark ms-2 opacity-75" style="font-size: 0.65rem;">${itens.length}</span>
+                                        <i class="${iconClassHeader}"></i> ${titleLabel} <span class="badge bg-white text-dark ms-2 opacity-75" style="font-size: 0.65rem;">${badgeCount}</span>
                                     </button>
                                 </h2>
                                 <div id="${collapseId}" class="accordion-collapse collapse">
@@ -684,23 +747,21 @@ window.toggleBuscaItemMode = function () {
     const containerBusca = document.getElementById('container-busca-item');
     const listaResultados = document.getElementById('lista-resultados-itens');
     const formMercado = document.getElementById('form-cadastro-mercado');
+    const formOutras = document.getElementById('form-cadastro-outras');
     const versao = document.getElementById('busca-item-versao');
     const ref = document.getElementById('busca-item-referencia');
 
-    if (fonte === 'MERCADO') {
-        containerBusca.classList.add('d-none');
-        listaResultados.classList.add('d-none');
-        formMercado.classList.remove('d-none');
-        versao.disabled = true;
-        ref.disabled = true;
-    } else {
-        containerBusca.classList.remove('d-none');
-        listaResultados.classList.remove('d-none');
-        formMercado.classList.add('d-none');
-        versao.disabled = false;
-        ref.disabled = false;
-        atualizarVersoesBusca();
-    }
+    // Fontes com cadastro 100% manual (sem busca em tabela de referência).
+    const isManual = (fonte === 'MERCADO' || fonte === 'OUTRAS');
+
+    containerBusca.classList.toggle('d-none', isManual);
+    listaResultados.classList.toggle('d-none', isManual);
+    formMercado.classList.toggle('d-none', fonte !== 'MERCADO');
+    formOutras.classList.toggle('d-none', fonte !== 'OUTRAS');
+    versao.disabled = isManual;
+    ref.disabled = isManual;
+
+    if (!isManual) atualizarVersoesBusca();
 }
 
 // Currency Input Mask
@@ -867,6 +928,61 @@ window.adicionarItemMercadoManual = function () {
     // Reset Fornecedores
     document.getElementById('container-fornecedores').innerHTML = '';
     document.getElementById('metodo-menor').checked = true;
+
+    bootstrap.Modal.getInstance(document.getElementById('modalBuscarItemComposicao')).hide();
+}
+
+// Fonte "Outras": cadastro 100% manual para fontes fora de SEINFRA/SINAPI/ORSE/Mercado.
+// O usuário informa Unid., Preço (unitário) e Coeficiente, igual às demais fontes (o
+// preço unitário digitado é o que entra em item.preco e é multiplicado pelo Coeficiente
+// no cálculo da composição). "Valor Total" (Preço × Coeficiente) é só uma prévia — mostra
+// o mesmo valor que vai aparecer na coluna "Total" da tabela de itens.
+window.calcularValorTotalOutras = function () {
+    const rawPreco = document.getElementById('outras-preco').value.replace(/\./g, '').replace(',', '.');
+    const preco = parseFloat(rawPreco) || 0;
+    const coef = parseFloat(document.getElementById('outras-coef').value) || 0;
+    const elResult = document.getElementById('outras-valor-total-calc');
+
+    if (preco > 0 && coef > 0) {
+        const valorTotal = preco * coef;
+        elResult.textContent = valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    } else {
+        elResult.textContent = 'R$ 0,00';
+    }
+}
+
+window.adicionarItemOutrasManual = function () {
+    const desc = document.getElementById('outras-desc').value.trim();
+    const unid = document.getElementById('outras-unid').value.trim().toUpperCase();
+    const rawPreco = document.getElementById('outras-preco').value.replace(/\./g, '').replace(',', '.');
+    const preco = parseFloat(rawPreco);
+    const coef = parseFloat(document.getElementById('outras-coef').value);
+
+    if (!desc) { alert("Informe a descrição."); return; }
+    if (!unid) { alert("Informe a unidade."); return; }
+    if (isNaN(preco) || preco <= 0) { alert("Preço inválido."); return; }
+    if (isNaN(coef) || coef <= 0) { alert("Coeficiente inválido."); return; }
+
+    adicionarItemComposicao({
+        fonte: 'OUTRAS',
+        versao: 'MANUAL',
+        referencia: 'MANUAL',
+        codigo: 'MANUAL',
+        descricao: desc,
+        unidade: unid,
+        preco: parseFloat(preco.toFixed(2)),
+        tipo: 'INSUMO',
+        grupo: 'MATERIAL',
+        coeficiente: coef,
+        anexos: []
+    });
+
+    // Reset Form
+    document.getElementById('outras-desc').value = '';
+    document.getElementById('outras-unid').value = '';
+    document.getElementById('outras-preco').value = '';
+    document.getElementById('outras-coef').value = '1.00';
+    document.getElementById('outras-valor-total-calc').textContent = 'R$ 0,00';
 
     bootstrap.Modal.getInstance(document.getElementById('modalBuscarItemComposicao')).hide();
 }
@@ -1107,8 +1223,10 @@ async function executarBuscaItemComposicao() {
 function adicionarItemComposicao(item) {
     // Verifica duplicação
     const existe = currentCompositionItems.find(i => {
-        // Se for cotação de mercado, permite múltiplos itens se as descrições forem diferentes
-        if (item.fonte === 'MERCADO') {
+        // Cotações de mercado e itens de "Outras" fontes não têm código próprio (todos
+        // usam o mesmo código fixo 'COTAÇÃO'/'MANUAL'), então a checagem de duplicidade
+        // usa a descrição em vez do código — senão só seria possível adicionar 1 item.
+        if (item.fonte === 'MERCADO' || item.fonte === 'OUTRAS') {
             return i.fonte === item.fonte && i.descricao === item.descricao;
         }
         return i.codigo === item.codigo && i.fonte === item.fonte;
@@ -1212,6 +1330,8 @@ function renderizarItensComposicao() {
             let sourceDisplay = '';
             if (item.fonte === 'MERCADO') {
                 sourceDisplay = `<span class="badge bg-light text-secondary border me-1" style="font-size:0.65rem">MERCADO</span>`;
+            } else if (item.fonte === 'OUTRAS') {
+                sourceDisplay = `<span class="badge bg-light text-secondary border me-1" style="font-size:0.65rem">OUTRAS</span>`;
             } else {
                 sourceDisplay = `
                                     <div class="d-flex flex-column align-items-center" style="line-height:1.1;">
@@ -1258,10 +1378,10 @@ function renderizarItensComposicao() {
         return sectionHtml;
     };
 
-    html += renderSection('MAO_DE_OBRA', 'MAO DE OBRA', 'bg-body-secondary');
+    html += renderSection('MAO_DE_OBRA', 'MÃO DE OBRA', 'bg-body-secondary');
     html += renderSection('MATERIAL', 'MATERIAIS', 'bg-body-secondary');
     html += renderSection('EQUIPAMENTOS', 'EQUIPAMENTOS', 'bg-body-secondary');
-    html += renderSection('SERVICO', 'SERVIOS', 'bg-body-secondary');
+    html += renderSection('SERVICO', 'SERVIÇOS', 'bg-body-secondary');
 
     tbody.innerHTML = html;
 }
@@ -1569,10 +1689,10 @@ const normalizarItemParaPDF = (item) => {
     // Mapeamento de nomes de grupo para padrão de exibição
     const rawGrupo = (item.tipo_grupo || item.grupo || item.g || 'GERAL').toUpperCase();
     let grupoDisplay = rawGrupo;
-    if (rawGrupo === 'MAO_DE_OBRA' || rawGrupo === 'MAO DE OBRA') grupoDisplay = 'MAO DE OBRA';
-    else if (rawGrupo === 'SERVICO' || rawGrupo === 'SERVICOS') grupoDisplay = 'SERVIO';
+    if (rawGrupo === 'MÃO_DE_OBRA' || rawGrupo === 'MÃO DE OBRA') grupoDisplay = 'MÃO DE OBRA';
+    else if (rawGrupo === 'SERVIÇO' || rawGrupo === 'SERVIÇOS') grupoDisplay = 'SERVIÇO';
     else if (rawGrupo === 'MATERIAL' || rawGrupo === 'MATERIAIS') grupoDisplay = 'MATERIAL';
-    else if (rawGrupo === 'COMPOSICAO' || rawGrupo === 'COMPOSICOES') grupoDisplay = 'COMPOSIÇÃO';
+    else if (rawGrupo === 'COMPOSIÇÃO' || rawGrupo === 'COMPOSIÇÕESS') grupoDisplay = 'COMPOSIÇÃO';
 
     // Fallbacks para Código e Descrição
     const codigo = item.codigo_insumo || item.codigo_item || item.codigo || item.cod || '-';
@@ -1669,7 +1789,7 @@ async function gerarPDF_Profissional(rawInput) {
         const retroativos = [];
 
         const body = [];
-        const ordemGrupos = ['MAO DE OBRA', 'MATERIAL', 'EQUIPAMENTOS', 'SERVIO', 'GERAL'];
+        const ordemGrupos = ['MÃO DE OBRA', 'MATERIAL', 'EQUIPAMENTOS', 'SERVIÇO', 'GERAL'];
         const itensAgrupados = itens.reduce((acc, item) => {
             const g = item.grupo || 'GERAL';
             if (!acc[g]) acc[g] = [];

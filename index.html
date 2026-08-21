@@ -2208,7 +2208,7 @@
                         </div>
 
                         <section class="filters-card">
-                            <div class="filters-title">FILTROS DE CONSULTA (COMPOSIES)</div>
+                            <div class="filters-title">FILTROS DE CONSULTA (COMPOSIÇÕES)</div>
                             <div class="row g-2">
                                 <div class="col">
                                     <div class="input-group input-group-sm">
@@ -3171,6 +3171,7 @@
                                                 <option value="SINAPI">SINAPI</option>
                                                 <option value="ORSE">ORSE</option>
                                                 <option value="MERCADO">MERCADO</option>
+                                                <option value="OUTRAS">OUTRAS</option>
                                             </select>
                                         </div>
                                         <div class="col-md-4">
@@ -3351,6 +3352,47 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- CONTAINER 3: CADASTRO MANUAL - OUTRAS FONTES -->
+                                    <div id="form-cadastro-outras" class="d-none mt-2 border-top pt-2">
+                                        <div class="row g-2">
+                                            <div class="col-md-12">
+                                                <label class="form-label small fw-bold mb-1">Descrição do Item</label>
+                                                <textarea class="form-control form-control-sm" id="outras-desc"
+                                                    rows="2" placeholder="Descrição completa..."></textarea>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold mb-1">Unid.</label>
+                                                <input type="text" class="form-control form-control-sm"
+                                                    id="outras-unid" placeholder="UN">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold mb-1">Preço</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">R$</span>
+                                                    <input type="text" class="form-control" id="outras-preco"
+                                                        oninput="formatMoneyInput(this); calcularValorTotalOutras()"
+                                                        placeholder="0,00">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold mb-1">Coeficiente</label>
+                                                <input type="number" class="form-control form-control-sm"
+                                                    id="outras-coef" value="1.00" min="0" step="0.0001"
+                                                    oninput="calcularValorTotalOutras()">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold mb-1">Valor Total</label>
+                                                <div class="form-control form-control-sm bg-light text-end text-success fw-bold"
+                                                    id="outras-valor-total-calc">R$ 0,00</div>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-primary w-100 mt-2"
+                                            onclick="adicionarItemOutrasManual()">
+                                            <i class="bi bi-plus-lg me-1"></i> Adicionar Item
+                                        </button>
+                                    </div>
+
                                     <div class="list-group mt-2 border shadow-sm bg-white" id="lista-resultados-itens"
                                         style="max-height: 300px; overflow-y: auto;">
                                         <div class="text-center py-3 text-muted small">Digite algo para buscar...</div>

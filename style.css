@@ -3461,6 +3461,30 @@
             color: rgba(255, 255, 255, 0.7);
         }
 
+        /* .table-light (ex.: cabeçalho da tabela de itens da Composição Analítica)
+           define a variável --bs-table-bg localmente no <thead>, e essa variável é
+           herdada pelas células <th>/<td> via CSS custom property — então sobrescrever
+           só o background-color do <thead> (regra acima) não muda a cor das células,
+           que continuam calculando o próprio fundo a partir de --bs-table-bg (#f8f9fa,
+           quase branco) e ficam claras mesmo no tema escuro. É preciso redefinir a
+           própria variável para as células herdarem o valor escuro corretamente. */
+        body.theme-dark .table-light {
+            --bs-table-bg: rgba(255, 255, 255, 0.06);
+            --bs-table-color: rgba(255, 255, 255, 0.85);
+            --bs-table-border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Linhas divisoras de grupo (MATERIAIS / MÃO DE OBRA / EQUIPAMENTOS / SERVIÇOS)
+           dentro da tabela de itens da Composição Analítica (renderSection, em
+           composicoes.js) usam um background-color FIXO inline (#e9ecef, quase branco)
+           gerado no próprio HTML, não uma classe — nenhuma regra de classe alcança um
+           estilo inline, então precisa de !important aqui para vencer. .bg-body-secondary
+           só é usado por essas linhas nesta tabela, então o escopo é seguro. */
+        body.theme-dark tr.bg-body-secondary {
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
         /* Bootstrap: modais */
         body.theme-dark .modal-content {
             background-color: #142e22 !important;
