@@ -39,75 +39,153 @@ function calcularDiasDevolucao() {
 // Ensure FISCAIS_LIST exists (avoid TDZ) and Performance tweak: optionally silence verbose console logs in production
 var FISCAIS_LIST = [
     'ÁGABE SOUSA',
+
     'ALEXANDRE CÁSSIO',
+
     'ALEXANDRE HORTÊNCIO',
+
     'ANTÔNIO EDSON',
+
     'ANTÔNIO ELDER',
+
     'ANTÔNIO ROLIM',
+
     'ARTHUR EDÍSIO',
-    'CARLOS RIOS',
+
     'CAIO TIMBÓ',
+
+    'CARLOS RIOS',
+
     'CLOVIS FONTENELE',
+
     'CRISTIANA PALÁCIO',
+
     'CRISTIANO GUILHERME',
+
     'DAVI BRAGA',
+
     'DAVI GADELHA',
+
     'DAVID MACHADO',
+
+    'DIEGO ALEXANDRE OLIVEIRA PEIXOTO',
+
     'DIEGO DEMÉTRIO',
+
     'EDGAR PEIXOTO',
+
     'EDILSON JR.',
+
+    'EDUARDO RICARTE FEITOSA',
+
     'EDUARDO CIDRÃO',
+
     'EDUARDO STÊNIO',
+
     'EMMANUEL CRUZ',
+
     'FÁBIO BONFIM',
+
+    'FILIPE RIBEIRO MACEDO',
+
     'FLÁVIO COLARES',
+
     'FLEURY NAPOLEÃO',
+
     'FRANCISCO GOIANA',
+
     'FRANCISCO PARENTE',
+
     'FRANCISCO TALES',
+
     'GECOPE DIFOR',
+
     'GUILHERME MAIA',
+
     'HEBERT ALAN',
+
     'IGGO EMANUEL',
+
     'ÍTALO HENRIQUE',
+
     'JÉSSICA DINIZ',
+
     'JOHN HERBERT',
-    'JOSÉ LEONÉZIO',
-    'JOSÉ MICHELL',
-    'JOSÉ MUNIZ',
-    'JOSÉ ROSEMBERG',
-    'JOSÉ WILLIAN',
-    'JOSUÉ JOHAB',
-    'JOVANKA RANGEL',
-    'JURANDIR VIANA',
-    'JUSTINIANO CAMURÇA',
-    'KENEDDY MAYK',
-    'KERLON DIÓGENES',
-    'LEANDRO LESSA',
-    'LUCAS TEOTONIO',
+
     'JOÃO LEONARDI',
+
+    'JOSÉ LEONÉZIO',
+
+    'JOSÉ MICHELL',
+
+    'JOSÉ MUNIZ',
+
+    'JOSÉ ROSEMBERG',
+
+    'JOSÉ WILLIAN',
+
+    'JOSUÉ JOHAB',
+
+    'JOVANKA RANGEL',
+
+    'JURANDIR VIANA',
+
+    'JUSTINIANO CAMURÇA',
+
+    'KENEDDY MAYK',
+
+    'KERLON DIÓGENES',
+
+    'LEONARDO DE ANDRADE PEREIRA',
+
     'LUCAS ARAÚJO',
+
+    'LUCAS TEOTONIO',
+
     'LUCIANO DENIZARDY',
+
     'MANOEL LUCAS',
+
     'MÁRCIO MONTENEGRO',
+
     'MÁRIO EDSON',
+
+    'MESSIAS ROMÁRIO DE SANTIAGO LIMA',
+
     'MAURO JOSÉ',
+
     'NERTAN FONSECA',
+
     'NILDENO ARAGÃO',
+
     'ORLANDO LIMA',
+
     'PAULO LOIOLA',
+
     'ROBERTO BRINGEL',
+
     'ROBERTO HOLANDA',
+
     'ROBERTO XAVIER',
+
     'RUI DE PAULA',
+
     'SAULLO MARINHO',
+
     'SILVIO CAMPOS',
+
     'TATHIANE ANDRADE',
+
     'TÚLIO REZENDE',
+
     'VICENTE DE SOUSA',
+
     'VIRNA DE PAULA',
+
     'WEBER TEIXEIRA',
+
     'WESLEY PEDROSA',
+
     'WILSON MACHADO'
 ];
 FISCAIS_LIST.sort((a, b) => a.localeCompare(b, 'pt-BR'));
