@@ -93,6 +93,19 @@ function gerarLinkOrse(codigo, referencia) {
     } catch (e) { console.error("Erro gerarLinkOrse", e); return "#"; }
 }
 
+// No ORSE, composição e insumo podem compartilhar o número (ex.: composição
+// 'S13998' e insumo '13998'). Só a composição tem "abre" no site do ORSE —
+// abrir o link para um insumo levaria à composição de mesmo número, que é outro
+// item. `identificacao === 'I'` marca insumo.
+function orseEhInsumo(item) {
+    return String(item && item.identificacao || '').trim().toUpperCase() === 'I';
+}
+
+function avisarInsumoOrseSemComposicao(codigo) {
+    alert(`O código ${codigo} é um INSUMO do ORSE, não uma composição.\n\n`
+        + `Insumos não têm composição analítica — o "abre" no site do ORSE existe só para composições (código iniciado por "S").`);
+}
+
 function gerarLinkSeinfra(codigo, ref) {
     const enc = (ref || '').toLowerCase().trim();
     // 'nao_desonerada' se contiver termos de negação ou for exatamente 'onerada'
@@ -128,8 +141,15 @@ function renderTabelaResults(lista) {
         const btnImprimir = `<button class="btn btn-sm btn-outline-success border me-1" onclick="imprimirLinhaTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Imprimir Composição"><i class="bi bi-printer"></i></button>`;
 
         if (fonte === 'ORSE') {
-            const link = gerarLinkOrse(item.codigo, item.referencia);
-            btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<a href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a></div>`;
+            let btnComposicao;
+            if (orseEhInsumo(item)) {
+                // Insumo não tem composição — avisa em vez de abrir o "abre" de outro item.
+                btnComposicao = `<button class="btn btn-sm btn-outline-secondary border" onclick="avisarInsumoOrseSemComposicao('${item.codigo}')" title="Insumo — sem composição"><i class="bi bi-info-circle"></i></button>`;
+            } else {
+                const link = gerarLinkOrse(item.codigo, item.referencia);
+                btnComposicao = `<a href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary" title="Ver Composição no ORSE"><i class="bi bi-box-arrow-up-right"></i></a>`;
+            }
+            btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}${btnComposicao}</div>`;
         } else {
             btnAction = `<div class="d-flex align-items-center justify-content-end">${btnImprimir}<button class="btn btn-sm btn-light border" onclick="abrirDetalheTabela('${item.codigo}', '${fonte}', '${versaoBase}', '${tipoRef}')" title="Ver Detalhes"><i class="bi bi-chevron-right"></i></button></div>`;
         }

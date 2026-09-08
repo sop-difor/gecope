@@ -12,9 +12,8 @@ Cada fonte tem sua pasta com o passo a passo:
 | Pasta | O que tem |
 |---|---|
 | **`SINAPI/`** | Extrator que lê a planilha `.xlsx` da Caixa e gera o CSV, + script que sobe e carrega. |
-| **`ORSE/`** | Passo a passo para carregar o CSV do ORSE (o CSV vem do seu programa). |
-| **`SEINFRA/`** | Passo a passo para carregar o CSV da SEINFRA (idem). |
-| `_migracao_inicial/` | Scripts da reestruturação de 2026-09 — **já aplicados**, só referência/rollback. |
+| **`ORSE/`** | Extrator (`gerar_stg_orse.py`: serviços + insumos → CSV) + script que sobe e carrega + `RECARGA.md`. |
+| **`SEINFRA/`** | Passo a passo para carregar o CSV da SEINFRA (o CSV vem do seu programa). |
 
 ---
 
@@ -28,7 +27,8 @@ Cabeçalho + uma linha por item. Colunas por fonte:
 | **ORSE** | `identificacao, codigo, descricao, unidade, preco_unitario, tipo_encargo, referencia` |
 | **SEINFRA** | `identificacao, codigo, descricao, unidade, preco_unitario, tipo_encargo, referencia, composicao` |
 
-- `identificacao`: `C` (composição/serviço) ou `I` (insumo).
+- `identificacao`: `C` (composição/serviço) ou `I` (insumo). ORSE: carregue
+  **serviços e insumos** todo mês (o extrator junta os dois num CSV só).
 - `tipo_encargo`: `onerada` ou `desonerada` (aceita `onerado`/`desonerado`/`não desonerada`
   e normaliza). ORSE: sempre `onerada`.
 - `referencia`: SINAPI/ORSE = `AAAA-MM-01` (ex. `2026-07-01`); SEINFRA = número da

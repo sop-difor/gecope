@@ -2358,83 +2358,136 @@ const KPI_BREAKDOWN_CORES = {
 };
 const KPI_BREAKDOWN_CINZA = { light: '#c3c2b7', dark: '#5c5c58' };
 
-// Abre o modal de distribuição por fiscal ao clicar num dos cards de KPI da aba
-// Processos. statusFiltro=null usa todas as linhas atualmente filtradas na tela
-// (mesmo conjunto exibido pelo card "Processos").
-function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
-    const todasLinhas = window.currentVisibleRows || [];
-    const linhas = statusFiltro
-        ? todasLinhas.filter(d => (d.status || "").toUpperCase() === statusFiltro)
-        : todasLinhas;
-
+// Classifica as linhas por uma chave (fiscal, distrito, ...) e devolve os pares
+// [rótulo, quantidade] em ordem decrescente. Valor vazio cai em `rotuloVazio`.
+function _classificarBreakdown(linhas, chaveFn, rotuloVazio) {
     const contagem = new Map();
     linhas.forEach(d => {
-        const nome = (d.fiscal || "").trim() || "Não informado";
-        contagem.set(nome, (contagem.get(nome) || 0) + 1);
+        const k = String(chaveFn(d) || '').trim() || rotuloVazio;
+        contagem.set(k, (contagem.get(k) || 0) + 1);
     });
-    let entradas = Array.from(contagem.entries()).sort((a, b) => b[1] - a[1]);
+    return Array.from(contagem.entries()).sort((a, b) => b[1] - a[1]);
+}
 
-    const total = linhas.length;
-    const isDark = document.body.classList.contains('theme-dark');
+// Monta uma seção "rosca + legenda" reutilizável (por fiscal, por distrito, ...).
+// `entradas` = pares [rótulo, qtd] já ordenados; `total` = soma das quantidades.
+// `empilhado` = rosca em cima e legenda embaixo (para as seções ficarem lado a
+// lado, cada uma numa coluna estreita).
+function _secaoBreakdown(rotulo, entradas, total, isDark, infoDireita, empilhado) {
+    if (total === 0) {
+        return `<div class="fw-bold mb-2" style="color:var(--text-heading);">${escapeHTML(rotulo)}</div>
+                <div class="text-center text-muted py-3"><i class="bi bi-inbox d-block mb-1"></i>Sem dados.</div>`;
+    }
     const paleta = isDark ? KPI_BREAKDOWN_CORES.dark : KPI_BREAKDOWN_CORES.light;
     const cinza = isDark ? KPI_BREAKDOWN_CINZA.dark : KPI_BREAKDOWN_CINZA.light;
 
-    // Mais de 7 fiscais: mantém os 7 maiores e agrupa o resto em "Outros" para
+    // Mais de 8 categorias: mantém as 7 maiores e agrupa o resto em "Outros" para
     // não estourar o teto de cores categoricamente seguras (ver dataviz skill).
     let fatias = entradas;
     if (entradas.length > 8) {
         const principais = entradas.slice(0, 7);
-        const somaOutros = entradas.slice(7).reduce((acc, [, qtd]) => acc + qtd, 0);
+        const somaOutros = entradas.slice(7).reduce((acc, [, q]) => acc + q, 0);
         fatias = [...principais, ["Outros", somaOutros]];
     }
 
+    const r = 70, cx = 90, cy = 90, sw = 26;
+    const circ = 2 * Math.PI * r;
+    let acc = 0;
+    const arcosSVG = fatias.map(([nome, qtd], i) => {
+        const frac = qtd / total;
+        const len = frac * circ;
+        const dashoffset = -acc;
+        acc += len;
+        const cor = nome === "Outros" ? cinza : paleta[i % paleta.length];
+        const pct = Math.round(frac * 1000) / 10;
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cor}" stroke-width="${sw}"
+            stroke-dasharray="${len} ${circ - len}" stroke-dashoffset="${dashoffset}"
+            transform="rotate(-90 ${cx} ${cy})"><title>${escapeHTML(nome)}: ${qtd} (${pct}%)</title></circle>`;
+    }).join('');
+
+    // A legenda mostra TODAS as categorias (não só as que viraram fatia colorida
+    // própria); quem caiu em "Outros" na rosca aparece aqui em cinza, mas com
+    // nome e quantidade individuais. Nome sem truncar (o modal é largo).
+    const legendaHTML = entradas.map(([nome, qtd], i) => {
+        const cor = i < 7 ? paleta[i % paleta.length] : cinza;
+        const pct = Math.round((qtd / total) * 1000) / 10;
+        return `<div class="d-flex align-items-start justify-content-between py-1 gap-2" style="font-size:0.85rem;">
+            <div class="d-flex align-items-start gap-2" style="min-width:0;flex:1;">
+                <span style="width:10px;height:10px;border-radius:2px;background:${cor};flex:none;margin-top:0.28rem;"></span>
+                <span style="color:var(--text-heading);word-break:break-word;">${escapeHTML(nome)}</span>
+            </div>
+            <span class="fw-bold" style="color:var(--text-heading);white-space:nowrap;">${qtd} <span class="fw-normal" style="color:var(--text-muted);">(${pct}%)</span></span>
+        </div>`;
+    }).join('');
+
+    const layoutInterno = empilhado
+        ? 'flex-column align-items-center gap-3'
+        : 'flex-column flex-sm-row align-items-center gap-4';
+    const alturaLegenda = empilhado ? 340 : 280;
+
+    return `
+        <div class="d-flex align-items-baseline justify-content-between mb-2 gap-2">
+            <span class="fw-bold" style="color:var(--text-heading);">${escapeHTML(rotulo)}</span>
+            ${infoDireita ? `<span style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap;">${escapeHTML(infoDireita)}</span>` : ''}
+        </div>
+        <div class="d-flex ${layoutInterno}">
+            <div style="position:relative;flex:none;">
+                <svg width="180" height="180" viewBox="0 0 180 180">${arcosSVG}</svg>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <div style="font-size:1.6rem;font-weight:800;color:var(--text-heading);line-height:1;">${total}</div>
+                    <div style="font-size:0.68rem;color:var(--text-muted);">processo${total === 1 ? '' : 's'}</div>
+                </div>
+            </div>
+            <div class="kpi-breakdown-legend" style="flex:1;min-width:0;width:100%;max-height:${alturaLegenda}px;overflow-y:auto;">${legendaHTML}</div>
+        </div>`;
+}
+
+// Abre o modal de drill-down ao clicar num dos cards de KPI da aba Processos.
+// Mostra duas quebras do mesmo conjunto de processos: por fiscal e por Distrito
+// Operacional (replanilhamentos). statusFiltro=null usa todas as linhas
+// atualmente filtradas na tela (mesmo conjunto do card "Processos").
+// `statusFiltro`: null = todas as linhas visíveis; string = um status; array =
+// vários status (ex.: card "Processos Fiscalização" = ANÁLISE + REANÁLISE FISCAL).
+function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
+    const todasLinhas = window.currentVisibleRows || [];
+    const alvos = statusFiltro == null ? null
+        : (Array.isArray(statusFiltro) ? statusFiltro : [statusFiltro]).map(s => String(s).toUpperCase());
+    const linhas = alvos
+        ? todasLinhas.filter(d => alvos.includes((d.status || "").toUpperCase()))
+        : todasLinhas;
+
+    const total = linhas.length;
+    const isDark = document.body.classList.contains('theme-dark');
+
+    const SEM_FISCAL = "Não informado";
+    const SEM_DISTRITO = "Sem distrito operacional";
+    const porFiscal = _classificarBreakdown(linhas, d => d.fiscal, SEM_FISCAL);
+    const porDistrito = _classificarBreakdown(linhas, d => d.distritoOperacional, SEM_DISTRITO);
+
+    const nFiscais = porFiscal.filter(([n]) => n !== SEM_FISCAL).length;
+    const temSemFiscal = porFiscal.some(([n]) => n === SEM_FISCAL);
+    const nDistritos = porDistrito.filter(([n]) => n !== SEM_DISTRITO).length;
+    const temSemDistrito = porDistrito.some(([n]) => n === SEM_DISTRITO);
+
     const titleEl = document.getElementById('kpiBreakdownTitulo');
-    titleEl.innerHTML = `<i class="bi ${iconClass || 'bi-pie-chart'} me-2"></i>${escapeHTML(titulo)} por fiscal`;
+    titleEl.innerHTML = `<i class="bi ${iconClass || 'bi-pie-chart'} me-2"></i>${escapeHTML(titulo)}`;
 
     const conteudo = document.getElementById('kpiBreakdownConteudo');
     if (total === 0) {
         conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Nenhum processo neste status.</div>`;
     } else {
-        const r = 70, cx = 90, cy = 90, sw = 26;
-        const circ = 2 * Math.PI * r;
-        let acc = 0;
-        const arcosSVG = fatias.map(([nome, qtd], i) => {
-            const frac = qtd / total;
-            const len = frac * circ;
-            const dashoffset = -acc;
-            acc += len;
-            const cor = nome === "Outros" ? cinza : paleta[i % paleta.length];
-            const pct = Math.round(frac * 1000) / 10;
-            return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cor}" stroke-width="${sw}"
-                stroke-dasharray="${len} ${circ - len}" stroke-dashoffset="${dashoffset}"
-                transform="rotate(-90 ${cx} ${cy})"><title>${escapeHTML(nome)}: ${qtd} (${pct}%)</title></circle>`;
-        }).join('');
-
-        // A lista abaixo mostra TODOS os fiscais (não só os que viraram fatia
-        // colorida própria no gráfico) — quem caiu dentro de "Outros" na rosca
-        // aparece aqui com o mesmo cinza, mas com nome e quantidade individuais.
-        const legendaHTML = entradas.map(([nome, qtd], i) => {
-            const cor = i < 7 ? paleta[i % paleta.length] : cinza;
-            const pct = Math.round((qtd / total) * 1000) / 10;
-            return `<div class="d-flex align-items-center justify-content-between py-1" style="font-size:0.85rem;">
-                <div class="d-flex align-items-center gap-2" style="min-width:0;">
-                    <span style="width:10px;height:10px;border-radius:2px;background:${cor};flex:none;"></span>
-                    <span class="text-truncate" style="color:var(--text-heading);">${escapeHTML(nome)}</span>
-                </div>
-                <span class="fw-bold ms-2" style="color:var(--text-heading);white-space:nowrap;">${qtd} <span class="fw-normal" style="color:var(--text-muted);">(${pct}%)</span></span>
-            </div>`;
-        }).join('');
-
+        const infoFiscais = `${nFiscais} ${nFiscais === 1 ? 'fiscal' : 'fiscais'}`
+            + (temSemFiscal ? ' + sem fiscal' : '');
+        const infoDistritos = `${nDistritos} distrito${nDistritos === 1 ? '' : 's'}`
+            + (temSemDistrito ? ' + sem distrito' : '');
         conteudo.innerHTML = `
-            <div class="d-flex flex-column flex-sm-row align-items-center gap-4">
-                <div style="position:relative;flex:none;">
-                    <svg width="180" height="180" viewBox="0 0 180 180">${arcosSVG}</svg>
-                    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-                        <div style="font-size:1.6rem;font-weight:800;color:var(--text-heading);line-height:1;">${total}</div>
-                        <div style="font-size:0.68rem;color:var(--text-muted);">processo${total === 1 ? '' : 's'}</div>
-                    </div>
+            <div class="d-flex flex-column flex-lg-row gap-4 gap-lg-5 align-items-stretch">
+                <div style="flex:1;min-width:0;">
+                    ${_secaoBreakdown('Por fiscal', porFiscal, total, isDark, infoFiscais, true)}
                 </div>
-                <div class="kpi-breakdown-legend" style="flex:1;min-width:0;width:100%;max-height:260px;overflow-y:auto;">${legendaHTML}</div>
+                <div style="flex:1;min-width:0;">
+                    ${_secaoBreakdown('Por Distrito Operacional (replanilhamentos)', porDistrito, total, isDark, infoDistritos, true)}
+                </div>
             </div>`;
     }
 
@@ -2594,7 +2647,11 @@ function updateReuniao() {
     }
     document.getElementById("meetingFooterNote").textContent = `Exibindo ${rows.length} processos`;
     document.getElementById("card_proc_total").textContent = rows.length;
-    document.getElementById("card_proc_andamento").textContent = rows.filter(d => (d.status || "").toUpperCase() === "AGUAR. ANÁLISE").length;
+    // Card "Processos Fiscalização": consolida ANÁLISE FISCAL + REANÁLISE FISCAL.
+    document.getElementById("card_proc_andamento").textContent = rows.filter(d => {
+        const s = (d.status || "").toUpperCase();
+        return s === "ANÁLISE FISCAL" || s === "DEVOLVIDO P/ REANÁLISE FISCAL";
+    }).length;
     document.getElementById("card_proc_aprovados").textContent = rows.filter(d => (d.status || "").toUpperCase() === "ANÁLISE FISCAL").length;
     document.getElementById("card_proc_dias").textContent = rows.filter(d => (d.status || "").toUpperCase() === "DEVOLVIDO P/ REANÁLISE FISCAL").length;
 

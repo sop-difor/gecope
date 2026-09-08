@@ -2078,12 +2078,12 @@
                                 </div>
                             </div>
                             <div class="proc-kpi-card accent-orange" style="cursor:pointer;" title="Ver distribuição por fiscal"
-                                onclick="abrirBreakdownFiscal('AGUAR. ANÁLISE', 'Aguardando Análise', 'bi-hourglass-split')">
-                                <div class="proc-kpi-icon bg-orange"><i class="bi bi-hourglass-split"></i></div>
+                                onclick="abrirBreakdownFiscal(['ANÁLISE FISCAL','DEVOLVIDO P/ REANÁLISE FISCAL'], 'Processos Fiscalização (Status = ANÁLISE E REANÁLISE FISCAL)', 'bi-clipboard-check')">
+                                <div class="proc-kpi-icon bg-orange"><i class="bi bi-clipboard-check"></i></div>
                                 <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Aguardando Análise</span>
+                                    <span class="proc-kpi-label">Processos Fiscalização</span>
                                     <div class="proc-kpi-value" id="card_proc_andamento">0</div>
-                                    <div class="proc-kpi-sub">Status = AGUAR. ANÁLISE</div>
+                                    <div class="proc-kpi-sub">Status = ANÁLISE E REANÁLISE FISCAL</div>
                                 </div>
                             </div>
                             <div class="proc-kpi-card accent-green" style="cursor:pointer;" title="Ver distribuição por fiscal"
@@ -4270,14 +4270,14 @@
 
                             <!-- Modal de Distribuição por Fiscal (drill-down dos cards de KPI de Processos) -->
                             <div class="modal fade" id="modalKpiBreakdown" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-dialog modal-dialog-centered modal-xl">
                                     <div class="modal-content">
                                         <div class="modal-header">
                                             <h5 class="modal-title" id="kpiBreakdownTitulo"></h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
                                                 aria-label="Close"></button>
                                         </div>
-                                        <div class="modal-body">
+                                        <div class="modal-body" style="max-height:75vh;overflow-y:auto;">
                                             <div id="kpiBreakdownConteudo"></div>
                                         </div>
                                         <div class="modal-footer">
