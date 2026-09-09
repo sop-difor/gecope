@@ -2735,6 +2735,51 @@
             display: none !important;
         }
 
+        /* Chips de filtro por status de meta no topo do modal de drill-down.
+           "Atrasado"/"No prazo" são toggles independentes; "Todas" limpa o filtro.
+           Cores ativas seguem os badges de meta (.badge-meta-atrasado/-prazo). */
+        .kpi-meta-chip {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 1px solid var(--sop-slate-200);
+            background: none;
+            color: var(--text-muted);
+            border-radius: 999px;
+            padding: 0.15rem 0.6rem;
+            font-size: 0.78rem;
+            /* peso fixo (o ativo distingue por cor de fundo, não por peso) para
+               não haver "pulo" de largura ao alternar. */
+            font-weight: 500;
+            line-height: 1.4;
+            cursor: pointer;
+            transition: background-color .12s, color .12s, border-color .12s;
+        }
+        .kpi-meta-chip:hover {
+            border-color: var(--text-muted);
+        }
+        .kpi-meta-chip:focus-visible {
+            outline: 2px solid var(--sop-blue);
+            outline-offset: 1px;
+        }
+        .kpi-meta-chip.ativo {
+            border-color: transparent;
+            background: var(--sop-slate-200);
+            color: var(--text-heading);
+        }
+        .kpi-meta-chip.chip-atrasado.ativo {
+            background: #DC3545;
+            color: #fff;
+        }
+        .kpi-meta-chip.chip-prazo.ativo {
+            background: #FFC107;
+            color: #000;
+        }
+        .kpi-meta-chip-n {
+            margin-left: 0.3rem;
+            font-weight: 400;
+            opacity: 0.75;
+        }
+
         /* Cabeçalho de seção — mesmo espírito dos cards de KPI (ícone colorido + título),
            usado para substituir os headers de acordeão antigos na aba Administração */
         .admin-section-header {

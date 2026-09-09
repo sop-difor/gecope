@@ -2495,11 +2495,99 @@ function _toggleDistritoBreakdown(btn, panelId) {
 }
 window._toggleDistritoBreakdown = _toggleDistritoBreakdown;
 
+// Estado do modal de drill-down entre re-renders (troca do filtro de status de
+// meta sem reabrir o modal): linhas já recortadas por status + faixas de meta
+// selecionadas nos chips (Set vazio = "Todas").
+let _breakdownState = null;
+
+// Chips de filtro por status de meta no topo do modal. Contagens fixas sobre o
+// conjunto recortado por status (linhasBase), para o usuário saber o que cada
+// chip rende independentemente do que já está selecionado. Quando há algum
+// recorte ativo, sinaliza à direita quantos processos "Sem meta" ficam de fora
+// (não têm chip próprio), para o total menor da rosca não confundir.
+function _chipsMetaBreakdown(metas, linhasBase) {
+    const cont = { 'Atrasado': 0, 'No prazo': 0, 'Sem meta': 0 };
+    linhasBase.forEach(d => { const m = getMetaSt(d); if (cont[m] !== undefined) cont[m]++; });
+
+    const chip = (valor, rotulo, extraCls) => {
+        const ativo = metas.has(valor);
+        return `<button type="button" class="kpi-meta-chip${extraCls ? ' ' + extraCls : ''}${ativo ? ' ativo' : ''}"
+            data-meta="${escapeHTML(valor)}" aria-pressed="${ativo}" onclick="_toggleBreakdownMetaFiltro('${valor}')">${escapeHTML(rotulo)}<span class="kpi-meta-chip-n">${cont[valor]}</span></button>`;
+    };
+    const todasAtivo = metas.size === 0;
+    const notaOcultos = (!todasAtivo && cont['Sem meta'] > 0)
+        ? `<span style="color:var(--text-muted);font-size:0.75rem;">${cont['Sem meta']} sem meta (fora deste filtro)</span>`
+        : '';
+    return `<div class="d-flex flex-wrap align-items-center gap-2 mb-3" style="font-size:0.8rem;"
+        role="group" aria-label="Filtrar por status da meta">
+        <span style="color:var(--text-muted);">Status da meta:</span>
+        <button type="button" class="kpi-meta-chip${todasAtivo ? ' ativo' : ''}" data-meta="Todas" aria-pressed="${todasAtivo}" onclick="_toggleBreakdownMetaFiltro('')">Todas<span class="kpi-meta-chip-n">${linhasBase.length}</span></button>
+        ${chip('Atrasado', 'Atrasado', 'chip-atrasado')}
+        ${chip('No prazo', 'No prazo', 'chip-prazo')}
+        ${notaOcultos}
+    </div>`;
+}
+
+// (Re)monta o corpo do modal de drill-down a partir de `_breakdownState`,
+// aplicando o filtro de status de meta atual. Chamada na abertura e a cada
+// clique nos chips.
+function _renderBreakdownConteudo() {
+    if (!_breakdownState) return;
+    const { linhasBase, metas } = _breakdownState;
+    const conteudo = document.getElementById('kpiBreakdownConteudo');
+
+    if (linhasBase.length === 0) {
+        conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Nenhum processo neste status.</div>`;
+        return;
+    }
+
+    // Set vazio = "Todas" (nenhum recorte por meta).
+    const linhas = metas.size === 0 ? linhasBase : linhasBase.filter(d => metas.has(getMetaSt(d)));
+    const total = linhas.length;
+    const chipsHTML = _chipsMetaBreakdown(metas, linhasBase);
+
+    if (total === 0) {
+        conteudo.innerHTML = chipsHTML
+            + `<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Nenhum processo com esse filtro de meta.</div>`;
+        return;
+    }
+
+    const isDark = document.body.classList.contains('theme-dark');
+    const SEM_FISCAL = "Não informado";
+    const SEM_DISTRITO = "Sem distrito operacional";
+    const porDistrito = _classificarBreakdown(linhas, d => d.distritoOperacional, SEM_DISTRITO);
+    const nDistritos = porDistrito.filter(([n]) => n !== SEM_DISTRITO).length;
+    const temSemDistrito = porDistrito.some(([n]) => n === SEM_DISTRITO);
+    const infoDistritos = `${nDistritos} distrito${nDistritos === 1 ? '' : 's'}`
+        + (temSemDistrito ? ' + sem distrito' : '');
+
+    conteudo.innerHTML = chipsHTML
+        + _secaoDistritoComFiscais(linhas, porDistrito, total, isDark, infoDistritos, SEM_DISTRITO, SEM_FISCAL);
+}
+
+// Liga/desliga uma faixa de meta nos chips do modal. `valor` vazio = "Todas"
+// (limpa o recorte). "Atrasado" e "No prazo" são independentes (dá pra ver as
+// duas juntas, ou só uma). Sem nenhuma marcada, volta a "Todas".
+function _toggleBreakdownMetaFiltro(valor) {
+    if (!_breakdownState) return;
+    const metas = _breakdownState.metas;
+    if (valor === '') metas.clear();
+    else if (metas.has(valor)) metas.delete(valor);
+    else metas.add(valor);
+    _renderBreakdownConteudo();
+    // O innerHTML foi reconstruído, então o chip clicado foi recriado — devolve o
+    // foco ao equivalente para não jogar o teclado pro topo do documento.
+    const conteudo = document.getElementById('kpiBreakdownConteudo');
+    const alvo = conteudo && conteudo.querySelector(`.kpi-meta-chip[data-meta="${valor === '' ? 'Todas' : valor}"]`);
+    if (alvo) alvo.focus();
+}
+window._toggleBreakdownMetaFiltro = _toggleBreakdownMetaFiltro;
+
 // Abre o modal de drill-down ao clicar num dos cards de KPI da aba Processos.
-// Abre enxuto: só a quebra por Distrito Operacional (replanilhamentos). Cada
-// distrito expande, ao clique, para mostrar os fiscais daquele distrito que
-// estão com processos. statusFiltro=null usa todas as linhas atualmente
-// filtradas na tela (mesmo conjunto do card "Processos").
+// Abre enxuto: só a quebra por Distrito Operacional (replanilhamentos), com
+// TODOS os processos do status. Cada distrito expande, ao clique, para mostrar
+// os fiscais daquele distrito. Os chips no topo permitem recortar por status de
+// meta (Atrasado / No prazo) sem fechar o modal.
 // `statusFiltro`: null = todas as linhas visíveis; string = um status; array =
 // vários status (ex.: card "Processos Fiscalização" = ANÁLISE + REANÁLISE FISCAL).
 function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
@@ -2510,27 +2598,12 @@ function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
         ? todasLinhas.filter(d => alvos.includes((d.status || "").toUpperCase()))
         : todasLinhas;
 
-    const total = linhas.length;
-    const isDark = document.body.classList.contains('theme-dark');
-
-    const SEM_FISCAL = "Não informado";
-    const SEM_DISTRITO = "Sem distrito operacional";
-    const porDistrito = _classificarBreakdown(linhas, d => d.distritoOperacional, SEM_DISTRITO);
-
-    const nDistritos = porDistrito.filter(([n]) => n !== SEM_DISTRITO).length;
-    const temSemDistrito = porDistrito.some(([n]) => n === SEM_DISTRITO);
+    _breakdownState = { linhasBase: linhas, metas: new Set() };
 
     const titleEl = document.getElementById('kpiBreakdownTitulo');
     titleEl.innerHTML = `<i class="bi ${iconClass || 'bi-pie-chart'} me-2"></i>${escapeHTML(titulo)}`;
 
-    const conteudo = document.getElementById('kpiBreakdownConteudo');
-    if (total === 0) {
-        conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-inbox fs-2 d-block mb-2"></i>Nenhum processo neste status.</div>`;
-    } else {
-        const infoDistritos = `${nDistritos} distrito${nDistritos === 1 ? '' : 's'}`
-            + (temSemDistrito ? ' + sem distrito' : '');
-        conteudo.innerHTML = _secaoDistritoComFiscais(linhas, porDistrito, total, isDark, infoDistritos, SEM_DISTRITO, SEM_FISCAL);
-    }
+    _renderBreakdownConteudo();
 
     const modalEl = document.getElementById('modalKpiBreakdown');
     // O HTML deste projeto tem divs não fechadas em vários trechos, o que faz
