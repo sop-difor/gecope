@@ -2700,11 +2700,39 @@
         .proc-kpi-icon.bg-blue { background: #0d6efd; box-shadow: 0 4px 10px -2px #0d6efd; }
         .proc-kpi-icon.bg-red { background: var(--filetype-pdf-fg); box-shadow: 0 4px 10px -2px var(--filetype-pdf-fg); }
 
-        /* Lista de fiscais do modal de distribuição por KPI (aba Processos) —
-           a barra de rolagem em si já vem do reset global (:root, topo do
-           arquivo); aqui só o espaçamento para ela não colar no texto. */
-        .kpi-breakdown-legend {
-            padding-right: 6px;
+        /* Lista expansível "Por Distrito Operacional" do modal de drill-down de KPI
+           (aba Processos): cada linha é um <button> de disclosure que revela os
+           fiscais do distrito. Borda um pouco mais forte que --border-soft para a
+           lista se ler como linhas clicáveis nos dois temas. */
+        .kpi-distrito-row {
+            border-bottom: 1px solid var(--sop-slate-200);
+            transition: background-color .12s;
+        }
+        /* Realce de hover no <div> da linha (não no <button>): mesmo token e
+           mesmo alvo (a linha inteira) do hover das linhas de tabela do projeto,
+           para a leitura de "linha clicável" ficar consistente. O botão é w-100,
+           então passar o mouse por ele aciona este :hover. */
+        .kpi-distrito-row:hover {
+            background: var(--sop-slate-50);
+        }
+        .kpi-distrito-toggle {
+            /* estilos base aqui (e não inline) para não competir por especificidade. */
+            appearance: none;
+            -webkit-appearance: none;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+        }
+        .kpi-distrito-toggle:focus-visible {
+            outline: 2px solid var(--sop-blue);
+            outline-offset: -2px;
+        }
+        /* O Reboot do Bootstrap 5.3 não traz [hidden]; garante o esconde do painel
+           recolhido mesmo que ele ganhe uma classe utilitária de display no
+           futuro. Escopo restrito ao modal para não mexer no resto do app. */
+        #kpiBreakdownConteudo [hidden] {
+            display: none !important;
         }
 
         /* Cabeçalho de seção — mesmo espírito dos cards de KPI (ícone colorido + título),
