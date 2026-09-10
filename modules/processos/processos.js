@@ -448,7 +448,8 @@ async function garantirFiscaisCarregados() {
 // Resolve um fiscal por matrícula (exato) ou por nome (normalizado) contra window.fiscais.
 function fiscalPorMatricula(mat) {
     if (!mat) return null;
-    return window.fiscais.find(f => f.matricula === String(mat).trim()) || null;
+    const alvo = normalizarMatriculaFiscal(mat);
+    return window.fiscais.find(f => normalizarMatriculaFiscal(f.matricula) === alvo) || null;
 }
 function fiscalPorNome(nome) {
     if (!nome) return null;
@@ -460,6 +461,16 @@ function fiscalPorNome(nome) {
             return fn.startsWith(alvo + ' ') || alvo.startsWith(fn + ' ');
         })
         || null;
+}
+
+function adicionarFiscalDaComissao({ matricula = null, nome = null } = {}) {
+    const matriculaTexto = String(matricula || '').trim();
+    const nomeTexto = String(nome || '').trim().toUpperCase();
+    if (!matriculaTexto || !nomeTexto || fiscalPorMatricula(matriculaTexto)) return;
+    window.fiscais.push({ matricula: matriculaTexto, nome: nomeTexto });
+    window.fiscais.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    window.dynamicUsers = window.fiscais.map(f => f.nome);
+    atualizarDropdownsFiscais();
 }
 
 // Popula um <select> de Fiscal com as opções (value=matrícula, texto=nome), mantendo a 1ª
@@ -520,6 +531,10 @@ function lerFiscalSelecionado(selectEl) {
 
 function normalizarNomeFiscal(nome) {
     return (nome || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+function normalizarMatriculaFiscal(matricula) {
+    return String(matricula || '').trim().toUpperCase().replace(/[.\-\/\s]+/g, '');
 }
 
 // Funde entradas que representam o mesmo fiscal mas vieram de tabelas diferentes com/sem
@@ -604,11 +619,15 @@ async function buscarObraPorCodigo(codigo) {
         if (obra.id_obra != null) {
             const { data: comissao, error: errCom } = await sbClient
                 .from('comissao_fiscalizacao')
-                .select('nome_completo, nome_referencia, tipo')
+                .select('nome_completo, nome_referencia, tipo, matricula')
                 .eq('id_obra', obra.id_obra);
             if (!errCom && comissao) {
                 comissaoCompleta = comissao
-                    .map(m => ({ nome: (m.nome_completo || m.nome_referencia || '').trim(), ...classifyComissaoProcesso(m.tipo) }))
+                    .map(m => ({
+                        nome: (m.nome_completo || m.nome_referencia || '').trim(),
+                        matricula: (m.matricula || '').trim() || null,
+                        ...classifyComissaoProcesso(m.tipo)
+                    }))
                     .filter(m => m.nome)
                     .sort((a, b) => b.rank - a.rank);
             }
@@ -622,6 +641,7 @@ async function buscarObraPorCodigo(codigo) {
             distrito_operacional: obra.distrito_operacional || '',
             municipio: obra.municipio || '',
             fiscalSugerido: comissaoCompleta[0] ? comissaoCompleta[0].nome : '',
+            fiscalSugeridoMatricula: comissaoCompleta[0] ? comissaoCompleta[0].matricula : null,
             comissaoCompleta
         };
     } catch (e) {
@@ -639,7 +659,7 @@ async function buscarObraPorCodigo(codigo) {
 // garantirOpcaoFiscal já deixou selecionado no campo Fiscal Responsável.
 function montarListaComissaoHTML(comissaoCompleta, onClickFnName) {
     return comissaoCompleta.map((m, idx) =>
-        `<button type="button" class="btn btn-sm ${idx === 0 ? 'btn-outline-primary' : 'btn-outline-secondary'}" onclick="${onClickFnName}(this, '${escapeHTML(m.nome).replace(/'/g, "\\'")}')">${escapeHTML(m.label)}: ${escapeHTML(m.nome)}</button>`
+        `<button type="button" class="btn btn-sm ${idx === 0 ? 'btn-outline-primary' : 'btn-outline-secondary'}" onclick="${onClickFnName}(this, '${escapeHTML(m.nome).replace(/'/g, "\\'")}', '${escapeHTML(m.matricula || '').replace(/'/g, "\\'")}')">${escapeHTML(m.label)}: ${escapeHTML(m.nome)}</button>`
     ).join('');
 }
 
@@ -679,7 +699,14 @@ async function buscarObraCadastro() {
     document.getElementById('cad_contratada').value = resultado.contratada;
     document.getElementById('cad_distrito').value = resultado.distrito_operacional;
     document.getElementById('cad_municipio').value = resultado.municipio;
-    selecionarFiscal(document.getElementById('cad-fiscal'), { nome: resultado.fiscalSugerido });
+    adicionarFiscalDaComissao({
+        matricula: resultado.fiscalSugeridoMatricula,
+        nome: resultado.fiscalSugerido
+    });
+    selecionarFiscal(document.getElementById('cad-fiscal'), {
+        matricula: resultado.fiscalSugeridoMatricula,
+        nome: resultado.fiscalSugerido
+    });
 
     const descCurta = (resultado.descricao_obra || '').slice(0, 80);
     statusEl.className = 'form-text text-success';
@@ -693,8 +720,9 @@ async function buscarObraCadastro() {
     }
 }
 
-function selecionarFiscalCadastro(btnEl, nome) {
-    selecionarFiscal(document.getElementById('cad-fiscal'), { nome });
+function selecionarFiscalCadastro(btnEl, nome, matricula) {
+    adicionarFiscalDaComissao({ matricula, nome });
+    selecionarFiscal(document.getElementById('cad-fiscal'), { matricula, nome });
     // Marcação sutil de qual integrante está selecionado: o botão clicado troca para o
     // mesmo estilo outline-primary usado no resto do app, os demais voltam a secondary.
     if (btnEl && btnEl.parentElement) {
@@ -740,7 +768,14 @@ async function buscarObraDetalhes() {
     document.getElementById('det_contratada').value = resultado.contratada;
     document.getElementById('det_distrito').value = resultado.distrito_operacional;
     document.getElementById('det_municipio').value = resultado.municipio;
-    selecionarFiscal(document.getElementById('det_fiscal'), { nome: resultado.fiscalSugerido });
+    adicionarFiscalDaComissao({
+        matricula: resultado.fiscalSugeridoMatricula,
+        nome: resultado.fiscalSugerido
+    });
+    selecionarFiscal(document.getElementById('det_fiscal'), {
+        matricula: resultado.fiscalSugeridoMatricula,
+        nome: resultado.fiscalSugerido
+    });
 
     statusEl.className = 'form-text text-success';
     statusEl.textContent = 'Obra encontrada — revise os campos e clique em "Salvar Alterações" para confirmar o vínculo.';
