@@ -599,6 +599,17 @@ function classifyComissaoProcesso(tipoRaw) {
     return { label: tipoRaw ? String(tipoRaw).toUpperCase() : 'MEMBRO', rank: -1 };
 }
 
+function selecionarComissaoVigente(comissao) {
+    if (!Array.isArray(comissao) || !comissao.length) return [];
+    const datas = comissao
+        .map(m => String(m.atualizado_em || '').slice(0, 10))
+        .filter(Boolean)
+        .sort();
+    if (!datas.length) return comissao;
+    const dataVigente = datas[datas.length - 1];
+    return comissao.filter(m => String(m.atualizado_em || '').slice(0, 10) === dataVigente);
+}
+
 // Busca uma obra em contratos_edificacao pelo Código da Obra e sua comissão de
 // fiscalização em comissao_fiscalizacao, para pré-preencher o cadastro/vínculo de
 // processos. Nunca lança: quem chama trata { encontrado:false } como "não achou, segue
@@ -619,10 +630,10 @@ async function buscarObraPorCodigo(codigo) {
         if (obra.id_obra != null) {
             const { data: comissao, error: errCom } = await sbClient
                 .from('comissao_fiscalizacao')
-                .select('nome_completo, nome_referencia, tipo, matricula')
+                .select('nome_completo, nome_referencia, tipo, matricula, atualizado_em')
                 .eq('id_obra', obra.id_obra);
             if (!errCom && comissao) {
-                comissaoCompleta = comissao
+                comissaoCompleta = selecionarComissaoVigente(comissao)
                     .map(m => ({
                         nome: (m.nome_completo || m.nome_referencia || '').trim(),
                         matricula: (m.matricula || '').trim() || null,
@@ -648,6 +659,46 @@ async function buscarObraPorCodigo(codigo) {
         console.error('[ERRO] buscarObraPorCodigo:', e);
         return { encontrado: false };
     }
+}
+
+async function sincronizarFiscaisDosProcessos() {
+    const codigos = [...new Set(window.allData.map(row => row.codigoObra).filter(Boolean))];
+    if (!codigos.length) return;
+    const { data: obras, error: errObras } = await sbClient
+        .from('contratos_edificacao')
+        .select('id_obra, codigo_obra')
+        .in('codigo_obra', codigos);
+    if (errObras || !obras || !obras.length) return;
+
+    const idsObra = obras.map(obra => obra.id_obra).filter(id => id != null);
+    const { data: comissao, error: errComissao } = await sbClient
+        .from('comissao_fiscalizacao')
+        .select('id_obra, nome_completo, nome_referencia, tipo, matricula, atualizado_em')
+        .in('id_obra', idsObra);
+    if (errComissao || !comissao) return;
+
+    const porObra = new Map();
+    obras.forEach(obra => porObra.set(obra.codigo_obra, []));
+    const codigoPorObra = new Map(obras.map(obra => [obra.id_obra, obra.codigo_obra]));
+    const grupos = new Map();
+    comissao.forEach(membro => {
+        const grupo = grupos.get(membro.id_obra) || [];
+        grupo.push(membro);
+        grupos.set(membro.id_obra, grupo);
+    });
+    grupos.forEach((membros, idObra) => {
+        const vigentes = selecionarComissaoVigente(membros);
+        const fiscal = vigentes
+            .map(membro => ({ ...membro, ...classifyComissaoProcesso(membro.tipo) }))
+            .sort((a, b) => b.rank - a.rank)[0];
+        if (fiscal) porObra.set(codigoPorObra.get(idObra), fiscal);
+    });
+    window.allData.forEach(row => {
+        const fiscal = porObra.get(row.codigoObra);
+        if (!fiscal) return;
+        row.fiscal = (fiscal.nome_completo || fiscal.nome_referencia || '').trim();
+        row.fiscalMatricula = (fiscal.matricula || '').trim() || null;
+    });
 }
 
 // (Removido garantirOpcaoFiscal — o dropdown de Fiscal agora é chaveado por matrícula;
@@ -1070,6 +1121,12 @@ async function carregarDadosSupabase() {
 
         return obj;
     });
+
+    try {
+        await sincronizarFiscaisDosProcessos();
+    } catch (e) {
+        console.warn('[Fiscal] Não foi possível sincronizar comissões vigentes:', e);
+    }
 
     // window.allData já foi atualizado acima; não é necessário reatribuir
     /* window.allData já foi atualizado acima */

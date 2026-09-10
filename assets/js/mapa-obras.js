@@ -86,7 +86,7 @@ const CONTRATOS_COLS=['id_obra','nr_contrato_sop','codigo_obra','descricao_obra'
   'data_fim_vigencia_contrato','cnpj_contratada','cnpj_contratante','atualizado_em'].join(',');
 // prazo_execucao/prazo_vigencia_contrato: prazo ORIGINAL contratado em dias (aba
 // Aditivos de prazo). nr_os: nº da ordem de serviço (bloco Detalhes do Resumo).
-const COMISSAO_COLS='id_obra,nome_completo,nome_referencia,tipo,matricula';
+const COMISSAO_COLS='id_obra,nome_completo,nome_referencia,tipo,matricula,atualizado_em';
 // aditivos_contrato/ficha_contrato não têm id_obra — a chave de junção com
 // contratos_edificacao é nr_contrato_sop (texto, já denormalizado nas duas tabelas,
 // evita depender de ficha_contrato.id_contrato pra cruzar com aditivos_contrato).
@@ -264,8 +264,15 @@ function inListFilter(col,values,quote){
 async function fetchFiscais(idFilter){
   const filter=inListFilter('id_obra',idFilter,false);
   const rows=await fetchTable(SB_COMISSAO,{select:COMISSAO_COLS,filter}); const m={};
+  const datasPorObra={};
+  for(const r of rows){
+    const data=String(r.atualizado_em||'').slice(0,10);
+    if(data && (!datasPorObra[r.id_obra] || data>datasPorObra[r.id_obra])) datasPorObra[r.id_obra]=data;
+  }
   for(const r of rows){
     const k=r.id_obra; if(k==null) continue;
+    const data=String(r.atualizado_em||'').slice(0,10);
+    if(datasPorObra[k] && data!==datasPorObra[k]) continue;
     const nome=r.nome_completo||r.nome_referencia; if(!nome) continue;
     const c=classifyComissao(r.tipo);
     (m[k]=m[k]||[]).push({nome, tipo:c.label, rank:c.rank, matricula:r.matricula||''});
