@@ -581,20 +581,19 @@ function colapsarVariantesFiscais(lista) {
 
 // --- INTEGRAÇÃO COM CONTRATOS SOP (SIGSOP) — busca de obra por código para autopreencher o cadastro ---
 
-// Classifica o "tipo" de um integrante da comissão de fiscalização, mesma hierarquia
-// usada no Mapa de Obras (assets/js/mapa-obras.js:classifyComissao) para decidir quem
-// aparece como "o fiscal" quando a comissão tem mais de um integrante:
-// Presidente > Fiscal > 1º/2º/3º Membro > Suplente.
+// Classifica o "tipo" de um integrante da comissão de fiscalização, usando a
+// hierarquia para decidir quem aparece como fiscal responsável:
+// Fiscal > 1º Membro > Presidente > 2º/3º Membro > Suplente.
 function classifyComissaoProcesso(tipoRaw) {
     const norm = (tipoRaw || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (norm.includes('PRESIDENTE')) return { label: 'PRESIDENTE', rank: 6 };
-    if (norm.includes('FISCAL')) return { label: 'FISCAL', rank: 5 };
+    if (norm.includes('FISCAL')) return { label: 'FISCAL', rank: 7 };
     // Precisa vir antes dos testes de dígito: "1º Suplente" contém "1", então SUPLENTE
     // tem que ser checado primeiro — senão seria classificado como titular "1º Membro".
     if (norm.includes('SUPLENTE')) return { label: 'SUPLENTE', rank: 1 };
-    if (norm.includes('1') || norm.includes('PRIMEIRO')) return { label: '1º MEMBRO', rank: 4 };
-    if (norm.includes('2') || norm.includes('SEGUNDO')) return { label: '2º MEMBRO', rank: 3 };
-    if (norm.includes('3') || norm.includes('TERCEIRO')) return { label: '3º MEMBRO', rank: 2 };
+    if (norm.includes('1') || norm.includes('PRIMEIRO')) return { label: '1º MEMBRO', rank: 6 };
+    if (norm.includes('PRESIDENTE')) return { label: 'PRESIDENTE', rank: 5 };
+    if (norm.includes('2') || norm.includes('SEGUNDO')) return { label: '2º MEMBRO', rank: 4 };
+    if (norm.includes('3') || norm.includes('TERCEIRO')) return { label: '3º MEMBRO', rank: 3 };
     if (norm.includes('MEMBRO')) return { label: 'MEMBRO', rank: 0 };
     return { label: tipoRaw ? String(tipoRaw).toUpperCase() : 'MEMBRO', rank: -1 };
 }
