@@ -55,29 +55,12 @@
                                                                                     return;
                                                                                 }
 
-                                                                                // Busca os últimos disparos de metas no banco para verificar qual foi o último aviso por processo/fiscal
-                                                                                const { data: logs, error: logsError } = await sbClient
-                                                                                    .from('whatsapp_logs')
-                                                                                    .select('mensagem, destinatario_nome, created_at')
-                                                                                    .eq('evento', 'novas_metas_processo')
-                                                                                    .order('created_at', { ascending: false })
-                                                                                    .limit(10000);
-
-                                                                                const ultimoAlertaPorChave = new Map();
-                                                                                const cleanStr = str => (str || '').replace(/[^A-Z0-9]/ig, '').toUpperCase();
-
-                                                                                if (!logsError && logs) {
-                                                                                    logs.forEach(log => {
-                                                                                        const nupLog = (log.mensagem ? log.mensagem.match(/NUP:\* ([\d\/\-]+)/)?.[1] : null);
-                                                                                        const objetoLog = (log.mensagem ? log.mensagem.match(/OBJETO:\* ([^\n]+)/)?.[1] : null);
-                                                                                        if (!nupLog) return;
-                                                                                        // Chave composta: NUP + FISCAL + OBJETO (limpos)
-                                                                                        const chave = `${cleanStr(nupLog)}|${cleanStr(log.destinatario_nome)}|${cleanStr(objetoLog)}`;
-                                                                                        if (!ultimoAlertaPorChave.has(chave)) {
-                                                                                            ultimoAlertaPorChave.set(chave, new Date(log.created_at).getTime());
-                                                                                        }
-                                                                                    });
-                                                                                }
+                                                                                // Dedupe é feito pela flag `aviso_atraso_enviado` no banco (ver update mais
+                                                                                // abaixo, com `.eq('aviso_atraso_enviado', false)` como lock lógico) — não
+                                                                                // depende de histórico de mensagens. Egress: removida em 18/09/2026 a consulta
+                                                                                // de até 10.000 `whatsapp_logs` que rodava aqui a cada boot/login/gravação de
+                                                                                // admin só para montar um mapa (`ultimoAlertaPorChave`) que nunca era lido —
+                                                                                // ver docs/auditoria-egress-2026-09.md, achado 1.
 
                                                                                 // Filtra processos "Atrasados" que possuem fiscal e ainda NO tiveram aviso enviado (Flag de Banco)
                                                                                 const atrasados = (window.allData || []).filter(d => {
@@ -1131,12 +1114,29 @@
                                                                             }
                                                                         };
 
-                                                                        // Inicia verificação ao carregar se estiver na aba de config
+                                                                        // Inicia verificação ao carregar se estiver na aba de config. `#ws-status-text`
+                                                                        // fica no DOM o tempo todo (só o painel de Administração é que é
+                                                                        // escondido por RBAC), então sem a checagem de papel isto rodava para
+                                                                        // TODO usuário logado, não só admin — mesmo tratamento do badge abaixo
+                                                                        // (egress, 18/09/2026; docs/auditoria-egress-2026-09.md, item 7).
                                                                         document.addEventListener('DOMContentLoaded', () => {
                                                                             // Pequeno delay para garantir que o DOM está pronto e estilos aplicados
-                                                                            setTimeout(verificarStatusEvolution, 800); // Optimized from 2000ms
+                                                                            setTimeout(() => {
+                                                                                if (typeof getCurrentUserRole === 'function' && getCurrentUserRole() === 'admin') verificarStatusEvolution();
+                                                                            }, 800); // Optimized from 2000ms
                                                                             setTimeout(atualizarBadgeStatusWhatsApp, 1500);
-                                                                            setInterval(atualizarBadgeStatusWhatsApp, 60000);
+                                                                            // 5 min (era 1 min) e pausado com a aba em segundo plano — o badge só
+                                                                            // avisa de um problema, não precisa de tempo real (egress, 18/09/2026).
+                                                                            setInterval(() => { if (!document.hidden) atualizarBadgeStatusWhatsApp(); }, 300000);
+                                                                            // O setInterval acima continua contando com a aba oculta (só o corpo é
+                                                                            // pulado) — sem isto, um outage que começa enquanto a aba está em
+                                                                            // segundo plano só aparece no próximo múltiplo de 5 min após o admin
+                                                                            // voltar o foco, podendo levar ~10 min por causa das 2 falhas seguidas
+                                                                            // exigidas antes de acender o alarme (achado da revisão adversarial do
+                                                                            // Passo 1, 18/09/2026). Checagem já é no-op para quem não é admin.
+                                                                            document.addEventListener('visibilitychange', () => {
+                                                                                if (!document.hidden) atualizarBadgeStatusWhatsApp();
+                                                                            });
                                                                         });
 
                                                                         window.testarConexaoWhatsApp = async function (event) {

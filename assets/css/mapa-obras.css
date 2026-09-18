@@ -18,6 +18,16 @@
      tem nenhum contrato. Cinza dedicado, fora da paleta coroplética (verde) e da cor
      de base, para distinguir "0 resultados" de "poucos resultados". */
   --nomatch-fill:#5C6B64; --nomatch-border:#7E8C85; --nomatch-label:#7E8C85;
+  /* Modo Replanilhamentos — área cuja média sai de amostra pequena demais para virar cor
+     na escala. Mesmo cinza neutro do "sem correspondência" (os dois dizem "não há número
+     para comparar aqui"), mas token próprio: o sentido é outro e pode divergir depois.
+     Por ser var(), acompanha a redefinição de --nomatch-* no tema claro sozinho. A
+     opacidade vive aqui porque a legenda (CSS) e o polígono (JS) precisam da mesma.
+     O PREENCHIMENTO SOZINHO NÃO BASTA: no tema claro a escala verde começa em L* 85 e o
+     cinza composto cai na mesma luminância do piso — "sem número comparável" viraria
+     "o menor valor do mapa". Quem separa os dois é o contorno tracejado (.sem-amostra,
+     mais abaixo), que não é canal de cor; o preenchimento é só reforço. */
+  --amostra-fill:var(--nomatch-fill); --amostra-border:var(--nomatch-border); --amostra-opacity:.40;
 
   --bg-base:#071310; --bg-header-1:#07130E; --bg-header-2:#0C2A1E; --bg-header-3:#0A2118;
   /* Etapa A / Bloco 3 (Rodada 3.1) — "campo" do mapa, distinto do piso da página.
@@ -101,6 +111,9 @@
     --map-line:#F4FAF7;
     --choro-floor:.20; --choro-span:.52;
     --nomatch-fill:#B3BEB8; --nomatch-border:#93A099; --nomatch-label:#6C7A73;
+    /* cinza mais presente e contorno mais escuro que no escuro: aqui a faixa de
+       luminância entre o campo do mapa (L* 93) e o piso da escala (L* 85) é estreita. */
+    --amostra-opacity:.55; --amostra-border:#7B8A83;
 
     /* rótulos do mapa: halo vira um "sussurro" claro (imperceptível como contorno) */
     --shadow-ink:#F4FAF7;
@@ -132,7 +145,11 @@
   /* gráficos respirando + hierarquia (KPI > título > gráfico > legenda) */
   :root:not(.theme-dark) .statwrap{margin-top:18px}
   :root:not(.theme-dark) .stackbar{height:13px}
-  :root:not(.theme-dark) .statleg{gap:10px 14px}
+  /* :not(.cards) porque esta regra foi escrita para a LEGENDA horizontal (hoje só
+     #aditivoLeg). Sem ela, a especificidade (0,3,0) daqui vencia o .statleg.cards
+     (0,2,0) e mudava o espaçamento dos cartões no tema claro — regressão silenciosa
+     aberta quando #statLeg virou classe. */
+  :root:not(.theme-dark) .statleg:not(.cards){gap:10px 14px}
 
   /* cabeçalho: bordas mais delicadas; "Carteira ativa" sem a ênfase âmbar */
   :root:not(.theme-dark) .btn-voltar,
@@ -271,20 +288,41 @@
   /* "Situação das obras" — 3 mini-cards verticais (a barra empilhada saiu). Mesma
      linguagem dos KPIs: superfície elevada; claro = sombra, escuro = gradiente+borda. */
   #statBar{display:none}
-  #statLeg{flex-direction:column;gap:9px;align-items:stretch;margin-top:12px}
-  #statLeg .sit{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px;
+  /* Promovido de #statLeg para a classe .statleg.cards: o mesmo cartão é reusado pelo
+     painel de Replanilhamentos, e amarrado a um id ele só valia num lugar — as classes
+     .sit-l/.sit-v/.sit-p copiadas para outro contexto não pegavam nada e a linha saía
+     sem hierarquia nenhuma. #statLeg carrega a classe no HTML. */
+  .statleg.cards{flex-direction:column;gap:9px;align-items:stretch;margin-top:12px}
+  .statleg.cards .sit{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px;
         padding:10px 13px;border-radius:10px;font-size:12px;
         background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));border:1px solid var(--card-border)}
-  #statLeg .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
-  #statLeg .sit-l{color:var(--text-muted);font-weight:600}
-  #statLeg .sit-v{flex-basis:100%;margin-top:4px;color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:700}
-  #statLeg .sit-p{color:var(--text-dim);font-weight:600;font-family:Montserrat,sans-serif}
+  .statleg.cards .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .statleg.cards .sit-l{color:var(--text-muted);font-weight:600}
+  .statleg.cards .sit-v{flex-basis:100%;margin-top:4px;color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:700}
+  .statleg.cards .sit-p{color:var(--text-dim);font-weight:600;font-family:Montserrat,sans-serif}
   /* mesma profundidade dos cards: claro = sombra em camadas + topo mais claro;
      escuro = gradiente/borda + fio de luz no topo + sombra bem suave */
-  :root:not(.theme-dark) #statLeg .sit{border-color:rgba(20,40,33,.12);border-top-color:rgba(20,40,33,.05);
+  :root:not(.theme-dark) .statleg.cards .sit{border-color:rgba(20,40,33,.12);border-top-color:rgba(20,40,33,.05);
         box-shadow:0 1px 2px rgba(20,40,33,.05),0 4px 10px rgba(20,40,33,.04),0 8px 18px rgba(20,40,33,.028)}
-  :root.theme-dark #statLeg .sit{border-top-color:rgba(255,255,255,.14);
+  :root.theme-dark .statleg.cards .sit{border-top-color:rgba(255,255,255,.14);
         box-shadow:0 1px 2px rgba(0,0,0,.2),0 5px 14px rgba(0,0,0,.14)}
+  /* nota metodológica de rodapé de bloco: contexto que precisa estar disponível, mas
+     nunca competindo com os números acima. */
+  .foot-note{margin-top:9px;font-size:10.5px;line-height:1.45;color:var(--text-dim);font-weight:600}
+  /* Modo Replanilhamentos: os KPIs e os 3 gráficos de OBRAS saem da tela. Eles são
+     markup estático, filhos diretos do aside, e sem isto o painel do modo novo começa
+     a ~1.350px do topo de uma coluna de ~890px — o gestor troca de conjunto e continua
+     lendo "OBRAS 1.284 / VALOR TOTAL R$ 4,8 bi" em letra garrafal. O `>` garante que só
+     os blocos estáticos somem, não os .statwrap que o painel novo emite dentro de #body. */
+  aside.modo-replan > .kpis,
+  aside.modo-replan > .statwrap{display:none}
+  /* Cartão de MÉTRICA (≠ legenda). #statLeg é legenda: rótulo e valor no mesmo corpo
+     está certo lá. Aqui o valor é a manchete, então segue a proporção que os .kpi já
+     usam na mesma tela (rótulo pequeno em caixa alta, valor grande em Space Grotesk) —
+     sem isso a linha sai 12/12/12 e nada indica qual número é o principal. */
+  .statleg.cards.metricas .sit-l{font-size:10.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
+  .statleg.cards.metricas .sit-v{font-size:17px;line-height:1.1;margin-top:5px}
+  .statleg.cards.metricas .sit-p{font-size:11px;font-weight:600}
 
   /* Nível 3 — ranking "Distritos Operacionais" / "Cidades": cartão compacto e discreto,
      mesma linguagem dos KPIs (superfície levemente elevada), porém menor — é área
@@ -311,7 +349,14 @@
   *::-webkit-scrollbar-thumb{background-color:rgba(var(--raise-rgb),.22);border-radius:999px}
   *::-webkit-scrollbar-thumb:hover{background-color:rgba(var(--raise-rgb),.4)}
   html,body{margin:0;height:100%}
+  /* coluna flex: o <main> ocupa o que sobra do cabeçalho, medido de verdade. Antes era
+     height:calc(100% - 59px) no <main>, e 59px não é a altura real do cabeçalho (~83px
+     com a fonte carregada, mais ainda no modo apresentação) — a diferença empurrava o
+     rodapé do mapa para fora da janela e cortava o que mora lá embaixo (o controle de
+     zoom do Leaflet, e agora a legenda do modo Replanilhamentos). Os dois outros filhos
+     do body (#modalBg e #dataError) são position:fixed, fora do fluxo. */
   body{font-family:Montserrat,system-ui,sans-serif;color:var(--text-base);background:var(--bg-base);
+       display:flex;flex-direction:column;
        font-feature-settings:"tnum" 1,"lnum" 1;-webkit-font-smoothing:antialiased}
   header.top{display:flex;align-items:center;gap:16px;padding:15px 24px;position:relative;z-index:700;
              background:linear-gradient(90deg,var(--bg-header-1),var(--bg-header-2) 60%,var(--bg-header-3));
@@ -378,9 +423,15 @@
      vive perto da definição de .kpi/.kpi.wide, mais abaixo — evita duas fontes de
      verdade divergindo (foi exatamente esse padrão espalhado que causou o corte de
      texto corrigido na revisão desta sessão) */
-  /* redesign: painel lateral mais largo (era 384px) — dá respiro pra tipografia maior
-     e pros cartões de KPI/contrato sem precisar espremer valores em R$ */
-  main{display:grid;grid-template-columns:1fr 440px;height:calc(100% - 59px);transition:grid-template-columns .35s ease}
+  /* redesign: painel lateral mais largo (era 384px, depois 440px) — dá respiro pra
+     tipografia maior e pros cartões de KPI/contrato sem precisar espremer valores em R$;
+     alargado de novo em 2026-09-17 (usuário: "uma visão melhor dos dados") — a seção
+     GECOPE × Fiscalização do modo Replanilhamentos (dois cartões lado a lado, cada um com
+     lista de status e um dos dois com o donut) era o conteúdo mais apertado do painel. */
+  /* linha explícita: sem ela a linha implícita é `auto` e cresce com o conteúdo do
+     painel lateral (que tem rolagem própria), esticando o mapa para além da janela. */
+  main{display:grid;grid-template-columns:1fr 600px;grid-template-rows:minmax(0,1fr);
+       flex:1;min-height:0;transition:grid-template-columns .35s ease}
   main.aside-collapsed{grid-template-columns:1fr 0}
   main.aside-collapsed aside{padding:0;border-left:0;overflow:hidden}
   @media (max-width:860px){main.aside-collapsed{grid-template-rows:1fr 0}}
@@ -409,10 +460,42 @@
   .leaflet-container{background:var(--map-field);font-family:inherit}
   .leaflet-tooltip{background:var(--bg-panel);border:1px solid rgba(var(--ng-rgb),.3);color:var(--text-bright);box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
   .leaflet-tooltip:before{border-top-color:rgba(var(--ng-rgb),.3)}
+  .leaflet-tooltip .tip-sub{display:block;margin-top:3px;font-size:11px;font-weight:600;color:var(--text-dim)}
+  /* Legenda da escala do modo Replanilhamentos. Reproduz a pintura do polígono em vez de
+     inventar cor: a cor-base do mapa na opacidade de piso e de teto da coroplética
+     (--choro-floor/--choro-span, os mesmos que o JS lê), sobre o campo do mapa. */
+  /* z-index acima de 600: os rótulos do mapa são markers do Leaflet, e o painel deles
+     fica em 600 — abaixo disso os nomes dos municípios desenhariam por cima do cartão.
+     A gaveta de Controles (.ctrl) subiu para 610 para continuar vencendo a legenda. */
+  .rp-legenda{position:absolute;z-index:601;left:14px;bottom:14px;width:min(232px,calc(100% - 90px));
+        background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);border:1px solid rgba(var(--raise-rgb),.12);
+        border-radius:11px;padding:10px 12px 11px;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);color:var(--text-base)}
+  .rp-legenda[hidden]{display:none}
+  .rp-leg-t{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-label);line-height:1.35}
+  .rp-leg-s{font-size:10px;font-weight:600;color:var(--text-dim);margin:2px 0 8px}
+  .rp-leg-bar{height:10px;border-radius:5px;background-color:var(--map-field);
+        background-image:linear-gradient(90deg,
+          color-mix(in srgb,var(--map-base) calc(var(--choro-floor)*100%),transparent),
+          color-mix(in srgb,var(--map-base) calc((var(--choro-floor) + var(--choro-span))*100%),transparent));
+        box-shadow:inset 0 0 0 1px rgba(var(--raise-rgb),.12)}
+  .rp-leg-esc{display:flex;justify-content:space-between;margin-top:4px;font-family:'Space Grotesk',sans-serif;
+        font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  .rp-leg-item{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  /* a amostra da legenda repete o polígono: tracejado + cinza, não só cinza */
+  .rp-leg-sw{width:16px;height:10px;border-radius:3px;flex:none;border:1px dashed var(--amostra-border);
+        background:color-mix(in srgb,var(--amostra-fill) calc(var(--amostra-opacity)*100%),var(--map-field))}
+  /* Área sem amostra para a média. Classe no elemento, não opção de estilo do Leaflet:
+     `setStyle` mescla opções, então um dashArray aplicado por lá ficaria preso ao
+     polígono depois de voltar para o modo Obras. A propriedade CSS vence o atributo de
+     apresentação que o Leaflet escreve, inclusive no hover. */
+  .leaflet-container path.sem-amostra{stroke:var(--amostra-border);stroke-dasharray:5 4}
+  /* contador do rótulo fora da escala: outra unidade ("3 desp."), então fora da cor de
+     acento — sem apagar o nome da área, como faz .nomatch */
+  .grp-label.sem-amostra .lbl-count,.mun-label.sem-amostra .lbl-count{color:var(--nomatch-label);text-shadow:none}
   .leaflet-bar a{background:var(--bg-panel);color:var(--badge-text);border-color:rgba(var(--ng-rgb),.2)}
   .leaflet-bar a:hover{background:var(--bg-hover)}
 
-  .ctrl{position:absolute;z-index:600;top:14px;left:14px;width:min(296px,calc(100vw - 28px));color:var(--text-base);display:none;
+  .ctrl{position:absolute;z-index:610;top:14px;left:14px;width:min(296px,calc(100vw - 28px));color:var(--text-base);display:none;
         background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);border:1px solid rgba(var(--raise-rgb),.12);
         border-radius:14px;padding:15px;box-shadow:0 10px 28px rgba(var(--shadow-rgb),.3);
         max-height:calc(100% - 28px);overflow-y:auto} /* Etapa C: ~14 campos — rola por dentro; 100% = altura do #mapWrap (não da viewport), pra caber no 56vh do mapa em telas ≤860px */
@@ -434,6 +517,28 @@
   .filt-toggle.has-active{background:rgba(var(--ng-rgb),.16);border-color:rgba(var(--ng-rgb),.5);color:var(--ng-light)}
   #filtersHost[hidden]{display:none}
   .seg{display:flex;background:rgba(var(--raise-rgb),.05);border-radius:9px;padding:3px;gap:3px;margin-bottom:14px}
+  /* `display` de autor vence o [hidden] da folha do navegador (origem ganha de
+     especificidade), então um .seg com o atributo continuaria à mostra — foi assim que
+     o seletor de modo apareceu para todos os papéis. Genérica, não por id: qualquer
+     segmento que nasça oculto herda a guarda. Mesmo motivo de #filtersHost acima. */
+  .seg[hidden]{display:none}
+  /* aviso do seletor de modo — âmbar, contido, nunca modal. [hidden] explícito pelo
+     mesmo motivo do .seg acima. */
+  .modo-aviso{margin:0 0 14px;padding:8px 10px;border-radius:8px;font-size:11px;line-height:1.5;
+        font-weight:600;color:var(--amber-text);background:rgba(var(--amber-rgb),.10);
+        border:1px solid rgba(var(--amber-rgb),.28)}
+  .modo-aviso[hidden]{display:none}
+  /* encosta no seletor logo acima, compensando parte do margin-bottom do .seg. Amarrado
+     à adjacência para que, se o aviso mudar de lugar, ele não herde um recuo sem par. */
+  .seg + .modo-aviso{margin-top:-6px}
+  /* Régua fora de alcance (dentro de um distrito as cidades só existem pelo local da
+     obra): o botão fica visível e explicado pela .ctrl-nota, não some. */
+  .seg button:disabled{cursor:not-allowed;opacity:.5}
+  /* 3–4 botões por linha num painel de 296px: sem isto "Tempo médio" quebra em duas
+     linhas no tema claro (gap maior) e o segmento fica com alturas desiguais. */
+  #ctrlReplan .seg button{white-space:nowrap;padding-left:2px;padding-right:2px;font-size:11.5px}
+  .ctrl-nota{margin:-6px 0 14px;font-size:10.5px;line-height:1.45;font-weight:600;color:var(--text-dim)}
+  .ctrl-nota:empty{display:none}
   .seg button{flex:1;border:0;background:transparent;font-family:inherit;font-size:12px;font-weight:600;color:var(--text-muted);
               padding:8px 4px;border-radius:7px;cursor:pointer;transition:.15s}
   .seg button.on{background:rgba(var(--ng-rgb),.16);color:var(--text-brightest);box-shadow:inset 0 0 0 1px rgba(var(--ng-rgb),.3)}
@@ -538,6 +643,8 @@
      fixo no topo, fora do .pop-body que rola */
   .crumb-pop .sec-h{flex:none;margin:0;padding:10px 10px 8px;cursor:move;user-select:none}
   .crumb-pop .pop-body{flex:1;min-height:0;overflow:auto;padding:0 10px 10px}
+  /* de qual recorte saíram os números da lista (só no modo Replanilhamentos) */
+  .crumb-pop .pop-sub{padding:0 10px 8px;margin-top:-8px;font-size:10px;font-weight:600;color:var(--text-dim);line-height:1.4}
   .crumb-pop .resize-grip{position:absolute;right:1px;bottom:1px;width:18px;height:18px;
         cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end;
         padding:2px;opacity:.5;transition:opacity .15s}
@@ -595,6 +702,154 @@
   /* KPIs "nível 1" (.k-obras/.k-valor) e o número em vermelho de Paralisadas (.k-par)
      ficam no bloco da Rodada 3.2/Parte B, mais acima. */
   body.presentation .kpi .k{font-size:11px}
+  /* KPIs do modo Replanilhamentos: mesmo cartão dos KPIs de Obras, sem ícone e com uma
+     terceira linha de contexto — a média nunca aparece sem o tamanho da amostra ao lado,
+     e as contagens nunca sem o período. O grid próprio evita mexer no dos KPIs de Obras,
+     que reservam a coluna do ícone. */
+  .kpi-rp{grid-template-columns:1fr;grid-template-areas:"k" "v" "s"}
+  /* Destaque (usuário, 2026-09-17): os 4 KPIs são a primeira leitura do gestor no painel
+     de fiscais — promovidos ao mesmo tratamento "hero" que Obras/Valor total já usam
+     (barra de acento + brilho no número), em vez do nível "compacto" que .kpi dá por
+     padrão. Reforça, não decora: os quatro cards continuam do mesmo peso entre si (nenhum
+     vira "mais hero" que os outros três). Sombra/hover herdados de .kpi (mesma elevação
+     por tema já definida ali) — só a barra e o brilho são específicos daqui. */
+  .kpi-rp{padding-left:19px}
+  .kpi-rp::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+        background:linear-gradient(var(--ng),var(--ng-deep))}
+  .kpi-rp .v{font-size:21px;margin-top:7px;text-shadow:0 0 16px rgba(var(--ng-rgb),.22)}
+  .kpi-rp .ks{grid-area:s;margin-top:6px;font-family:Montserrat,sans-serif;font-size:10.5px;
+        line-height:1.35;font-weight:600;color:var(--text-dim)}
+  /* botão "i" ao lado do rótulo: abre a explicação do número (mostraRpTip). Discreto de
+     propósito — é apoio ao número, não pode competir com ele. */
+  .kpi-rp .k{display:flex;align-items:center;gap:6px}
+  .kpi-info{flex:none;display:inline-grid;place-items:center;width:15px;height:15px;padding:0;
+        border-radius:50%;border:1px solid var(--card-border);background:transparent;
+        font:italic 700 9.5px/1 Georgia,'Times New Roman',serif;text-transform:none;
+        color:var(--text-dim);cursor:help;transition:color .14s ease,border-color .14s ease}
+  .kpi-info:hover,.kpi-info:focus-visible{color:var(--ng);border-color:rgba(var(--ng-rgb),.55)}
+  .kpi-info:focus-visible{outline:2px solid rgba(var(--ng-rgb),.55);outline-offset:1px}
+  /* "Processos na GECOPE": total no cartão e, dentro dele, uma linha por status — lista
+     de apoio, em corpo menor que o total; status zerado recua para não competir. */
+  .statleg.cards .sit-gec .sit-v{font-size:17px}
+  .gec-lista{flex-basis:100%;margin-top:9px;padding-top:6px;border-top:1px solid var(--card-border)}
+  .gec-st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0;font-size:11px}
+  .gec-st span{color:var(--text-muted);font-weight:600;letter-spacing:.2px}
+  .gec-st b{color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12.5px}
+  .gec-st.zero span,.gec-st.zero b{color:var(--text-dim);font-weight:500}
+  /* "GECOPE × Fiscalização": os dois lados da fila, lado a lado a partir de ~420px de
+     largura do painel; empilhados abaixo disso (mesmo breakpoint do restante do painel). */
+  .gxf{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  /* Destaque (usuário, 2026-09-17): eram só uma borda sobre o fundo do painel — a seção
+     menos lida da tela. Ganharam a mesma superfície elevada dos KPIs (.kpi, definição lá
+     em cima): fundo em gradiente, sombra por tema, barra de acento e elevação no hover —
+     os MESMOS valores de sombra/hover de .kpi, não uma paleta nova. */
+  .gxf-grp{position:relative;overflow:hidden;border:1px solid var(--card-border);border-radius:10px;
+        padding:11px 12px 11px 15px;background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));
+        transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+  .gxf-grp::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+        background:linear-gradient(var(--ng),var(--ng-deep))}
+  .gxf-grp:hover{transform:translateY(-2px)}
+  :root:not(.theme-dark) .gxf-grp{border-color:rgba(20,40,33,.12);border-top-color:rgba(20,40,33,.05);
+        box-shadow:0 1px 2px rgba(20,40,33,.05),0 4px 10px rgba(20,40,33,.045),0 10px 22px rgba(20,40,33,.03)}
+  :root:not(.theme-dark) .gxf-grp:hover{
+        border-color:rgba(var(--ng-rgb),.55);
+        box-shadow:inset 0 0 0 999px rgba(var(--ng-rgb),.05),
+                   0 0 0 1px rgba(var(--ng-rgb),.30),
+                   0 3px 8px rgba(20,40,33,.10),0 14px 30px rgba(20,40,33,.09)}
+  :root.theme-dark .gxf-grp{border-top-color:rgba(255,255,255,.16);
+        box-shadow:0 1px 2px rgba(0,0,0,.22),0 6px 16px rgba(0,0,0,.16)}
+  :root.theme-dark .gxf-grp:hover{
+        border-color:rgba(var(--ng-rgb),.50);
+        box-shadow:inset 0 0 0 999px rgba(var(--ng-rgb),.10),
+                   0 0 0 1px rgba(var(--ng-rgb),.32),
+                   0 3px 8px rgba(0,0,0,.32),0 14px 32px rgba(0,0,0,.26)}
+  .gxf-h{display:flex;align-items:baseline;gap:7px;font-size:11px;font-weight:700;
+        letter-spacing:.2px;text-transform:uppercase;color:var(--text-label)}
+  .gxf-h b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+        text-transform:none;letter-spacing:0;color:var(--text-brightest);margin-left:auto}
+  .gxf-pct{font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;
+        text-transform:none;letter-spacing:0;color:var(--text-dim)}
+  .gxf-grp .gec-lista{margin-top:8px;padding-top:7px}
+  /* Sempre empilhado (anel em cima, legenda embaixo) — não em linha: mesmo com o aside
+     alargado para 600px (era 440px), a coluna real de .gxf-grp fica perto de 200px —
+     confortável pro anel de 84px + legenda empilhados, mas ainda apertada demais pros dois
+     lado a lado (achado do rev-design, 2026-09-17: um @media de LARGURA DA VIEWPORT não
+     cobre isso, porque o aside só fica com largura fixa quando a viewport já é ≥860px —
+     a coluna aperta exatamente na faixa de tela em que o @media de viewport estreita não
+     dispara). */
+  .gxf-donut{display:flex;flex-direction:column;align-items:flex-start;gap:9px;margin-top:11px;
+        padding-top:10px;border-top:1px solid var(--card-border)}
+  .gxf-donut svg{flex:none}
+  .donut-track{stroke:rgba(var(--raise-rgb),.14)}
+  .donut-seg{stroke-linecap:butt}
+  .donut-seg.atraso{stroke:var(--amber)}
+  .donut-seg.noprazo{stroke:var(--ng)}
+  .donut-seg.semprazo{stroke:rgba(var(--raise-rgb),.55)}
+  .donut-ctr{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;fill:var(--text-brightest)}
+  .donut-leg{display:flex;flex-direction:column;gap:6px;width:100%;min-width:0}
+  .donut-leg-i{display:flex;align-items:center;gap:7px;font-size:11px}
+  .donut-dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .donut-dot.atraso{background:var(--amber)}
+  .donut-dot.noprazo{background:var(--ng)}
+  .donut-dot.semprazo{background:rgba(var(--raise-rgb),.55)}
+  .donut-leg-l{color:var(--text-muted);font-weight:600;flex:1;min-width:0}
+  .donut-leg-v{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text-bright);white-space:nowrap}
+  .donut-leg-p{font-family:Montserrat,sans-serif;font-weight:600;color:var(--text-dim);font-size:10px}
+  @media (max-width:420px){
+    .gxf{grid-template-columns:1fr}
+  }
+  .kpi-tip{position:fixed;z-index:3000;max-width:260px;padding:9px 11px;border-radius:9px;
+        background:var(--bg-panel);border:1px solid rgba(var(--ng-rgb),.3);color:var(--text-bright);
+        font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.45;font-weight:500;
+        text-align:justify;pointer-events:none;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
+  .kpi-tip p{margin:0 0 7px}
+  .kpi-tip p:last-child{margin-bottom:0}
+  /* linha de recorte sob um .sec-h: de onde vêm os números da seção (período, régua,
+     ordem). Encosta no cabeçalho, em corpo menor que o conteúdo que anuncia. */
+  .sec-sub{margin:-6px 0 11px;font-size:10.5px;line-height:1.4;font-weight:600;color:var(--text-dim)}
+  /* E4 — ranking de fiscais por tempo médio, do mais lento ao mais rápido. Reduzido em
+     2026-09-17 a nome + tempo + barra, a pedido do usuário: as seis informações por linha
+     (despachos, lotação, delta sobre a média, fila) e os três parágrafos de leitura da
+     seção poluíam sem explicar, e todos passaram para a janela que a linha abre. */
+  /* margin-bottom, não gap do .qdf-box: a mesma respiração que .rrow{margin-bottom:10px}
+     usa no ranking de distritos/cidades. */
+  .qdf{display:flex;flex-direction:column;gap:7px;padding:9px 10px;margin-bottom:8px;border-radius:8px;
+        cursor:pointer;border:1px solid transparent;transition:background .14s ease,border-color .14s ease}
+  .qdf:last-child{margin-bottom:0}
+  .qdf-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  /* A partir de QUAD_LISTA_ROLA nomes a lista rola dentro da própria caixa, pra não
+     empurrar o ranking dos 11 distritos para fora da primeira dobra. Sem
+     overscroll-behavior: quando a lista acaba, a roda do mouse volta a rolar o painel.
+     Prender a rolagem aqui criava 328px de atrito bem acima do ranking, que é o controle
+     de descida do macro para o detalhe — e esta lista é conteúdo em fluxo, não modal. */
+  .qdf-box.qdf-rola{max-height:328px;overflow-y:auto;
+        padding-right:4px;margin-right:-4px}
+  .qdf:hover{background:rgba(var(--ng-rgb),.07);border-color:rgba(var(--ng-rgb),.22)}
+  .qdf:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
+  .qdf-n{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .qdf-nome{font-size:11.5px;font-weight:700;color:var(--text-bright);min-width:0}
+  /* Contador de despachos: volta SÓ na linha de amostra fina — é a informação que muda a
+     leitura daquele número, e em nenhuma outra linha ela faria falta. */
+  .qdf-fina{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:700;color:var(--text-dim)}
+  .qdf-v{flex:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
+        color:var(--text-brightest);white-space:nowrap}
+  .qdf .rbar{margin-top:0}
+  /* Lista de processos (nível da cidade). Não é navegável — a janela do processo é de
+     outra etapa —, então não herda .rrow nem o cursor/hover de cartão clicável. */
+  .proc{border:1px solid var(--card-border);border-radius:11px;padding:11px 13px;margin-bottom:9px;
+        background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2))}
+  :root:not(.theme-dark) .proc{box-shadow:0 1px 3px rgba(var(--shadow-rgb),.10)}
+  .proc.meta{border-color:rgba(var(--amber-rgb),.38)}
+  .proc-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .proc-n{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--text-bright)}
+  .proc-s{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-label);
+        white-space:nowrap;flex:none}
+  .proc-o{font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.4;color:var(--text-obj);margin-top:5px;
+        display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .proc-m{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:10.5px;font-weight:600;
+        color:var(--text-dim);font-family:Montserrat,sans-serif}
+  .proc-m span:last-child{text-align:right;flex:none}
+  .proc-meta{margin-top:7px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--amber-text)}
   .scope{font-size:12.5px;color:var(--text-label);margin:22px 0 12px;font-weight:600;letter-spacing:.3px}
   .scope b{color:var(--text-brightest)}
 
@@ -645,7 +900,7 @@
   /* cards navegáveis por teclado (.rrow/.obra/.chip.mun.locate têm role="button"+
      tabindex no JS, não são <button> nativos) — sem isso o anel de foco do
      navegador ou não aparece ou usa o outline azul padrão, destoando do tema */
-  .rrow:focus-visible,.obra:focus-visible,.chip.mun.locate:focus-visible,.chip-sel:focus-visible,.crumb a.sib:focus-visible{
+  .rrow:focus-visible,.obra:focus-visible,.chip.mun.locate:focus-visible,.chip-sel:focus-visible,.crumb a.sib:focus-visible,.chip.abre:focus-visible{
     outline:2px solid var(--ng);outline-offset:2px}
   /* redesign: mesma superfície sólida dos KPIs (--card-bg), em vez do gradiente
      quase-transparente de antes — cartão com presença própria contra o fundo do
@@ -661,9 +916,29 @@
   .rrow .nm{color:var(--text-bright);font-weight:600}
   .rrow .sub2{color:var(--text-dim);font-size:11.5px;font-weight:600}
   .rrow .vv{font-family:'Space Grotesk',sans-serif;color:var(--ng-light);font-weight:700}
-  .rbar{height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.07);margin-top:9px;overflow:hidden}
+  .rbar{position:relative;height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.07);margin-top:9px;overflow:hidden}
   .rbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--ng),var(--ng-deep))}
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
+  /* Barra VAZADA = média sobre menos de AMOSTRA_SOLIDA despachos (ver amostraFina no JS).
+     Hachura no lugar do preenchimento sólido: mantém a cor (que continua significando
+     "acima/abaixo da média") e o comprimento (que continua sendo o valor), e tira só a
+     solidez — que é exatamente o que falta ao número. A hachura é legível de longe numa
+     projeção, ao contrário de uma diferença de opacidade. */
+  .rbar.fina>i{background:repeating-linear-gradient(115deg,
+        rgba(var(--ng-rgb),.75) 0 4px, rgba(var(--ng-rgb),.18) 4px 9px)}
+  .rbar.amber.fina>i{background:repeating-linear-gradient(115deg,
+        rgba(var(--amber-rgb),.8) 0 4px, rgba(var(--amber-rgb),.20) 4px 9px)}
+  /* Traço de referência (E4 — média do recorte) dentro da própria trilha da barra: mesma
+     posição em todas as linhas, eixo comum sem precisar desenhar um eixo separado.
+     Recessivo (raise-rgb, a mesma tinta que .rbar já usa pro fundo, só mais opaca) — é
+     contexto, não um dado novo disputando atenção com a barra. */
+  .rbar-ref{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;
+        background:rgba(var(--raise-rgb),.45);pointer-events:none}
+  /* aviso âmbar de "esta seção não existe neste recorte" (régua/nível) — mesmo tom do
+     .modo-aviso do seletor de modo, contido dentro do .statwrap em vez de solto no topo. */
+  .qd-aviso{margin:0;padding:8px 10px;border-radius:8px;font-size:11px;line-height:1.5;
+        font-weight:600;color:var(--amber-text);background:rgba(var(--amber-rgb),.10);
+        border:1px solid rgba(var(--amber-rgb),.28)}
 
   .obra{cursor:pointer;border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;margin-bottom:12px;
         background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));
@@ -690,6 +965,13 @@
   .chip.mun.locate{cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:.15s}
   .chip.mun.locate svg{flex:none}
   .chip.mun.locate:hover{background:rgba(var(--ng-rgb),.22);border-color:rgba(var(--ng-rgb),.55);color:var(--text-brightest)}
+  /* E5 — chip só com ícone (abrir o painel do distrito), aninhado dentro de .nm como
+     .chip.mun.locate já é aninhado dentro de .obra: mesma linguagem, um controle a
+     menos para inventar. */
+  .chip.abre{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+        padding:3px;margin:0 2px;vertical-align:-2px;transition:.15s}
+  .chip.abre svg{width:11px;height:11px;flex:none;display:block}
+  .chip.abre:hover{background:rgba(var(--ng-rgb),.22);border-color:rgba(var(--ng-rgb),.55);color:var(--text-brightest)}
   /* chip de item na seleção combinada (Ctrl+clique) — clicável pra tirar da seleção,
      mesma linguagem visual do chip de município mas com o "✕" deixando a ação óbvia */
   .chip-sel{cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin:0 6px 6px 0;
@@ -1065,6 +1347,139 @@
   .modal .med-leg-i b{font-family:'Space Grotesk',sans-serif;color:var(--ng-light);flex:none;width:34px}
   .rev{margin-top:11px;font-size:11.5px;color:var(--text-body2);line-height:1.5}
   .rev b{color:var(--ng-light);font-family:'Space Grotesk',sans-serif}
+  /* ============================================================================
+     E5 — painéis de distrito e de fiscal (janelas do modo Replanilhamentos).
+     Redesenhados em 2026-09-17 a pedido do usuário: as janelas eram quatro cartões
+     iguais e uma lista, e vão ser projetadas num conselho deliberativo da SOP.
+
+     A régua é DIAS: a mesma escala horizontal desenha cada despacho de um fiscal,
+     cada fiscal da base e cada distrito do estado (ver eixoDias no JS). Quem lê a
+     primeira já sabe ler as outras duas.
+
+     TRÊS PESOS DE SUPERFÍCIE, de propósito — um painel de cartões todos iguais é o
+     que a janela antiga já era: (1) .dsh-hero, o número que a janela existe para
+     dizer, único com tipo grande e com a lâmina de acento; (2) .dsh-plot, superfície
+     de gráfico, quieta e sem acento; (3) .dsh-tile, o ladrilho menor, quase plano.
+     ============================================================================ */
+  .modal .mbody.dsh{display:flex;flex-direction:column;gap:16px}
+  .modal .dsh-topo{display:grid;grid-template-columns:minmax(230px,.85fr) 1.15fr;gap:14px;align-items:stretch}
+  @media (max-width:760px){ .modal .dsh-topo{grid-template-columns:1fr} }
+  /* (1) herói */
+  .modal .dsh-hero,.modal .dsh-plot,.modal .dsh-tile{
+        background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));
+        border:1px solid var(--card-border);border-radius:12px}
+  :root:not(.theme-dark) .modal .dsh-hero,:root:not(.theme-dark) .modal .dsh-plot{
+        box-shadow:0 1px 2px rgba(var(--shadow-rgb),.06),0 6px 16px rgba(var(--shadow-rgb),.05)}
+  :root.theme-dark .modal .dsh-hero,:root.theme-dark .modal .dsh-plot{
+        box-shadow:0 6px 18px rgba(var(--shadow-rgb),.28)}
+  .modal .dsh-hero{position:relative;overflow:hidden;padding:16px 18px;display:flex;flex-direction:column;gap:7px;
+        border-color:rgba(var(--ng-rgb),.4);
+        background:linear-gradient(160deg,rgba(var(--ng-rgb),.17),rgba(var(--ng-rgb),.05))}
+  .modal .dsh-hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+        background:linear-gradient(var(--ng),var(--ng-deep))}
+  /* Sem média comparável a lâmina verde afirmaria um resultado que não existe. */
+  .modal .dsh-hero-vazio{border-color:var(--card-border);background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2))}
+  .modal .dsh-hero-vazio::before{background:rgba(var(--raise-rgb),.18)}
+  /* Amostra fina: existe número, mas a lâmina verde de "resultado firme" vira âmbar —
+     o mesmo tom de ressalva que o painel já usa para atraso. */
+  .modal .dsh-hero-fina{border-color:rgba(var(--amber-rgb),.42);
+        background:linear-gradient(160deg,rgba(var(--amber-rgb),.14),rgba(var(--amber-rgb),.04))}
+  .modal .dsh-hero-fina::before{background:linear-gradient(var(--amber),var(--amber-deep))}
+  .modal .dsh-fraco{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;line-height:1.4;
+        color:var(--amber-text);border-top:1px dashed rgba(var(--amber-rgb),.32);padding-top:7px;margin-top:1px}
+  .modal .fcard-fina{font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;color:var(--amber-text)}
+
+  /* ---- grupos da lista de processos (janela do fiscal) ----
+     Cada grupo é uma faixa, não um cartão: os cartões já são os processos lá dentro, e
+     aninhar cartão em cartão apagaria a hierarquia. A faixa só delimita e conta. */
+  .modal .gproc{border-top:1px dashed var(--card-border);padding-top:12px;margin-top:12px}
+  .modal .gproc:first-of-type{border-top:0;padding-top:0;margin-top:0}
+  /* dentro de .dsh-plot (fila de hoje) o grupo não tem cabeçalho nem divisa própria */
+  .modal .gproc-nu{border-top:0;padding-top:0;margin-top:2px}
+  .modal .gproc-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+        font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;
+        text-transform:uppercase;color:var(--text-label)}
+  .modal .gproc-h b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+        color:var(--text-brightest);letter-spacing:0}
+  .modal .gproc-s{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;
+        color:var(--text-dim);margin-top:3px}
+  .modal .gproc .adToggle{margin-top:9px}
+  .modal .gproc .proc{margin-top:10px}
+  /* O único tipo grande dos dois painéis: é o que se lê do fundo de uma sala de reunião. */
+  .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:42px;font-weight:700;line-height:1;
+        color:var(--text-brightest);display:flex;align-items:baseline;gap:8px;margin-top:2px}
+  .modal .dsh-un{font-family:Montserrat,sans-serif;font-size:13px;font-weight:700;color:var(--text-muted)}
+  .modal .dsh-delta{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;
+        font-size:11.5px;font-weight:700;line-height:1.35}
+  .modal .dsh-delta.acima{color:var(--amber-text)}
+  .modal .dsh-delta.abaixo{color:var(--ng-light)}
+  :root:not(.theme-dark) .modal .dsh-delta.abaixo{color:var(--badge-text)}
+  .modal .dsh-seta{font-size:10px;flex:none}
+  .modal .dsh-sub{font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-dim);line-height:1.4}
+  /* (2) superfície de gráfico */
+  .modal .dsh-plot{padding:14px 16px;display:flex;flex-direction:column;gap:9px;min-width:0}
+  .modal .dsh-pos{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text-brightest)}
+  .modal .dsh-nota{font-family:Montserrat,sans-serif;font-size:11px;line-height:1.45;color:var(--text-dim);font-weight:600}
+  /* (3) ladrilhos */
+  .modal .dsh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  .modal .dsh-tile{padding:11px 13px;display:flex;flex-direction:column;gap:3px;background:var(--card-bg-2)}
+  .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--text-brightest);line-height:1.1}
+  .modal .dsh-tl{font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;letter-spacing:.5px;
+        text-transform:uppercase;color:var(--text-label)}
+  .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
+
+  /* ---- eixo de dias: a régua compartilhada ---- */
+  .modal .ed-wrap{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .modal .ed{width:100%;height:auto;display:block;overflow:visible}
+  .modal .ed-base{stroke:rgba(var(--raise-rgb),.22);stroke-width:1}
+  .modal .ed-tick{stroke:rgba(var(--raise-rgb),.09);stroke-width:1}
+  .modal .ed-tlab{fill:var(--text-dim);font-size:9px;font-family:Montserrat,sans-serif;font-weight:600}
+  /* Um ponto = um caso real. Semitransparente de propósito: dois despachos com tempos
+     próximos escurecem um ao outro em vez de um sumir atrás do outro — a sobreposição
+     vira densidade, que é informação, e não perda de dado. */
+  .modal .ed-dot{fill:rgba(var(--ng-rgb),.55);stroke:rgba(var(--ng-rgb),.85);stroke-width:1}
+  .modal .ed-dot.on{fill:var(--amber);stroke:var(--amber-deep);stroke-width:1.5}
+  /* Marcas verticais: a média de quem a janela é (contínua, verde) e a média geral
+     (tracejada, recessiva). A tracejada é referência de fundo, não um dado a mais. */
+  .modal .ed-mark{stroke:var(--ng);stroke-width:2}
+  .modal .ed-mark.ref{stroke:rgba(var(--raise-rgb),.5);stroke-width:2;stroke-dasharray:3 3}
+  .modal .ed-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;
+        font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  .modal .ed-leg-i{display:inline-flex;align-items:center;gap:6px}
+  .modal .ed-leg-i b{font-family:'Space Grotesk',sans-serif;color:var(--text-bright);font-weight:700}
+  .modal .ed-key{width:12px;height:0;border-top:2px solid var(--ng);flex:none}
+  .modal .ed-key.ref{border-top-style:dashed;border-top-color:rgba(var(--raise-rgb),.5)}
+
+  /* ---- barra empilhada da fila de hoje ---- */
+  .modal .sbar{display:flex;flex-direction:column;gap:9px}
+  .modal .sbar-track{display:flex;height:12px;border-radius:6px;overflow:hidden;background:rgba(var(--raise-rgb),.10)}
+  .modal .sbar-track>i{display:block;height:100%}
+  .modal .sbar-track>i.atraso{background:var(--amber)}
+  .modal .sbar-track>i.noprazo{background:var(--ng)}
+  .modal .sbar-track>i.semprazo{background:rgba(var(--raise-rgb),.32)}
+  .modal .sbar-leg{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:Montserrat,sans-serif;
+        font-size:11.5px;font-weight:600;color:var(--text-data)}
+  .modal .sbar-i{display:inline-flex;align-items:center;gap:7px}
+  .modal .sbar-dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .modal .sbar-dot.atraso{background:var(--amber)}
+  .modal .sbar-dot.noprazo{background:var(--ng)}
+  .modal .sbar-dot.semprazo{background:rgba(var(--raise-rgb),.32)}
+
+  /* ---- cartões da equipe (janela de distrito) ---- */
+  .modal .fcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:11px}
+  .modal .fcard{cursor:pointer;display:flex;flex-direction:column;gap:5px;padding:13px 14px;border-radius:12px;
+        border:1px solid var(--card-border);background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));
+        transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+  .modal .fcard:hover{border-color:rgba(var(--ng-rgb),.42);transform:translateY(-2px)}
+  :root.theme-dark .modal .fcard:hover{box-shadow:0 10px 24px rgba(var(--shadow-rgb),.38)}
+  :root:not(.theme-dark) .modal .fcard:hover{box-shadow:0 2px 4px rgba(var(--shadow-rgb),.08),0 10px 22px rgba(var(--shadow-rgb),.07)}
+  .modal .fcard:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
+  .modal .fcard-n{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;color:var(--text-bright);line-height:1.3}
+  .modal .fcard-v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--text-brightest);line-height:1.1}
+  .modal .fcard-sem{font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--text-dimmer)}
+  .modal .fcard-s{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  .modal .fcard .rbar{margin-top:2px}
+
   .empty{color:var(--text-dim);font-size:12.5px;padding:10px 0}
   .foot{font-size:10.5px;color:var(--text-dimmer);margin-top:20px;line-height:1.55;border-top:1px solid rgba(var(--raise-rgb),.08);padding-top:12px}
   .foot b{color:var(--badge-text)}

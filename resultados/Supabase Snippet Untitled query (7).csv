@@ -1,0 +1,27 @@
+tablename,policyname,roles,cmd,qual
+app_atividades,app_atividades_all_authenticated,{authenticated},ALL,true
+composicoes_biblioteca,composicoes_biblioteca_write_authenticated,{authenticated},ALL,true
+composicoes_biblioteca,composicoes_delete,{authenticated},DELETE,(pode_editar_composicoes_terceiros() OR (lower(criador_email) = lower((auth.jwt() ->> 'email'::text))))
+composicoes_biblioteca,composicoes_insert,{authenticated},INSERT,null
+composicoes_biblioteca,composicoes_biblioteca_read_public,"{anon,authenticated}",SELECT,true
+composicoes_biblioteca,composicoes_select,{authenticated},SELECT,tem_papel_valido()
+composicoes_biblioteca,composicoes_update,{authenticated},UPDATE,tem_papel_valido()
+orcamentos_biblioteca,orcamentos_biblioteca_write_authenticated,{authenticated},ALL,true
+orcamentos_biblioteca,orcamentos_delete,{authenticated},DELETE,pode_gravar_orcamentos()
+orcamentos_biblioteca,orcamentos_insert,{authenticated},INSERT,null
+orcamentos_biblioteca,orcamentos_select,{authenticated},SELECT,tem_papel_valido()
+orcamentos_biblioteca,Leitura Publica,{anon},SELECT,true
+orcamentos_biblioteca,orcamentos_update,{authenticated},UPDATE,tem_papel_valido()
+processos,processos_rw_authenticated,{authenticated},ALL,"((COALESCE(( SELECT au.role
+   FROM app_users au
+  WHERE (au.email = ( SELECT (auth.jwt() ->> 'email'::text)))), ''::text) <> 'fiscal'::text) OR (fiscal_matricula = ( SELECT au.matricula
+   FROM app_users au
+  WHERE (au.email = ( SELECT (auth.jwt() ->> 'email'::text))))))"
+processos,processos_insert,{authenticated},INSERT,null
+processos,ia_ro_select,{gecope_ia_readonly},SELECT,true
+processos,processos_select,{authenticated},SELECT,(( SELECT pode_ver_todos_processos() AS pode_ver_todos_processos) OR ((( SELECT meu_papel() AS meu_papel) = 'fiscal'::text) AND ((fiscal_matricula = ( SELECT minha_matricula() AS minha_matricula)) OR (fiscal_matricula IS NULL))))
+processos,processos_update,{authenticated},UPDATE,pode_gravar_processos()
+whatsapp_logs,whatsapp_logs_delete_admin,{public},DELETE,app_users_is_admin()
+whatsapp_logs,whatsapp_logs_insert_authenticated,{authenticated},INSERT,null
+whatsapp_logs,whatsapp_logs_select_admin,{authenticated},SELECT,app_users_is_admin()
+whatsapp_logs,whatsapp_logs_update_admin,{authenticated},UPDATE,app_users_is_admin()

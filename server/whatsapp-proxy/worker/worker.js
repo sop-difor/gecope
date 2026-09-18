@@ -20,6 +20,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !EVO_API_URL || !EVO_API_KEY 
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL_MS || '2000', 10);
+// Teto do backoff adaptativo (ver mainLoop): sem ele, fila vazia por muito tempo significa
+// consultar o banco pra sempre a cada POLL_INTERVAL — achado 2026-09-17 revisando a carga
+// do projeto no Supabase (~60 requisições/min ociosas, 24h por dia, mesmo sem mensagem
+// nenhuma pra mandar).
+const POLL_INTERVAL_MAX = parseInt(process.env.POLL_INTERVAL_MAX_MS || '20000', 10);
 const STALE_PROCESSING_MS = parseInt(process.env.STALE_PROCESSING_MS || '300000', 10); // 5 min
 
 let shuttingDown = false;
@@ -134,10 +139,15 @@ async function reclaimOrphanLogs() {
     console.log(`[reclaim-logs] ${orphanIds.length} log(s) órfão(s) (sem job correspondente) encerrado(s) como 'falha'.`);
 }
 
+// Colunas explícitas nas duas consultas: antes traziam a linha inteira (inclusive o
+// texto da mensagem) DUAS vezes por job — aqui só pra descobrir o id, e de novo no
+// retorno do UPDATE — quando processJob/sendToEvolution só leem id/number/text/log_id/
+// attempts (grep no arquivo confirma). Egress, 18/09/2026 — docs/auditoria-egress-
+// 2026-09.md, item 4 do bloco "Serviços da VM".
 async function claimJob() {
     const { data: jobs, error } = await sb
         .from('whatsapp_jobs')
-        .select('*')
+        .select('id')
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
         .limit(1);
@@ -151,7 +161,7 @@ async function claimJob() {
         .update({ status: 'processing', started_at: new Date().toISOString() })
         .eq('id', job.id)
         .eq('status', 'pending')
-        .select()
+        .select('id, number, text, log_id, attempts')
         .single();
 
     if (updErr || !updated) return null;
@@ -262,25 +272,55 @@ let lastOrphanSweep = 0;
 
 async function mainLoop() {
     console.log('Worker iniciado e aguardando jobs...');
+    // Backoff adaptativo: começa em POLL_INTERVAL (resposta rápida a picos de fila) e
+    // DOBRA a cada volta sem job encontrado, até o teto POLL_INTERVAL_MAX — não fica
+    // consultando o banco no ritmo de pico o dia inteiro com a fila vazia. Volta pro
+    // mínimo assim que processa um job: a próxima mensagem da fila (se houver) continua
+    // sendo pega rápido, sem esperar o backoff descer sozinho.
+    let currentInterval = POLL_INTERVAL;
+    // Conta erros consecutivos (zerada sempre que um ciclo termina sem erro, com ou sem
+    // job). Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, itens 2 e 3 do bloco
+    // "Serviços da VM".
+    let consecutiveErrors = 0;
     while (!shuttingDown) {
         try {
-            await reclaimStaleJobs();
+            // reclaimStaleJobs (como reclaimOrphanLogs) faz varredura sem índice dedicado, e
+            // STALE_PROCESSING_MS/ORPHAN_LOG_STALE_MS já dão 5min/90s de tolerância — rodar a
+            // cada volta do loop (a cada ~POLL_INTERVAL) era desperdício: sozinho, isso já
+            // era ~4.320 consultas/dia com a fila ociosa no teto do backoff.
             if (Date.now() - lastOrphanSweep >= ORPHAN_SWEEP_INTERVAL_MS) {
                 lastOrphanSweep = Date.now();
+                await reclaimStaleJobs();
                 await reclaimOrphanLogs();
             }
             const job = await claimJob();
             if (job) {
+                currentInterval = POLL_INTERVAL;
+                consecutiveErrors = 0;
                 await processJob(job);
                 await new Promise(r => setTimeout(r, 300));
                 continue;
             }
+            consecutiveErrors = 0;
         } catch (error) {
             console.error('--- ERRO NO LOOP PRINCIPAL ---');
             console.error('Mensagem:', error.message);
             console.error('Causa real:', error.cause);
+            consecutiveErrors++;
+            if (consecutiveErrors <= 1) {
+                // Erro ISOLADO pode ser transitório (rede, timeout) — não soma ao backoff de
+                // fila vazia, senão um erro no meio de um backoff já alto faria a próxima
+                // tentativa esperar mais ainda, bem quando convém tentar de novo logo.
+                currentInterval = POLL_INTERVAL;
+            }
+            // Erro REPETIDO (2+): não reseta mais. Sem isto, uma instabilidade sustentada
+            // (chave revogada, projeto pausado, Supabase fora do ar) fazia o worker martelar
+            // o banco a POLL_INTERVAL o tempo todo — justo na hora em que mais precisa
+            // recuar, não ficar tentando de novo rápido. currentInterval continua de onde
+            // estava e dobra normalmente, como se fosse mais uma volta de fila vazia.
         }
-        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+        await new Promise(r => setTimeout(r, currentInterval));
+        currentInterval = Math.min(currentInterval * 2, POLL_INTERVAL_MAX);
     }
     console.log('Worker encerrado (shutdown gracioso).');
     process.exit(0);

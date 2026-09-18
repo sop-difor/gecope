@@ -10,7 +10,9 @@ async function processarAtendimentoComposicao() {
     const resp = document.getElementById('textoAtenderComp').value;
     await processarDecisaoGenerica({
         table: 'composicoes_biblioteca', id, index, decision: 'atendido',
-        respText: resp, modalId: 'modalAtenderComposicao', callback: carregarComposicoes
+        // callback() é chamado sem argumentos — sem o wrapper, forceRefresh cairia no
+        // default (false) e a tela mostraria a decisão de antes da gravação.
+        respText: resp, modalId: 'modalAtenderComposicao', callback: () => carregarComposicoes({ forceRefresh: true })
     });
 }
 
@@ -20,12 +22,12 @@ async function processarRecusaComposicao() {
     const resp = document.getElementById('textoRecusarComp').value;
     await processarDecisaoGenerica({
         table: 'composicoes_biblioteca', id, index, decision: 'recusado',
-        respText: resp, modalId: 'modalRecusarComposicao', callback: carregarComposicoes
+        respText: resp, modalId: 'modalRecusarComposicao', callback: () => carregarComposicoes({ forceRefresh: true })
     });
 }
 
 async function deletarComposicao(id, path) {
-    await deletarRegistroGenerico('composicoes_biblioteca', 'composicoes_biblioteca', id, path, carregarComposicoes);
+    await deletarRegistroGenerico('composicoes_biblioteca', 'composicoes_biblioteca', id, path, () => carregarComposicoes({ forceRefresh: true }));
 }
 
 /* ==========================================================================
@@ -65,7 +67,13 @@ async function salvarNovaComposicao() {
         // Caminho no Bucket 'composicoes_biblioteca'
         const storagePath = `${catPath}/${subPath}/${obraPath}/V1_${arquivoNomePath}`;
 
-        const { error: uploadError } = await sbClient.storage.from('composicoes_biblioteca').upload(storagePath, arquivo);
+        // cacheControl de 1 ano: o caminho carrega a versão (V1_/V2_/...), nunca é
+        // reescrito com conteúdo diferente (mesmo raciocínio de modules/orcamentos/
+        // orcamentos.js, achado 2026-09-17 revisando o egress do Storage do projeto).
+        const { error: uploadError } = await sbClient.storage.from('composicoes_biblioteca').upload(storagePath, arquivo, {
+            cacheControl: '31536000',
+            upsert: false
+        });
         if (uploadError) throw uploadError;
 
         const { data: publicUrlData } = sbClient.storage.from('composicoes_biblioteca').getPublicUrl(storagePath);
@@ -105,7 +113,7 @@ async function salvarNovaComposicao() {
         alert(" Composição cadastrada com sucesso!");
         form.reset();
         bootstrap.Modal.getInstance(document.getElementById('modalCadastrarComposicao')).hide();
-        carregarComposicoes();
+        carregarComposicoes({ forceRefresh: true });
 
     } catch (error) {
         console.error(error);
@@ -150,7 +158,11 @@ async function enviarNovaVersaoComposicao() {
         if (pathParts.length > 1) pathParts.pop();
         const newStoragePath = `${pathParts.join('/')}/${newVersionLabel}_${nomeLimpo}`;
 
-        const { error: uploadError } = await sbClient.storage.from('composicoes_biblioteca').upload(newStoragePath, arquivo);
+        // cacheControl de 1 ano: ver comentário no upload da V1, mais acima no arquivo.
+        const { error: uploadError } = await sbClient.storage.from('composicoes_biblioteca').upload(newStoragePath, arquivo, {
+            cacheControl: '31536000',
+            upsert: false
+        });
         if (uploadError) throw uploadError;
 
         const { data: pubUrl } = sbClient.storage.from('composicoes_biblioteca').getPublicUrl(newStoragePath);
@@ -175,6 +187,15 @@ async function enviarNovaVersaoComposicao() {
         }).eq('id', id);
         if (updateVersaoError) throw updateVersaoError;
 
+        // Apaga a versão anterior do Storage: sem link nenhum no front-end pra versões
+        // antigas, guardá-la só soma espaço e egress à toa (mesmo raciocínio de
+        // modules/orcamentos/orcamentos.js, enviarNovaVersao). Best-effort: se falhar, não
+        // desfaz o envio da versão nova (já gravada), só avisa no console.
+        if (currentData.arquivo_path && currentData.arquivo_path !== newStoragePath) {
+            const { error: removeError } = await sbClient.storage.from('composicoes_biblioteca').remove([currentData.arquivo_path]);
+            if (removeError) console.error('Não foi possível apagar a versão anterior do Storage:', removeError);
+        }
+
         if (descricao) {
             // Salvar comentário de sistema
             const { data: curr } = await sbClient.from('composicoes_biblioteca').select('comentarios_revisao').eq('id', id).single();
@@ -196,7 +217,7 @@ async function enviarNovaVersaoComposicao() {
         registrarAtividade('COMPOSICAO', `atualizou a versão (${newVersionLabel}) da composição: ${currentData?.descricao || 'N/A'}`, '', currentData?.descricao);
 
         bootstrap.Modal.getInstance(document.getElementById('modalNovaVersaoComposicao')).hide();
-        carregarComposicoes();
+        carregarComposicoes({ forceRefresh: true });
     } catch (err) { alert("Erro: " + err.message); } finally { btn.disabled = false; btn.innerText = txtOrig; }
 }
 
@@ -283,7 +304,7 @@ async function enviarComentarioComposicao() {
         registrarAtividade('COMPOSICAO', `adicionou um comentário na composição: ${curr?.descricao || 'N/A'}`, '', curr?.descricao);
 
         bootstrap.Modal.getInstance(document.getElementById('modalComentarioComposicao')).hide();
-        carregarComposicoes();
+        carregarComposicoes({ forceRefresh: true });
     } catch (err) {
         alert("Erro ao enviar: " + err.message);
     } finally {
@@ -338,7 +359,7 @@ async function deletarItemHistoricoComposicao(id, index) {
         if (updateError) throw updateError;
 
         alert("Registro excluído!");
-        carregarComposicoes();
+        carregarComposicoes({ forceRefresh: true });
 
     } catch (err) {
         alert("Erro ao excluir: " + err.message);
@@ -355,7 +376,68 @@ async function deletarItemHistoricoComposicao(id, index) {
 const SOP_SEARCH_MIN_CHARS = 2;
 const SOP_RESULT_LIMIT = 300;
 
-async function carregarComposicoes() {
+// Cache em memória da lista "não-SOP" (null = ainda não carregada nesta sessão). A busca
+// SOP já era eficiente (contagem + filtro no servidor, só a partir de 2 caracteres — ver
+// abaixo); o defeito era só a lista não-SOP: `select('*')` da tabela inteira refeito em
+// TODO carregarComposicoes(), inclusive a cada tecla digitada, com o filtro aplicado
+// depois, no cliente. Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, item 4.
+let _composicoesNaoSopCache = null;
+
+async function buscarComposicoesNaoSopDoBanco() {
+    let data = [];
+    let hasMore = true;
+    let blockStart = 0;
+    const blockSize = 1000;
+    let queryError = null;
+
+    while (hasMore) {
+        const { data: bData, error } = await sbClient
+            .from('composicoes_biblioteca')
+            .select('*')
+            .neq('usuario', 'SOP')
+            .order('usuario', { ascending: true })
+            .order('subcategoria', { ascending: true })
+            .order('descricao', { ascending: true })
+            .range(blockStart, blockStart + blockSize - 1);
+
+        if (error) {
+            queryError = error;
+            break;
+        }
+
+        if (bData && bData.length > 0) {
+            data = data.concat(bData);
+            blockStart += blockSize;
+            if (bData.length < blockSize) {
+                hasMore = false;
+            }
+        } else {
+            hasMore = false;
+        }
+    }
+
+    if (!queryError) _composicoesNaoSopCache = data;
+    return { error: queryError };
+}
+
+// Busca a lista não-SOP no banco só se ainda não há cache ou se `forceRefresh` for pedido
+// explicitamente (depois de criar/editar/comentar/excluir uma composição própria — a SOP
+// nunca é escrita por aqui). Digitação na busca chama isto sem forceRefresh.
+async function carregarComposicoes({ forceRefresh = false } = {}) {
+    const container = document.getElementById('accordionComposicoes');
+    if (!container) return;
+    if (forceRefresh || _composicoesNaoSopCache === null) {
+        const { error } = await buscarComposicoesNaoSopDoBanco();
+        if (error) {
+            console.error('[ERRO Composições]', error);
+            container.innerHTML = `<div class="alert alert-danger">Erro ao carregar banco: ${error.message}</div>`;
+            return;
+        }
+    }
+    await renderizarComposicoes();
+}
+
+async function renderizarComposicoes() {
     const container = document.getElementById('accordionComposicoes');
     const termoBusca = document.getElementById('comp-search').value.trim().toLowerCase();
     const role = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
@@ -368,43 +450,7 @@ async function carregarComposicoes() {
     container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success"></div><div class="mt-2 text-secondary fw-bold">Carregando composições...</div></div>';
 
     try {
-        let data = [];
-        let hasMore = true;
-        let blockStart = 0;
-        const blockSize = 1000;
-        let queryError = null;
-
-        while (hasMore) {
-            const { data: bData, error } = await sbClient
-                .from('composicoes_biblioteca')
-                .select('*')
-                .neq('usuario', 'SOP')
-                .order('usuario', { ascending: true })
-                .order('subcategoria', { ascending: true })
-                .order('descricao', { ascending: true })
-                .range(blockStart, blockStart + blockSize - 1);
-
-            if (error) {
-                queryError = error;
-                break;
-            }
-
-            if (bData && bData.length > 0) {
-                data = data.concat(bData);
-                blockStart += blockSize;
-                if (bData.length < blockSize) {
-                    hasMore = false;
-                }
-            } else {
-                hasMore = false;
-            }
-        }
-
-        if (queryError) {
-            console.error('[ERRO Composições]', queryError);
-            container.innerHTML = `<div class="alert alert-danger">Erro ao carregar banco: ${queryError.message}</div>`;
-            return;
-        }
+        const data = _composicoesNaoSopCache || [];
 
         // SOP: apenas a contagem total (rápida, "head only") + busca filtrada no banco
         // quando há termo digitado. Nunca traz os ~2.800 registros de uma vez.
@@ -622,15 +668,17 @@ async function carregarComposicoes() {
         }
         container.innerHTML = html || '<div class="text-center py-5 text-muted">Nenhuma composição disponível.</div>';
     } catch (err) {
-        console.error('[ERRO carregarComposicoes]', err);
+        console.error('[ERRO renderizarComposicoes]', err);
         container.innerHTML = `<div class="alert alert-danger">Erro crítico ao carregar composições: ${err.message}</div>`;
     }
 }
 
 // --- GLOBAL INIT LISTENERS (Moved out to fix loop) ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Initial Load
-    carregarComposicoes();
+    // Sem carga eager aqui: era uma segunda consulta completa da lista não-SOP no boot,
+    // além da que showPane (core/shell.js, ~linha 230) já faz sob demanda, com cache, na
+    // primeira vez que a aba Composições é aberta — egress, 18/09/2026 (item 4 da
+    // auditoria).
 
     // Search Listener
     document.getElementById('comp-search')?.addEventListener('input', debounce(() => {
@@ -1527,7 +1575,7 @@ async function salvarComposicaoAnalitica() {
         form.reset();
         currentCompositionItems = [];
         if (typeof renderItemsTable === 'function') renderItemsTable();
-        carregarComposicoes();
+        carregarComposicoes({ forceRefresh: true });
 
     } catch (error) {
         console.error(error);
@@ -1583,8 +1631,10 @@ async function prepararExportacaoComposicao(id, urlArquivo) {
 
         // 3. Se temos URL e  um .json, buscamos o conteúdo
         if (urlArquivo && urlArquivo.toLowerCase().includes('.json')) {
-            const finalUrl = `${urlArquivo}?t=${new Date().getTime()}`;
-            const response = await fetch(finalUrl);
+            // Sem ?t=: o caminho já muda a cada nova versão (padrão V{n}_...), então não
+            // há risco de conteúdo velho — e sem cache-bust o CDN/navegador pode reaproveitar
+            // a resposta em vez de baixar de novo a cada clique (egress, 18/09/2026).
+            const response = await fetch(urlArquivo);
             if (!response.ok) throw new Error("Erro ao baixar dados da composição.");
             docData = await response.json();
         }
@@ -1998,8 +2048,9 @@ async function visualizarComposicao(id, url, options = {}) {
 
             // 3. Caso 2: Composição Importada (JSON SOP)
             if (url && url.toLowerCase().includes('.json')) {
-                const finalUrl = `${url}?t=${new Date().getTime()}`;
-                const response = await fetch(finalUrl);
+                // Sem ?t= — ver comentário equivalente em prepararExportacaoComposicao
+                // (egress, 18/09/2026).
+                const response = await fetch(url);
                 if (!response.ok) throw new Error("Erro ao baixar arquivo JSON.");
 
                 const json = await response.json();

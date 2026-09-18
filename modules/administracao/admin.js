@@ -652,9 +652,19 @@
         }
     }
 
-    // Notifications polling (admin)
+    // Notifications polling (admin) — marca como lida toda notificação não lida que não
+    // seja pedido de novo usuário (essas ficam não lidas de propósito, para aparecerem em
+    // fetchPendingCount/openAdminPendings). Nada aqui é exibido na tela.
+    // Egress (18/09/2026): antes baixava select('*') da tabela inteira de não lidas a cada
+    // 45s só para descartar o conteúdo e marcar como lida; virou 1 UPDATE sem retorno, sem
+    // transferir nenhuma linha. Intervalo subiu para 5 min e pausa com a aba em segundo
+    // plano — ver docs/auditoria-egress-2026-09.md, item 7.
     let _notifIntervalId = null;
-    function startNotificationsPoll() { if (_notifIntervalId) return; fetchNotifications(); _notifIntervalId = setInterval(fetchNotifications, 45000); }
+    function startNotificationsPoll() {
+        if (_notifIntervalId) return;
+        fetchNotifications();
+        _notifIntervalId = setInterval(() => { if (!document.hidden) fetchNotifications(); }, 300000);
+    }
     function stopNotificationsPoll() { if (_notifIntervalId) { clearInterval(_notifIntervalId); _notifIntervalId = null; } }
 
     async function fetchPendingCount() {
@@ -666,15 +676,12 @@
 
     async function fetchNotifications() {
         try {
-            const { data, error } = await sbClient.from('app_notifications').select('*').eq('read', false).order('created_at', { ascending: true });
+            const { error } = await sbClient.from('app_notifications')
+                .update({ read: true })
+                .eq('read', false)
+                .neq('type', 'new_user_request');
             if (error) throw error;
-            if (data && data.length) {
-                data.forEach(async n => {
-                    if (n.type === 'new_user_request') return; // Skip mark as read for new user requests so they appear in pending
-                    try { console.log('Nova Notificação:', n.type, n.payload); await sbClient.from('app_notifications').update({ read: true }).eq('id', n.id); } catch (e) { console.error(e); }
-                });
-            }
-        } catch (err) { console.error('Erro ao buscar notificações', err); }
+        } catch (err) { console.error('Erro ao marcar notificações como lidas', err); }
     }
 
     // Open pending section (used by clickable stat card)

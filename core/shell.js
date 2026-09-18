@@ -268,11 +268,20 @@ function updateDashboard() {
 document.addEventListener('DOMContentLoaded', () => {
     const landing = document.getElementById('landingOverlay');
 
-    // Carrega dados automaticamente
-    carregarDadosSupabase();
+    // Só busca automaticamente aqui se ESTA ABA já tinha uma sessão aplicada (recarregou
+    // a página já logado: ver IIFE de restauração em processos.js, perto do fim do
+    // arquivo). O JWT do Supabase persiste 30 dias no localStorage, mas o papel do
+    // usuário só é conhecido depois do login (sessionStorage, que morre quando a aba
+    // fecha) — sem essa checagem, toda ABA NOVA baixava a tabela inteira aqui E DE NOVO
+    // no login (auth.js), porque as duas rodavam sem saber uma da outra. Egress,
+    // 18/09/2026 — ver docs/auditoria-egress-2026-09.md, item 2.
+    if ((sessionStorage.getItem('sop_role') || 'guest') !== 'guest') {
+        carregarDadosSupabase();
+    }
 
-    // Carrega lista de fiscais/usuários do Banco
-    carregarListaFiscais();
+    // carregarListaFiscais() NÃO fica aqui: auth.js já chama a mesma função no próprio
+    // DOMContentLoaded dele, de forma incondicional (roda em toda carga de página, aba
+    // nova ou não) — ter as duas chamadas duplicava a consulta em toda visita.
 
     document.querySelectorAll('.mask-date').forEach(input => {
         input.addEventListener('input', function (e) {
@@ -306,12 +315,10 @@ document.addEventListener('DOMContentLoaded', () => {
     wireEvents();
     applyRBACToPainels();
     verificarAdminSalvo();
-    // PERFORMANCE: marca a flag de cache antes do carregamento inicial — sem isso,
-    // a primeira vez que o usuário abria a aba Orçamentos (showPane, linha ~3191)
-    // disparava uma segunda consulta paginada completa a orcamentos_biblioteca,
-    // idêntica a esta, porque a flag nunca tinha sido setada por este carregamento eager.
-    window._orcamentosCarregados = true;
-    carregarOrcamentos();
+    // Orçamentos NÃO carrega aqui: essa era uma carga eager que baixava a tabela inteira
+    // no boot para TODO usuário, mesmo quem nunca abre a aba. showPane (linha ~223) já
+    // carrega sob demanda, com cache, na primeira vez que a aba Orçamentos é aberta —
+    // egress, 18/09/2026 (item 3 da auditoria).
 });
 
 // --- FUNO PARA APLICAR RBAC NOS PAINIS ---
@@ -358,15 +365,37 @@ function wireEvents() {
         currentSort = []; updateReuniao();
     });
 
-    // Listeners de Orçamentos com Debounce
-    const orcSearch = document.getElementById('orcamento-search');
-    if (orcSearch) orcSearch.addEventListener('input', debounce(carregarOrcamentos, 400));
+    // Busca de Orçamentos: o único ouvinte fica em modules/orcamentos/orcamentos.js (perto
+    // do cache que ele filtra). Havia dois ouvintes no mesmo campo — cada pausa de digitação
+    // disparava a consulta duas vezes (egress, 18/09/2026; item 3 da auditoria).
 
     // Listeners de Tabelas (BDI/Desconto/Busca) com Debounce
     document.getElementById('busca-bdi')?.addEventListener('input', debounce(recalcTabela, 300));
     document.getElementById('busca-desc')?.addEventListener('input', debounce(recalcTabela, 300));
 
-    document.querySelectorAll('.nav-link').forEach(t => t.addEventListener('shown.bs.tab', (e) => { const p = document.querySelector(e.target.getAttribute('data-bs-target')); if (p) p.querySelectorAll('.chart-placeholder').forEach(c => Plotly.Plots.resize(c)); }));
+    document.querySelectorAll('.nav-link').forEach(t => t.addEventListener('shown.bs.tab', (e) => {
+        const targetSel = e.target.getAttribute('data-bs-target');
+        const p = document.querySelector(targetSel);
+        if (p) p.querySelectorAll('.chart-placeholder').forEach(c => Plotly.Plots.resize(c));
+
+        // showPane() é o único lugar que carrega Orçamentos/Composições sob demanda — mas
+        // as abas de cima usam data-bs-toggle="tab" nativo do Bootstrap, clicáveis
+        // diretamente sem passar por showPane(). Antes disso não importava porque as duas
+        // listas eram baixadas inteiras no boot para todo mundo (removido em 18/09/2026 —
+        // docs/auditoria-egress-2026-09.md, itens 3 e 4); sem aquela carga eager, quem abre
+        // Orçamentos ou Composições direto pela aba do topo (sem passar pela Home antes)
+        // veria o painel vazio. Mesma checagem de flag que showPane() usa — se showPane()
+        // já carregou (fluxo pela Home), isto não refaz a consulta.
+        const paneId = (targetSel || '').replace('#', '');
+        if (paneId === 'pane-orcamentos' && typeof carregarOrcamentos === 'function' && !window._orcamentosCarregados) {
+            window._orcamentosCarregados = true;
+            carregarOrcamentos();
+        }
+        if (paneId === 'pane-composicoes' && typeof carregarComposicoes === 'function' && !window._composicoesCarregadas) {
+            window._composicoesCarregadas = true;
+            carregarComposicoes();
+        }
+    }));
 }
 
 // Silencia console.log/info em produção (extraído de main.js).

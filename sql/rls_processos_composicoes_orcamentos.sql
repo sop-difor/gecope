@@ -88,17 +88,20 @@ $function$;
 -- =============================================================================
 ALTER TABLE public.processos ENABLE ROW LEVEL SECURITY;
 
+-- (select ...) em cada função: sem o wrapper o Postgres reavalia a função por linha em vez
+-- de cachear como InitPlan — recomendação oficial de performance de RLS do Supabase
+-- (achado em 2026-09-17, mesma correção aplicada em autorizacoes_especiais.sql).
 DROP POLICY IF EXISTS "processos_select" ON public.processos;
 CREATE POLICY "processos_select"
   ON public.processos
   FOR SELECT
   TO authenticated
   USING (
-    public.meu_papel() IN ('admin','gerente','externo')
+    (select public.meu_papel()) IN ('admin','gerente','externo')
     OR (
-      public.meu_papel() = 'fiscal'
+      (select public.meu_papel()) = 'fiscal'
       AND (
-        processos.fiscal_matricula = public.minha_matricula()
+        processos.fiscal_matricula = (select public.minha_matricula())
         OR processos.fiscal_matricula IS NULL
       )
     )

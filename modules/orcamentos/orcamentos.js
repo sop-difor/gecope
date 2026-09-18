@@ -60,11 +60,16 @@ async function salvarNovoOrcamento() {
         const storagePath = `${catPath}/${subPath}/${obraPath}/V1_${arquivoNomePath}`;
 
         // 3. Upload para o Supabase Storage
+        // cacheControl de 1 ano: o caminho já carrega a versão (V1_/V2_/...), nunca é
+        // reescrito com conteúdo diferente — cache longo não arrisca servir arquivo
+        // desatualizado. Achado 2026-09-17: sem isso (era 1h), as mesmas planilhas de
+        // memória de cálculo (4-6 MB cada) eram buscadas de novo na origem a cada abertura
+        // fora da janela de 1h, e eram a maior parte do egress do projeto.
         const { data: uploadData, error: uploadError } = await sbClient
             .storage
             .from('orcamentos')
             .upload(storagePath, arquivo, {
-                cacheControl: '3600',
+                cacheControl: '31536000',
                 upsert: false
             });
 
@@ -113,7 +118,7 @@ async function salvarNovoOrcamento() {
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         modal.hide();
 
-        carregarOrcamentos();
+        carregarOrcamentos({ forceRefresh: true });
 
     } catch (error) {
         console.error(error);
@@ -172,7 +177,7 @@ async function deletarItemHistoricoOrcamento(id, index) {
         if (updateError) throw updateError;
 
         alert("Registro excluído!");
-        carregarOrcamentos();
+        carregarOrcamentos({ forceRefresh: true });
 
     } catch (err) {
         alert("Erro ao excluir: " + err.message);
@@ -180,12 +185,13 @@ async function deletarItemHistoricoOrcamento(id, index) {
     }
 }
 
-async function carregarOrcamentos() {
-    const container = document.getElementById('accordionOrcamentos');
-    const termoBusca = document.getElementById('orcamento-search').value.toLowerCase();
-    const role = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
-    const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
+// Cache em memória da lista de orçamentos (null = ainda não carregada nesta sessão).
+// Egress (18/09/2026): a busca por texto rodava esta mesma consulta paginada da tabela
+// inteira a cada tecla, com o filtro aplicado depois, no cliente — agora ela só refiltra
+// o que já está aqui. Ver docs/auditoria-egress-2026-09.md, item 3.
+let _orcamentosCache = null;
 
+async function buscarOrcamentosDoBanco() {
     let data = [];
     let hasMore = true;
     let blockStart = 0;
@@ -217,7 +223,28 @@ async function carregarOrcamentos() {
         }
     }
 
-    if (queryError) { container.innerHTML = `Erro: ${queryError.message}`; return; }
+    if (!queryError) _orcamentosCache = data;
+    return { error: queryError };
+}
+
+// Busca no banco só se ainda não há cache ou se `forceRefresh` for pedido explicitamente
+// (depois de criar/editar/comentar/excluir um orçamento — a lista mudou de verdade).
+// Digitação na busca e o botão "Limpar" chamam isto sem forceRefresh: só re-renderizam.
+async function carregarOrcamentos({ forceRefresh = false } = {}) {
+    const container = document.getElementById('accordionOrcamentos');
+    if (forceRefresh || _orcamentosCache === null) {
+        const { error } = await buscarOrcamentosDoBanco();
+        if (error) { if (container) container.innerHTML = `Erro: ${error.message}`; return; }
+    }
+    renderizarOrcamentos();
+}
+
+function renderizarOrcamentos() {
+    const container = document.getElementById('accordionOrcamentos');
+    const termoBusca = document.getElementById('orcamento-search').value.toLowerCase();
+    const role = (sessionStorage.getItem('sop_role') || 'guest').toLowerCase();
+    const isAdmin = (document.body.classList.contains('is-admin') || role === 'admin' || role === 'gerente') && role !== 'fiscal';
+    const data = _orcamentosCache || [];
 
     const dataFiltrada = data.filter(item => {
         if (!termoBusca) return true;
@@ -479,7 +506,11 @@ async function enviarNovaVersao() {
         const folderPath = pathParts.join('/');
         const newStoragePath = `${folderPath}/${newVersionLabel}_${nomeLimpo}`;
 
-        const { error: uploadError } = await sbClient.storage.from('orcamentos').upload(newStoragePath, arquivo);
+        // cacheControl de 1 ano: ver comentário em salvarNovoOrcamento() acima.
+        const { error: uploadError } = await sbClient.storage.from('orcamentos').upload(newStoragePath, arquivo, {
+            cacheControl: '31536000',
+            upsert: false
+        });
         if (uploadError) throw uploadError;
 
         const { data: publicUrlData } = sbClient.storage.from('orcamentos').getPublicUrl(newStoragePath);
@@ -508,6 +539,15 @@ async function enviarNovaVersao() {
 
         if (updateError) throw updateError;
 
+        // Apaga a versão anterior do Storage: o front-end não linka pra versões antigas
+        // (só existe o botão "Baixar", que sempre pega a atual — usuário, 2026-09-17),
+        // então guardá-la só soma espaço e egress à toa. Best-effort: se falhar, não
+        // desfaz o envio da versão nova (já gravada), só avisa no console.
+        if (currentData.arquivo_path && currentData.arquivo_path !== newStoragePath) {
+            const { error: removeError } = await sbClient.storage.from('orcamentos').remove([currentData.arquivo_path]);
+            if (removeError) console.error('Não foi possível apagar a versão anterior do Storage:', removeError);
+        }
+
         // Notificação WhatsApp
         processarNotificacao('atualizacao_orcamento', {
             REF_ORCAMENTO: currentData?.obra || currentData?.processo || 'N/A'
@@ -523,7 +563,7 @@ async function enviarNovaVersao() {
 
         alert(`Versão ${newVersionLabel} enviada! Status alterado para ATUALIZADO. Arquivos de comentários resolvidos foram limpos.`);
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalNovaVersao')).hide();
-        carregarOrcamentos();
+        carregarOrcamentos({ forceRefresh: true });
 
     } catch (err) {
         alert("Erro: " + err.message);
@@ -580,7 +620,11 @@ async function enviarComentarioOrcamento() {
         if (arquivoAnexo) {
             const nomeLinpo = sanitizarNomeArquivo(arquivoAnexo.name);
             const path = `anexos_comentarios/${id}_${Date.now()}_${nomeLinpo}`;
-            const { error: uploadError } = await sbClient.storage.from('orcamentos').upload(path, arquivoAnexo);
+            // cacheControl de 1 ano: caminho com timestamp, nunca reescrito.
+            const { error: uploadError } = await sbClient.storage.from('orcamentos').upload(path, arquivoAnexo, {
+                cacheControl: '31536000',
+                upsert: false
+            });
             if (uploadError) throw uploadError;
             const { data } = sbClient.storage.from('orcamentos').getPublicUrl(path);
             anexoUrl = data.publicUrl;
@@ -617,7 +661,7 @@ async function enviarComentarioOrcamento() {
 
         alert("Solicitação enviada!");
         bootstrap.Modal.getInstance(document.getElementById('modalComentarioOrcamento')).hide();
-        carregarOrcamentos();
+        carregarOrcamentos({ forceRefresh: true });
     } catch (err) {
         alert("Erro ao enviar: " + err.message);
     }
@@ -643,7 +687,9 @@ async function processarAtendimento() {
     const resp = document.getElementById('textoAtender').value;
     await processarDecisaoGenerica({
         table: 'orcamentos_biblioteca', id, index, decision: 'atendido',
-        respText: resp, modalId: 'modalAtenderRevisao', callback: carregarOrcamentos
+        // callback() é chamado sem argumentos — sem o wrapper, forceRefresh cairia no
+        // default (false) e a tela mostraria a decisão de antes da gravação.
+        respText: resp, modalId: 'modalAtenderRevisao', callback: () => carregarOrcamentos({ forceRefresh: true })
     });
 }
 
@@ -653,12 +699,12 @@ async function processarRecusa() {
     const resp = document.getElementById('textoRecusar').value;
     await processarDecisaoGenerica({
         table: 'orcamentos_biblioteca', id, index, decision: 'recusado',
-        respText: resp, modalId: 'modalRecusarRevisao', callback: carregarOrcamentos
+        respText: resp, modalId: 'modalRecusarRevisao', callback: () => carregarOrcamentos({ forceRefresh: true })
     });
 }
 
 async function deletarOrcamento(id, path) {
-    await deletarRegistroGenerico('orcamentos_biblioteca', 'orcamentos', id, path, carregarOrcamentos);
+    await deletarRegistroGenerico('orcamentos_biblioteca', 'orcamentos', id, path, () => carregarOrcamentos({ forceRefresh: true }));
 }
 
 /* --- FUNES DE DECISO CORRIGIDAS (RESOLVE TELA ESCURA) --- */

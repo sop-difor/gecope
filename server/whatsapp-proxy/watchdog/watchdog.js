@@ -79,9 +79,11 @@ async function getEvolutionState() {
 // esse caso, quando o connectionState sozinho não pegaria.
 async function hasRecentConnectionFailures() {
   const since = new Date(Date.now() - FAILURE_WINDOW_MS).toISOString();
+  // Só `result` é lido abaixo (id nunca é usado, só o .length do filter). Egress,
+  // 18/09/2026 — docs/auditoria-egress-2026-09.md, item 4 do bloco "Serviços da VM".
   const { data, error } = await sb
     .from('whatsapp_jobs')
-    .select('id, result')
+    .select('result')
     .eq('status', 'failed')
     .gte('finished_at', since);
 
@@ -91,8 +93,12 @@ async function hasRecentConnectionFailures() {
   return count >= FAILURE_THRESHOLD;
 }
 
+// Só restart_requested_at/last_restarted_at são lidos em tick() — as outras colunas de
+// whatsapp_control (degraded_since, updated_at) só são ESCRITAS por este processo, nunca
+// relidas daqui (fica espelhado em degradedSinceMemory). Egress, 18/09/2026 — item 4 do
+// bloco "Serviços da VM" da auditoria.
 async function getControlRow() {
-  const { data, error } = await sb.from('whatsapp_control').select('*').eq('id', 1).maybeSingle();
+  const { data, error } = await sb.from('whatsapp_control').select('restart_requested_at, last_restarted_at').eq('id', 1).maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -113,7 +119,12 @@ let degradedSinceMemory = null;
 async function tick() {
   const control = await getControlRow();
   const state = await getEvolutionState();
-  const recentFailures = await hasRecentConnectionFailures();
+  // hasRecentConnectionFailures() é sinal COMPLEMENTAR pro caso em que a Evolution API
+  // mente dizendo "open" (ver comentário na função) — se state já não é "open", isBad já
+  // fica true de qualquer jeito, então pular a consulta aqui economiza uma leitura de
+  // whatsapp_jobs sem limite a cada 30s. Egress, 18/09/2026 — item 4 do bloco "Serviços
+  // da VM" da auditoria.
+  const recentFailures = (state === 'open') ? await hasRecentConnectionFailures() : false;
   const isBad = state !== 'open' || recentFailures;
 
   if (isBad && !degradedSinceMemory) {

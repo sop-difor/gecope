@@ -784,7 +784,12 @@
         arquivoNome = state.arquivoOriginal.name;
         var nomeLimpo = sanitizarNomeArquivo(arquivoNome);
         arquivoPath = "curva_abc/" + state.processoVinculado.id + "/v" + proximaVersao + "_" + Date.now() + "_" + nomeLimpo;
-        var up = await sbClient.storage.from("orcamentos").upload(arquivoPath, state.arquivoOriginal);
+        // cacheControl de 1 ano: caminho com versão + timestamp, nunca reescrito (mesmo
+        // raciocínio de modules/orcamentos/orcamentos.js, achado 2026-09-17).
+        var up = await sbClient.storage.from("orcamentos").upload(arquivoPath, state.arquivoOriginal, {
+          cacheControl: '31536000',
+          upsert: false
+        });
         if (up.error) throw up.error;
         var pub = sbClient.storage.from("orcamentos").getPublicUrl(arquivoPath);
         arquivoUrl = pub.data.publicUrl;
@@ -834,7 +839,9 @@
         };
       });
 
-      var insItens = await sbClient.from("curva_abc_itens").insert(itensPayload).select();
+      // Sem .select(): a linha 850 (carregarVersaoDb) já recarrega os itens da versão
+      // logo em seguida — o retorno do insert nunca foi lido (egress, 18/09/2026).
+      var insItens = await sbClient.from("curva_abc_itens").insert(itensPayload);
       if (insItens.error) throw insItens.error;
 
       if (typeof registrarAtividade === "function") {

@@ -19,7 +19,7 @@
    - <html> — para que o CSS (:root:not(.theme-dark)) e o JavaScript, que lê as
      variáveis de cor via getComputedStyle(document.documentElement), enxerguem
      a mesma paleta;
-   - <body> — para manter a convenção body.theme-dark compartilhada com o resto
+   - <body> — para manter a convenção bodclaudey.theme-dark compartilhada com o resto
      do GECOPE. */
 (function(){
   try{
@@ -61,6 +61,11 @@
         <ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
       <span id="btnScopeTxt">Carteira ativa</span>
     </button>
+    <button class="btn-present" id="btnRefresh" title="Forçar atualização dos dados agora (ignora o cache local)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      <span id="btnRefreshTxt">Atualizar dados</span>
+    </button>
     <button class="btn-present" id="btnPresent" title="Alternar tela cheia real do navegador">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -82,6 +87,45 @@
     </button>
     <div class="ctrl" id="ctrl">
       <div class="ctrl-head"><span>Controles</span><button class="ctrl-close" id="ctrlClose" aria-label="Recolher">✕</button></div>
+      <!-- Escolhe o conjunto de dados do painel. Revelado só para admin/gerente (ver
+           podeVerReplanilhamentos em mapa-obras.js); começa oculto para não piscar antes
+           de o papel ser conhecido. O `hidden` só esconde o .seg porque o CSS tem a
+           guarda `.seg[hidden]{display:none}` — sem ela, o display:flex de autor vence
+           a folha do navegador e o seletor aparece para todo mundo. -->
+      <div class="lbl" id="lblControle" hidden>Conjunto de dados</div>
+      <div class="seg" id="segControle" hidden>
+        <button data-v="obras" class="on">Obras</button>
+        <button data-v="replanilhamentos">Replanilhamentos</button>
+      </div>
+      <!-- Aviso contido do seletor de modo. Falha ao carregar o conjunto SECUNDÁRIO não
+           pode acionar o overlay de tela cheia (#dataError): ele apagaria o mapa de obras
+           que está íntegro e só ofereceria recarregar, perdendo a navegação. -->
+      <div class="modo-aviso" id="modoAviso" hidden></div>
+      <!-- Controles do modo Replanilhamentos. Os de Obras (abaixo) saem de cena neste
+           modo: busca e filtros operam sobre contratos e não teriam efeito nos processos. -->
+      <div id="ctrlReplan" hidden>
+        <div class="lbl">Métrica</div>
+        <div class="seg" id="segRpMetrica">
+          <button data-v="tempo" class="on">Tempo médio</button>
+          <button data-v="desp">Despachos</button>
+          <button data-v="fila">Processos</button>
+        </div>
+        <div class="lbl">Período</div>
+        <div class="seg" id="segRpPeriodo">
+          <button data-v="hoje">Hoje</button>
+          <button data-v="6m">6 meses</button>
+          <button data-v="12m" class="on">1 ano</button>
+          <button data-v="24m">2 anos</button>
+        </div>
+        <div class="lbl">Distrito Operacional do(a)</div>
+        <div class="seg" id="segRpRegua">
+          <button data-v="equipe" class="on">Fiscal</button>
+          <button data-v="obra">Obra</button>
+        </div>
+        <div class="ctrl-nota" id="rpReguaNota"></div>
+        <div class="ctrl-nota">A busca e os filtros de obras ficam guardados e voltam ao trocar para Obras.</div>
+      </div>
+      <div id="ctrlObras">
       <div class="lbl">Métrica (obra · valor)</div>
       <div class="seg" id="segMetric">
         <button data-v="obras" class="on">Obra</button>
@@ -95,10 +139,13 @@
       <div id="filtersHost" hidden></div>
       <div id="filterChips" aria-label="Filtros ativos"></div>
       <button class="clearf" id="clearF">Limpar busca e filtros</button>
+      </div>
     </div>
 
     <div class="crumb" id="crumb"></div>
     <div class="crumb-pop" id="crumbPop"></div>
+    <!-- Legenda da escala de cor do modo Replanilhamentos (o modo Obras não tem). -->
+    <div class="rp-legenda" id="rpLegenda" hidden></div>
 
     <button class="aside-toggle" id="asideToggle" aria-label="Mostrar painel lateral">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8EF0C4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -127,7 +174,7 @@
     <div class="statwrap">
       <div class="sec-h"><span>Situação das obras</span></div>
       <div class="stackbar" id="statBar"></div>
-      <div class="statleg" id="statLeg"></div>
+      <div class="statleg cards" id="statLeg"></div>
     </div>
     <div class="statwrap">
       <div class="sec-h"><span>Valor original vs. aditivos</span></div>

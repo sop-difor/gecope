@@ -63,14 +63,28 @@ function phoneVariants(raw) {
 // processarNotificacao roda para ações comuns de negócio) poderia usar este endpoint como
 // uma plataforma de disparo de texto livre para QUALQUER número, dentro ou fora da folha de
 // funcionários, sob a identidade oficial do WhatsApp do SOP-CE.
+// Cache em memória de app_users.telefone_whatsapp (TTL curto) — processarNotificacao no
+// front-end dispara um /send por destinatário, então uma única ação de negócio (ex.:
+// notificar 5 fiscais de uma vez) chamava isto 5 vezes, cada uma baixando de novo TODOS
+// os telefones cadastrados. Telefone cadastrado não muda com frequência, então 5 min é
+// uma folga segura. Em caso de falha na busca (cache vazio/expirado), continua lançando
+// o erro — não cai para um cache antigo, propositalmente: é um portão anti-abuso, então
+// na dúvida (rede instável) o envio deve ser rejeitado, não liberado. Egress, 18/09/2026
+// — docs/auditoria-egress-2026-09.md, item 6 do bloco "Serviços da VM".
+const KNOWN_RECIPIENTS_CACHE_MS = 5 * 60 * 1000;
+let knownRecipientsCache = null; // { users, at }
+
 async function isKnownRecipient(number) {
   const incoming = phoneVariants(number);
-  const { data: users, error } = await sb
-    .from('app_users')
-    .select('telefone_whatsapp')
-    .not('telefone_whatsapp', 'is', null);
-  if (error) throw error;
-  return (users || []).some(u => {
+  if (!knownRecipientsCache || (Date.now() - knownRecipientsCache.at) >= KNOWN_RECIPIENTS_CACHE_MS) {
+    const { data: users, error } = await sb
+      .from('app_users')
+      .select('telefone_whatsapp')
+      .not('telefone_whatsapp', 'is', null);
+    if (error) throw error;
+    knownRecipientsCache = { users: users || [], at: Date.now() };
+  }
+  return knownRecipientsCache.users.some(u => {
     for (const v of phoneVariants(u.telefone_whatsapp)) {
       if (incoming.has(v)) return true;
     }
@@ -107,14 +121,25 @@ function createInstance() {
 
 app.get('/health', (req, res) => res.status(200).send('ok'));
 
+// Rota pública, sem autenticação (nada aqui identifica quem chama) — nada no repositório
+// a usa hoje (o healthcheck do Dockerfile bate em /health, sem tocar o banco), mas fica
+// mantida caso algum monitoramento externo já aponte pra ela. Cache curto: sem isso,
+// qualquer um na internet, via Caddy, conseguia gerar uma consulta ao Supabase por
+// requisição, sem limite — amplificação básica. Egress, 18/09/2026 — item 8 do bloco
+// "Serviços da VM" da auditoria.
+let readyCache = null; // { ok, error, at }
+const READY_CACHE_MS = 10000;
 app.get('/ready', async (req, res) => {
+  if (readyCache && (Date.now() - readyCache.at) < READY_CACHE_MS) {
+    return res.status(readyCache.ok ? 200 : 503).json(readyCache.body);
+  }
   try {
     const { error } = await sb.from('whatsapp_jobs').select('id').limit(1);
-    if (error) return res.status(503).json({ ok: false, error: error.message });
-    return res.json({ ok: true });
+    readyCache = { ok: !error, at: Date.now(), body: error ? { ok: false, error: error.message } : { ok: true } };
   } catch (e) {
-    return res.status(503).json({ ok: false, error: e.message });
+    readyCache = { ok: false, at: Date.now(), body: { ok: false, error: e.message } };
   }
+  return res.status(readyCache.ok ? 200 : 503).json(readyCache.body);
 });
 
 // Marca um log como falha usando o cliente service role (ignora RLS) — desde que

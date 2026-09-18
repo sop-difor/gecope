@@ -446,23 +446,38 @@
 
 })(window);
 
+// Deriva window.financeiroData de window.allData (já baixado por carregarDadosSupabase)
+// em vez de consultar vw_processos_financeiro — são as MESMAS linhas de "processos" que
+// acabaram de trafegar, só filtradas. Regra e tolerância copiadas ao pé da letra de
+// sql/_aplicados/create_view_processos_financeiro.sql (mesmos nomes ali documentados).
+// Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, item 6.
+//
+// analiseAprofundada precisa ser RECALCULADA aqui, não copiada do mapProcessoRow de
+// window.allData: lá ela cai no default `true` (processos.js, mapProcessoRow) porque a
+// tabela "processos" crua não tem essa coluna — só a própria view calculava o valor real.
+// Copiar o default teria feito todo processo contar como "aprofundado", inflando
+// silenciosamente TAXA DE REVISÃO/VARIAÇÃO MÉDIA/MEDIANA/CORTE MÉDIO ENTRE ALTERADOS.
 async function carregarDadosFinanceiro() {
     try {
-        const { data, error } = await sbClient
-            .from('vw_processos_financeiro')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error) throw new Error(`View "vw_processos_financeiro" não acessível: ${error.message}`);
-        if (!Array.isArray(data)) throw new Error('Tipo de dados inválido: esperado array');
-
-        window.financeiroData = data.map(mapProcessoRow);
+        const origem = Array.isArray(window.allData) ? window.allData : [];
+        window.financeiroData = origem
+            .filter(d => (d.status === 'APROVADO' || d.status === 'ARQUIVADO')
+                && d.repercFiscal !== 0
+                && d.repercGecope !== 0)
+            .map(d => ({
+                ...d,
+                analiseAprofundada: Math.abs(d.acrescFiscal) > 0.01
+                    || Math.abs(d.acrescGecope) > 0.01
+                    || Math.abs(d.supressGecope - d.supressFiscal) > 0.01
+            }));
+        // window.allData já vem ordenado por created_at desc (mesma order da consulta
+        // original a "processos"); filter() preserva a ordem, sem precisar reordenar.
     } catch (err) {
-        console.error('[ERRO] Falha ao carregar dados financeiros:', err);
+        console.error('[ERRO] Falha ao montar dados financeiros:', err);
         // Sem isso, o painel Financeiro ficava com KPIs zerados sem nenhuma
         // indicação de que a causa foi uma falha de carregamento (e não
         // simplesmente "nenhum processo corresponde ao filtro").
-        alert('Não foi possível carregar os dados financeiros. Tente novamente em instantes.\n' + (err && err.message ? err.message : ''));
+        alert('Não foi possível montar os dados financeiros. Tente novamente em instantes.\n' + (err && err.message ? err.message : ''));
     }
 }
 

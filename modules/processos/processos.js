@@ -142,12 +142,20 @@ function isSetorRiscoDiligencia(sigla) {
 async function carregarAlertasRetornoComentarios() {
     if (!sbClient || !window.allData || !window.allData.length) return;
     try {
-        const ids = window.allData.filter(d => d.id).map(d => String(d.id));
+        // Só processo com status APROVADO chega a LER alertaRetornoUltimo — veja
+        // aplicarAlertaPreDiligencia logo abaixo: emRiscoBruto exige stTxt.includes('APROVADO').
+        // Para os demais, o campo fica null e nunca é consultado, então baixar o histórico
+        // deles aqui era desperdício. Colunas explícitas: created_at só ordena no servidor,
+        // não precisa vir na resposta. Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md,
+        // item 8.
+        const ids = window.allData
+            .filter(d => d.id && (d.status || '').toString().toUpperCase().includes('APROVADO'))
+            .map(d => String(d.id));
         if (!ids.length) return;
 
         const { data, error } = await sbClient
             .from('alerta_retorno_comentarios')
-            .select('*')
+            .select('processo_id, sigla, comentario')
             .in('processo_id', ids)
             .order('created_at', { ascending: false });
 
@@ -406,7 +414,8 @@ function iniciarVarreduraRiscoDiligencia() {
 
 window.dynamicUsers = [];
 // Lista canônica de fiscais: [{ matricula, nome }] — nome já em CAIXA ALTA, sem espaços nas pontas.
-// Fonte única: app_users (role='fiscal'). O <option>.value do dropdown de Fiscal passa a ser a
+// Fonte única: app_users, todo mundo (usuário, 2026-09-17 — gerente/admin também fiscalizam
+// processos). O <option>.value do dropdown de Fiscal passa a ser a
 // matrícula (gravada em processos.fiscal_matricula, FK -> app_users.matricula); processos.fiscal
 // (texto) continua sendo gravado a partir do rótulo, para as telas que ainda leem o nome.
 window.fiscais = [];
@@ -414,10 +423,12 @@ let _fiscaisPromise = null;
 
 async function carregarListaFiscais() {
     try {
+        // Sem filtro de role (usuário, 2026-09-17): gerente/admin também aparecem como fiscal
+        // em processos reais (ex.: matrícula 70024810, role 'gerente', fiscal de 7 processos) e
+        // ficavam de fora do dropdown, obrigando alteração só por SQL direto.
         const { data, error } = await sbClient
             .from('app_users')
-            .select('matricula, nome, sobrenome, full_name')
-            .eq('role', 'fiscal');
+            .select('matricula, nome, sobrenome, full_name');
         if (error) throw error;
 
         window.fiscais = (data || [])
@@ -1038,6 +1049,56 @@ function mapProcessoRow(r) {
         excluido_por: r.excluido_por,
         data_exclusao: r.data_exclusao
     };
+}
+
+// Mesma sequência de atualização de tela que o final de carregarDadosSupabase() roda,
+// sem refazer nenhuma consulta de rede que uma edição/exclusão pontual não precisa
+// (processos inteiro, contratos_edificacao, comissao_fiscalizacao, alerta_retorno_
+// comentarios em lote). carregarDadosFinanceiro() já é só cálculo em memória sobre
+// window.allData (ver financeiro.js) — chamar de novo aqui é barato.
+async function atualizarPainelAposEdicaoLocal() {
+    await carregarDadosFinanceiro();
+    populateAllTabFilters();
+    renderLastUpdate();
+    updateDashboard();
+    updateFinanceiro();
+    if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
+    iniciarVarreduraRiscoDiligencia();
+}
+
+// Busca só a LINHA recém-gravada (não a tabela inteira) e mescla no objeto que já existe
+// em window.allData — Object.assign, não substituição, para preservar campos que outras
+// rotinas anexam ao objeto por fora do mapProcessoRow (ex.: alertaRetornoUltimo,
+// alerta_pre_diligencia, suite_sigla_risco — recalculados de qualquer forma por
+// iniciarVarreduraRiscoDiligencia() dentro de atualizarPainelAposEdicaoLocal(), mas só
+// para ESTA linha se ela sobreviver aqui). Usa o mesmo mapProcessoRow que o carregamento
+// completo usa, para garantir a mesma forma e os mesmos tipos (Date/Number) dos campos.
+// Se a busca falhar, cai para o full reload em vez de arriscar deixar a tela com dado
+// velho. Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, item 5.
+async function atualizarLinhaProcessoLocal(id) {
+    try {
+        const { data, error } = await sbClient.from('processos').select('*').eq('id', id).single();
+        if (error || !data) throw error || new Error('Linha não encontrada após salvar.');
+
+        const fresh = mapProcessoRow(data);
+        window.allData = window.allData || [];
+        const idx = window.allData.findIndex(d => d.id === id);
+        if (idx === -1) window.allData.unshift(fresh);
+        else Object.assign(window.allData[idx], fresh);
+
+        await atualizarPainelAposEdicaoLocal();
+    } catch (e) {
+        console.error('[ERRO] Falha ao atualizar linha local do processo, recarregando tudo:', e);
+        await carregarDadosSupabase();
+    }
+}
+
+// Exclusão de processo é lógica (status='EXCLUÍDO'): carregarDadosSupabase() já filtra
+// esse status ao montar window.allData, então remover a linha localmente reproduz
+// exatamente o efeito de uma recarga completa.
+async function removerProcessoLocal(id) {
+    window.allData = (window.allData || []).filter(d => d.id !== id);
+    await atualizarPainelAposEdicaoLocal();
 }
 
 async function carregarDadosSupabase() {
@@ -1817,7 +1878,8 @@ async function executarAcaoDetalhes(actionType) {
         } else {
             alert("Excluído com sucesso!");
             bootstrap.Modal.getInstance(document.getElementById('modalDetalhes')).hide();
-            carregarDadosSupabase();
+            // Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, item 5.
+            removerProcessoLocal(idUnico);
         }
         return;
     }
@@ -2081,7 +2143,12 @@ async function executarAcaoDetalhes(actionType) {
             setTimeout(() => {
                 msg.style.display = 'none';
                 bootstrap.Modal.getInstance(document.getElementById('modalDetalhes')).hide();
-                carregarDadosSupabase();
+                // Não aguardado de propósito: igual ao antigo carregarDadosSupabase() que
+                // estava aqui, o código abaixo lê registroOriginal (estado ANTES da
+                // gravação) — atualizarLinhaProcessoLocal só muta window.allData depois
+                // que a busca de rede (assíncrona) resolver, então esta comparação segue
+                // vendo o valor antigo. Egress, 18/09/2026 — item 5 da auditoria.
+                atualizarLinhaProcessoLocal(idUnico);
 
                 // Log de Atividade (Apenas se status mudou, ou log geral)
                 if (updates.status && updates.status !== registroOriginal.status) {

@@ -228,17 +228,21 @@ $function$;
 -- ---------------------------------------------------------------------------
 
 -- PROCESSOS: ver todos (Fiscal com override) + gravar (Fiscal/Externo com override)
+-- (select ...) em cada função: sem o wrapper o Postgres reavalia a função (cada uma com
+-- sua própria subquery em app_users) por linha em vez de cachear como InitPlan —
+-- recomendação oficial de performance de RLS do Supabase, achado em 2026-09-17 revisando a
+-- demora do painel de fiscais (mesma autorização, plano de execução mais barato).
 DROP POLICY IF EXISTS "processos_select" ON public.processos;
 CREATE POLICY "processos_select"
   ON public.processos
   FOR SELECT
   TO authenticated
   USING (
-    public.pode_ver_todos_processos()
+    (select public.pode_ver_todos_processos())
     OR (
-      public.meu_papel() = 'fiscal'
+      (select public.meu_papel()) = 'fiscal'
       AND (
-        processos.fiscal_matricula = public.minha_matricula()
+        processos.fiscal_matricula = (select public.minha_matricula())
         OR processos.fiscal_matricula IS NULL
       )
     )

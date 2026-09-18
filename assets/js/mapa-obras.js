@@ -21,6 +21,8 @@ function readTokens(){ return {
   // Etapa C — cinza de "sem correspondência" (filtro ativo, 0 contratos na área).
   // Tokens --nomatch-* definidos nos dois temas; CSS é a única fonte da cor.
   nomatchFill:_tok('--nomatch-fill'), nomatchBorder:_tok('--nomatch-border'),
+  // Modo Replanilhamentos — área com amostra pequena demais para entrar na escala.
+  amostraFill:_tok('--amostra-fill'), amostraOpacity:parseFloat(_tok('--amostra-opacity'))||0.40,
 }; }
 // TOKENS continua const (referência estável usada em todo o arquivo); na troca de
 // tema o conteúdo é reescrito no lugar com Object.assign, não trocado o objeto.
@@ -70,6 +72,36 @@ async function obterTokenSessao(){
     return data?.session?.access_token ?? null;
   }catch{ return null; }
 }
+// Papel do usuário logado (E1) — decide se o modo Replanilhamentos é OFERECIDO. Não é
+// controle de acesso: o gate real é a view no banco, que devolve 0 linhas para quem não
+// for admin/gerente. Aqui só evitamos mostrar um botão que levaria a uma tela vazia.
+// app_users libera SELECT a qualquer autenticado (policy "Usuários autenticados podem
+// ver perfis"), então esta consulta não depende de papel nenhum para funcionar.
+let USER_PAPEL=null;
+async function obterPapelUsuario(){
+  try{
+    if(!window.sbClient) return null;
+    const {data}=await window.sbClient.auth.getSession();
+    const email=data?.session?.user?.email; if(!email) return null;
+    // ilike, não eq: public.meu_papel() casa por lower(email)=lower(jwt.email), e uma
+    // comparação exata aqui deixaria um admin com e-mail gravado em caixa diferente
+    // invisível para o front-end embora a view lhe devolva tudo.
+    const {data:rows,error}=await window.sbClient
+      .from('app_users').select('role').ilike('email',email).limit(1);
+    if(error) throw error;
+    return rows&&rows[0] ? rows[0].role : null;
+  }catch(e){ console.warn('Não foi possível ler o papel do usuário:',e.message||e); return null; }
+}
+function podeVerReplanilhamentos(){ return PAPEIS_REPLAN.includes(USER_PAPEL); }
+// Papel que não pôde ser lido (rede oscilando, usuário fora de app_users) é diferente
+// de papel negado. Esconder o modo nesse caso faria um admin legítimo não achar o
+// painel e não ter como descobrir por quê. Como o portão de verdade é a view no banco
+// — que devolve 0 linhas e cai na mensagem de acesso restrito — errar para o lado de
+// OFERECER é barato aqui, e errar para o lado de esconder é caro.
+// Exige sessão: sem ela o papel não é "indeterminado", é inexistente — e a página
+// inteira já está atrás do aviso de login.
+function papelIndefinido(){ return USER_PAPEL===null && !!SESSION_TOKEN; }
+
 const SB_KEY=window.SUPABASE_KEY;
 const SB_TABLE='contratos_edificacao';
 const SB_COMISSAO='comissao_fiscalizacao';
@@ -117,12 +149,59 @@ const STM_LEGENDA=[
 // (toggle "Histórico completo"), porque não mudam mais e só diluiriam os KPIs/gráficos.
 const ACTIVE_STATUSES=['Em Execução','Aguardando OS','Paralisada'];
 
+// ---- modo Replanilhamentos (E1) ----
+// Fonte única: a view já resolve fila/despacho/data de despacho/fiscal/obra, para que
+// este módulo e a quebra por distrito de modules/processos/processos.js nunca calculem
+// a mesma coisa de dois jeitos (ver sql/create_vw_painel_desempenho_fiscais.sql).
+// A view é restrita a admin/gerente NO BANCO: quem não tem papel recebe 0 linhas, não
+// erro. A porta no front (PAPEIS_REPLAN) existe para não OFERECER o que o banco negaria.
+const SB_PROCESSOS='vw_painel_desempenho_fiscais';
+const PAPEIS_REPLAN=['admin','gerente'];
+const PROCESSOS_COLS=['id','processo','status','status_exibicao','tipo','prioritario',
+  'na_fila','situacao','despachado','data_despacho','tempo_fiscal_dias','aberto_ja_pronto',
+  'dias_na_unidade','conferencia',
+  'data_compromisso_fiscal','meta_estourada',
+  'fiscal_matricula','fiscal_nome','fiscal_gedop','fiscal_gerencia','fiscal_cadastrado',
+  'codigo_obra','obra_descricao','obra_municipio','obra_valor','obra_status',
+  'contratada','contratante','analista','data_recebimento','reperc_fiscal','reperc_gecope'].join(',');
+// ---- mapa do modo Replanilhamentos (E2) ----
+const RP_METRICA={
+  tempo:{label:'Tempo médio de resposta'},
+  desp:{label:'Despachos'},
+  fila:{label:'Processos'},
+};
+const RP_PERIODO={'6m':{meses:6,txt:'últimos 6 meses'},'12m':{meses:12,txt:'últimos 12 meses'},
+                  '24m':{meses:24,txt:'últimos 24 meses'},
+                  // "Hoje" (antes "Tudo"): processos com o fiscal agora; despachos e tempo
+                  // médio do histórico inteiro — pedido do usuário, 2026-09-16.
+                  'hoje':{meses:null,txt:'todo o histórico'}};
+// Duas réguas de amostra, e não uma (decisão do usuário, 2026-09-17).
+//
+// AMOSTRA_MIN é o piso para EXISTIR média: abaixo disto não há número em lugar nenhum —
+// nem cor no mapa, nem KPI, nem linha no ranking. Era 5 até 2026-09-17, e com esse corte
+// só 11 dos 58 fiscais apareciam no ranking: um painel que não respondia à pergunta que
+// existe para responder. Baixado para 2 a pedido do usuário.
+//
+// AMOSTRA_SOLIDA é o piso para o número ser tratado como FIRME. Entre os dois, a média é
+// mostrada mas marcada como fina — porque a dispersão DENTRO de um mesmo fiscal é enorme
+// (a tira de despachos da janela mostra o mesmo fiscal indo de 24 a 338 dias), e com 2
+// ou 3 casos um único processo travado decide o número. Sem a marca, alguém com 2
+// despachos seria ordenado nominalmente ao lado de alguém com 30, na mesma lista, diante
+// de um conselho deliberativo — e é isso que a barra vazada e o contador impedem.
+const AMOSTRA_MIN=2;
+const AMOSTRA_SOLIDA=5;
+// Amostra que existe mas não é firme (ver acima): vale só onde uma PESSOA é nomeada.
+function amostraFina(n){ return n>=AMOSTRA_MIN && n<AMOSTRA_SOLIDA; }
+// janelinha do botão "i" dos KPIs (mostraRpTip). Declarada aqui, e não junto das funções,
+// porque renderPanelReplan pode rodar antes de o script chegar lá.
+let _rpTip=null, _rpTipAlvo=null;
+
 // monta o objeto que o app consome (obras entram depois, no loadData).
 // O módulo opera exclusivamente por Distrito Operacional — os dados de "Região"
 // (ce-referencia.json:REGIOES, ce-blocos.json:reg) continuam no disco, mas não
 // são mais lidos pelo app.
 const DB={distritos:DISTRITOS, municipios:{}};
-for(const cod in MUN){ DB.municipios[cod]={nome:MUN[cod].nome, do:MUN[cod].do, obras:[]}; }
+for(const cod in MUN){ DB.municipios[cod]={nome:MUN[cod].nome, do:MUN[cod].do, obras:[], processos:[]}; }
 
 // Escapa texto vindo do banco (contratos_edificacao/comissao_fiscalizacao) antes de
 // injetar via innerHTML \u2014 p\u00e1gina p\u00fablica, sem login, ent\u00e3o qualquer HTML gravado
@@ -328,8 +407,17 @@ async function fetchMedicoes(idFilter){
 // quando a BASE mudou de fato, não quando a página foi recarregada (antes usava
 // `new Date()`, então mostrava "agora" mesmo em bases paradas há dias).
 let _lastStatus=null; // últimos args — replay na troca de tema (o dot lê TOKENS.ng/amber inline)
-function setStatus(txt,ok,lastSync){
-  _lastStatus={txt,ok,lastSync};
+// Último status do modo Obras, para a volta de Replanilhamentos. Capturado AQUI, a cada
+// chamada, e não uma única vez na entrada do modo: #btnScope (Carteira ativa/Histórico
+// completo) continua ativo dentro do modo novo e dispara loadData(), então um retrato
+// congelado faria a volta para Obras exibir a contagem de contratos do escopo anterior.
+// Declarado junto de _lastStatus de propósito — setStatus é chamada já na falha de carga
+// do GeoJSON, antes de boa parte do arquivo ser avaliada.
+let _statusObras=null;
+// `replan` marca que o texto veio do modo Replanilhamentos.
+function setStatus(txt,ok,lastSync,replan){
+  _lastStatus={txt,ok,lastSync,replan:!!replan};
+  if(!replan) _statusObras={txt,ok,lastSync,replan:false};
   const el=document.getElementById('connStatus');
   if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); const dot=ok?TOKENS.ng:TOKENS.amber; d.style.background=dot; d.style.boxShadow='0 0 10px '+dot;}
   const b=document.querySelector('.badge');
@@ -371,11 +459,14 @@ function showLoginRequired(msg){
   const link=document.getElementById('dataErrorLink'); if(link) link.style.display='inline-block';
 }
 
-// cache de curta duração (sessionStorage) para não refazer o fetch inteiro a cada
-// F5 durante uma apresentação — 5min é curto o bastante pra nunca mostrar dado
-// visivelmente desatualizado, e longo o bastante pra recarregar/trocar de escopo
-// instantaneamente dentro da mesma sessão.
-const CACHE_TTL_MS=5*60*1000;
+// cache (sessionStorage) para não refazer o fetch inteiro a cada F5. As bases de
+// origem mudam no máximo 1x por dia (carga manual/mensal — ver docs/auditoria-egress-
+// 2026-09.md, item 9), então 5min era bem mais curto do que precisava: toda sessão que
+// passasse desse tempo — inclusive só de alguém deixando a aba aberta numa
+// apresentação — refazia as 5 consultas inteiras. 1h ainda mostra "Base atualizada em"
+// no cabeçalho (então a defasagem fica visível) e o botão "Atualizar dados" ao lado do
+// alternador de escopo força uma recarga a qualquer momento, ignorando o cache.
+const CACHE_TTL_MS=60*60*1000;
 // Etapa B: o formato do cache ganhou `medic` (v3 — curva de medição do Resumo) e,
 // depois, mais colunas em cada linha de `medic` (v4 — nr_protocolo/total/status pra
 // a tabela mensal da aba Medições). v5: cada linha de `adit` ganhou data_publicacao.
@@ -480,6 +571,10 @@ async function loadData(){
     let lastSync=null;
     for(const r of rows){ if(r.atualizado_em && (!lastSync || r.atualizado_em>lastSync)) lastSync=r.atualizado_em; }
     setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true, lastSync);
+    // #btnScope continua ativo no modo Replanilhamentos e recarrega as obras: o
+    // setStatus acima já atualizou o retrato de Obras (_statusObras) para a volta, e
+    // aqui a linha de status volta a falar do conjunto que está em foco.
+    if(modoReplan()) atualizarStatusModo();
   }catch(e){
     console.error(e);
     showDataError('Não foi possível carregar os contratos: '+e.message);
@@ -488,6 +583,119 @@ async function loadData(){
   document.body.classList.remove('boot-loading');
   fillFilters(); render(); refit();
 }
+
+/* ============================================================
+   MODO REPLANILHAMENTOS — carga (E1)
+   Os processos entram no MESMO índice geográfico das obras
+   (DB.municipios[cod].processos), pelo município da obra — que a view garante
+   em 100% dos casos, porque cai em processos.municipio quando a obra já encerrou
+   e saiu de contratos_edificacao. Assim o modo novo herda de graça a navegação,
+   os rótulos e o enquadramento que já existem.
+   ============================================================ */
+let PROCESSOS=[], _procCarregado=false, _procDiag=null;
+// Processos por distrito nas duas réguas (String(gid) -> processos). Montados uma vez na
+// carga: o nível 1 consulta um deles a cada hover e a cada render.
+let _procPorEquipe=new Map(), _procPorObra=new Map();
+function modoReplan(){ return st.modo==='replanilhamentos'; }
+
+// gedop (app_users) -> id do distrito no GeoJSON. Os 11 valores casam 1:1 com
+// ce-referencia.json depois de normalizar acento e caixa; 'FORTALEZA' é a única
+// exceção real (o mapa chama de 'RM Fortaleza'). De-para explícito em vez de
+// heurística de prefixo: são 11 valores estáveis, e um casamento silenciosamente
+// errado jogaria os fiscais de um distrito inteiro no balde errado.
+const GEDOP_ALIAS={'FORTALEZA':'RM FORTALEZA'};
+let _gedop2gid=null;
+function gidDeGedop(gedop){
+  if(!_gedop2gid){ _gedop2gid={}; groupsList().forEach(g=>{ _gedop2gid[normTxt(g.nome)]=g.id; }); }
+  const k=normTxt(gedop||''); if(!k) return null;
+  const alvo=GEDOP_ALIAS[k]||k;
+  return _gedop2gid[alvo]!==undefined?_gedop2gid[alvo]:null;
+}
+function mapProcesso(r){
+  const cod=r.obra_municipio?NAMEIDX[normTxt(r.obra_municipio)]:null;
+  return {
+    id:r.id, processo:r.processo||'—', status:r.status||'—',
+    statusTxt:r.status_exibicao||r.status||'—',
+    tipo:r.tipo||'', prioritario:!!r.prioritario,
+    naFila:r.na_fila===true, despachado:r.despachado===true,
+    // Arquivado no meio do trâmite (ARQUIVADO sem data de aprovação) não é despacho, nem
+    // fila, nem GECOPE: fica fora das métricas. APROVADO sem data (erro de cadastro) e
+    // processo sem linha na view de tempo (situacao nula) idem — contados na conferência.
+    foraDoCiclo:r.situacao!=='em_tramitacao'&&r.situacao!=='despachado',
+    situacao:r.situacao||'',
+    dataDespacho:r.data_despacho||null,
+    // Dias na unidade do fiscal no SUITE até a ida à GECOPE que resultou na aprovação, só
+    // do fiscal que despachou (ver sql/create_vw_painel_desempenho_fiscais.sql). null é
+    // dado ausente, não zero: aberto já pronto ou motivo em `conferencia`.
+    tempoFiscal:r.tempo_fiscal_dias==null?null:num(r.tempo_fiscal_dias),
+    abertoJaPronto:r.aberto_ja_pronto===true,
+    conferencia:r.conferencia||'',
+    // Processo na fila: dias desde a última entrada na unidade do fiscal no SUITE. null =
+    // o status diz fila, mas o processo ainda tramita até a unidade do fiscal.
+    diasNaUnidade:r.dias_na_unidade==null?null:num(r.dias_na_unidade),
+    // Tri-estado preservado de propósito: a view devolve NULL quando o processo não tem
+    // data_compromisso_fiscal, e NULL ("sem meta") é diferente de false ("dentro da
+    // meta"). Colapsar os dois faria o denominador de "N além da meta" virar a fila
+    // inteira e subestimar o atraso.
+    metaEstourada:r.meta_estourada==null?null:r.meta_estourada===true,
+    fiscalMat:r.fiscal_matricula||'', fiscalNome:r.fiscal_nome||'(sem fiscal)',
+    fiscalCadastrado:r.fiscal_cadastrado===true,
+    gedop:r.fiscal_gedop||'', gerencia:r.fiscal_gerencia||'', gid:gidDeGedop(r.fiscal_gedop),
+    codigo_obra:r.codigo_obra||'', objeto:r.obra_descricao||'—',
+    municipioTxt:r.obra_municipio||'', municipioCod:cod||null,
+    // obra já encerrada sai de contratos_edificacao, então 41% dos despachados não têm
+    // valor. null (não 0) para que nenhuma média o conte como "obra de valor zero".
+    valorObra:r.obra_valor==null?null:num(r.obra_valor),
+    contratada:r.contratada||'—', contratante:r.contratante||'—',
+    analista:r.analista||'', raw:r
+  };
+}
+// Carrega uma vez por sessão de página. Não entra no cache de sessionStorage das obras:
+// aquele é chaveado por escopo de carteira, que não existe aqui, e o volume é pequeno
+// (algumas centenas de linhas) — não vale o risco de servir número velho num painel de
+// desempenho.
+async function loadProcessos(){
+  if(_procCarregado) return {ok:true};
+  if(!SESSION_TOKEN) return {ok:false,erro:'sem sessão'};
+  const rows=await fetchTable(SB_PROCESSOS,{select:PROCESSOS_COLS});
+  PROCESSOS=rows.map(mapProcesso);
+  for(const c in DB.municipios) DB.municipios[c].processos=[];
+  _procPorEquipe=new Map(); _procPorObra=new Map();
+  const indexa=(m,gid,p)=>{ const k=String(gid); let a=m.get(k); if(!a){ a=[]; m.set(k,a); } a.push(p); };
+  let semMunicipio=0, semGedop=0, gedopSemDistrito=0, comAmbos=0, divergencia=0, despSemData=0;
+  let despSemTempo=0, abertosProntos=0, aprovSemData=0, semSituacao=0;
+  for(const p of PROCESSOS){
+    // Os dois ficam fora de todas as métricas (foraDoCiclo); contados para não sumirem calados.
+    if(p.situacao==='aprovado_sem_data') aprovSemData++;
+    if(!p.situacao) semSituacao++;
+    // Sem data de despacho, o processo só entra no período "Hoje". Contado para que a
+    // ausência apareça na conferência em vez de encolher os recortes em silêncio.
+    if(p.despachado && !p.dataDespacho) despSemData++;
+    // Despacho sem tempo conta nos despachos e fica fora da média: os dois motivos são
+    // contados à parte, porque "aberto já pronto" é regra e o outro é caso a conferir.
+    if(p.despachado && p.tempoFiscal==null){ if(p.abertoJaPronto) abertosProntos++; else despSemTempo++; }
+    if(p.municipioCod) DB.municipios[p.municipioCod].processos.push(p); else semMunicipio++;
+    // Dois motivos diferentes para não ter distrito do fiscal, contados à parte: fiscal
+    // sem lotação preenchida, ou gedop grafado de um jeito que não casa com nenhum dos
+    // 11 distritos. O segundo derruba um distrito inteiro e precisa ser distinguível.
+    if(!p.gedop) semGedop++; else if(p.gid==null) gedopSemDistrito++;
+    // Um processo tem DOIS distritos possíveis: o da obra (geografia, que o mapa usa) e
+    // o do fiscal (gedop, que a leitura de desempenho pede). Medido aqui para que a
+    // divergência seja um número conhecido e não uma surpresa no meio de uma reunião.
+    p.gidObra = p.municipioCod ? gidOf(p.municipioCod) : null;
+    if(p.gid!=null) indexa(_procPorEquipe,p.gid,p);
+    if(p.gidObra!=null) indexa(_procPorObra,p.gidObra,p);
+    if(p.gid!=null && p.gidObra!=null){
+      comAmbos++;                                  // contado, não derivado por subtração:
+      if(String(p.gid)!==String(p.gidObra)) divergencia++;  // as ausências se sobrepõem
+    }
+  }
+  _procCarregado=true;
+  _procDiag={total:PROCESSOS.length, semMunicipio, semGedop, gedopSemDistrito, comAmbos, divergencia, despSemData,
+             despSemTempo, abertosProntos, aprovSemData, semSituacao};
+  return {ok:true, ..._procDiag};
+}
+
 const BRL=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
 // só pras abas Aditivos/Medições do modal (valores por contrato individual, onde
 // centavos importam pra bater com o extrato oficial) — os KPIs do painel principal e
@@ -510,6 +718,17 @@ function signedBRL(n){ return (n<0?'−':'')+BRL2.format(Math.abs(n)); }
 // inteiro" como bloco único) deixou de ser um destino navegável — o app nasce
 // já dividido nos distritos e a animação de entrada termina neles.
 const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:'ativa',
+  // E1 — 'obras' (comportamento de sempre) ou 'replanilhamentos'. Tudo que é específico
+  // do modo novo fica atrás de modoReplan(); o modo Obras não enxerga nada disso.
+  modo:'obras',
+  // E2 — lente do mapa no modo Replanilhamentos. `regua` decide para qual distrito um
+  // processo conta: 'equipe' (lotação do fiscal, app_users.gedop) ou 'obra' (município da
+  // obra). Vale só no nível 1: cidade não existe pela lotação, então do nível 2 para
+  // baixo tudo conta pelo local da obra (ver reguaEquipe()).
+  // E4 — `fiscal` é a matrícula escolhida no quadrante despachos × tempo (null = nenhuma).
+  // Vive aqui, junto do resto da lente do modo novo, para que nenhum estado dele exista
+  // fora de st. Sobrevive à volta a Obras (inerte: só o painel do modo novo a lê).
+  rp:{metrica:'tempo', periodo:'12m', regua:'equipe'},
   sel:null, // Ctrl+clique em vários distritos/municípios: {kind:'group'|'city', ids:Set}
   // Etapa C: chaves novas declaradas já como Set (as defs em FILTER_DEFS e a UI
   // entram no Bloco 2 — até lá ficam vazias e inertes).
@@ -566,6 +785,114 @@ function obrasOf(id){
 }
 function aggIds(ids){let obras=0,valor=0,valorOriginal=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;valorOriginal+=o.valor_original;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;}));return{obras,valor,valorOriginal,par,adit};}
 function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:a.obras;}
+// ---- recorte e período do modo Replanilhamentos (E2) ----
+// Mesma aritmética de `current_date - interval 'N months'` do Postgres, que o diagnóstico
+// SQL usa: o dia é limitado ao último dia do mês de destino (31/08 − 6 meses = 28/02). O
+// Date.setMonth transbordaria para março, e o corte daqui divergiria do SQL justamente
+// nos dias em que alguém confere os dois lado a lado.
+function corteDespacho(meses){
+  if(meses==null) return null;
+  const h=new Date(); let y=h.getFullYear(), m=h.getMonth()-meses;
+  y+=Math.floor(m/12); m=((m%12)+12)%12;
+  const d=Math.min(h.getDate(), new Date(y,m+1,0).getDate());
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+// A régua vale para a entidade DISTRITO, em qualquer nível: a lista de irmãos da trilha
+// ("Outros distritos") abre no nível 2 e continua listando distritos — se ela consultasse
+// o nível, mostraria Crateús com 10 despachos logo depois de o mapa ter mostrado 12.
+function procsDoDistrito(gid){ return (st.rp.regua==='equipe'?_procPorEquipe:_procPorObra).get(String(gid))||[]; }
+// Já esta responde pelo MAPA: do nível 2 para baixo o mapa mostra cidades, e cidade só
+// existe pelo local da obra.
+function reguaEquipe(){ return st.rp.regua==='equipe' && st.level<=1; }
+function procsDeMuns(ids){ const out=[]; ids.forEach(id=>{ for(const p of DB.municipios[id].processos) out.push(p); }); return out; }
+// Espelha scopeIds(), mas devolve PROCESSOS: na régua da equipe o recorte de um distrito
+// não é um conjunto de municípios. No nível 1 sem destaque, o total é a soma dos 11
+// distritos da régua ativa — assim o estado bate com a soma do que o mapa pinta, e o que
+// fica de fora aparece na "Conferência da carga".
+function procsDoRecorte(){
+  if(st.sel && st.sel.ids.size){
+    return st.sel.kind==='group' ? [...st.sel.ids].flatMap(procsDoDistrito) : procsDeMuns([...st.sel.ids]);
+  }
+  if(st.level===1 && st.hoverGroup!=null) return procsDoDistrito(st.hoverGroup);
+  if(st.level<=1) return groupsList().flatMap(g=>procsDoDistrito(g.id));
+  if(st.level===2) return procsDeMuns(idsOfGroup(st.group));
+  return procsDeMuns([st.city]);
+}
+// Agregado de uma lista de processos. `tempoMedio` sai só dos despachados NO PERÍODO e
+// COM tempo medido, e `nTempo` viaja junto de propósito: média de desempenho sem o tamanho
+// da amostra ao lado convida à conclusão errada sobre uma pessoa.
+// Fila, atraso e GECOPE são a posição de HOJE; despachos e tempo obedecem ao período.
+// `procs` é o card PROCESSOS (decisão do usuário, 2026-09-16): em "Hoje", só quem está com
+// o fiscal agora; numa janela, quem passou pela Fiscalização nela — com o fiscal hoje mais
+// os despachados no período. `fiscais` conta os responsáveis por ESSES processos, e
+// `semMatricula` os que não entram nessa conta por falta de matrícula.
+function aggProc(procs){
+  let total=0,fila=0,despTotal=0,desp=0,somaTempo=0,nTempo=0,metaEst=0,comMeta=0,semMatricula=0,naGecope=0;
+  // Despachos do período SEM tempo medido, separados por motivo: "aberto já pronto" é
+  // regra (menos de 1 dia com o fiscal) e o outro é caso a conferir. Contados aqui para
+  // que a janela possa DIZER por que alguém com 4 despachos não tem média — sem isso o
+  // painel só mostra o buraco (achado do usuário em 2026-09-17, olhando Fortaleza).
+  let prontos=0,semTempo=0;
+  const fiscais=new Set(), gecope=new Map(), filaPorStatus=new Map();
+  const hoje=st.rp.periodo==='hoje';
+  const contaFiscal=p=>{ if(p.fiscalMat) fiscais.add(p.fiscalMat); else semMatricula++; };
+  // data_despacho chega como 'AAAA-MM-DD' (coluna date): comparar texto é comparar data.
+  // corte null = "Hoje", que para despachos e tempo é o histórico inteiro.
+  const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
+  for(const p of procs){
+    total++;
+    if(p.naFila){ fila++;
+      contaFiscal(p);
+      // meta_estourada é NULL quando não há data_compromisso_fiscal, e o cadastro zera
+      // essa data ao sair de um status com meta. "N atrasados" só significa algo contra
+      // o total que TEM prazo, não contra a fila inteira.
+      if(p.metaEstourada!=null) comMeta++;
+      if(p.metaEstourada) metaEst++;
+      // Quebrado por status (statusTxt já traz "REANÁLISE FISCAL" no lugar do rótulo
+      // longo do banco — mesma fonte da seção "GECOPE × Fiscalização", usuário 2026-09-17).
+      const kf=String(p.statusTxt||'').trim().toUpperCase()||'—';
+      filaPorStatus.set(kf,(filaPorStatus.get(kf)||0)+1);
+    } else if(p.despachado){ despTotal++;
+      if(corte==null || (!!p.dataDespacho && p.dataDespacho>=corte)){
+        desp++;
+        if(!hoje) contaFiscal(p);
+        if(p.tempoFiscal!=null){ somaTempo+=p.tempoFiscal; nTempo++; }
+        else if(p.abertoJaPronto) prontos++;
+        else semTempo++;
+      }
+    } else if(!p.foraDoCiclo){ naGecope++;
+      // Nem com o fiscal nem despachado: está na GECOPE (Diligência, Em Análise, Aguar.
+      // Aprovação…). Quebrado por status para a seção "Processos na GECOPE".
+      const k=String(p.status||'').trim().toUpperCase()||'—';
+      gecope.set(k,(gecope.get(k)||0)+1);
+    }
+  }
+  return {total,fila,desp,despTotal,naGecope,gecope,filaPorStatus,
+          procs:hoje?fila:fila+desp, fiscais:fiscais.size, semMatricula,
+          metaEst,comMeta,prontos,semTempo,
+          tempoMedio:nTempo?somaTempo/nTempo:null, nTempo};
+}
+// Valor que o mapa pinta para um agregado. `v` null = sem número comparável (só acontece
+// no tempo médio, com amostra abaixo de AMOSTRA_MIN) — pinta em cinza, fora da escala.
+function rpValor(a){
+  const m=st.rp.metrica;
+  if(m==='fila') return {v:a.procs, n:a.procs};   // o mesmo número do card PROCESSOS
+  if(m==='desp') return {v:a.desp, n:a.desp};
+  return {v:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null, n:a.nTempo};
+}
+function rpFmt(v){
+  if(v==null) return '—';
+  return st.rp.metrica==='tempo' ? fmtDias(v) : NUM.format(v);
+}
+// rótulo curto do mapa: cabe sob o nome do distrito sem empurrar o declutter.
+// Abaixo de AMOSTRA_MIN, "sem dado" (pedido do usuário, 2026-09-16): a contagem de
+// despachos no lugar dos dias parecia outra medida ao lado dos vizinhos. O número de
+// despachos continua no hover e no ranking.
+function rpFmtCurto(r){
+  if(st.rp.metrica!=='tempo') return NUM.format(r.v);
+  if(r.v==null) return 'sem dado';
+  return `${Math.round(r.v)} d`;
+}
 
 // ---- mapa ----
 const map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:6,maxZoom:11});
@@ -593,9 +920,62 @@ function choroT(value,max){ return Math.max(0,Math.min(1,value/max)); }
 // que passam. Distrito: consulta _groupCountByGid (contagem já calculada 1x por
 // render(), como _groupValByGid). Fora de filtro, sempre false — mapa idêntico ao de hoje.
 let _groupCountByGid=new Map();
-function noMatchCity(id){ return hasActiveFilter() && aggIds([id]).obras===0; }
-function noMatchGroup(gid){ return hasActiveFilter() && (_groupCountByGid.get(String(gid))||0)===0; }
+// Os filtros são de contratos: no modo Replanilhamentos não acinzentam nem travam área
+// (seguem guardados em st.f para a volta a Obras).
+function noMatchCity(id){ return !modoReplan() && hasActiveFilter() && aggIds([id]).obras===0; }
+function noMatchGroup(gid){ return !modoReplan() && hasActiveFilter() && (_groupCountByGid.get(String(gid))||0)===0; }
 const NOMATCH_STYLE=()=>({fillColor:TOKENS.nomatchFill,color:TOKENS.nomatchBorder,weight:0.5+0.4*zt(),fillOpacity:.16,opacity:.5});
+
+// ---- pintura do modo Replanilhamentos (E2) ----
+// Calculado 1x por render(), como _groupValByGid: groupStyle/styleFeature/declutter só
+// consultam (declutter chama a prioridade dentro de um sort). Nível 1 = os 11 distritos
+// na régua ativa; níveis 2 e 3 = as cidades do distrito aberto, pelo local da obra.
+// Cada entrada: {v, n, tot} — valor pintado (null = amostra insuficiente), amostra, e
+// total de processos (prioridade de rótulo, estável entre métricas).
+let _rpGrp=new Map(), _rpMun=new Map(), _rpMaxGrp=1, _rpMaxMun=1, _rpTemEscala=true;
+function rpPreparaMapa(){
+  _rpGrp=new Map(); _rpMun=new Map();
+  // tot sem os fora do ciclo: cidade só com arquivados no trâmite não entra no ranking
+  const entrada=procs=>{ const a=aggProc(procs); return {...rpValor(a), tot:a.fila+a.despTotal+a.naGecope}; };
+  if(st.level<=1) groupsList().forEach(g=>_rpGrp.set(String(g.id), entrada(procsDoDistrito(g.id))));
+  else idsOfGroup(st.level===2?st.group:gidOf(st.city)).forEach(id=>_rpMun.set(id, entrada(DB.municipios[id].processos)));
+  const maxDe=m=>{ let x=0; m.forEach(r=>{ if(r.v!=null && r.v>x) x=r.v; }); return x>0?x:1; };
+  _rpMaxGrp=maxDe(_rpGrp); _rpMaxMun=maxDe(_rpMun);
+  // Existe escala quando ao menos uma área tem número comparável. Se NENHUMA tem, marcar
+  // cada uma como exceção não informa nada — a legenda diz a frase inteira, e o mapa fica
+  // uniforme em vez de todo tracejado.
+  _rpTemEscala=[...(st.level<=1?_rpGrp:_rpMun).values()].some(r=>r.v!=null);
+}
+// Mesma escala única de opacidade do modo Obras (choroT + floor/span por tema): mais
+// escuro = número maior, em todas as métricas. Amostra insuficiente sai da escala.
+function rpPreenche(r,max){
+  if(!r || r.v==null) return {fillColor:TOKENS.amostraFill, fillOpacity:TOKENS.amostraOpacity};
+  return {fillColor:BASE, fillOpacity:TOKENS.choroFloor+TOKENS.choroSpan*choroT(r.v,max)};
+}
+function rpTip(nome,r,onde){
+  const m=st.rp.metrica, per=RP_PERIODO[st.rp.periodo].txt, n=r?r.n:0;
+  const desp=`${NUM.format(n)} despacho${n===1?'':'s'}`;
+  let sub;
+  if(m==='fila') sub=rpQuandoProc();
+  else if(m==='desp') sub=per;
+  else if(r && r.v!=null) sub=`em ${desp} · ${per}`;
+  else sub=`só ${desp} · ${per} — a média pede ao menos ${AMOSTRA_MIN}`;
+  return `<b>${escHtml(nome)}</b><br>${RP_METRICA[m].label}: ${rpFmt(r?r.v:null)}`
+    +`<span class="tip-sub">${escHtml(sub)}</span><span class="tip-sub">${escHtml(onde)}</span>`;
+}
+// Recorte de tempo da contagem de PROCESSOS: em "Hoje" é a posição atual, e não o
+// histórico que o mesmo botão significa para despachos e tempo médio.
+function rpQuandoProc(){ return st.rp.periodo==='hoje' ? 'hoje' : RP_PERIODO[st.rp.periodo].txt; }
+function rpOndeGrupo(){ return reguaEquipe()?'Contado pela equipe lotada no distrito':'Contado pelas obras localizadas no distrito'; }
+// "o que está sendo contado, e como" — uma frase só, usada pela legenda do mapa e pela
+// lista de irmãos da trilha, para as duas nunca discordarem.
+function rpRecorteTxt(porDistrito){
+  const quando = st.rp.metrica==='fila' ? rpQuandoProc() : RP_PERIODO[st.rp.periodo].txt;
+  const alvo = porDistrito
+    ? (st.rp.regua==='equipe'?'distritos pela equipe do fiscal':'distritos pelo local da obra')
+    : 'cidades pelo local da obra';
+  return `${quando} · ${alvo}`;
+}
 function styleFeature(f){
   const id=f.properties.id;
   if(!visible(id)) return HID;                    // níveis 0 e 1: municípios escondidos
@@ -604,6 +984,7 @@ function styleFeature(f){
     // intensidade coroplética normal — precisa ser visualmente inconfundível com
     // "só tem muita obra" (que usa a mesma cor base, só mais opaca)
     if(st.sel&&st.sel.kind==='city'&&st.sel.ids.has(String(id))) return {fillColor:TOKENS.ng,color:TOKENS.mapLine,weight:1.6+0.8*zt(),fillOpacity:.78,opacity:1};
+    if(modoReplan()) return {...rpPreenche(_rpMun.get(id),_rpMaxMun),color:TOKENS.mapOpenBorder,weight:0.5+0.7*zt(),opacity:.85};
     if(noMatchCity(id)) return NOMATCH_STYLE();   // Etapa C: filtro ativo, 0 contratos
     // preenchimento varia com a métrica atual (obra/valor/aditivo), não é mais
     // uma cor uniforme — um município com 0 obras e um com o máximo do distrito
@@ -616,11 +997,26 @@ function styleFeature(f){
 }
 function applyInteractivity(){
   // Etapa C: polígono "sem correspondência" também fica inerte (não navegável).
-  layer.eachLayer(l=>{ if(l._path){ const id=l.feature.properties.id; l._path.style.pointerEvents = (visible(id) && !noMatchCity(id))?'':'none'; } });
+  layer.eachLayer(l=>{ if(l._path){ const id=l.feature.properties.id; l._path.style.pointerEvents = (visible(id) && !noMatchCity(id))?'':'none';
+    // E2: o tracejado de "sem amostra" é classe, não opção de estilo — `setStyle` do
+    // Leaflet MESCLA opções, então um dashArray aplicado aqui ficaria preso no polígono
+    // ao voltar para o modo Obras. A classe sai sozinha na próxima passada.
+    l._path.classList.toggle('sem-amostra', semAmostraMun(id)); } });
+}
+// Cinza fora da escala: só existe no nível 2, onde as cidades são pintadas pela escala
+// (no nível 3 a cidade aberta tem preenchimento cheio, como no modo Obras).
+function semAmostraMun(id){
+  if(!modoReplan() || st.level!==2 || !_rpTemEscala) return false;
+  const r=_rpMun.get(id); return !!r && r.v==null;
+}
+function semAmostraGrp(gid){
+  if(!modoReplan() || !_rpTemEscala) return false;
+  const r=_rpGrp.get(String(gid)); return !!r && r.v==null;
 }
 const tip=L.tooltip({sticky:true,direction:'top'});
 function tipHtml(id){
   // Etapa D: nível 0 removido — o app nunca fica no "Ceará inteiro".
+  if(modoReplan()) return rpTip(DB.municipios[id].nome,_rpMun.get(id),'Contado pelas obras localizadas na cidade');
   if(st.level===1){const g=gidOf(id),gg=grpById(g);const v=mval(aggIds(idsOfGroup(g)));return `<b>${gg.nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`;}
   const v=mval(aggIds([id]));return `<b>${DB.municipios[id].nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`;
 }
@@ -661,6 +1057,7 @@ function groupStyle(f){
   // distrito/região na seleção combinada (Ctrl+clique): mesmo destaque cheio usado
   // pra município selecionado no nível 2 — consistência visual entre os dois níveis
   if(f&&st.sel&&st.sel.kind==='group'&&st.sel.ids.has(String(f.properties.gid))) return {fillColor:TOKENS.ng,color:TOKENS.mapLine,weight:gw()+1.2,fillOpacity:.68,opacity:1};
+  if(f&&modoReplan()) return {...rpPreenche(_rpGrp.get(String(f.properties.gid)),_rpMaxGrp),color:TOKENS.mapGroupBorder,weight:gw(),opacity:.9};
   if(f&&noMatchGroup(f.properties.gid)) return NOMATCH_STYLE(); // Etapa C: filtro ativo, distrito sem contratos
   // sem busca/filtro ativos: cor uniforme, como sempre foi — a própria divisão em
   // distritos/regiões já é a informação. Com filtro ativo, escala a opacidade pela
@@ -681,11 +1078,22 @@ function onGroup(f,l){
   l.on('mouseover',()=>{ if(inert()) return; l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; if(panelVisible()) renderPanel();
     // com filtro ativo, _groupValByGid já tem esse valor (calculado em render() logo
     // antes do groupLayer.setStyle() que acabou de rodar) — não recalcula à toa aqui.
+    if(modoReplan()){
+      tip.setLatLng(l.getBounds().getCenter()).setContent(rpTip(f.properties.nome,_rpGrp.get(String(gid)),rpOndeGrupo())).addTo(map);
+      return;
+    }
     const v=hasActiveFilter()?(_groupValByGid.get(String(gid))||0):mval(aggIds(idsOfGroup(gid)));
     tip.setLatLng(l.getBounds().getCenter()).setContent(`<b>${f.properties.nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`).addTo(map); });
   l.on('mouseout',()=>{ groupLayer.resetStyle(l); st.hoverGroup=null; if(panelVisible()) renderPanel(); tip.remove(); });
   // Ctrl/Cmd+clique num distrito/região soma à seleção combinada em vez de entrar nele
-  l.on('click',e=>{ if(inert()) return; if(e.originalEvent&&(e.originalEvent.ctrlKey||e.originalEvent.metaKey)){ toggleSelection('group',gid); return; } goGroup(gid); });
+  l.on('click',e=>{ if(inert()) return;
+    if(e.originalEvent&&(e.originalEvent.ctrlKey||e.originalEvent.metaKey)){ toggleSelection('group',gid); return; }
+    // No modo Replanilhamentos o clique abre o PAINEL do distrito, não a lista de
+    // municípios (usuário, 2026-09-17): descer para cidades é a pergunta da aba
+    // Contratos — aqui a pergunta é como aquela equipe está indo. O caminho para as
+    // cidades continua no ranking do painel lateral, que não mudou.
+    if(modoReplan()){ abreModalDistrito(gid); return; }
+    goGroup(gid); });
 }
 function buildGroupLayer(){ if(groupLayer) groupLayer.remove(); groupLayer=L.geoJSON(GRP.do,{style:groupStyle,onEachFeature:onGroup}); }
 
@@ -903,19 +1311,35 @@ function lblFS(){const t=zt();return {grp:12+3.5*t, mun:10.5+3*t, st:32};}
 function applyLabelSizes(){const s=lblFS(),r=document.documentElement.style;
   r.setProperty('--grpfs',s.grp.toFixed(1)+'px');r.setProperty('--munfs',s.mun.toFixed(1)+'px');r.setProperty('--stfs',s.st+'px');return s;}
 function refreshMapCounts(){
+  if(modoReplan()){
+    // Só os valores preparados em rpPreparaMapa(); rótulo fora do recorte fica vazio (ele
+    // está oculto pelo declutter de qualquer jeito, e a volta a Obras reescreve todos).
+    const escreve=(it,r)=>{ const el=it.mk.getElement(); if(!el) return;
+      const c=el.querySelector('.lbl-count'); if(c) c.textContent=r?rpFmtCurto(r):'';
+      el.classList.remove('nomatch');
+      // O rótulo fora da escala ("sem dado") não pode sair no verde de acento dos que
+      // têm valor: é outra unidade e outro significado. Só ele muda de cor — o nome do
+      // distrito continua legível, ao contrário do .nomatch, que apaga o rótulo inteiro.
+      el.classList.toggle('sem-amostra', _rpTemEscala && !!r && r.v==null); };
+    groupItems.forEach(it=>escreve(it,_rpGrp.get(String(it.id))));
+    cityItems.forEach(it=>escreve(it,_rpMun.get(it.id)));
+    return;
+  }
   const filt=hasActiveFilter();
   groupItems.forEach(it=>{
     const el=it.mk.getElement(); const c=el&&el.querySelector('.lbl-count');
     const n=aggIds(idsOfGroup(it.id)).obras;
     if(c) c.textContent=NUM.format(n);
     // Etapa C: rótulo esmaecido — só onde o rótulo aparece (nível 1 para distrito).
-    if(el) el.classList.toggle('nomatch', filt && n===0 && st.level===1);
+    if(el){ el.classList.toggle('nomatch', filt && n===0 && st.level===1);
+            el.classList.remove('sem-amostra'); }   // resíduo do modo Replanilhamentos
   });
   cityItems.forEach(it=>{
     const el=it.mk.getElement(); const c=el&&el.querySelector('.lbl-count');
     const n=obrasOf(it.id).length;
     if(c) c.textContent=NUM.format(n);
-    if(el) el.classList.toggle('nomatch', filt && n===0 && visible(it.id)); // só o município visível no nível 2/3
+    if(el){ el.classList.toggle('nomatch', filt && n===0 && visible(it.id)); // só o município visível no nível 2/3
+            el.classList.remove('sem-amostra'); }
   });
 }
 function updateLabels(){
@@ -937,9 +1361,13 @@ function updateLabels(){
   // grande o bastante pra esconder Quixeramobim (cercado por outros 5 distritos)
   // em janelas não-maximizadas — a fonte renderizada não muda, só a folga usada
   // pra decidir o que colide com o quê.
-  if(st.level===1) declutter(groupItems, s.grp*0.48, s.grp*2.2, 2, null, it=>aggIds(idsOfGroup(it.id)).obras);
-  else if(st.level===2) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>String(gidOf(it.id))===String(st.group), it=>obrasOf(it.id).length);
-  else if(st.level===3) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>it.id===st.city, it=>obrasOf(it.id).length);
+  // no modo Replanilhamentos a prioridade é o nº de processos, lido do mapa preparado.
+  const rp=modoReplan();
+  const prioG=rp ? it=>(_rpGrp.get(String(it.id))||{tot:0}).tot : it=>aggIds(idsOfGroup(it.id)).obras;
+  const prioC=rp ? it=>(_rpMun.get(it.id)||{tot:0}).tot : it=>obrasOf(it.id).length;
+  if(st.level===1) declutter(groupItems, s.grp*0.48, s.grp*2.2, 2, null, prioG);
+  else if(st.level===2) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>String(gidOf(it.id))===String(st.group), prioC);
+  else if(st.level===3) declutter(cityItems, s.mun*0.6, s.mun*2.6, 7, it=>it.id===st.city, prioC);
 }
 
 // ---- painel ----
@@ -1053,24 +1481,54 @@ function setKPIs(){
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
 // ({k,nome,sub,v}). Compartilhadas entre renderPanel() e o popover de navegação
 // lateral da trilha (Fase 8): uma lista, uma ordenação, um lugar só calculando.
+// Modo Replanilhamentos: o mesmo valor que o mapa pinta (rpValor), para que a lista de
+// irmãos da trilha não mostre contagem de obras ao lado de um mapa de processos. No tempo
+// médio o tamanho da amostra vai no subtítulo da linha: esta é uma lista feita para
+// comparar áreas lado a lado, e 5 despachos não podem pesar como 97.
+function rpEntrada(procs){
+  const r=rpValor(aggProc(procs));
+  return {v:r.v, sub:st.rp.metrica==='tempo'?`${NUM.format(r.n)} desp.`:''};
+}
 function groupEntries(){
   // ordem fixa dos Distritos Operacionais, pela numeração (1º, 2º, …).
-  return groupsList().map(g=>({k:g.id,nome:g.nome.replace(/^D\.O\.\s*/,''),sub:g.sede,v:mval(aggIds(idsOfGroup(g.id)))}))
-    .sort((a,b)=>a.k-b.k);
+  return groupsList().map(g=>{
+    const e=modoReplan()?rpEntrada(procsDoDistrito(g.id)):null;
+    return {k:g.id,nome:g.nome.replace(/^D\.O\.\s*/,''),sub:e?e.sub:g.sede,
+            v:e?e.v:mval(aggIds(idsOfGroup(g.id)))};
+  }).sort((a,b)=>a.k-b.k);
 }
 // includeZero=true pro popover de irmãos (Fase 8): lá qualquer município do grupo
 // precisa ser navegável, mesmo sem contrato — diferente do ranking do painel do
 // nível 2, que só lista quem tem obra (filtro original, mantido por padrão)
 function cityEntries(ids,includeZero){
-  return ids.map(id=>({k:id,nome:DB.municipios[id].nome,sub:'',v:mval(aggIds([id]))}))
-    .filter(e=>includeZero||e.v>0).sort((a,b)=>b.v-a.v);
+  return ids.map(id=>{
+    const e=modoReplan()?rpEntrada(DB.municipios[id].processos):null;
+    return {k:id,nome:DB.municipios[id].nome,sub:e?e.sub:'',v:e?e.v:mval(aggIds([id]))};
+  }).filter(e=>includeZero||e.v>0).sort((a,b)=>b.v-a.v);   // v null (amostra insuficiente) conta como 0: vai para o fim
 }
 function rankRows(entries,onClick){
-  const max=Math.max(1,...entries.map(e=>e.v));
-  const amber=st.metric==='aditivo'?' amber':'';
+  const max=Math.max(1,...entries.map(e=>e.v||0));
+  const fmt=modoReplan()?rpFmt:METRIC[st.metric].fmt;
+  const amber=!modoReplan()&&st.metric==='aditivo'?' amber':'';
   return entries.map((e,i)=>`<div class="rrow" role="button" tabindex="0" data-k="${e.k}" data-kind="${onClick}">
-     <div class="t"><span class="nm">${escHtml(e.nome)} ${e.sub?`<span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${METRIC[st.metric].fmt(e.v)}</span></div>
-     <div class="rbar${amber}"><i style="width:${Math.max(4,e.v/max*100)}%"></i></div></div>`).join('');
+     <div class="t"><span class="nm">${escHtml(e.nome)} ${e.sub?`<span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${fmt(e.v)}</span></div>
+     <div class="rbar${amber}"><i style="width:${Math.max(4,(e.v||0)/max*100)}%"></i></div></div>`).join('');
+}
+// E5 — mesma linha do ranking, só que no modo Replanilhamentos e no nível dos distritos:
+// cada um ganha um chip para abrir a janela de detalhe (ver abreModalDistrito), aninhado
+// dentro de .nm como .chip.mun.locate já é aninhado dentro de .obra — mesmo padrão, não um
+// segundo controle interativo inventado. Função separada, e não um ramo dentro de
+// rankRows(): ela é comum ao modo Obras, que não pode herdar o chip por engano.
+function rpRankRowsHtml(entries,kind){
+  const max=Math.max(1,...entries.map(e=>e.v||0));
+  return entries.map(e=>{
+    const abre=kind==='group'
+      ? ` <span class="chip abre" role="button" tabindex="0" data-abre="distrito" data-gid="${e.k}" title="Ver janela do distrito" aria-label="Ver janela do distrito ${escHtml(e.nome)}">${RS_ICO.dist}</span>`
+      : '';
+    return `<div class="rrow" role="button" tabindex="0" data-k="${e.k}" data-kind="${kind}">
+     <div class="t"><span class="nm">${escHtml(e.nome)}${abre}${e.sub?` <span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${rpFmt(e.v)}</span></div>
+     <div class="rbar"><i style="width:${Math.max(4,(e.v||0)/max*100)}%"></i></div></div>`;
+  }).join('');
 }
 // ativação de .rrow (painel de ranking e popover de irmãos usam o mesmo HTML/dataset)
 function goRrow(rr){ if(rr.dataset.kind==='group')goGroup(rr.dataset.k); else goCity(rr.dataset.k); }
@@ -1785,6 +2243,21 @@ function wireAdToggles(){
 }
 function closeModal(){ document.getElementById('modalBg').classList.remove('show'); }
 document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') closeModal(); });
+// E5 — a janela de distrito lista a equipe em cartões (.fcard), e cada um abre o painel
+// daquele fiscal por cima. #modal fica fora de #body, então precisa do próprio listener.
+document.getElementById('modal').addEventListener('click',e=>{
+  const abre=e.target.closest('.chip.abre');
+  if(abre){ abrirJanela(abre); return; }
+  const fc=e.target.closest('.fcard');
+  if(fc) abreModalFiscal(fc.dataset.mat);
+});
+document.getElementById('modal').addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ') return;
+  const abre=e.target.closest('.chip.abre');
+  if(abre){ e.preventDefault(); abrirJanela(abre); return; }
+  const fc=e.target.closest('.fcard');
+  if(fc){ e.preventDefault(); abreModalFiscal(fc.dataset.mat); }
+});
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 // Esc limpa a seleção combinada (Ctrl+clique) — mas só quando não há nada "mais
 // em cima" pra fechar primeiro (modal aberto, dropdown de filtro aberto), senão
@@ -1815,10 +2288,857 @@ function resultsSuffix(ids){
   const n=aggIds(ids).obras;
   return ` · <b>${NUM.format(n)}</b> contrato${n===1?'':'s'} encontrado${n===1?'':'s'}`;
 }
+// Descreve o recorte REAL, não o nível de navegação. scopeIds() também honra
+// st.sel (Ctrl+clique) e st.hoverGroup (mouse sobre um distrito no nível 1) — e
+// passar o mouse é o gesto mais comum do mapa. Derivar o rótulo só de st.level
+// fazia o painel trocar os números para um distrito e continuar escrito
+// "Ceará . Todos os Distritos Operacionais".
+function escopoReplanTxt(){
+  if(st.sel && st.sel.ids.size){
+    const k=st.sel.kind==='group'?'distrito':'município', n=st.sel.ids.size;
+    return `${NUM.format(n)} ${k}${n===1?'':'s'} selecionado${n===1?'':'s'}`;
+  }
+  // No nível 1 o nome diz também a régua: "Equipe de Sobral" e "Obras em Sobral" são
+  // conjuntos diferentes de processos, e o mesmo nome para os dois esconderia isso.
+  if(st.level===1 && st.hoverGroup!=null){
+    const nome=grpById(st.hoverGroup).nome.replace(/^D\.O\.\s*/,'');
+    return reguaEquipe()?`Equipe de ${nome}`:`Obras em ${nome}`;
+  }
+  if(st.level<=1) return 'Ceará . Todos os Distritos Operacionais';
+  if(st.level===2) return `Obras em ${grpById(st.group).nome.replace(/^D\.O\.\s*/,'')}`;
+  return `Obras em ${DB.municipios[st.city].nome}`;
+}
+// dias com uma casa decimal. fmtPct1 fazia o mesmo, mas o nome dela promete
+// percentual e mentia no call site.
+function fmtDias(v){ return v.toFixed(1).replace('.',',')+' dias'; }
+// anel de rosca com N fatias (usuário, 2026-09-17: Atrasado × No prazo × Sem prazo dentro
+// da Fiscalização). Cor só por classe CSS (`cls`), nunca hex aqui — mesma regra do
+// quadrante (docs/painel-fiscais/revisores.md, rev-aderencia). Fatias de tamanho 0 não
+// desenham arco (dasharray zerado gera artefato visual).
+function donutMulti(segs,size){
+  size=size||118;
+  const total=segs.reduce((s,x)=>s+x.n,0);
+  const stroke=Math.round(size*.17), r=(size-stroke)/2, c=2*Math.PI*r, cx=size/2, cy=size/2;
+  const aria=segs.map(s=>`${s.label}: ${NUM.format(s.n)}`).join(', ');
+  if(!total) return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Sem processos">
+    <circle class="donut-track" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke-width="${stroke}"/></svg>`;
+  let acc=0;
+  const arcos=segs.filter(s=>s.n>0).map(s=>{
+    const len=c*(s.n/total), offset=-acc; acc+=len;
+    return `<circle class="donut-seg ${s.cls}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke-width="${stroke}" `
+      +`stroke-dasharray="${len.toFixed(2)} ${(c-len).toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" `
+      +`transform="rotate(-90 ${cx} ${cy})"><title>${escHtml(s.label)}: ${NUM.format(s.n)} (${fmtPct1(s.n/total*100)}%)</title></circle>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${escHtml(aria)}">
+    <circle class="donut-track" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke-width="${stroke}"/>${arcos}
+    <text class="donut-ctr" x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central">${NUM.format(total)}</text></svg>`;
+}
+// legenda da rosca: dot + rótulo + valor + percentual, uma linha por fatia com n > 0.
+function donutLeg(segs){
+  const total=segs.reduce((s,x)=>s+x.n,0);
+  return `<div class="donut-leg">${segs.filter(s=>s.n>0).map(s=>
+    `<div class="donut-leg-i"><span class="donut-dot ${s.cls}"></span>`
+    +`<span class="donut-leg-l">${escHtml(s.label)}</span>`
+    +`<span class="donut-leg-v">${NUM.format(s.n)} <span class="donut-leg-p">(${total?fmtPct1(s.n/total*100):'0,0'}%)</span></span></div>`
+  ).join('')}</div>`;
+}
+// ---- painel do modo Replanilhamentos (E3) ----
+// Ranking do recorte: distritos no nível 1 (na régua ativa), cidades dentro de um
+// distrito. Ordenado pela métrica, do maior para o menor — é o que o mapa pinta, em
+// forma de lista navegável. Área sem número comparável (amostra curta) vai para o fim,
+// mas continua na lista: ela existe e é navegável, só não tem média.
+function rpRanking(){
+  if(st.level>=3) return null;
+  const kind = st.level<=1 ? 'group' : 'city';
+  // Reaproveita o que rpPreparaMapa() já agregou para pintar o mapa: mesmas áreas, mesmo
+  // recorte, mesma passada. A lista não pode divergir do mapa nem por engano, e o hover de
+  // distrito — que redesenha o painel, não o mapa — deixa de repetir 11 agregações.
+  const de=r=>({v:r.v, tot:r.tot, sub:st.rp.metrica==='tempo'?`${NUM.format(r.n)} desp.`:''});
+  const vazio={v:null,n:0,tot:0};
+  const ents = kind==='group'
+    ? groupsList().map(g=>({k:g.id,nome:g.nome.replace(/^D\.O\.\s*/,''),...de(_rpGrp.get(String(g.id))||vazio)}))
+    // parênteses: sem eles o .filter parece aplicar-se ao ternário inteiro
+    : (idsOfGroup(st.group).map(id=>({k:id,nome:DB.municipios[id].nome,...de(_rpMun.get(id)||vazio)}))
+                           .filter(e=>e.tot>0));   // cidade sem processo nenhum só alongaria a lista
+  // Desempate por volume e depois por nome: quando NENHUMA área tem média (comum entre
+  // cidades), ordenar só pelo valor deixaria a lista na ordem do arquivo GeoJSON, que não
+  // diz nada — quem tem mais processos é a leitura útil que sobra.
+  ents.sort((a,b)=>(b.v==null?-1:b.v)-(a.v==null?-1:a.v) || b.tot-a.tot || a.nome.localeCompare(b.nome,'pt-BR'));
+  return {kind,ents};
+}
+// Ordem de leitura da lista de processos: quem está parado na fila há mais tempo primeiro,
+// depois o que está na GECOPE, o histórico já despachado (mais recente antes) e, no fim, os
+// arquivados no meio do trâmite.
+function rpOrdemProc(a,b){
+  const pos=p=>p.naFila?0:p.despachado?2:p.foraDoCiclo?3:1;
+  if(pos(a)!==pos(b)) return pos(a)-pos(b);
+  // na fila sem dias na unidade (ainda tramitando até o fiscal) vai para o fim da fila
+  if(a.naFila) return (b.diasNaUnidade??-1)-(a.diasNaUnidade??-1);
+  if(a.despachado) return String(b.dataDespacho||'').localeCompare(String(a.dataDespacho||''));
+  return 0;
+}
+function procCard(p){
+  const estado = p.naFila
+    // sem dias: o motivo vem da view; o caso comum é o processo ainda tramitando até o fiscal
+    ? (p.diasNaUnidade==null?(/fora da unidade/.test(p.conferencia)||!p.conferencia?'tramitando até o fiscal':'com o fiscal, sem registro no SUITE')
+       :`${NUM.format(p.diasNaUnidade)} dia${p.diasNaUnidade===1?'':'s'} com o fiscal`)
+    : p.despachado ? (p.dataDespacho?`despachado em ${fmtDateBR(p.dataDespacho)}`:'despachado, sem data')
+    : p.foraDoCiclo ? (p.situacao==='arquivado_no_tramite'?'arquivado no trâmite':'aprovado, sem data')
+                   : 'na GECOPE';
+  // Tempo só do despachado, e só de quem despachou. Sem tempo, diz o porquê quando é regra
+  // (aberto já pronto); o caso a conferir fica sem número, nunca com zero.
+  const tempo = !p.despachado ? ''
+    : p.tempoFiscal!=null ? `${fmtDias(p.tempoFiscal)} no setor`
+    : p.abertoJaPronto ? 'aberto já pronto' : '';
+  return `<div class="proc${p.metaEstourada?' meta':''}">`
+    +`<div class="proc-h"><span class="proc-n">${escHtml(p.processo)}</span>`
+    +`<span class="proc-s">${escHtml(p.statusTxt)}</span></div>`
+    // objeto ausente vem como '—' de mapProcesso: uma linha inteira do cartão para um
+    // travessão não diz nada, então ela some
+    +(p.objeto&&p.objeto!=='—'?`<div class="proc-o">${escHtml(p.objeto)}</div>`:'')
+    +`<div class="proc-m"><span>${escHtml(p.fiscalNome)}</span>`
+    +`<span>${escHtml(estado)}${tempo?` · ${escHtml(tempo)}`:''}</span></div>`
+    +(p.metaEstourada?`<div class="proc-meta">Atrasado</div>`:'')+`</div>`;
+}
+const PROC_LISTA_MAX=15;
+/* ---- ranking de fiscais por tempo médio (E4) ----
+   O mapa compara ÁREAS; esta seção compara PESSOAS, que é a pergunta que sobra depois
+   dele: entre os fiscais deste recorte, quem está mais lento. Uma barra horizontal por
+   fiscal, do mais lento ao mais rápido — leitura direta, sem eixo nem quadrante para
+   explicar antes. O gráfico anterior (dispersão despachos × tempo, com medianas e
+   quadrantes) passou por 3 rodadas de revisão, mas exigia explicação verbal para um
+   gestor lê-lo; trocado por decisão do usuário em 2026-09-17. O número de despachos
+   aparece ao lado de cada barra — explica o volume por trás do tempo, mas não é o que a
+   barra mede. */
+// Acima disto a lista de fiscais rola dentro da própria caixa (ver .qdf-rola no CSS).
+const QUAD_LISTA_ROLA=8;
+// Agregado por fiscal. NÃO reimplementa as regras de aggProc: agrupa os processos por
+// matrícula e chama a mesma função que alimenta os KPIs logo acima, para que o número de
+// um fiscal nunca possa divergir do total que o painel afirma três centímetros acima.
+// População: quem tem fila hoje ou despacho no período. Coincide com o card FISCAIS nas
+// janelas de 6 meses a 2 anos; em "Hoje" não — o card conta só os responsáveis pela fila
+// atual, e o ranking continua comparando despachos e tempo do histórico inteiro.
+function aggFiscais(procs){
+  const porMat=new Map(); let semFiscal=0;
+  for(const p of procs){
+    // Processo sem matrícula não vira linha: "(sem fiscal)" não é uma pessoa, e juntar
+    // todos numa linha só criaria um fiscal fantasma com a carga somada de vários. Contado
+    // para aparecer no rodapé em vez de encolher a lista em silêncio.
+    if(!p.fiscalMat){ semFiscal++; continue; }
+    let a=porMat.get(p.fiscalMat); if(!a){ a=[]; porMat.set(p.fiscalMat,a); }
+    a.push(p);
+  }
+  const lista=[];
+  porMat.forEach((ps,mat)=>{
+    const a=aggProc(ps);
+    if(!a.fila && !a.desp) return;   // mesma regra do KPI: só GECOPE não conta como presença
+    lista.push({mat, nome:ps[0].fiscalNome, gedop:ps[0].gedop,
+                fila:a.fila, desp:a.desp, n:a.nTempo, tempo:a.tempoMedio,
+                prontos:a.prontos, semTempo:a.semTempo});
+  });
+  return {lista, semFiscal};
+}
+function rpFiscaisRanking(procs){
+  const {lista,semFiscal}=aggFiscais(procs);
+  // Mesma régua de amostra do mapa, da legenda e dos KPIs: sem AMOSTRA_MIN despachos COM
+  // TEMPO MEDIDO não há média, e sem média não há linha. Quem passa do piso mas não chega
+  // a AMOSTRA_SOLIDA entra marcado, não escondido (ver fiscaisRankingLista).
+  const pts=lista.filter(f=>f.n>=AMOSTRA_MIN);
+  // Do mais lento para o mais rápido: a mesma pergunta que o painel inteiro faz.
+  pts.sort((a,b)=>b.tempo-a.tempo || b.desp-a.desp || a.nome.localeCompare(b.nome,'pt-BR'));
+  // `nFiscais` é o denominador do "N de M" do cabeçalho — a confissão de cobertura
+  // parcial que sobrou depois de a seção perder os parágrafos explicativos.
+  // `semTempoBastante` é o caso que confunde: despachou o bastante, mas os despachos não
+  // têm tempo medido no SUITE. Sem esta contagem o leitor vê alguém com 4 despachos fora
+  // da lista e conclui que o painel está errado (achado do usuário, 2026-09-17).
+  const semTempoBastante=lista.filter(f=>f.n<AMOSTRA_MIN && f.desp>=AMOSTRA_MIN).length;
+  return {pts, nFiscais:lista.length, semFiscal, semTempoBastante};
+}
+// Uma linha por fiscal: nome à esquerda, tempo médio à direita, barra proporcional
+// abaixo — e nada mais. Pedido do usuário em 2026-09-17: "apenas o nome do Fiscal e o
+// Tempo médio dele e só"; despachos, lotação, delta sobre a média e fila poluíam a
+// leitura sem explicar o número. A explicação inteira passou para a janela do fiscal,
+// que a própria linha abre no clique.
+// A barra usa o mais lento da lista como 100% e os demais relativos a ele (mesma técnica
+// de .rbar/rankRows() do ranking de distritos/cidades, não uma escala inventada aqui).
+// `avg` é a média do RECORTE inteiro (a.tempoMedio, o mesmo número do card "Tempo médio"
+// no topo do painel) — não a média só de quem entrou na lista, que se moveria a cada
+// fiscal excluído por amostra e deixaria de bater com o card três centímetros acima.
+// Vira um traço vertical dentro de cada barra (mesma posição em todas, eixo comum), e
+// quem está acima dele — mais lento que o próprio recorte — ganha a barra em âmbar.
+function fiscaisRankingLista(q,avg){
+  const max=Math.max(1,avg||0,...q.pts.map(p=>p.tempo));
+  const refPct=avg!=null?Math.max(0,Math.min(100,avg/max*100)):null;
+  const ref=refPct!=null?`<b class="rbar-ref" style="left:${refPct}%"></b>`:'';
+  return q.pts.map(p=>{
+    const acima=avg!=null&&p.tempo>avg;
+    // Amostra fina: o contador de despachos volta SÓ nesta linha, e a barra fica vazada.
+    // A limpeza pedida em 2026-09-17 continua valendo para quem tem número firme — a
+    // informação extra aparece exatamente onde ela muda a leitura, e em lugar nenhum mais.
+    const fina=amostraFina(p.n);
+    const cont=fina?`<span class="qdf-fina">${escHtml(`${NUM.format(p.n)} desp.`)}</span>`:'';
+    return `<div class="qdf" role="button" tabindex="0" data-mat="${escHtml(p.mat)}"`
+      +` title="Ver painel de ${escHtml(p.nome)}" aria-label="Ver painel de ${escHtml(p.nome)}${fina?`, média sobre ${NUM.format(p.n)} despachos`:''}">`
+      +`<div class="qdf-top"><span class="qdf-n"><span class="qdf-nome">${escHtml(p.nome)}</span>${cont}</span>`
+      +`<span class="qdf-v">${escHtml(fmtDias(p.tempo))}</span></div>`
+      +`<div class="rbar${acima?' amber':''}${fina?' fina':''}"><i style="width:${Math.max(4,p.tempo/max*100)}%"></i>${ref}</div></div>`;
+  }).join('');
+}
+function rpFiscaisRankingHtml(procs,a){
+  // Duas condições, a mesma razão. (1) Do nível 2 para baixo o recorte é geográfico: os
+  // fiscais que aparecem ali são os que atuaram naquelas obras, não uma equipe, e a fatia
+  // de cada um fica pequena demais para comparar pessoa com pessoa. (2) No nível dos
+  // distritos com a régua do LOCAL DA OBRA vale exatamente o mesmo: cada fiscal entraria
+  // só com os despachos cujas obras caem naquele distrito — uma fatia do trabalho dele,
+  // que a barra e o rodapé chamariam de "despachos no período", absoluto. Comparar pessoa
+  // com pessoa exige a carga inteira de cada uma, então a seção só existe na régua da
+  // equipe, onde o distrito É o conjunto de fiscais. Decisão do usuário em 2026-09-16.
+  // reguaEquipe() já é "regua==='equipe' && level<=1": as duas condições num só teste.
+  // Antes a seção simplesmente desaparecia aqui (return '') — usuário relatou que "some"
+  // sem explicação ao trocar a régua para Obra ou descer a navegação. Em vez de nada,
+  // um aviso âmbar (mesmo tom do .modo-aviso do seletor de modo) diz por que ela não
+  // está disponível neste recorte, com a causa certa: régua ou nível de navegação.
+  if(!reguaEquipe()){
+    const motivo = st.rp.regua!=='equipe'
+      ? 'com o Distrito Operacional do(a) em "Obra" cada fiscal apareceria só com a fatia dos processos daquele distrito, não a carga inteira da pessoa — troque para "Fiscal" para comparar pessoas.'
+      : 'dentro de uma cidade ou processo aberto o recorte já não é mais a equipe de um distrito inteiro.';
+    return `<div class="statwrap"><div class="sec-h"><span>Fiscais · tempo médio</span></div>`
+      +`<div class="qd-aviso">Esta comparação entre fiscais não aparece ${escHtml(motivo)}</div></div>`;
+  }
+  return fiscaisRankingBlockHtml(procs,a);
+}
+// E5 — núcleo do ranking de fiscais, separado de rpFiscaisRankingHtml() porque este
+// devolve, antes dele, o aviso de por que a comparação não existe fora da régua da equipe.
+function fiscaisRankingBlockHtml(procs,a){
+  const q=rpFiscaisRanking(procs);
+  if(!q.nFiscais && !q.semFiscal) return '';
+  const per=RP_PERIODO[st.rp.periodo].txt;
+  // Média do card "Tempo médio" (topo do painel), não uma média local da lista — ver
+  // fiscaisRankingLista. Some junto com o card, pela mesma régua de amostra (AMOSTRA_MIN).
+  const avg=a&&a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
+  const cab=`<div class="sec-h"><span>Fiscais · tempo médio</span>`
+    +`<span>${NUM.format(q.pts.length)} de ${NUM.format(q.nFiscais)}</span></div>`;
+  // Uma linha de recorte no lugar dos três parágrafos que a seção carregava (cobertura em
+  // volume, legenda do traço e rodapé de exclusões, todos somados a seis números por
+  // linha): o usuário pediu a seção limpa em 2026-09-17, e cada uma dessas contas passou
+  // para a janela do fiscal, onde há espaço para explicá-la. O "N de M" do cabeçalho
+  // continua confessando a cobertura parcial, que é o essencial que não podia sair daqui.
+  // "do mais lento ao mais rápido" saiu: a ordem é visível na própria coluna de números e
+  // nas barras, e a linha precisa caber em uma só. A barra vazada, porém, precisa ser
+  // explicada — é a única marca da lista cujo significado não se deduz olhando.
+  // Duas legendas e a dica de clique já enchem a linha: "número frágil" sai, porque a
+  // barra vazada mais o contador de despachos ao lado do nome já dizem isso, e a janela
+  // do fiscal soletra a ressalva por extenso para quem abrir.
+  const temFina=q.pts.some(p=>amostraFina(p.n));
+  const sub=`<div class="sec-sub">${escHtml(per
+    +(avg!=null?` · traço = média do recorte (${fmtDias(avg)})`:'')
+    +(temFina?` · barra vazada = menos de ${AMOSTRA_SOLIDA} despachos`:'')
+    +'. Clique para ver o painel.')}</div>`;
+  if(!q.pts.length){
+    return `<div class="statwrap">${cab}`
+      +`<div class="empty">Nenhum fiscal deste recorte despachou ${AMOSTRA_MIN} vezes no período — sem média, não há barra para comparar.</div></div>`;
+  }
+  // A lista ganha rolagem própria a partir de QUAD_LISTA_ROLA nomes, em vez de corte: todo
+  // fiscal listado precisa continuar alcançável, mas sem empurrar o ranking dos 11
+  // distritos para fora da primeira dobra.
+  const rola=q.pts.length>QUAD_LISTA_ROLA?' qdf-rola':'';
+  // A única exclusão que o leitor não consegue deduzir do cabeçalho: despachou o bastante,
+  // mas os despachos não têm tempo medido. Uma linha, e só quando o caso existe.
+  const nota=q.semTempoBastante
+    ? `<div class="foot-note">${escHtml(`${NUM.format(q.semTempoBastante)} ${q.semTempoBastante===1?'fiscal despachou':'fiscais despacharam'} `
+      +`${AMOSTRA_MIN} vezes ou mais no período, mas sem tempo medido no SUITE em ${AMOSTRA_MIN} `
+      +`${AMOSTRA_MIN===1?'delas':'deles'} — a média sai do tempo, não da contagem.`)}</div>`
+    : '';
+  return `<div class="statwrap">${cab}${sub}<div class="qdf-box${rola}">${fiscaisRankingLista(q,avg)}</div>${nota}</div>`;
+}
+
+/* ---- E5 — janelas de detalhe de distrito e de fiscal ----
+   Duas janelas de leitura (sem edição, sem abas), reaproveitando o modal genérico que a
+   obra já usa (#modalBg/#modal) em vez de um segundo overlay: só um modal fica aberto por
+   vez, e o padrão de abrir/fechar/clicar fora já existe e já foi revisado. */
+
+function mostraJanelaGenerica(){
+  document.getElementById('modalBg').classList.add('show');
+  const x=document.getElementById('modalX'); if(x) x.onclick=closeModal;
+  wireAdToggles();   // listas recolhidas das duas janelas (ver verToggle)
+  document.getElementById('modal').scrollTop=0;   // reabrir por cima de outra janela herdava a rolagem dela
+}
+// Mesma mecânica do .adToggle das abas de aditivo (wireAdToggles liga qualquer botão
+// dentro de .modal pelo data-target), com o texto livre: aqui o que se abre é a lista de
+// processos, e não um grupo de aditivos.
+function verToggle(targetId,texto){
+  return `<button type="button" class="adToggle" data-target="${targetId}" aria-expanded="false" aria-controls="${targetId}">`
+    +`<span>${escHtml(texto)}</span> <span class="adToggle-car">▾</span></button>`;
+}
+
+/* ---- a régua única das duas janelas: DIAS ----
+   O mesmo eixo horizontal desenha as três comparações que os painéis fazem — cada
+   despacho de um fiscal, cada fiscal da base, cada distrito do estado. Quem aprende a
+   ler a primeira já sabe ler as outras duas, e nenhuma delas precisa de uma escala
+   própria para ser explicada antes. Um ponto é um caso real na posição do número dele;
+   pontos sobrepostos escurecem uns aos outros (densidade) em vez de se esconderem.
+   `marcas` são as referências verticais — a média de quem a janela é e a média geral. */
+function eixoDias(pts,marcas,opts){
+  opts=opts||{};
+  if(!pts.length) return `<div class="empty">${escHtml(opts.vazio||'Sem despachos com tempo medido para comparar.')}</div>`;
+  marcas=(marcas||[]).filter(m=>m&&m.v!=null);
+  const W=640,H=opts.altura||92,PADL=16,PADR=16,iw=W-PADL-PADR;
+  const topo=Math.max(...pts.map(p=>p.v),...marcas.map(m=>m.v),1);
+  // A escala termina numa dezena redonda, não no maior valor da amostra: o eixo é lido em
+  // voz alta numa reunião, e "0 a 213" não é um número que alguém repita.
+  const passo=topo>400?100:topo>150?50:topo>60?20:10;
+  const max=Math.max(passo,Math.ceil(topo/passo)*passo);
+  const X=v=>PADL+Math.max(0,Math.min(1,v/max))*iw;
+  const yBase=H-20, yPt=yBase-15;
+  let grade='';
+  for(let v=0;v<=max;v+=passo){
+    // A unidade vai no último tique, não numa legenda à parte: um rótulo faz os dois
+    // trabalhos, e o eixo deixa de precisar de um "dias" solto ao lado dele.
+    const rot=v===max?`${v} dias`:String(v);
+    grade+=`<line class="ed-tick" x1="${X(v).toFixed(1)}" x2="${X(v).toFixed(1)}" y1="10" y2="${yBase}"/>`
+      +`<text class="ed-tlab" x="${X(v).toFixed(1)}" y="${H-6}" text-anchor="${v===max?'end':'middle'}">${rot}</text>`;
+  }
+  const linhas=marcas.map(m=>`<line class="ed-mark ${escHtml(m.cls||'')}" x1="${X(m.v).toFixed(1)}" x2="${X(m.v).toFixed(1)}" y1="6" y2="${yBase}"/>`).join('');
+  const dots=pts.map(p=>`<circle class="ed-dot${p.on?' on':''}" cx="${X(p.v).toFixed(1)}" cy="${yPt}" r="${p.on?6.5:5}">`
+    +`<title>${escHtml(p.label||'')}</title></circle>`).join('');
+  const aria=`${NUM.format(pts.length)} pontos entre 0 e ${max} dias`
+    +marcas.map(m=>`; ${m.label}: ${fmtDias(m.v)}`).join('');
+  const leg=marcas.length?`<div class="ed-leg">`
+    +marcas.map(m=>`<span class="ed-leg-i"><i class="ed-key ${escHtml(m.cls||'')}"></i>${escHtml(m.label)} <b>${escHtml(fmtDias(m.v))}</b></span>`).join('')
+    +`</div>`:'';
+  return `<div class="ed-wrap"><svg viewBox="0 0 ${W} ${H}" class="ed" preserveAspectRatio="none" role="img" aria-label="${escHtml(aria)}">`
+    +`${grade}<line class="ed-base" x1="${PADL}" x2="${W-PADR}" y1="${yBase}" y2="${yBase}"/>${linhas}${dots}</svg>${leg}</div>`;
+}
+// Cartão-herói: o número que a janela existe para dizer, com a distância dele até a
+// referência logo abaixo. Um por janela — é o único lugar com tipo grande, e o resto do
+// painel fica deliberadamente quieto em volta dele.
+function heroTempo(valor,n,referencia,rotuloRef){
+  if(valor==null){
+    return `<div class="dsh-hero dsh-hero-vazio"><div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor</div>`
+      +`<div class="dsh-big">—</div>`
+      +`<div class="dsh-sub">${escHtml(n?`só ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido — a média pede ao menos ${AMOSTRA_MIN}`
+        :'nenhum despacho com tempo medido')}</div></div>`;
+  }
+  const d=referencia!=null?valor-referencia:null;
+  // O sinal é o que o conselho lê primeiro: acima da referência é âmbar e aponta para
+  // cima, abaixo é verde e aponta para baixo. Sem referência, nenhuma das duas.
+  const delta=d==null?'':`<div class="dsh-delta ${d>0?'acima':'abaixo'}">`
+    +`<span class="dsh-seta">${d>0?'▲':'▼'}</span>${escHtml(`${fmtDias(Math.abs(d))} ${d>0?'acima':'abaixo'} ${rotuloRef} (${fmtDias(referencia)})`)}</div>`;
+  // Amostra fina: o aviso fica colado no número grande, não no rodapé da janela. É o
+  // número que vai ser lido em voz alta numa reunião, e a ressalva precisa viajar junto.
+  const fraco=amostraFina(n)
+    ? `<div class="dsh-fraco">${escHtml(`Amostra pequena: com ${NUM.format(n)} despachos, um único processo travado move bastante esta média.`)}</div>`
+    : '';
+  return `<div class="dsh-hero${amostraFina(n)?' dsh-hero-fina':''}"><div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor</div>`
+    +`<div class="dsh-big">${escHtml(fmtDias(valor).replace(' dias',''))}<span class="dsh-un">dias</span></div>`
+    +delta
+    +`<div class="dsh-sub">${escHtml(`em ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido`)}</div>${fraco}</div>`;
+}
+// Ladrilho pequeno: o terceiro e mais leve peso de superfície da janela (herói → gráfico →
+// ladrilho). Não repete o .mkpi do modal de obra para não herdar o tamanho dele aqui.
+function tile(valor,label,sub){
+  return `<div class="dsh-tile"><div class="dsh-tv">${escHtml(valor)}</div>`
+    +`<div class="dsh-tl">${escHtml(label)}</div>`+(sub?`<div class="dsh-ts">${escHtml(sub)}</div>`:'')+`</div>`;
+}
+// Barra empilhada da fila de hoje. Mesmo tri-estado do donut GECOPE × Fiscalização, e
+// pela mesma razão: processo SEM data de compromisso não é "no prazo", é um terceiro
+// grupo — somá-lo ao verde inflaria justamente o número que tranquiliza.
+function barraAtraso(atrasado,noPrazo,semPrazo){
+  const tot=atrasado+noPrazo+semPrazo;
+  if(!tot) return '';
+  const seg=(n,cls,rot)=>n?`<i class="${cls}" style="width:${(n/tot*100).toFixed(2)}%" title="${escHtml(`${rot}: ${NUM.format(n)}`)}"></i>`:'';
+  const item=(n,cls,rot)=>n?`<span class="sbar-i"><i class="sbar-dot ${cls}"></i>${escHtml(`${NUM.format(n)} ${rot}`)}</span>`:'';
+  return `<div class="sbar"><div class="sbar-track">${seg(atrasado,'atraso','Atrasado')}${seg(noPrazo,'noprazo','No prazo')}${seg(semPrazo,'semprazo','Sem prazo')}</div>`
+    +`<div class="sbar-leg">${item(atrasado,'atraso','atrasado'+(atrasado===1?'':'s'))}${item(noPrazo,'noprazo','no prazo')}${item(semPrazo,'semprazo','sem prazo')}</div></div>`;
+}
+/* Referências da janela do fiscal, TODAS no período ativo (decisão do usuário,
+   2026-09-17: "tudo segue o período"). Antes a janela lia a carreira inteira da pessoa e
+   a comparava com a média histórica; a lista de processos, porém, passou a ser separada
+   pelo filtro, e a tela ficou com três recortes ao mesmo tempo. Uma tela, uma pergunta,
+   uma janela — é o que sobrevive a alguém perguntando "isso é de quando?" numa reunião.
+   Nenhuma das duas tem cache: o período muda, e servir número velho num painel de
+   desempenho é pior que recalcular 400 linhas ao abrir uma janela. */
+function refGeral(){
+  const a=aggProc(PROCESSOS);
+  return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null, n:a.nTempo};
+}
+// A coorte sai de aggFiscais(), a MESMA função que monta o ranking lateral e os cartões
+// de equipe — assim a posição que a janela afirma ("2º mais lento de 20") nunca pode
+// discordar da ordem que a lista ao lado mostra.
+function coorteFiscais(){
+  return aggFiscais(PROCESSOS).lista
+    .filter(f=>f.n>=AMOSTRA_MIN)
+    .map(f=>({mat:f.mat, nome:f.nome, n:f.n, media:f.tempo}))
+    .sort((x,y)=>x.media-y.media);
+}
+// Os 11 distritos pela régua da equipe, NO PERÍODO ATIVO — ao contrário da coorte de
+// fiscais, aqui o recorte é o mesmo que a janela do distrito declara no subtítulo, então
+// as duas pontas da comparação já nascem iguais. Sem cache: o período muda.
+function coorteDistritos(){
+  return groupsList().map(g=>{
+    const a=aggProc(procsEquipeDistrito(g.id));
+    return {gid:String(g.id),nome:g.nome.replace(/^D\.O\.\s*/,''),
+            media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null,n:a.nTempo};
+  }).filter(d=>d.media!=null).sort((a,b)=>a.media-b.media);
+}
+// Média do estado no período ativo, pela mesma régua da equipe da janela de distrito.
+function refEstadoPeriodo(){
+  const a=aggProc(groupsList().flatMap(g=>procsEquipeDistrito(g.id)));
+  return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null,n:a.nTempo};
+}
+// "Onde isto está" — a coorte inteira no eixo de dias, com o item da janela destacado.
+// Um gráfico só responde a pergunta que o conselho faz de verdade ("somos bons ou ruins
+// nisto?") melhor que uma lista de 11 ou 58 barras: mostra a POSIÇÃO e a DISPERSÃO na
+// mesma linha — se todo mundo está mal, ou se este é o ponto fora da curva.
+function posicaoHtml(titulo,coorte,chave,valorChave,ref,rotuloRef,unidade){
+  if(coorte.length<2) return '';
+  // Fora da coorte (amostra abaixo de AMOSTRA_MIN) a seção não existe: um eixo cheio de
+  // pares sem nenhum ponto destacado responde "onde este está" com "em lugar nenhum", e
+  // o herói ao lado já disse por que não há média.
+  const idx=coorte.findIndex(c=>String(c[chave])===String(valorChave));
+  if(idx<0) return '';
+  const pts=coorte.map(c=>({v:c.media,on:String(c[chave])===String(valorChave),
+                            label:`${c.nome}: ${fmtDias(c.media)}`}));
+  const marcas=ref!=null?[{v:ref,label:rotuloRef,cls:'ref'}]:[];
+  // Conta pela ponta mais próxima: "19º mais rápido de 20" é verdade, mas a frase que o
+  // conselho precisa ouvir sobre esse caso é "2º mais lento de 20". A coorte vem ordenada
+  // do mais rápido para o mais lento, então a posição pelo fim é o espelho da do começo.
+  const txtPos=idx<coorte.length/2
+    ? `${NUM.format(idx+1)}º mais rápido de ${NUM.format(coorte.length)} ${unidade}`
+    : `${NUM.format(coorte.length-idx)}º mais lento de ${NUM.format(coorte.length)} ${unidade}`;
+  const pos=`<div class="dsh-pos">${escHtml(txtPos)}</div>`;
+  return `<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.chart} ${escHtml(titulo)}</div>${pos}`
+    +eixoDias(pts,marcas,{altura:84})+`</div>`;
+}
+
+// Distrito: sempre a EQUIPE lotada ali, não importa a régua ativa no painel (equipe × local
+// da obra). A régua decide como o MAPA pinta o distrito; a janela responde "quem é esse
+// distrito", e isso é a lotação do fiscal — a régua da obra contaria só quem passou por uma
+// obra ali, fatiando cada fiscal do jeito que a E4 já baniu da comparação pessoa a pessoa.
+function procsEquipeDistrito(gid){ return _procPorEquipe.get(String(gid))||[]; }
+/* Sobre QUANTOS despachos a média foi tirada — e, quando ela não existe, por quê.
+   O corte de AMOSTRA_MIN é sobre despachos COM TEMPO MEDIDO no SUITE, não sobre
+   despachos: quem despachou 4 vezes mas só tem 1 tempo registrado fica sem média. Sem
+   esta frase o painel mostrava o buraco sem explicá-lo, e o usuário encontrou o caso em
+   Fortaleza (2026-09-17) sem ter como saber a causa. Os dois motivos de um despacho não
+   ter tempo são diferentes e aparecem separados: "aberto já pronto" é regra (menos de
+   1 dia com o fiscal), "sem tempo no SUITE" é caso a conferir no cadastro. */
+function baseDaMedia(f){
+  if(!f.desp) return 'sem despacho no período';
+  const falta=f.desp-f.n;
+  if(!falta) return `média sobre ${NUM.format(f.n)} despacho${f.n===1?'':'s'}`;
+  const porque=[];
+  if(f.prontos) porque.push(`${NUM.format(f.prontos)} aberto${f.prontos===1?'':'s'} já pronto${f.prontos===1?'':'s'}`);
+  if(f.semTempo) porque.push(`${NUM.format(f.semTempo)} sem tempo no SUITE`);
+  return `${NUM.format(f.n)} de ${NUM.format(f.desp)} despachos com tempo medido`
+    +(porque.length?` — ${porque.join(', ')}`:'');
+}
+// Os fiscais do distrito em cartões, cada um com o macro dele (pedido do usuário,
+// 2026-09-17). Do mais lento ao mais rápido — a mesma pergunta que o painel inteiro faz.
+// Quem ainda não tem amostra comparável vai para o fim com "sem média", e não com um
+// número: a régua de AMOSTRA_MIN vale aqui igual ao mapa, ao ranking e aos KPIs.
+function equipeCardsHtml(procs){
+  const {lista,semFiscal}=aggFiscais(procs);
+  if(!lista.length) return '';
+  const comMedia=lista.filter(f=>f.n>=AMOSTRA_MIN).sort((a,b)=>b.tempo-a.tempo);
+  const sem=lista.filter(f=>f.n<AMOSTRA_MIN)
+                 .sort((a,b)=>b.desp-a.desp||a.nome.localeCompare(b.nome,'pt-BR'));
+  const max=Math.max(1,...comMedia.map(f=>f.tempo));
+  const card=f=>{
+    const tem=f.n>=AMOSTRA_MIN, fina=amostraFina(f.n);
+    const valor=tem?escHtml(fmtDias(f.tempo)):'<span class="fcard-sem">sem média</span>';
+    // Mesma marca do ranking, pela mesma razão: aqui também uma pessoa é nomeada.
+    const barra=tem?`<div class="rbar${fina?' fina':''}"><i style="width:${Math.max(4,f.tempo/max*100)}%"></i></div>`:'';
+    // Sem média, o cartão precisa dizer POR QUE — era o buraco que o usuário encontrou em
+    // Fortaleza (2026-09-17): fiscal com mais de 2 despachos e nenhum número, sem pista.
+    const aviso=(!tem||fina)?`<div class="fcard-fina">${escHtml(baseDaMedia(f))}</div>`:'';
+    return `<div class="fcard" role="button" tabindex="0" data-mat="${escHtml(f.mat)}"`
+      +` title="Ver painel de ${escHtml(f.nome)}" aria-label="Ver painel de ${escHtml(f.nome)}">`
+      +`<div class="fcard-n">${escHtml(f.nome)}</div>`
+      +`<div class="fcard-v">${valor}</div>${barra}${aviso}`
+      +`<div class="fcard-s">${escHtml(`${NUM.format(f.desp)} despacho${f.desp===1?'':'s'} · ${NUM.format(f.fila)} em tramitação`)}</div></div>`;
+  };
+  const nota=semFiscal
+    ? `<div class="foot-note">${escHtml(`${NUM.format(semFiscal)} processo${semFiscal===1?'':'s'} desta equipe `
+      +`${semFiscal===1?'está':'estão'} sem matrícula de fiscal gravada e ${semFiscal===1?'fica':'ficam'} fora dos cartões.`)}</div>`
+    : '';
+  return `<div class="statwrap"><div class="sec-h"><span>A equipe</span>`
+    +`<span>${NUM.format(lista.length)} ${lista.length===1?'fiscal':'fiscais'}</span></div>`
+    +`<div class="sec-sub">Do mais lento ao mais rápido. Clique num cartão para abrir o painel do fiscal.</div>`
+    +`<div class="fcards">${comMedia.map(card).join('')}${sem.map(card).join('')}</div>${nota}</div>`;
+}
+function abreModalDistrito(gid){
+  const g=grpById(gid); if(!g) return;
+  const procs=procsEquipeDistrito(gid), a=aggProc(procs);
+  const nome=g.nome.replace(/^D\.O\.\s*/,'');
+  const per=RP_PERIODO[st.rp.periodo].txt;
+  const obras=new Set(); procs.forEach(p=>{ if(p.codigo_obra) obras.add(p.codigo_obra); });
+  // Mesmo tri-estado do card/donut GECOPE × Fiscalização: sem prazo não é "no prazo".
+  const noPrazo=Math.max(0,a.comMeta-a.metaEst), semPrazo=Math.max(0,a.fila-a.comMeta);
+  const est=refEstadoPeriodo();
+  const media=a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
+  const sub=`<div class="msub">${RS_ICO.dist}<span>Equipe do Distrito Operacional · ${escHtml(per)}</span></div>`;
+  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média do estado')}`
+    +posicaoHtml('Onde este distrito está',coorteDistritos(),'gid',String(gid),est.media,'Média do estado','distritos comparáveis')
+    +`</div>`;
+  const tiles=`<div class="dsh-tiles">`
+    +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
+    +tile(NUM.format(a.desp),'Despachos',per)
+    +tile(NUM.format(a.fiscais),'Fiscais','responsáveis por esses processos')
+    +tile(NUM.format(obras.size),'Obras atendidas')
+    +`</div>`;
+  // A fila de hoje, na mesma linguagem horizontal do resto da janela. O donut de atraso
+  // do painel lateral diria o mesmo aqui — uma barra a mais, um gráfico a menos.
+  const hoje=a.fila
+    ? `<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.pessoa} Com a fiscalização hoje</div>`
+      +barraAtraso(a.metaEst,noPrazo,semPrazo)
+      +`<div class="dsh-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} desta equipe `
+        +`${a.naGecope===1?'está':'estão'} na GECOPE, fora das mãos do fiscal.`)}</div></div>`
+    : '';
+  const corpo=a.total
+    ? topo+tiles+hoje+equipeCardsHtml(procs)
+    : '<div class="empty">Nenhum processo de replanilhamento nesta equipe.</div>';
+  document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
+      <div class="mh-titles"><div class="mt">${escHtml(nome)}</div>${sub}</div>
+      <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
+    </div></div>
+    <div class="mbody dsh">${corpo}</div>`;
+  mostraJanelaGenerica();
+}
+
+// Fiscal: a carga da pessoa em TODOS os distritos (a fatia geográfica de onde a janela foi
+// aberta nunca serviu para avaliar alguém), medida no PERÍODO ativo. Passa por aggProc() de
+// propósito — a mesma função que imprime os KPIs do painel e monta o ranking —, para que
+// nenhum número da janela possa divergir do que a tela ao lado afirma. `todos` continua
+// sendo a lista completa: é dela que sai o grupo "Fora deste recorte", que existe para a
+// conta da lista fechar em vez de sumirem processos em silêncio.
+function fichaFiscal(mat){
+  const todos=PROCESSOS.filter(p=>p.fiscalMat===mat);
+  const a=aggProc(todos);
+  // Obras do RECORTE, não da carga inteira: era o único número da janela que ainda
+  // contava a carreira, e um ladrilho fora do período no meio de três dentro dele é
+  // exatamente a confusão que "tudo segue o período" veio resolver.
+  const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
+  const obras=new Set();
+  for(const p of todos){
+    if(!p.codigo_obra) continue;
+    const dentro=p.naFila || (p.despachado && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte)));
+    if(dentro) obras.add(p.codigo_obra);
+  }
+  return {todos, a, obras:obras.size};
+}
+// Cartão de processo da ficha: NUP, descrição, contratada e contratante — não é o
+// procCard() da lista por cidade, que repete o nome do fiscal a cada linha (redundante
+// aqui, já que a janela inteira é de UM fiscal só). `estado` é o rótulo do grupo a que
+// ele pertence, e muda com o grupo: na fila diz o prazo, despachado diz a data.
+function fichaProcCard(p,estado){
+  return `<div class="proc${p.naFila&&p.metaEstourada===true?' meta':''}">`
+    +`<div class="proc-h"><span class="proc-n">${escHtml(p.processo)}</span>`
+    +(estado?`<span class="proc-s">${escHtml(estado)}</span>`:'')+`</div>`
+    +(p.objeto&&p.objeto!=='—'?`<div class="proc-o">${escHtml(p.objeto)}</div>`:'')
+    +`<div class="proc-m"><span>${escHtml(p.contratada)}</span><span>${escHtml(p.contratante)}</span></div></div>`;
+}
+// Rótulo de prazo de um processo que está com o fiscal agora. Tri-estado preservado: sem
+// data de compromisso não é "no prazo", é "sem prazo" (mesma regra do donut e da barra).
+function rotuloPrazo(p){
+  const q=p.metaEstourada===true?'Atrasado':p.metaEstourada===false?'No prazo':'Sem prazo';
+  return p.diasNaUnidade!=null ? `${q} · ${NUM.format(p.diasNaUnidade)} dia${p.diasNaUnidade===1?'':'s'}` : q;
+}
+/* Um grupo da lista de processos da janela do fiscal: cabeçalho com a contagem, e os
+   cartões atrás de um toggle — os dados macro primeiro, a lista no clique (pedido do
+   usuário, 2026-09-17). A janela mostrava os processos todos numa lista só, misturando
+   quem está com o fiscal agora e quem ele despachou há dois anos. */
+function grupoProcs(id,titulo,sub,procs,rotulo){
+  if(!procs.length) return '';
+  const mostra=procs.slice(0,PROC_LISTA_MAX);
+  // Sem título o grupo é só o toggle + a lista: é o caso da fila, que vive dentro de uma
+  // seção que já tem cabeçalho e contagem próprios (ver "Com o fiscal hoje").
+  return `<div class="gproc${titulo?'':' gproc-nu'}">`
+    +(titulo?`<div class="gproc-h"><span>${escHtml(titulo)}</span><b>${NUM.format(procs.length)}</b></div>`:'')
+    +(sub?`<div class="gproc-s">${escHtml(sub)}</div>`:'')
+    +verToggle(id,`Ver ${NUM.format(procs.length)} processo${procs.length===1?'':'s'}`)
+    +`<div id="${id}" hidden>`
+    +mostra.map(p=>fichaProcCard(p,rotulo?rotulo(p):'')).join('')
+    +(procs.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(procs.length)}.</div>`:'')
+    +`</div></div>`;
+}
+function abreModalFiscal(mat){
+  const f=fichaFiscal(mat); if(!f.todos.length) return;
+  const ref=f.todos[0], a=f.a;
+  const geral=refGeral();
+  const media=a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
+  const lot=ref.gedop?` · ${ref.gedop}`:'';
+  const perTxt=RP_PERIODO[st.rp.periodo].txt;
+  // O subtítulo declara o recorte da janela inteira: era "Carga completa", e passou a ser
+  // o período ativo quando todos os números da tela passaram a segui-lo.
+  const sub=`<div class="msub">${RS_ICO.pessoa}<span>${escHtml(perTxt)}${ref.fiscalMat?` · mat. ${ref.fiscalMat}`:''}${escHtml(lot)}</span></div>`;
+  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,geral.media,'da média geral')}`
+    +posicaoHtml('Onde este fiscal está',coorteFiscais(),'mat',mat,geral.media,'Média geral','fiscais comparáveis')
+    +`</div>`;
+  // A TIRA DE DESPACHOS — a explicação da média que o usuário pediu ao clicar no nome
+  // (2026-09-17). Um ponto por despacho no mesmo eixo de dias das outras comparações:
+  // com 8 ou 15 casos dá para VER se a média é o retrato do trabalho ou se dois
+  // processos parados puxaram todo o resto. Um histograma com essa amostra seria quase
+  // todo feito de caixas vazias, e a média sozinha esconde exatamente o que interessa.
+  // Só os despachos DO PERÍODO, como todo o resto da janela: a tira existe para explicar
+  // o número grande logo acima, e pontos fora do recorte dele explicariam outra coisa.
+  const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
+  const noPeriodo=p=>p.despachado && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte));
+  const desps=f.todos.filter(p=>noPeriodo(p)&&p.tempoFiscal!=null)
+                     .sort((x,y)=>x.tempoFiscal-y.tempoFiscal);
+  const marcas=[];
+  if(media!=null) marcas.push({v:media,label:'Média do fiscal',cls:'med'});
+  if(geral.media!=null) marcas.push({v:geral.media,label:'Média geral',cls:'ref'});
+  const lento=desps.length?desps[desps.length-1]:null;
+  const nota=desps.length>=2
+    ? `Mais demorado: ${lento.processo}, ${fmtDias(lento.tempoFiscal)}. Mais rápido: ${desps[0].processo}, ${fmtDias(desps[0].tempoFiscal)}.`
+    : '';
+  const tira=`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.clock} Cada despacho, do mais rápido ao mais lento</div>`
+    +eixoDias(desps.map(p=>({v:p.tempoFiscal,label:`${p.processo}: ${fmtDias(p.tempoFiscal)}`})),marcas,{altura:96,
+      vazio:`Nenhum despacho com tempo medido no SUITE ${perTxt} — sem casos para mostrar no eixo.`})
+    +(nota?`<div class="dsh-nota">${escHtml(nota)}</div>`:'')+`</div>`;
+  // Fila de hoje: mesmo tri-estado de prazo do resto do sistema. Atrasado primeiro, e
+  // dentro de cada grupo quem está parado há mais tempo antes — a ordem em que um gestor
+  // precisa ler a fila de alguém.
+  const ordemMeta=p=>p.metaEstourada===true?0:p.metaEstourada===false?1:2;
+  const fila=f.todos.filter(p=>p.naFila)
+    .sort((x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
+  const atras=fila.filter(p=>p.metaEstourada===true).length;
+  const noPrazo=fila.filter(p=>p.metaEstourada===false).length;
+  const semPrazo=fila.filter(p=>p.metaEstourada==null).length;
+  const espera=fila.reduce((mx,p)=>p.diasNaUnidade!=null&&p.diasNaUnidade>mx?p.diasNaUnidade:mx,-1);
+  // Os ladrilhos seguem o período, como o resto da janela. PROCESSOS usa a mesma
+  // definição do card homônimo do painel lateral (aggProc.procs): em "Hoje", só quem está
+  // com o fiscal agora; numa janela, esses mais os despachados nela.
+  const tiles=`<div class="dsh-tiles">`
+    +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
+    +tile(NUM.format(a.fila),'Em tramitação','com o fiscal hoje')
+    +tile(NUM.format(a.desp),'Despachos',perTxt)
+    +tile(NUM.format(f.obras),'Obras','dos processos acima')
+    +`</div>`;
+  // A lista dos que estão com o fiscal mora DENTRO da seção que já mostra a quebra de
+  // prazo, em vez de repetir a mesma quebra num grupo separado mais abaixo: a barra é o
+  // macro, o toggle abre os processos que a compõem. Cada cartão traz o próprio prazo.
+  const hoje=fila.length
+    ? `<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.pessoa} Com o fiscal hoje</div>`
+      +barraAtraso(atras,noPrazo,semPrazo)
+      +(espera>=0?`<div class="dsh-nota">${escHtml(`O mais antigo está há ${NUM.format(espera)} dia${espera===1?'':'s'} na unidade do fiscal.`)}</div>`:'')
+      +grupoProcs('fichaFila','','',fila,rotuloPrazo)
+      +`</div>`
+    : '';
+  // Os processos separados pelo PERÍODO ativo (pedido do usuário, 2026-09-17): a janela
+  // mostrava tudo numa lista só, misturando o que está com o fiscal agora com o que ele
+  // despachou há dois anos. Os três grupos são disjuntos e somam o total do cabeçalho —
+  // o terceiro existe justamente para que a conta feche, em vez de sumirem em silêncio os
+  // processos que não couberam nos dois primeiros.
+  const despPer=f.todos.filter(noPeriodo)
+    .sort((x,y)=>String(y.dataDespacho||'').localeCompare(String(x.dataDespacho||'')));
+  const dentro=new Set([...fila,...despPer]);
+  const resto=f.todos.filter(p=>!dentro.has(p)).sort(rpOrdemProc);
+  const rotDesp=p=>p.dataDespacho?fmtDateBR(p.dataDespacho):'sem data';
+  const lista=`<div class="statwrap"><div class="sec-h"><span>Processos</span><span>${NUM.format(f.todos.length)}</span></div>`
+    +`<div class="sec-sub">${escHtml(`Os que estão com o fiscal aparecem na seção acima. Aqui, o que ele despachou — ${perTxt}.`)}</div>`
+    +grupoProcs('fichaDesp',`Despachados · ${perTxt}`,'Do mais recente para o mais antigo.',despPer,rotDesp)
+    +grupoProcs('fichaResto','Fora deste recorte',
+        'Na GECOPE, despachados antes do período ou arquivados no meio do trâmite.',resto,null)
+    +`</div>`;
+  document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
+      <div class="mh-titles"><div class="mt">${escHtml(ref.fiscalNome)}</div>${sub}</div>
+      <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
+    </div></div>
+    <div class="mbody dsh">${topo}${tira}${tiles}${hoje}${lista}</div>`;
+  mostraJanelaGenerica();
+}
+// Chip ".chip.abre" das linhas de distrito do ranking — checado antes de .rrow no clique e
+// no teclado, porque fica aninhado dentro dela: sem isso o mesmo clique também desceria
+// para as cidades por baixo da janela que acabou de abrir.
+function abrirJanela(el){
+  if(el.dataset.abre==='distrito') abreModalDistrito(el.dataset.gid);
+}
+
+function renderPanelReplan(scope,body){
+  escondeRpTip();   // o innerHTML abaixo apaga o botão âncora; a janelinha ficaria órfã
+  const procs=procsDoRecorte(), a=aggProc(procs), per=RP_PERIODO[st.rp.periodo].txt;
+  // "Replanilhamentos" já aparece sozinho no cabeçalho (1.1, 2026-09-17): repeti-lo aqui
+  // era a mesma poluição que as outras correções da rodada estão tirando (achado do
+  // rev-correcao). O escopo some com a palavra sozinho.
+  scope.innerHTML=`<b>${escHtml(escopoReplanTxt())}</b>`;
+  // escapa dentro dos helpers, não em cada chamada: parte dos argumentos (nome de fiscal,
+  // descrição de obra, nº do processo) vem do banco.
+  const linha=(rot,val,sub)=>`<div class="sit"><span class="sit-l">${escHtml(rot)}</span>`
+    +`<span class="sit-v">${escHtml(val)}${sub?` <span class="sit-p">${escHtml(sub)}</span>`:''}</span></div>`;
+  // Pedido do usuário: o cartão mostra só rótulo curto e número; a explicação (e o
+  // denominador que antes ia no subtítulo) mora na janelinha do botão "i" — ver rpTip.
+  // `sub` fica para o que é DADO e não explicação (atrasados × no prazo, média suprimida).
+  const kpi=(rot,val,tip,sub)=>`<div class="kpi kpi-rp"><div class="k">${escHtml(rot)}`
+    +`<button type="button" class="kpi-info" data-tip="${escHtml(tip)}" aria-label="O que é ${escHtml(rot)}?">i</button></div>`
+    +`<div class="v">${escHtml(val)}</div>`+(sub?`<div class="ks">${sub}</div>`:'')+`</div>`;
+  // Anomalias de carga são da BASE INTEIRA — não do recorte —, daí ficarem à parte e o
+  // rótulo dizer isso. O subtítulo diz de qual contagem cada uma fica de fora: as duas
+  // réguas perdem processos diferentes. Aparecem inclusive no recorte vazio, onde podem
+  // ser a explicação do vazio.
+  const d=_procDiag, anomalias=[];
+  if(d&&d.semMunicipio) anomalias.push(linha('Sem município reconhecido', NUM.format(d.semMunicipio), 'fora da contagem pelo local da obra'));
+  if(d&&d.semGedop) anomalias.push(linha('Fiscal sem lotação', NUM.format(d.semGedop), 'fora da contagem pela equipe'));
+  if(d&&d.gedopSemDistrito) anomalias.push(linha('Lotação fora dos 11 distritos', NUM.format(d.gedopSemDistrito), 'fora da contagem pela equipe'));
+  if(d&&d.despSemData) anomalias.push(linha('Despachado sem data', NUM.format(d.despSemData), 'só entra no período “Hoje”'));
+  if(d&&d.despSemTempo) anomalias.push(linha('Despachado sem tempo no SUITE', NUM.format(d.despSemTempo), 'conta como despacho, fora do tempo médio'));
+  if(d&&d.aprovSemData) anomalias.push(linha('Aprovado sem data de aprovação', NUM.format(d.aprovSemData), 'fora de todas as contagens'));
+  if(d&&d.semSituacao) anomalias.push(linha('Sem cálculo do SUITE', NUM.format(d.semSituacao), 'fora de todas as contagens'));
+  if(d&&d.abertosProntos) anomalias.push(linha('Aberto já pronto', NUM.format(d.abertosProntos), 'menos de 1 dia com o fiscal: conta como despacho, fora do tempo médio'));
+  if(d&&d.divergencia) anomalias.push(linha('Distrito da obra ≠ do fiscal', NUM.format(d.divergencia), `de ${NUM.format(d.comAmbos)} com os dois conhecidos`));
+  const conferencia = anomalias.length?`<div class="statwrap">
+      <div class="sec-h"><span>Conferência da carga</span><span>base inteira</span></div>
+      <div class="statleg cards">${anomalias.join('')}</div>
+    </div>`:'';
+  if(!a.total){
+    body.innerHTML=`<div class="empty">Nenhum processo de replanilhamento neste recorte.</div>`+conferencia;
+    return;
+  }
+  // Mesma regra do mapa (rpValor): abaixo de AMOSTRA_MIN a média não é exibida — o
+  // painel não pode mostrar um número que o mapa se recusou a pintar.
+  const nDesp=`${NUM.format(a.nTempo)} despacho${a.nTempo===1?'':'s'}`;
+  const tempo = a.nTempo>=AMOSTRA_MIN ? fmtDias(a.tempoMedio) : '—';
+  const nota = st.level>=2
+    ? 'Dentro do distrito, cidades e totais contam pelo local da obra; os fiscais são os que atuaram nesses processos, não necessariamente a equipe lotada aqui.'
+    : reguaEquipe()
+      ? 'Distritos contados pela equipe: cada processo entra no distrito onde o fiscal está lotado, onde quer que esteja a obra.'
+      : 'Distritos contados pelo local da obra; os fiscais são os que atuaram nesses processos, não a equipe lotada no distrito.';
+  // Os quatro cards seguem o período (pedido do usuário, 2026-09-16): em "Hoje", PROCESSOS
+  // e FISCAIS são a posição atual e DESPACHOS e TEMPO MÉDIO o histórico inteiro; numa
+  // janela, os quatro olham a janela. O resto é contexto e vem abaixo, em corpo menor.
+  const hoje=st.rp.periodo==='hoje', quandoProc=rpQuandoProc();
+  const fmtN=(n,s,p)=>`${NUM.format(n)} ${n===1?s:p}`;
+  // Atrasado = passou da data de compromisso do fiscal. Processo SEM essa data não é "no
+  // prazo" — não há prazo para cumprir —, então vira um terceiro grupo e só aparece
+  // quando existe; somá-lo ao "no prazo" inflaria justamente o número que tranquiliza.
+  // Só em "Hoje": atraso é condição de quem está com o fiscal agora, e numa janela o card
+  // também soma despachados, para os quais "atrasado" não quer dizer nada.
+  const noPrazo=a.comMeta-a.metaEst, semPrazo=a.fila-a.comMeta;
+  // O card PROCESSOS não leva mais subtexto (usuário, 2026-09-17): "N com o fiscal hoje ·
+  // M despachados" (fora de "Hoje") e "N atrasados · M no prazo" (em "Hoje") eram
+  // redundantes com os outros cards e com o donut da seção GECOPE × Fiscalização, que já
+  // mostra a mesma quebra atrasado/no prazo/sem prazo. `noPrazo`/`semPrazo`/`a.metaEst`
+  // continuam vivos — o donut (`segsAtraso`, mais abaixo) é quem os usa agora.
+  const procSub='';
+  // Textos do "i" em parágrafos (separados por \n\n): mostraRpTip() quebra cada um numa
+  // <p>, para não virar um bloco só difícil de ler (usuário, 2026-09-17).
+  const tipProc = hoje
+    ? 'Processos que estão com os fiscais hoje: status Análise Fiscal ou Devolvido p/ Reanálise Fiscal.\n\n'
+      +'Atrasado: já passou da data de compromisso do fiscal. No prazo: a data ainda não chegou.'
+      +(semPrazo?' Sem prazo: não tem data de compromisso cadastrada.':'')
+    : `Processos que passaram pela Fiscalização — ${quandoProc}: os que estão com os fiscais hoje `
+      +'(Análise Fiscal ou Devolvido p/ Reanálise Fiscal) mais os despachados para a GECOPE no período.';
+  const tipTempo='Média de dias que o processo ficou na unidade do fiscal no SUITE até ir para a GECOPE (ou, sem '
+    +'passagem pela GECOPE, para a DIFOR) e ser aprovado, somando idas e voltas.\n\n'
+    +'Conta só o tempo de quem despachou, desde que assumiu o processo; o tempo de um fiscal anterior não entra. '
+    +'Processo aberto já pronto (menos de 1 dia com o fiscal) conta como despacho, mas não entra na média.\n\n'
+    +`Calculada sobre ${fmtN(a.nTempo,'despacho','despachos')} — ${per}. `
+    +`Com menos de ${AMOSTRA_MIN} despachos a média não é mostrada: um único processo decidiria o resultado.`;
+  const tipDesp='Processos aprovados pela GECOPE (Aprovado, ou Arquivado com data de aprovação), na data em que '
+    +`saíram da unidade do fiscal no SUITE (sem passagem por ela, na data da ida à GECOPE) — ${per}.\n\n`
+    +'Arquivado sem data de aprovação não conta.';
+  const tipFiscais=`Fiscais responsáveis pelos processos do card Processos — ${quandoProc}. Cada fiscal conta uma vez, `
+    +'seja qual for o número de processos dele.'
+    +(a.semMatricula?`\n\n${fmtN(a.semMatricula,'processo está','processos estão')} sem matrícula de fiscal gravada e não `
+      +`${a.semMatricula===1?'entra':'entram'} nesta conta.`:'');
+  const kpis=`<div class="kpis kpis-rp">
+      ${kpi('Processos', NUM.format(a.procs), tipProc, procSub)}
+      ${kpi('Tempo médio', tempo, tipTempo,
+            a.nTempo>=AMOSTRA_MIN ? '' : escHtml(a.nTempo ? `só ${nDesp}` : 'nenhum despacho'))}
+      ${kpi('Despachos', NUM.format(a.desp), tipDesp)}
+      ${kpi('Fiscais', NUM.format(a.fiscais), tipFiscais,
+            a.semMatricula ? escHtml(`${fmtN(a.semMatricula,'processo','processos')} sem matrícula`) : '')}
+    </div>`;
+  // GECOPE: total e a quebra por status, uma linha cada (pedido do usuário). Os cinco
+  // status pedidos aparecem sempre, mesmo zerados; qualquer outro que a base tenha (EM
+  // REANÁLISE, CONTRATANTE…) só quando existe — sem ele as linhas não fechariam com o total.
+  const GECOPE_ST=['DILIGÊNCIA','EM ANÁLISE','AGUAR. ANÁLISE','AGUAR. REANÁLISE','AGUAR. APROVAÇÃO'];
+  const extras=[...a.gecope.keys()].filter(k=>!GECOPE_ST.includes(k)).sort((x,y)=>x.localeCompare(y,'pt-BR'));
+  const gecRows=[...GECOPE_ST,...extras].map(k=>{
+    const n=a.gecope.get(k)||0;
+    return `<div class="gec-st${n?'':' zero'}"><span>${escHtml(k)}</span><b>${NUM.format(n)}</b></div>`;
+  }).join('');
+  // FISCALIZAÇÃO: mesma ideia do GECOPE, quebrado pelos dois status da fila (statusTxt já
+  // traz "REANÁLISE FISCAL" no lugar do rótulo longo do banco).
+  const FILA_ST=['ANÁLISE FISCAL','REANÁLISE FISCAL'];
+  const filaExtras=[...a.filaPorStatus.keys()].filter(k=>!FILA_ST.includes(k)).sort((x,y)=>x.localeCompare(y,'pt-BR'));
+  const filaRows=[...FILA_ST,...filaExtras].map(k=>{
+    const n=a.filaPorStatus.get(k)||0;
+    return `<div class="gec-st${n?'':' zero'}"><span>${escHtml(k)}</span><b>${NUM.format(n)}</b></div>`;
+  }).join('');
+  // GECOPE × Fiscalização: os dois lados da fila de replanilhamento, hoje. Base = quem está
+  // num dos dois grupos (naGecope + fila), não o total do recorte (que inclui já
+  // despachado). Pedido do usuário em 2026-09-17: um título só, percentual de cada lado, e
+  // um anel mostrando quantos dos que estão na Fiscalização estão atrasados × no prazo —
+  // "sem prazo" (sem data de compromisso) entra como terceira fatia só quando existe, pela
+  // mesma razão do card PROCESSOS: somá-lo ao "no prazo" inflaria o número que tranquiliza.
+  const baseGxF=a.naGecope+a.fila;
+  const pctGxF=n=>baseGxF?`${fmtPct1(n/baseGxF*100)}%`:'—';
+  const segsAtraso=[
+    {n:a.metaEst, label:'Atrasado', cls:'atraso'},
+    {n:Math.max(noPrazo,0), label:'No prazo', cls:'noprazo'},
+    {n:Math.max(semPrazo,0), label:'Sem prazo', cls:'semprazo'},
+  ];
+  // Tamanho reduzido (84, não o padrão 118): dentro de .gxf-grp a coluna real do painel
+  // fica perto de 170px (achado do rev-design, 2026-09-17) — o anel padrão não cabia nem
+  // empilhado sobre a legenda sem sobrar quase nada de largura útil para os rótulos.
+  const donut=a.fila?`<div class="gxf-donut">${donutMulti(segsAtraso,84)}${donutLeg(segsAtraso)}</div>`:'';
+  const contexto=`<div class="statwrap">
+      <div class="sec-h"><span>Processos em Tramitação — GECOPE × FISCALIZAÇÃO</span></div>
+      <div class="sec-sub">Situação dos processos na GECOPE e na FISCALIZAÇÃO</div>
+      <div class="gxf">
+        <div class="gxf-grp">
+          <div class="gxf-h"><span>GECOPE</span><b>${NUM.format(a.naGecope)}</b><span class="gxf-pct">${pctGxF(a.naGecope)}</span></div>
+          <div class="gec-lista">${gecRows}</div>
+        </div>
+        <div class="gxf-grp">
+          <div class="gxf-h"><span>Fiscalização</span><b>${NUM.format(a.fila)}</b><span class="gxf-pct">${pctGxF(a.fila)}</span></div>
+          <div class="gec-lista">${filaRows}</div>
+          ${donut}
+        </div>
+      </div>
+      <div class="foot-note">${escHtml(nota)}</div>
+    </div>`;
+  // Ranking: a mesma métrica do mapa, em lista navegável. O cabeçalho nomeia a métrica —
+  // sem isso a coluna de números à direita fica sem unidade.
+  const r=rpRanking();
+  const ranking = r && r.ents.length ? `<div class="statwrap">
+      <div class="sec-h"><span>${r.kind==='group'?'Distritos':'Cidades'}</span>`
+      +`<span>${escHtml(RP_METRICA[st.rp.metrica].label)}</span></div>`
+      // mesma frase da legenda do mapa e da lista de irmãos da trilha: é a terceira
+      // superfície com estes números, e nenhuma delas pode dizer o recorte de um jeito
+      // diferente das outras
+      +`<div class="sec-sub">${escHtml(rpRecorteTxt(r.kind==='group'))}</div>`
+      +rpRankRowsHtml(r.ents,r.kind)+`</div>` : '';
+  // Nível 3 (cidade aberta): sem ranking abaixo, a navegação terminaria num beco. A lista
+  // dos processos é o detalhe que fecha o caminho macro → micro.
+  let lista='';
+  if(st.level>=3){
+    const ordenados=[...procs].sort(rpOrdemProc), mostra=ordenados.slice(0,PROC_LISTA_MAX);
+    lista=`<div class="statwrap">
+      <div class="sec-h"><span>Processos</span><span>${NUM.format(procs.length)}</span></div>`
+      +`<div class="sec-sub">Primeiro os que estão há mais tempo com o fiscal; depois os que estão na GECOPE, os já despachados e os arquivados no trâmite.</div>`
+      +mostra.map(procCard).join('')
+      +(procs.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(procs.length)}, nesta ordem.</div>`:'')
+      +`</div>`;
+  }
+  // Ordem de leitura: os quatro números do recorte, o contexto deles, as pessoas (E4), as
+  // áreas em lista navegável e, no fim do caminho, os processos.
+  body.innerHTML=kpis+contexto+rpFiscaisRankingHtml(procs,a)+ranking+lista+conferencia;
+}
+
 function renderPanel(){
-  setKPIs();
   const scope=document.getElementById('scope'), body=document.getElementById('body');
   const methodName='Distritos Operacionais';
+  // Tira de cena os KPIs e gráficos estáticos de OBRAS no modo novo (regra no CSS).
+  // Alternado aqui, e não em setModo, porque renderPanel roda nos dois modos: a volta
+  // para Obras — inclusive por reverterParaObras() — limpa a classe sem caminho próprio.
+  _asideEl.classList.toggle('modo-replan',modoReplan());
+  if(modoReplan()){ renderPanelReplan(scope,body); return; }
+  // Depois do desvio: setKPIs agrega obras e redesenha 3 gráficos, e renderPanel roda a
+  // cada hover de distrito — no modo novo esse trabalho iria para blocos ocultos.
+  setKPIs();
   if(st.sel && st.sel.ids.size){
     // seleção combinada (Ctrl+clique em vários distritos/municípios) tem
     // prioridade sobre o ranking/busca normais — é um recorte explícito do usuário
@@ -1884,14 +3204,21 @@ function renderCrumb(){
   c.innerHTML=h;
 }
 function renderFoot(){
-  document.getElementById('foot').innerHTML=
-    `Fluxo: <b>Distritos Operacionais → cidades</b>. Clique numa área para descer; use a trilha no topo para voltar.
-     Divisão oficial dos 11 D.Os (SOP). Dados oficiais da base de contratos de obras da SOP-CE.`;
+  // O clique no mapa faz coisas diferentes nos dois modos (ver onGroup): em Obras desce
+  // para as cidades, em Replanilhamentos abre o painel do distrito. O rodapé é o único
+  // lugar que explica o gesto, então precisa dizer o que ele faz AQUI.
+  const txt=modoReplan()
+    ? `Clique num <b>Distrito Operacional</b> no mapa para abrir o painel da equipe; use o ranking ao lado para descer até as cidades.
+       Divisão oficial dos 11 D.Os (SOP). Processos de replanilhamento do GECOPE; tempo de resposta pelo histórico do SUITE.`
+    : `Fluxo: <b>Distritos Operacionais → cidades</b>. Clique numa área para descer; use a trilha no topo para voltar.
+       Divisão oficial dos 11 D.Os (SOP). Dados oficiais da base de contratos de obras da SOP-CE.`;
+  document.getElementById('foot').innerHTML=txt;
 }
 
 function render(){
-  if(st.level===2) _levelMax=Math.max(1,...idsOfGroup(st.group).map(id=>mval(aggIds([id]))));
-  if(st.level===1 && hasActiveFilter()){
+  if(modoReplan()) rpPreparaMapa();
+  else if(st.level===2) _levelMax=Math.max(1,...idsOfGroup(st.group).map(id=>mval(aggIds([id]))));
+  if(!modoReplan() && st.level===1 && hasActiveFilter()){
     _groupValByGid=new Map(); _groupCountByGid=new Map();
     groupsList().forEach(g=>{ const a=aggIds(idsOfGroup(g.id)); _groupValByGid.set(String(g.id),mval(a)); _groupCountByGid.set(String(g.id),a.obras); });
     _levelMaxGroup=Math.max(1,...[..._groupValByGid.values()]);
@@ -1908,11 +3235,14 @@ function render(){
   if(st.level===1 && groupLayer){
     groupLayer.setStyle(groupStyle);
     // Etapa C: distrito "sem correspondência" fica sem pointer (cursor normal, não navegável)
-    groupLayer.eachLayer(l=>{ if(l._path) l._path.style.pointerEvents = noMatchGroup(l.feature.properties.gid)?'none':''; });
+    groupLayer.eachLayer(l=>{ if(!l._path) return;
+      l._path.style.pointerEvents = noMatchGroup(l.feature.properties.gid)?'none':'';
+      l._path.classList.toggle('sem-amostra', semAmostraGrp(l.feature.properties.gid)); });
   }
   setLayer(stateShape, false); // Etapa D: nível 0 removido — stateShape nunca é exibido
   setLayer(groupLayer, st.level===1); if(st.level===1 && groupLayer) groupLayer.bringToFront();
   renderCrumb(); renderPanel(); renderFoot(); renderFilterChips();
+  syncControlesModo(); renderLegendaReplan();
 }
 
 // ---- filtros / busca (multi-seleção) ----
@@ -2064,7 +3394,9 @@ function renderFilterChips(){
     ? chips.join('')+`<button type="button" class="fchip-clear" id="fchipClear">Limpar tudo</button>`
     : '';
   const c=document.getElementById('fchipClear'); if(c) c.onclick=clearAllFilters;
-  const tgl=document.getElementById('ctrlToggle'); if(tgl) tgl.classList.toggle('has-filters', chips.length>0);
+  // O selo diz "há filtro agindo no mapa". No modo Replanilhamentos os filtros de obras
+  // ficam guardados, mas não agem — o selo aceso ali apontaria para controles ocultos.
+  const tgl=document.getElementById('ctrlToggle'); if(tgl) tgl.classList.toggle('has-filters', chips.length>0 && !modoReplan());
   // "+" fica em destaque quando há algum filtro selecionado (podem estar recolhidos)
   const ft=document.getElementById('filtToggle');
   if(ft) ft.classList.toggle('has-active', FILTER_DEFS.some(d=>{const s=st.f[d.key];return s&&s.size;}));
@@ -2121,6 +3453,9 @@ if(_filtT){ _filtT.onclick=()=>toggleFilters(); toggleFilters(false); } // estad
 
 // painel lateral (KPIs/ranking) recolhível — aberto por padrão (ver modo apresentação abaixo)
 const _mainEl=document.querySelector('main'), _asideT=document.getElementById('asideToggle');
+// Lido por renderPanel(). Seguro aqui porque todo render() — o inicial, o de tema e os
+// de interação — acontece depois de `layer` existir, e ele só é criado mais abaixo.
+const _asideEl=_mainEl.querySelector('aside');
 // compartilhada com onGroup() (nível 1) — evita recriar o mesmo closure a cada feature
 // em buildGroupLayer() (~11-14x por build/troca de método).
 function panelVisible(){ return !_mainEl.classList.contains('aside-collapsed'); }
@@ -2196,7 +3531,7 @@ function repaintTheme(){
   Object.assign(TOKENS, readTokens());
   BASE=TOKENS.mapBase;
   syncStatusColors();                 // cores de STATUS_STATES (dots de "Situação das obras")
-  if(_lastStatus) setStatus(_lastStatus.txt,_lastStatus.ok,_lastStatus.lastSync); // dot de "Base de dados"
+  if(_lastStatus) setStatus(_lastStatus.txt,_lastStatus.ok,_lastStatus.lastSync,_lastStatus.replan); // dot de "Base de dados"
   if(!layer) return; // troca antes do init do mapa: o render() inicial já pinta no tema certo
   if(stateShape) stateShape.setStyle({fillColor:TOKENS.mapStateFill,color:`rgba(${TOKENS.ngRgb},.42)`});
   const _mbg=document.getElementById('modalBg');
@@ -2260,8 +3595,210 @@ function setDataScope(scope){
 if(_btnScope) _btnScope.addEventListener('click',()=>setDataScope(st.dataScope==='ativa'?'historico':'ativa'));
 syncScopeBtn(false);
 
+// Escape hatch para o cache de 1h (ver CACHE_TTL_MS acima): limpa só a entrada do
+// escopo atual e recarrega — sem isto, quem precisasse ver uma edição feita minutos
+// atrás em outra tela não teria como forçar isso antes do cache expirar sozinho.
+const _btnRefresh=document.getElementById('btnRefresh'), _btnRefreshTxt=document.getElementById('btnRefreshTxt');
+if(_btnRefresh) _btnRefresh.addEventListener('click',()=>{
+  try{ sessionStorage.removeItem(cacheKey(st.dataScope)); }catch(e){ /* privacidade/quota — segue sem cache mesmo */ }
+  _btnRefresh.disabled=true;
+  if(_btnRefreshTxt) _btnRefreshTxt.textContent='Atualizando…';
+  loadData().finally(()=>{
+    _btnRefresh.disabled=false;
+    if(_btnRefreshTxt) _btnRefreshTxt.textContent='Atualizar dados';
+  });
+});
+
 // (o segmento "Dividir por" — Distrito Op. / Região — foi removido; o módulo opera
 //  exclusivamente por Distrito Operacional.)
+// ---- seletor de modo (E1) ----
+// Revelado só depois que o papel é conhecido.
+const _segControle=document.getElementById('segControle'), _lblControle=document.getElementById('lblControle');
+// ---- controles e legenda do modo Replanilhamentos (E2) ----
+// Declarados antes de `layer`: todo render() — que chama as duas funções abaixo — só
+// acontece depois que ele existe (mesma garantia de _asideEl).
+const _ctrlReplan=document.getElementById('ctrlReplan'), _ctrlObras=document.getElementById('ctrlObras');
+const _rpReguaNota=document.getElementById('rpReguaNota'), _rpLeg=document.getElementById('rpLegenda');
+// Alterna os blocos de controle pelo modo. Chamada em todo render(), e não em setModo,
+// para que reverterParaObras() e qualquer outro caminho de volta a cubram sozinhos.
+// Busca e filtros de Obras saem de cena no modo novo (operam sobre contratos); os
+// filtros próprios dos processos chegam na E6.
+function syncControlesModo(){
+  if(!_ctrlReplan||!_ctrlObras) return;
+  const rp=modoReplan(), trocou=_ctrlReplan.hidden===rp;
+  _ctrlReplan.hidden=!rp; _ctrlObras.hidden=rp;
+  if(rp){
+    const foraDeAlcance=st.level>=2;
+    _ctrlReplan.querySelectorAll('#segRpRegua button').forEach(b=>{ b.disabled=foraDeAlcance; });
+    _rpReguaNota.textContent = foraDeAlcance
+      ? 'Dentro de um distrito, as cidades contam sempre pelo local da obra.'
+      : st.rp.regua==='equipe'
+        ? 'Cada processo conta para o distrito onde o fiscal está lotado, onde quer que esteja a obra.'
+        : 'Cada processo conta para o distrito onde fica a obra, qualquer que seja a lotação do fiscal.';
+  }
+  if(trocou && _ctrl.classList.contains('show')) fitCtrlHeight();
+}
+// Legenda da escala. Os extremos são os da escala EM USO (0 até o máximo do nível), para
+// que o tom mais escuro do mapa tenha um número ao lado. No nível 3 a cidade aberta é
+// pintada cheia, sem escala — a legenda sai.
+function renderLegendaReplan(){
+  if(!_rpLeg) return;
+  const mostra=modoReplan() && st.level<=2;
+  _rpLeg.hidden=!mostra; if(!mostra) return;
+  const m=st.rp.metrica;
+  const max=st.level===1?_rpMaxGrp:_rpMaxMun;
+  // max vale 1 quando nenhuma área tem valor positivo (ver rpPreparaMapa). Contagem toda
+  // zerada ainda é uma escala (topo 0); tempo sem nenhuma média não é — aí a barra sairia
+  // com um extremo vazio, e o que a legenda precisa dizer é por que está tudo cinza.
+  const semEscala = m==='tempo' && !_rpTemEscala;
+  const temValor = (st.level===1?[..._rpGrp.values()]:[..._rpMun.values()]).some(r=>r.v!=null && r.v>0);
+  const topo = m==='tempo' ? `${Math.round(max)} dias` : NUM.format(temValor?max:0);
+  const escala = semEscala
+    ? `<div class="rp-leg-s">Nenhuma ${st.level===1?'área':'cidade'} com ${AMOSTRA_MIN} despachos ou mais neste período.</div>`
+    : `<div class="rp-leg-bar" aria-hidden="true"></div><div class="rp-leg-esc"><span>0</span><span>${escHtml(topo)}</span></div>`;
+  _rpLeg.innerHTML=`<div class="rp-leg-t">${escHtml(RP_METRICA[m].label)}</div>`
+    +`<div class="rp-leg-s">${escHtml(rpRecorteTxt(st.level===1))}</div>`
+    +escala
+    // o cinza só precisa de nome enquanto divide o mapa com a escala; quando TUDO está
+    // cinza, a frase acima já explicou.
+    +(m==='tempo'&&!semEscala?`<div class="rp-leg-item"><span class="rp-leg-sw" aria-hidden="true"></span>Menos de ${AMOSTRA_MIN} despachos — sem dado</div>`:'');
+}
+// Janelinha de explicação dos KPIs do modo Replanilhamentos (botão "i"). Um único
+// elemento no <body>, posicionado por coordenada: dentro do cartão (overflow:hidden) ela
+// seria cortada, e o painel é refeito por innerHTML a cada render — a delegação no
+// document sobrevive a isso. Abre no hover e no foco, para funcionar também no teclado
+// e no toque.
+function mostraRpTip(btn){
+  if(!_rpTip){
+    _rpTip=document.createElement('div');
+    _rpTip.className='kpi-tip'; _rpTip.id='kpiTip'; _rpTip.setAttribute('role','tooltip');
+    document.body.appendChild(_rpTip);
+  }
+  if(_rpTipAlvo && _rpTipAlvo!==btn) _rpTipAlvo.removeAttribute('aria-describedby');
+  _rpTipAlvo=btn; btn.setAttribute('aria-describedby','kpiTip');
+  // Parágrafos separados por \n\n (ver tipProc/tipTempo/tipDesp/tipFiscais): cada um
+  // numa <p>, para não cair tudo numa única linha justificada.
+  _rpTip.innerHTML=(btn.dataset.tip||'').split('\n\n').filter(Boolean).map(p=>`<p>${escHtml(p)}</p>`).join('');
+  _rpTip.hidden=false;
+  const r=btn.getBoundingClientRect(), w=_rpTip.offsetWidth, h=_rpTip.offsetHeight, m=10;
+  const x=Math.min(Math.max(m, r.left+r.width/2-w/2), innerWidth-w-m);
+  let y=r.bottom+8; if(y+h>innerHeight-m) y=Math.max(m, r.top-h-8);
+  _rpTip.style.left=`${x}px`; _rpTip.style.top=`${y}px`;
+}
+function escondeRpTip(){
+  if(_rpTipAlvo) _rpTipAlvo.removeAttribute('aria-describedby');
+  _rpTipAlvo=null; if(_rpTip) _rpTip.hidden=true;
+}
+const kpiInfo=e=>e.target.closest&&e.target.closest('.kpi-info');
+document.addEventListener('mouseover',e=>{ const b=kpiInfo(e); if(b) mostraRpTip(b); });
+document.addEventListener('mouseout',e=>{ const b=kpiInfo(e); if(b && !b.contains(e.relatedTarget) && document.activeElement!==b) escondeRpTip(); });
+document.addEventListener('focusin',e=>{ const b=kpiInfo(e); if(b) mostraRpTip(b); });
+document.addEventListener('focusout',e=>{ if(e.target===_rpTipAlvo) escondeRpTip(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && _rpTipAlvo) escondeRpTip(); });
+// o painel rola: a âncora sai do lugar e a janelinha ficaria solta sobre outra coisa
+window.addEventListener('scroll',()=>{ if(_rpTipAlvo) escondeRpTip(); },true);
+// Seletores de métrica, período e régua. Um handler para os três: todos só trocam uma
+// chave de st.rp e redesenham.
+function ligaSegRp(id,chave){
+  const seg=document.getElementById(id); if(!seg) return;
+  seg.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b || b.disabled || st.rp[chave]===b.dataset.v) return;
+    st.rp[chave]=b.dataset.v;
+    seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    render();
+  });
+}
+ligaSegRp('segRpMetrica','metrica'); ligaSegRp('segRpPeriodo','periodo'); ligaSegRp('segRpRegua','regua');
+function revelarControleModo(){
+  const mostrar=podeVerReplanilhamentos()||papelIndefinido();
+  if(_segControle) _segControle.hidden=!mostrar;
+  if(_lblControle) _lblControle.hidden=!mostrar;
+  if(_ctrl&&_ctrl.classList.contains('show')) fitCtrlHeight();
+}
+const _modoAviso=document.getElementById('modoAviso');
+function avisoModo(msg){
+  if(!_modoAviso) return;
+  if(!msg){ _modoAviso.hidden=true; _modoAviso.textContent=''; return; }
+  _modoAviso.textContent=msg; _modoAviso.hidden=false;   // textContent: nunca injeta HTML
+  openCtrl(true);                                        // sem isso o aviso nasce dentro da gaveta fechada
+}
+// Volta o seletor e o status para Obras. Chamado em todo caminho de falha: sem ele o
+// botão fica aceso num modo em que não se entrou, e o status continua afirmando erro
+// sobre uma carteira de obras que está íntegra.
+function reverterParaObras(){
+  st.modo='obras';
+  document.querySelectorAll('#segControle button').forEach(x=>x.classList.toggle('on',x.dataset.v==='obras'));
+  // No caminho do catch o render() do modo novo pode ter escrito parte do painel antes
+  // de falhar; sem redesenhar, o cabeçalho continuaria dizendo "Replanilhamentos".
+  render();
+  atualizarStatusModo();
+}
+let _trocandoModo=false;
+async function setModo(modo){
+  if(modo===st.modo || _trocandoModo) return;
+  if(modo==='replanilhamentos' && !podeVerReplanilhamentos() && !papelIndefinido()){
+    // Última linha de defesa (o botão nem deveria estar visível). Barra, mas não em
+    // silêncio: um controle que não responde ao clique parece defeito.
+    avisoModo('Este painel é restrito a administradores e gerentes.');
+    return;
+  }
+  _trocandoModo=true;
+  avisoModo(null);
+  document.querySelectorAll('#segControle button').forEach(x=>x.classList.toggle('on',x.dataset.v===modo));
+  // Carregar os replanilhamentos busca a view inteira (tempo no SUITE calculado na
+  // leitura, sem coluna materializada) — na primeira troca da sessão isso leva mais de
+  // um segundo. Sem aviso nenhum o botão já acendia e a tela ficava parada, parecendo
+  // travada (usuário, 2026-09-17). Desabilita os dois botões (evita clique duplo por
+  // cima do _trocandoModo) e troca o texto de status até a troca terminar, em qualquer
+  // caminho — sucesso, falha ou volta pra Obras já reescrevem o status logo em seguida.
+  if(modo==='replanilhamentos'){
+    document.querySelectorAll('#segControle button').forEach(x=>x.disabled=true);
+    setStatus('Carregando replanilhamentos…', true, null, true);
+  }
+  try{
+    if(modo==='replanilhamentos'){
+      const r=await loadProcessos();
+      if(!r.ok){
+        avisoModo('Sua sessão expirou. Entre no GECOPE novamente para ver os replanilhamentos.');
+        reverterParaObras(); return;
+      }
+      // 0 linhas com sessão válida = a view negou por papel. O botão não deveria estar
+      // visível nesse caso, mas o papel pode ter mudado no meio da sessão.
+      if(!PROCESSOS.length){
+        avisoModo('Este painel é restrito a administradores e gerentes. Seu usuário não tem acesso aos dados de replanilhamento.');
+        reverterParaObras(); return;
+      }
+    }
+    st.modo=modo;
+    // Mantém nível, distrito e município: scopeIds() é puramente geográfico e os dois
+    // conjuntos usam o mesmo índice de município, então trocar de lente sem perder o
+    // lugar é o gesto que o painel quer ensinar — "mesmo recorte, outros dados".
+    render();
+    atualizarStatusModo();
+  }catch(e){
+    // O detalhe técnico (HTTP, nome de view, RLS) vai para o console, não para a tela
+    // de um gestor — lá ele não sugere nenhuma ação possível.
+    console.error('Falha ao trocar para o modo Replanilhamentos:',e);
+    avisoModo('Não foi possível carregar os replanilhamentos agora. O painel continua na carteira de obras; tente de novo em instantes.');
+    reverterParaObras();
+  }finally{
+    _trocandoModo=false;
+    document.querySelectorAll('#segControle button').forEach(x=>x.disabled=false);
+  }
+}
+// A linha "Base de dados · N contratos" do painel passa a falar do conjunto em foco.
+function atualizarStatusModo(){
+  if(!modoReplan()){
+    if(_statusObras) setStatus(_statusObras.txt,_statusObras.ok,_statusObras.lastSync);
+    return;
+  }
+  setStatus('Replanilhamentos', true, null, true);
+}
+if(_segControle) _segControle.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  setModo(b.dataset.v);
+});
+
 document.getElementById('segMetric').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return;
   document.querySelectorAll('#segMetric button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
@@ -2304,7 +3841,12 @@ function openSiblingPopover(anchorEl){
   // .pop-body é a única parte que rola — o cabeçalho (também a alça de arrasto) e
   // a alça de resize ficam FORA dela de propósito, senão sumiriam de vista assim
   // que o usuário rolasse até o fim da lista de irmãos.
+  // No modo Replanilhamentos a lista mostra a métrica do mapa, e precisa dizer de qual
+  // recorte ela saiu: sem isto, "93,1 dias" ao lado de um nome não diz nem o período nem
+  // a régua que produziu o número.
+  const sub=modoReplan()?`<div class="pop-sub">${escHtml(RP_METRICA[st.rp.metrica].label)} · ${escHtml(rpRecorteTxt(kind==='group'))}</div>`:'';
   _crumbPop.innerHTML=`<div class="sec-h" title="Arraste para mover"><span>${title}</span><span>${entries.length}</span></div>`
+    +sub
     +`<div class="pop-body">`+(entries.length?rankRows(entries,kind):'<div class="msel-empty">Nenhum resultado neste recorte</div>')+`</div>`
     +`<div class="resize-grip" title="Arraste para redimensionar"></div>`;
   // o gatilho não é o pai direto do popover no DOM (fica fora de #crumb, que
@@ -2398,9 +3940,19 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && isSiblingPopoverOpen()) closeSiblingPopover(); });
 
 document.getElementById('body').addEventListener('click',e=>{
+  // E5 — chip de abrir a janela do distrito: checado ANTES de .rrow porque o chip vive
+  // aninhado dentro dela (mesmo padrão de .chip.mun.locate dentro de .obra); sem checar
+  // primeiro, o mesmo clique também dispararia goRrow() por baixo.
+  const abre=e.target.closest('.chip.abre');
+  if(abre){ abrirJanela(abre); return; }
   // chip de item selecionado (Ctrl+clique): clicar nele tira da seleção combinada
   const sc=e.target.closest('.chip-sel');
   if(sc){ toggleSelection(st.sel?st.sel.kind:'group',sc.dataset.selid); return; }
+  // linha da lista de fiscais: a linha INTEIRA abre o painel do fiscal (usuário,
+  // 2026-09-17). Antes ela só se destacava — um clique que não levava a lugar nenhum — e
+  // a janela ficava atrás de um chip de 11px dentro dela.
+  const qp=e.target.closest('.qdf');
+  if(qp){ abreModalFiscal(qp.dataset.mat); return; }
   const rr=e.target.closest('.rrow');
   if(rr){ goRrow(rr); return; }
   // chip de município do card do contrato: leva direto até ele no mapa,
@@ -2410,10 +3962,18 @@ document.getElementById('body').addEventListener('click',e=>{
   const ob=e.target.closest('.obra'); if(ob){ const o=CUROBRAS[+ob.dataset.oid]; if(o) openModal(o); }
 });
 // mesmas ações acima, via teclado (Enter/Espaço) — os cards (.rrow/.obra/
-// .chip.mun.locate/.chip-sel) são <div>/<span> com role="button" e tabindex, não
-// elementos <button> nativos, então não recebem ativação por teclado de graça;
+// .chip.mun.locate/.chip-sel/.chip.abre) são <div>/<span> com role="button" e tabindex,
+// não elementos <button> nativos, então não recebem ativação por teclado de graça;
 // painel público de órgão estadual precisa ser navegável sem mouse.
-document.getElementById('body').addEventListener('keydown',e=>activateOnKey(e,'.rrow,.obra,.chip.mun.locate,.chip-sel'));
+document.getElementById('body').addEventListener('keydown',e=>{
+  // O chip de abrir janela é checado antes do resto pelo mesmo motivo do clique: ele fica
+  // aninhado dentro de .rrow. .qdf entra na lista comum — a linha inteira só abre a janela.
+  if(e.key==='Enter'||e.key===' '){
+    const abre=e.target.closest&&e.target.closest('.chip.abre');
+    if(abre){ e.preventDefault(); abrirJanela(abre); return; }
+  }
+  activateOnKey(e,'.qdf,.rrow,.obra,.chip.mun.locate,.chip-sel');
+});
 map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabels(); });
 map.on('moveend',()=>updateLabels());
 // clicar em espaço vazio do mapa (fora de qualquer distrito/região/município)
@@ -2451,6 +4011,10 @@ render();
 (async()=>{
   SESSION_TOKEN=await obterTokenSessao();
   loadData();   // sem sessão, mostra o aviso de login (showLoginRequired); com falha real, showDataError
+  // Papel resolvido em paralelo com a carga das obras: ele só decide se o seletor de
+  // modo aparece, então não vale atrasar o painel esperando por ele.
+  USER_PAPEL=await obterPapelUsuario();
+  revelarControleModo();
 })();
 
 // mantém o mapa centralizado apesar de fontes, layout e barra de endereço (mobile)
