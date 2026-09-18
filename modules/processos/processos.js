@@ -1499,16 +1499,17 @@ async function enviarParaPlanilha() {
         // Notificação WhatsApp (Apenas se entrar em Análise Fiscal)
         const statusInicial = formData.get("STATUS");
 
-        // Fecha a brecha do cadastro: se o processo já nasce em AGUAR. APROVAÇÃO,
-        // localiza o id recém-criado para abrir o checklist de documentação logo em seguida
+        // Localiza o id recém-criado — precisa dele sempre agora (não só quando nasce em
+        // AGUAR. APROVAÇÃO, para abrir o checklist), pois o setTimeout abaixo usa o id
+        // para atualizar só essa linha em vez de recarregar toda a tabela (egress,
+        // 18/09/2026 — mesmo padrão de atualizarLinhaProcessoLocal/removerProcessoLocal
+        // já usado em editar/excluir).
         let processoIdRecemCriado = null;
-        if (statusInicial === 'AGUAR. APROVAÇÃO') {
-            try {
-                const { data: pRow, error: errRow } = await sbClient.from('processos').select('id').eq('processo', numProcesso).maybeSingle();
-                if (!errRow && pRow) processoIdRecemCriado = pRow.id;
-            } catch (e) {
-                console.error('[ERRO] Ao localizar processo recém-criado para o checklist:', e);
-            }
+        try {
+            const { data: pRow, error: errRow } = await sbClient.from('processos').select('id').eq('processo', numProcesso).maybeSingle();
+            if (!errRow && pRow) processoIdRecemCriado = pRow.id;
+        } catch (e) {
+            console.error('[ERRO] Ao localizar processo recém-criado:', e);
         }
 
         if (statusInicial === 'ANÁLISE FISCAL') {
@@ -1560,9 +1561,17 @@ async function enviarParaPlanilha() {
             if (elObraStatus) elObraStatus.textContent = '';
             const elComissaoWrap = document.getElementById('cad_comissao_wrap');
             if (elComissaoWrap) elComissaoWrap.style.display = 'none';
-            carregarDadosSupabase();
+            // Busca só a linha recém-criada em vez de recarregar toda a tabela — mesmo
+            // padrão do editar/excluir. Se o id não foi localizado por algum motivo, cai
+            // para o reload completo em vez de deixar a tela sem o processo novo.
+            if (processoIdRecemCriado) atualizarLinhaProcessoLocal(processoIdRecemCriado);
+            else carregarDadosSupabase();
 
-            if (processoIdRecemCriado) {
+            // Checklist de documentação do aditivo só faz sentido para quem já nasce em
+            // AGUAR. APROVAÇÃO (fecha a brecha do cadastro) — processoIdRecemCriado agora
+            // é buscado sempre (linha acima também usa), não é mais um proxy dessa
+            // condição, então o status precisa ser checado aqui de novo.
+            if (processoIdRecemCriado && statusInicial === 'AGUAR. APROVAÇÃO') {
                 checklistAditivoState = {
                     processoStr: numProcesso,
                     processoId: processoIdRecemCriado,

@@ -97,11 +97,72 @@ VM — nunca o `whatsapp-proxy-web`, que é o único exposto à internet. Subir 
 esse serviço ainda exige SSH, mas só nesta única vez:
 
 ```bash
-cd whatsapp-proxy   # ou o caminho onde está o docker-compose.yml na VM
-git pull            # ou como quer que o código chegue na VM
+cd /home/opc/whatsapp-proxy   # caminho real na VM — não é clone do repo, ver seção 10
 docker compose up -d --build whatsapp-watchdog
 docker compose logs -f whatsapp-watchdog
 ```
 
 Confirmar que o log mostra `[watchdog] iniciado`. Dali em diante, qualquer reinício de
 rotina (conexão caiu, sessão travada) pode ser feito direto pelo painel, sem SSH.
+
+## 10. Atualizar código (worker/watchdog/web) depois da subida inicial
+
+**A VM não tem `git` instalado** e `/home/opc/whatsapp-proxy` não é um clone do
+repositório — os arquivos foram copiados manualmente. Atualizar um serviço depois de uma
+mudança no repositório (branch `main`) significa baixar cada arquivo alterado via `curl`
+da URL raw do GitHub, com backup do arquivo anterior antes de sobrescrever:
+
+```bash
+cd /home/opc/whatsapp-proxy
+# exemplo para o worker — repita por arquivo alterado, ajustando o caminho de destino
+cp worker/worker.js worker/worker.js.bak.$(date +%Y%m%d%H%M%S)
+curl -fsSL https://raw.githubusercontent.com/sop-difor/gecope/main/server/whatsapp-proxy/worker/worker.js \
+  -o worker/worker.js
+```
+
+**Antes de rebuildar o `worker`**, cheque se há job em andamento — derrubar o container
+no meio de um envio não duplica a mensagem (a garantia de `claimJob` é uma condição
+atômica no próprio UPDATE do Postgres, sobrevive ao restart), mas o job fica em
+`processing` até o `reclaimStaleJobs` liberá-lo (até ~5min de atraso):
+
+```bash
+# no SQL Editor do Supabase, ou via psql
+select id, status, attempts, started_at from whatsapp_jobs where status = 'processing';
+```
+
+Se vier vazio, ou se estiver ok esperar o `reclaimStaleJobs` recuperar o job travado,
+prossiga:
+
+```bash
+docker compose up -d --build <worker|whatsapp-watchdog|whatsapp-proxy-web>
+docker compose logs -f <serviço>
+```
+
+**Confirmar que subiu corretamente** — nenhum destes três serviços tem healthcheck HTTP
+habilitado no `docker-compose.yml`, então a única confirmação é pelo log:
+- `worker`: procurar `Worker iniciado e aguardando jobs...` e a AUSÊNCIA de
+  `--- ERRO NO LOOP PRINCIPAL ---` nos segundos seguintes.
+- `whatsapp-watchdog`: `[watchdog] iniciado`.
+- `whatsapp-proxy-web`: `docker compose ps` deve voltar a mostrar `healthy` (este sim tem
+  healthcheck) e `curl https://SEU_DOMINIO/health` deve responder `ok`.
+
+Depois do rebuild, vale conferir `whatsapp_jobs`/`whatsapp_logs` por qualquer linha que o
+`reclaimStaleJobs` tenha marcado como falha por causa do restart, para revisão manual.
+
+**Rollback:** se o serviço não voltar saudável, restaurar o `.bak` e rebuildar de novo:
+
+```bash
+cp worker/worker.js.bak.<timestamp> worker/worker.js
+docker compose up -d --build worker
+```
+
+**Estado em memória é zerado a cada rebuild** (autocurável, mas não instantâneo): o cache
+de `auth.getUser` (`web/auth-middleware.js`), o cache de `isKnownRecipient`
+(`web/index.js`) e os cooldowns/estado de degradação do watchdog voltam do zero — o
+watchdog pode levar alguns segundos para "lembrar" de um cooldown em andamento logo após
+seu próprio restart.
+
+**Compose roda uma única réplica por serviço** (sem `deploy.replicas` no
+`docker-compose.yml`) — é por isso que a condição atômica do `claimJob` (um único
+worker por vez) já basta hoje; se isso mudar no futuro, revisar a garantia de
+concorrência antes de escalar.
