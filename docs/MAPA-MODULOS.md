@@ -24,7 +24,7 @@
 | Relatórios e exportação | `relatorio.js` e o módulo que monta os dados |
 | Notificações ou envio de WhatsApp | `whatsapp.js` e `server/whatsapp-proxy/` |
 | Mapa de obras e geografia | `gecope_mapa_obras.html` e `assets/js/mapa-obras.js` |
-| Desempenho dos fiscais nos replanilhamentos | `assets/js/mapa-obras.js` (modo Replanilhamentos) e `sql/create_vw_painel_desempenho_fiscais.sql` |
+| Desempenho dos fiscais nos replanilhamentos | `assets/js/mapa-obras.js` (modo Replanilhamentos) e `sql/create_vw_painel_desempenho_fiscais.sql`. Desde a E7, a quebra por distrito/fiscal de `modules/processos/processos.js` (`abrirBreakdownFiscal`) também lê distrito/fiscal dessa mesma view (fonte única) — restrita a admin/gerente; some do clique pro papel fiscal (`.fiscal-no-breakdown`, `core/auth.js`). Decisões e revisões em `docs/painel-fiscais/`. |
 | Cronograma de analistas, tarefas ou rotinas | `cronograma.html` |
 | Perguntas em linguagem natural | `assistente.html` e `supabase/functions/gecope-assistant/` |
 | Métricas, feedback ou falhas do assistente | `assistente-painel.html` e `supabase/functions/gecope-assistant-painel/` |

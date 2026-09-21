@@ -2645,6 +2645,7 @@ function _secaoDistritoComFiscais(linhas, porDistrito, total, isDark, infoDireit
             ${_roscaBreakdownSVG(porDistrito, total, isDark)}
             <div style="flex:1;min-width:0;width:100%;font-size:0.8rem;color:var(--text-muted);padding-top:0.4rem;">
                 <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Clique num distrito para ver os fiscais com processos naquele distrito.
+                <div class="mt-1" style="font-size:0.74rem;">Distrito e fiscal aqui seguem quem respondeu pelo processo (troca de fiscal) — podem diferir do que aparece na linha desse processo na lista abaixo.</div>
             </div>
         </div>
         <div style="overflow-x:hidden;">${linhasHTML}</div>`;
@@ -2757,20 +2758,37 @@ window._toggleBreakdownMetaFiltro = _toggleBreakdownMetaFiltro;
 // meta (Atrasado / No prazo) sem fechar o modal.
 // `statusFiltro`: null = todas as linhas visíveis; string = um status; array =
 // vários status (ex.: card "Processos Fiscalização" = ANÁLISE + REANÁLISE FISCAL).
-function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
+//
+// E7 (fonte única com o painel de desempenho dos fiscais, 2026-09-18): o CONJUNTO
+// de linhas continua sendo o que a tela já filtrou (busca, aba, meta, prioritário —
+// `window.currentVisibleRows`, "Filtrado na tela" no card) — isso não muda. O que
+// muda é DE ONDE vem o distrito e o fiscal de cada linha: antes liam direto
+// `processos.distrito_operacional`/`processos.fiscal` (o fiscal ATUAL, mesmo que já
+// tenha passado o processo pra outra pessoa); agora vêm de
+// `vw_painel_desempenho_fiscais` — mesma fonte do painel do mapa, mesma definição de
+// "quem responde pelo processo" (troca de fiscal) e de distrito da obra (com fallback
+// pra contratos_edificacao). Sem isso, as duas telas podiam contar pessoas diferentes
+// pro mesmo processo. A view é restrita a admin/gerente (RLS fail-closed) — quem não
+// tem acesso recebe zero linhas da consulta, tratado abaixo; o clique nem chega a
+// disparar essa consulta pra quem já sabemos ser fiscal (ver `.fiscal-no-breakdown`
+// em core/auth.js e index.html — a interface não oferece o que o banco vai negar).
+// Id da chamada em voo — incrementado a cada clique. Um clique mais recente (no
+// mesmo card ou noutro) invalida a resposta de qualquer chamada anterior que ainda
+// não tenha voltado: sem isso, uma resposta mais lenta podia sobrescrever o
+// conteúdo com os dados de OUTRO card depois que o título já tinha mudado pro card
+// novo — título e corpo do modal dessincronizados (achado do rev-aderencia, E7).
+let _breakdownReqId = 0;
+async function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
+    const meuReqId = ++_breakdownReqId;
     const todasLinhas = window.currentVisibleRows || [];
     const alvos = statusFiltro == null ? null
         : (Array.isArray(statusFiltro) ? statusFiltro : [statusFiltro]).map(s => String(s).toUpperCase());
-    const linhas = alvos
+    const linhasFiltro = alvos
         ? todasLinhas.filter(d => alvos.includes((d.status || "").toUpperCase()))
         : todasLinhas;
 
-    _breakdownState = { linhasBase: linhas, metas: new Set() };
-
     const titleEl = document.getElementById('kpiBreakdownTitulo');
     titleEl.innerHTML = `<i class="bi ${iconClass || 'bi-pie-chart'} me-2"></i>${escapeHTML(titulo)}`;
-
-    _renderBreakdownConteudo();
 
     const modalEl = document.getElementById('modalKpiBreakdown');
     // O HTML deste projeto tem divs não fechadas em vários trechos, o que faz
@@ -2778,7 +2796,94 @@ function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
     // (às vezes um outro .modal com display:none, colapsando para 0x0). O
     // mesmo padrão de correção já é usado em outros modais do sistema.
     if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
+    const conteudo = document.getElementById('kpiBreakdownConteudo');
+    // A consulta à view é de rede — o modal abre já mostrando que está carregando
+    // em vez de ficar mudo até a resposta chegar.
+    conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-hourglass-split fs-2 d-block mb-2"></i>Carregando…</div>`;
     new bootstrap.Modal(modalEl).show();
+
+    if (linhasFiltro.length === 0) {
+        _breakdownState = { linhasBase: linhasFiltro, metas: new Set() };
+        _renderBreakdownConteudo();
+        return;
+    }
+
+    const ids = linhasFiltro.map(d => d.id).filter(id => id != null);
+    const { data, error } = await sbClient
+        .from('vw_painel_desempenho_fiscais')
+        .select('id, obra_distrito_operacional, fiscal_nome')
+        .in('id', ids);
+
+    if (meuReqId !== _breakdownReqId) return; // outro clique já assumiu a tela — descarta esta resposta
+
+    if (error) {
+        console.error('[abrirBreakdownFiscal] erro ao consultar vw_painel_desempenho_fiscais:', error.message);
+        conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-exclamation-triangle fs-2 d-block mb-2"></i>Não foi possível carregar o distrito/fiscal agora. Tente de novo em alguns instantes.</div>`;
+        return;
+    }
+
+    if (data.length === 0) {
+        // RLS fail-closed avalia o papel pra CONSULTA INTEIRA (meu_papel() no WHERE),
+        // nunca linha a linha — então zero linhas quase sempre é "sem acesso". Mas há
+        // uma segunda forma de bater zero, sem ser permissão: a tela filtra exclusão
+        // só por texto de status, a view filtra por `excluido_por` (colunas
+        // diferentes, cabeçalho do sql/create_vw_painel_desempenho_fiscais.sql admite
+        // legado onde discordam) — um recorte de status que calhe de conter só
+        // processos nesse legado bateria zero mesmo pra quem tem acesso pleno
+        // (achado do rev-correcao). Uma sonda sem filtro de id decide: se a view
+        // devolve QUALQUER linha pra este usuário, ele tem acesso — só estes ids
+        // específicos não bateram, e o motivo é dado, não permissão.
+        const { data: sonda, error: erroSonda } = await sbClient
+            .from('vw_painel_desempenho_fiscais')
+            .select('id')
+            .limit(1);
+        if (meuReqId !== _breakdownReqId) return;
+
+        if (erroSonda) {
+            // Falha de rede na sonda não é a mesma coisa que "sem acesso" — não
+            // confunde as duas (observação do rev-correcao na revisão da E7).
+            console.error('[abrirBreakdownFiscal] erro na sonda de acesso a vw_painel_desempenho_fiscais:', erroSonda.message);
+            conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-exclamation-triangle fs-2 d-block mb-2"></i>Não foi possível carregar o distrito/fiscal agora. Tente de novo em alguns instantes.</div>`;
+            return;
+        }
+        if (sonda && sonda.length > 0) {
+            // Tem acesso — marca como não confirmado em vez de fingir que são
+            // "Não informado" (que soaria como dado real de que não há fiscal/
+            // distrito) ou de reaparecer com o valor antigo da tabela em silêncio.
+            _breakdownState = {
+                linhasBase: linhasFiltro.map(d => ({ ...d, distritoOperacional: "Distrito não confirmado", fiscal: "Fiscal não confirmado" })),
+                metas: new Set()
+            };
+            _renderBreakdownConteudo();
+            return;
+        }
+        conteudo.innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-lock fs-2 d-block mb-2"></i>Você não tem acesso a esta visão por distrito/fiscal.</div>`;
+        return;
+    }
+
+    const porId = new Map(data.map(r => [r.id, r]));
+    const linhas = linhasFiltro.map(d => {
+        const v = porId.get(d.id);
+        if (!v) {
+            // Mesmo descompasso de exclusão do bloco acima, agora só pra ALGUNS ids
+            // do recorte, não todos. Marca como não confirmado em vez de manter o
+            // valor antigo (processos.distrito_operacional/processos.fiscal) —
+            // misturar fonte antiga e fonte nova na mesma lista, em silêncio, é
+            // exatamente o problema que a E7 existe pra evitar (achado do
+            // rev-correcao). Vira um grupo próprio, contável, na quebra.
+            return { ...d, distritoOperacional: "Distrito não confirmado", fiscal: "Fiscal não confirmado" };
+        }
+        // A view usa '(sem fiscal)' como sentinela de "sem ninguém respondendo" —
+        // diferente do sentinela local ("Não informado") que _classificarBreakdown
+        // já usa pra agrupar a barra "sem fiscal" do resto da tela. Sem esta troca,
+        // "(sem fiscal)" virava um nome de pessoa a mais na lista, em vez de cair
+        // no mesmo grupo "Não informado" dos demais.
+        const fiscalNome = (v.fiscal_nome && v.fiscal_nome !== '(sem fiscal)') ? v.fiscal_nome : "Não informado";
+        return { ...d, distritoOperacional: v.obra_distrito_operacional || null, fiscal: fiscalNome };
+    });
+
+    _breakdownState = { linhasBase: linhas, metas: new Set() };
+    _renderBreakdownConteudo();
 }
 window.abrirBreakdownFiscal = abrirBreakdownFiscal;
 

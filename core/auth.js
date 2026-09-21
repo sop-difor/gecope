@@ -328,6 +328,21 @@ function applyRoleToUI(rawRole) {
         document.querySelectorAll('.hide-fiscal').forEach(el => el.style.display = 'none');
     }
 
+    // 4b. E7 (painel de desempenho dos fiscais): a quebra por distrito/fiscal dos KPIs
+    // de Processos passou a ler de vw_painel_desempenho_fiscais, restrita a
+    // admin/gerente — a interface não pode oferecer um clique que o banco vai negar.
+    // Diferente de .hide-fiscal, aqui só o CLIQUE some (o número do card continua
+    // visível e útil pra todo papel; é só a quebra nominal por trás dele que é
+    // admin/gerente). `externo` entra na mesma restrição pelo mesmo motivo — nunca
+    // teria acesso à view (sugestão do rev-seguranca na revisão da E7).
+    if (role === 'fiscal' || role === 'externo') {
+        document.querySelectorAll('.fiscal-no-breakdown').forEach(el => {
+            el.style.cursor = 'default';
+            el.removeAttribute('title');
+            el.onclick = null;
+        });
+    }
+
     // 5. Atualiza contadores e Admin Dashboard
     if (role === 'admin') {
         fetchPendingCount();

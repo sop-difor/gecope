@@ -1,19 +1,29 @@
 
   :root{
-  --ng:#2FE6A0; --ng-light:#8EF0C4; --ng-mid:#4FE0A6; --ng-deep:#12907E; --ng-rgb:47,230,160;
+  /* E10 — a paleta calma criada para o modo Replanilhamentos (E9, 2026-09-18) promovida a
+     paleta ÚNICA do escuro: usuário relatou que o verde neon original (ainda vivo aqui, no
+     modo Obras) pesava e destoava do modo Replanilhamentos, que já tinha sido acalmado. */
+  --ng:#66C2A0; --ng-light:#A9DCC8; --ng-mid:#82CFB1; --ng-deep:#2C8A70; --ng-rgb:102,194,160;
   --amber:#F6B255; --amber-text:#F6C98A; --amber-text-2:#FFC98A; --amber-deep:#B4531A; --amber-rgb:246,178,85;
   --status-exec:#3C87C9; --status-ok:#189E6E; --status-wait:#FAB219;
   --status-stop:#D03B3B; --status-stop-deep:#7A1F1F; --status-stop-text:#FFC9C0; --status-stop-rgb:208,59,59;
 
   /* mapa (paleta própria, deliberadamente distinta da de status acima —
      ver STATUS_STATES em mapa-obras.js — para não confundir os dois canais de cor) */
-  --map-base:#3E9E70; --map-open-fill:#63C494; --map-open-border:#BDEED4;
-  --map-group-border:#CDEFDD; --map-state-fill:#1E7A54; --map-state-hover:#249066;
+  --map-base:#5FB08F; --map-open-fill:#63C494; --map-open-border:#5A7A6B;
+  --map-group-border:#6E8C7E; --map-state-fill:#1E7A54; --map-state-hover:#217052;
+  /* E11 (2026-09-21) — o modo Replanilhamentos tinha uma rampa âmbar própria pra métrica
+     Tempo (--map-warm/--warm-span, aliases de --amber). Usuário pediu pra tirar: o mapa
+     do modo Replanilhamentos usa a mesma rampa verde do modo Obras em toda métrica, sem
+     paleta própria. --map-warm/--warm-span saíram; a amostra insuficiente continua cinza
+     (--amostra-fill), que nunca dependeu disto. */
+  --lbl-count:var(--text-brightest);
   /* Etapa A / Bloco 4 — cor das linhas de hover/seleção do mapa (lida por
      TOKENS.mapLine no JS) e a fórmula da coroplética (opacidade = floor + span·t,
-     lida por TOKENS.choroFloor/choroSpan). No escuro resolvem para os valores de
-     sempre (--text-brightest / 0,10 / 0,62); o claro redefine só estes. */
-  --map-line:var(--text-brightest); --choro-floor:.10; --choro-span:.62;
+     lida por TOKENS.choroFloor/choroSpan). Piso/span de E9 (2026-09-18): com .10 o
+     distrito de valor baixo sumia no fundo; .17/.48 mantêm o piso visível sem estourar
+     o teto de contraste do rótulo. O claro redefine só estes dois abaixo. */
+  --map-line:var(--text-brightest); --choro-floor:.17; --choro-span:.48;
   /* Etapa C — "sem correspondência": distrito/município que, com o filtro ativo, não
      tem nenhum contrato. Cinza dedicado, fora da paleta coroplética (verde) e da cor
      de base, para distinguir "0 resultados" de "poucos resultados". */
@@ -123,6 +133,7 @@
     --text-muted:#3F5A4E; --text-label:#42604F; --text-dim:#48604F; --text-dimmer:#4F6558;
     --text-formal:#4F6558; --text-body2:#32453C; --text-input:#1E322A; --text-data:#1B2E26;
     --text-obj:#2B3E36; --text-chip:#32453C; --text-state-label:#2C4139; --badge-text:#0A6E49;
+    --lbl-count:var(--text-bright);
   }
 
   /* ---- Rodada 3.1: regras escopadas no tema claro (não afetam o escuro) ---- */
@@ -163,13 +174,13 @@
      ≥ WCAG AA em toda a faixa do coroplético e ≥ 3:1 nos estados hover/seleção
      (revisor Design/UX — Etapa A). O maior destaque de nome/seleção fica
      reservado para uma etapa posterior (JS). */
-  :root:not(.theme-dark) .grp-label .lbl-name{font-weight:500;color:#1C2B23;
+  :root:not(.theme-dark) .grp-label .lbl-name{font-weight:400;color:var(--text-bright);
         text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink)}
-  :root:not(.theme-dark) .grp-label .lbl-count{font-weight:700;font-size:calc(var(--grpfs,10px)*.87);color:#123024;
+  :root:not(.theme-dark) .grp-label .lbl-count{font-weight:600;font-size:calc(var(--grpfs,10px)*.87);color:var(--lbl-count);
         text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink)}
-  :root:not(.theme-dark) .mun-label .lbl-name{font-weight:500;color:#1C2B23;
+  :root:not(.theme-dark) .mun-label .lbl-name{font-weight:500;color:var(--text-bright);
         text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
-  :root:not(.theme-dark) .mun-label .lbl-count{font-weight:700;font-size:calc(var(--munfs,9px)*.87);color:#123024;
+  :root:not(.theme-dark) .mun-label .lbl-count{font-weight:600;font-size:calc(var(--munfs,9px)*.87);color:var(--lbl-count);
         text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
 
   /* botão "Limpar busca e filtros": ação secundária clara — não é campo, não some.
@@ -298,7 +309,7 @@
         background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));border:1px solid var(--card-border)}
   .statleg.cards .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
   .statleg.cards .sit-l{color:var(--text-muted);font-weight:600}
-  .statleg.cards .sit-v{flex-basis:100%;margin-top:4px;color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:700}
+  .statleg.cards .sit-v{flex-basis:100%;margin-top:4px;color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:600}
   .statleg.cards .sit-p{color:var(--text-dim);font-weight:600;font-family:Montserrat,sans-serif}
   /* mesma profundidade dos cards: claro = sombra em camadas + topo mais claro;
      escuro = gradiente/borda + fio de luz no topo + sombra bem suave */
@@ -502,16 +513,16 @@
   .ctrl.show{display:block}
   .ctrl-toggle{left:14px}
   .ctrl-head{display:flex;align-items:center;justify-content:space-between;margin:-2px 0 12px}
-  .ctrl-head span{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label)}
+  .ctrl-head span{font-size:10.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label)}
   .ctrl-close{border:1px solid rgba(var(--raise-rgb),.14);background:rgba(var(--raise-rgb),.05);color:var(--text-base);border-radius:8px;
         width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;display:grid;place-items:center;padding:0}
   .ctrl-close:hover{border-color:rgba(var(--ng-rgb),.4);color:var(--text-brightest)}
-  .lbl{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label);margin:3px 0 8px}
+  .lbl{font-size:10.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label);margin:3px 0 8px}
   /* "Filtros" + botão "+" (recolhe/expande as ~14 multi-seleções) */
   .lbl-filtros{display:flex;align-items:center;gap:8px}
   .filt-toggle{flex:none;width:18px;height:18px;line-height:1;padding:0;display:grid;place-items:center;
         border:1px solid rgba(var(--raise-rgb),.22);background:rgba(var(--raise-rgb),.06);color:var(--text-label);
-        border-radius:6px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:.12s}
+        border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:.12s}
   .filt-toggle:hover{border-color:rgba(var(--ng-rgb),.45);color:var(--text-brightest)}
   .filt-toggle[aria-expanded="true"]{background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.4);color:var(--ng-light)}
   .filt-toggle.has-active{background:rgba(var(--ng-rgb),.16);border-color:rgba(var(--ng-rgb),.5);color:var(--ng-light)}
@@ -546,7 +557,7 @@
         border-radius:8px;padding:8px 9px;font-family:inherit;font-size:12.5px;margin-bottom:8px}
   .fsel option{color:var(--text-on-light)}
   .clearf{border:1px solid rgba(var(--ng-rgb),.25);background:rgba(var(--ng-rgb),.10);color:var(--ng-light);font-family:inherit;
-          font-weight:700;font-size:11.5px;padding:7px 10px;border-radius:8px;cursor:pointer;width:100%}
+          font-weight:600;font-size:11.5px;padding:7px 10px;border-radius:8px;cursor:pointer;width:100%}
 
   .msel{position:relative;margin-bottom:8px}
   .msel-btn{width:100%;text-align:left;background:rgba(var(--raise-rgb),.05);border:1px solid rgba(var(--raise-rgb),.1);color:var(--text-input);
@@ -575,9 +586,12 @@
   /* Etapa C: o bloco de chips "Filtros ativos" traz o próprio "Limpar tudo"; o botão
      antigo do rodapé (#clearF) fica oculto para não duplicar a ação. */
   #clearF{display:none}
-  /* Etapa C: bloco "Filtros ativos" (chips) — some quando vazio */
-  #filterChips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 10px}
-  #filterChips:empty{display:none}
+  /* Etapa C: bloco "Filtros ativos" (chips) — some quando vazio. E6: mesma regra pro
+     bloco irmão do modo Replanilhamentos (#filterChipsRp) — só por ID em vez de classe
+     porque #filterChips já era assim; o resto do visual (.fchip, .fchip-clear) é
+     compartilhado normalmente. */
+  #filterChips,#filterChipsRp{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 10px}
+  #filterChips:empty,#filterChipsRp:empty{display:none}
   .fchip{cursor:pointer;display:inline-flex;align-items:center;gap:6px;
     color:var(--ng-light);background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.35);transition:.15s}
   .fchip:hover{background:rgba(var(--status-stop-rgb),.16);border-color:rgba(var(--status-stop-rgb),.5);color:var(--status-stop-text)}
@@ -600,7 +614,7 @@
   .crumb a{color:var(--ng-light);cursor:pointer;font-weight:600;white-space:nowrap}
   .crumb a:hover{text-decoration:underline}
   .crumb .sep{opacity:.45}
-  .crumb .cur{color:var(--text-brightest);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crumb .cur{color:var(--text-brightest);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* segmento atual da trilha quando também abre a lista de irmãos (Fase 8) — mesma
      cor/peso de .cur (ainda é "onde você está"), só ganha um caret pra sinalizar que
      é clicável além de informativo */
@@ -644,7 +658,7 @@
   .crumb-pop .sec-h{flex:none;margin:0;padding:10px 10px 8px;cursor:move;user-select:none}
   .crumb-pop .pop-body{flex:1;min-height:0;overflow:auto;padding:0 10px 10px}
   /* de qual recorte saíram os números da lista (só no modo Replanilhamentos) */
-  .crumb-pop .pop-sub{padding:0 10px 8px;margin-top:-8px;font-size:10px;font-weight:600;color:var(--text-dim);line-height:1.4}
+  .crumb-pop .pop-sub{padding:0 10px 8px;margin-top:-8px;font-size:10px}
   .crumb-pop .resize-grip{position:absolute;right:1px;bottom:1px;width:18px;height:18px;
         cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end;
         padding:2px;opacity:.5;transition:opacity .15s}
@@ -657,13 +671,33 @@
   .mun-label,.grp-label{background:none;border:0;box-shadow:none;pointer-events:none;width:0!important;height:0!important;overflow:visible}
   .mun-label .lbl,.grp-label .lbl{position:absolute;left:0;top:0;transform:translate(-50%,-50%);
                   display:flex;flex-direction:column;align-items:center;white-space:nowrap;gap:1px}
-  .mun-label .lbl-name{font-size:var(--munfs,9px);font-weight:600;color:var(--text-data);text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink),0 1px 2px var(--shadow-ink)}
-  .mun-label .lbl-count{font-size:calc(var(--munfs,9px)*.82);font-weight:700;color:var(--ng-light);letter-spacing:.2px;
+  /* E10 — peso e brilho dos rótulos do mapa, promovidos do modo Replanilhamentos (E9) para
+     os dois modos: nome em frase (sem versalete), número um degrau acima (600, tabular),
+     halo só de tinta — sem o glow colorido que pesava sobre o preenchimento.
+     E11 (2026-09-21) — nome do DISTRITO (grp-label) pediu peso normal (400), não 500:
+     usuário ainda lia como negrito. Nome do MUNICÍPIO (mun-label, rótulo bem menor, 9px)
+     segue em 500 — não foi pedido e um corpo tão pequeno em 400 perderia peso demais. */
+  .mun-label .lbl-name{font-size:var(--munfs,9px);font-weight:500;color:var(--text-brightest);text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink),0 1px 2px var(--shadow-ink)}
+  .mun-label .lbl-count{font-size:calc(var(--munfs,9px)*.82);font-weight:600;color:var(--lbl-count);letter-spacing:0;font-variant-numeric:tabular-nums;
                   text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
-  .grp-label .lbl-name{font-size:var(--grpfs,10px);font-weight:700;letter-spacing:.3px;color:var(--text-brightest);text-transform:uppercase;
-                  text-shadow:0 0 3px var(--shadow-ink),0 0 6px rgba(var(--ng-rgb),.32);text-align:center;line-height:1.15}
-  .grp-label .lbl-count{font-size:calc(var(--grpfs,10px)*.8);font-weight:700;letter-spacing:.3px;color:var(--ng-light);text-transform:none;
-                  text-shadow:0 0 3px var(--shadow-ink),0 0 8px rgba(var(--ng-rgb),.35)}
+  .grp-label .lbl-name{font-size:var(--grpfs,10px);font-weight:400;letter-spacing:0;color:var(--text-brightest);text-transform:none;
+                  text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink);text-align:center;line-height:1.15}
+  .grp-label .lbl-count{font-size:calc(var(--grpfs,10px)*.8);font-weight:600;letter-spacing:0;color:var(--lbl-count);text-transform:none;font-variant-numeric:tabular-nums;
+                  text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink)}
+  aside b,.modal b{font-weight:600}
+  /* E8 — o botão Carteira ativa/Histórico completo só troca o conjunto de OBRAS; nenhuma
+     superfície do modo Replanilhamentos lê esse conjunto (a fonte é a view de processos),
+     então ali ele era um controle que não mudava nada na tela. Volta com o modo Obras. */
+  body.modo-rp #btnScope{display:none}
+  body.modo-rp .rp-leg-sw{border-width:1.5px}
+  /* E9 (2026-09-18) acalmou o modo Replanilhamentos; E10 (2026-09-21) promoveu a paleta e a
+     escala de peso a default dos dois modos (ver --ng em :root e .mun-label/.grp-label
+     acima); E11 (2026-09-21) tirou a rampa âmbar do mapa — ver --map-warm em :root. O que
+     sobra aqui é só a Legenda, elemento que só existe no modo Replanilhamentos. */
+  body.modo-rp .rp-leg-t{font-weight:600;font-size:11.5px;letter-spacing:0;text-transform:none}
+  body.modo-rp .rp-leg-bar{height:8px;border-radius:4px}
+  body.modo-rp .rp-leg-esc{font-weight:500}
+
   /* Etapa C — rótulo de distrito/município "sem correspondência" (filtro ativo, 0 contratos): esmaecido */
   .mun-label.nomatch .lbl,.grp-label.nomatch .lbl{opacity:.4}
   .mun-label.nomatch .lbl-count,.grp-label.nomatch .lbl-count{color:var(--nomatch-label);text-shadow:none}
@@ -694,11 +728,11 @@
        column-gap:12px;align-items:start;
        background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));border:1px solid var(--card-border);
        transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
-  .kpi .k{grid-area:k;font-size:10.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
+  .kpi .k{grid-area:k;font-size:10.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
   /* o ícone fica centralizado (alinhado ao valor); nos cards compactos o rótulo é um
      pouco menor para caber numa linha ao lado do espaço do ícone */
   .kpi.k-par .k,.kpi.k-medio .k,.kpi.k-mun .k,.kpi.k-adit .k{font-size:9.5px;letter-spacing:.1px}
-  .kpi .v{grid-area:v;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--text-brightest);margin-top:8px;line-height:1}
+  .kpi .v{grid-area:v;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:var(--text-brightest);margin-top:8px;line-height:1}
   /* KPIs "nível 1" (.k-obras/.k-valor) e o número em vermelho de Paralisadas (.k-par)
      ficam no bloco da Rodada 3.2/Parte B, mais acima. */
   body.presentation .kpi .k{font-size:11px}
@@ -767,7 +801,7 @@
         letter-spacing:.2px;text-transform:uppercase;color:var(--text-label)}
   .gxf-h b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
         text-transform:none;letter-spacing:0;color:var(--text-brightest);margin-left:auto}
-  .gxf-pct{font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;
+  .gxf-pct{font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;
         text-transform:none;letter-spacing:0;color:var(--text-dim)}
   .gxf-grp .gec-lista{margin-top:8px;padding-top:7px}
   /* Sempre empilhado (anel em cima, legenda embaixo) — não em linha: mesmo com o aside
@@ -793,7 +827,7 @@
   .donut-dot.noprazo{background:var(--ng)}
   .donut-dot.semprazo{background:rgba(var(--raise-rgb),.55)}
   .donut-leg-l{color:var(--text-muted);font-weight:600;flex:1;min-width:0}
-  .donut-leg-v{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text-bright);white-space:nowrap}
+  .donut-leg-v{font-family:'Space Grotesk',sans-serif;font-weight:600;color:var(--text-bright);white-space:nowrap}
   .donut-leg-p{font-family:Montserrat,sans-serif;font-weight:600;color:var(--text-dim);font-size:10px}
   @media (max-width:420px){
     .gxf{grid-template-columns:1fr}
@@ -806,7 +840,8 @@
   .kpi-tip p:last-child{margin-bottom:0}
   /* linha de recorte sob um .sec-h: de onde vêm os números da seção (período, régua,
      ordem). Encosta no cabeçalho, em corpo menor que o conteúdo que anuncia. */
-  .sec-sub{margin:-6px 0 11px;font-size:10.5px;line-height:1.4;font-weight:600;color:var(--text-dim)}
+  .sec-sub,.crumb-pop .pop-sub{line-height:1.4;font-weight:600;color:var(--text-dim)}
+  .sec-sub{margin:-6px 0 11px;font-size:10.5px}
   /* E4 — ranking de fiscais por tempo médio, do mais lento ao mais rápido. Reduzido em
      2026-09-17 a nome + tempo + barra, a pedido do usuário: as seis informações por linha
      (despachos, lotação, delta sobre a média, fila) e os três parágrafos de leitura da
@@ -827,11 +862,11 @@
   .qdf:hover{background:rgba(var(--ng-rgb),.07);border-color:rgba(var(--ng-rgb),.22)}
   .qdf:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
   .qdf-n{display:flex;flex-direction:column;gap:2px;min-width:0}
-  .qdf-nome{font-size:11.5px;font-weight:700;color:var(--text-bright);min-width:0}
+  .qdf-nome{font-size:11.5px;font-weight:600;color:var(--text-bright);min-width:0}
   /* Contador de despachos: volta SÓ na linha de amostra fina — é a informação que muda a
      leitura daquele número, e em nenhuma outra linha ela faria falta. */
-  .qdf-fina{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:700;color:var(--text-dim)}
-  .qdf-v{flex:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
+  .qdf-fina{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:500;color:var(--text-dim)}
+  .qdf-v{flex:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
         color:var(--text-brightest);white-space:nowrap}
   .qdf .rbar{margin-top:0}
   /* Lista de processos (nível da cidade). Não é navegável — a janela do processo é de
@@ -864,7 +899,7 @@
   .statleg .sit{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted);font-weight:600}
   .statleg .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
   .statleg .sit b{color:var(--text-brightest);font-family:'Space Grotesk',sans-serif;font-weight:700}
-  .sec-h{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);margin:26px 0 12px;display:flex;justify-content:space-between}
+  .sec-h{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);margin:26px 0 12px;display:flex;justify-content:space-between}
   /* "Contratos por ano de assinatura" — barras em HTML/flex (não mais SVG esticado):
      texto sem distorção, valor acima de cada barra, trilho de fundo, ano de pico
      em destaque. Cores vêm dos tokens, então acompanha os dois temas. */
@@ -913,9 +948,10 @@
      de 1px), e esta regra não pode ganhar especificidade dele. */
   .rrow:hover{border-color:rgba(var(--ng-rgb),.35);box-shadow:0 0 0 1px rgba(var(--ng-rgb),.15)}
   .rrow .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px}
-  .rrow .nm{color:var(--text-bright);font-weight:600}
+  .rrow .nm{color:var(--text-bright);font-weight:500}
   .rrow .sub2{color:var(--text-dim);font-size:11.5px;font-weight:600}
-  .rrow .vv{font-family:'Space Grotesk',sans-serif;color:var(--ng-light);font-weight:700}
+  .rrow .vv{font-family:'Space Grotesk',sans-serif;color:var(--ng-light);font-weight:600}
+  .rrow.warm .vv{color:var(--amber-text)}
   .rbar{position:relative;height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.07);margin-top:9px;overflow:hidden}
   .rbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--ng),var(--ng-deep))}
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
@@ -991,7 +1027,7 @@
   .modal .mh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
          background:linear-gradient(180deg,var(--bg-modal),var(--bg-modal) 80%,transparent);padding:22px 26px 14px;border-bottom:1px solid rgba(var(--raise-rgb),.08)}
   .modal .mh-titles{min-width:0}
-  .modal .mt{font-family:Montserrat,sans-serif;font-size:19px;font-weight:700;color:var(--ng-mid)}
+  .modal .mt{font-family:Montserrat,sans-serif;font-size:19px;font-weight:600;color:var(--ng-mid)}
   /* subtítulo "Resumo executivo do contrato" — só na aba Resumo (o .mtop carrega data-tab) */
   .modal .msub{display:flex;align-items:center;gap:6px;margin-top:4px;
         font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;letter-spacing:.4px;
@@ -1006,6 +1042,10 @@
   .modal .adv-scope-note{font-family:Montserrat,sans-serif;font-size:10.5px;line-height:1.45;color:var(--text-dim);
         background:rgba(var(--ng-rgb),.06);border:1px solid rgba(var(--ng-rgb),.14);border-radius:9px;padding:9px 12px;margin-bottom:12px}
   .modal .adp-wrap .adv-scope-note{margin-bottom:0} /* .adp-wrap já tem gap:16px */
+  /* E6: mesmo motivo, no aviso de filtro ignorado das janelas de distrito/fiscal —
+     .mbody.dsh também já tem gap:16px, então a margin-bottom própria duplicava o
+     espaço antes do hero (achado do rev-design). */
+  .modal .mbody.dsh .adv-scope-note{margin-bottom:0}
   .modal .mx{border:1px solid rgba(var(--raise-rgb),.14);background:rgba(var(--raise-rgb),.05);color:var(--text-base);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:15px;flex:none;font-family:Montserrat,sans-serif}
   /* Etapa B: ações do cabeçalho do modal — "Localizar no mapa" + fechar */
   .modal .mh-actions{display:flex;align-items:center;gap:8px;flex:none}
@@ -1059,7 +1099,7 @@
      sem isso a aba Resumo continua visível "por baixo" ao trocar para outra aba. */
   .modal #mPaneResumo:not([hidden]){display:flex;flex-direction:column;gap:14px;padding-top:4px}
   .modal .rs-row{display:grid;gap:12px}
-  .modal .rs-lbl{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  .modal .rs-lbl{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.5px;
         text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:5px}
   .modal .rs-lbl svg{width:12px;height:12px;flex:none}
   .modal .rs-ic{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center;
@@ -1380,22 +1420,25 @@
   /* Sem média comparável a lâmina verde afirmaria um resultado que não existe. */
   .modal .dsh-hero-vazio{border-color:var(--card-border);background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2))}
   .modal .dsh-hero-vazio::before{background:rgba(var(--raise-rgb),.18)}
-  /* Amostra fina: existe número, mas a lâmina verde de "resultado firme" vira âmbar —
-     o mesmo tom de ressalva que o painel já usa para atraso. */
-  .modal .dsh-hero-fina{border-color:rgba(var(--amber-rgb),.42);
+  /* E8 — a cor do herói é o SINAL do delta, como em todo o painel: âmbar = acima da
+     referência (mais lento), verde = na referência ou abaixo. Antes era verde sempre — o
+     distrito 1º mais lento do estado aparecia com moldura verde sobre "▲ 60 dias acima". */
+  .modal .dsh-hero-acima{border-color:rgba(var(--amber-rgb),.42);
         background:linear-gradient(160deg,rgba(var(--amber-rgb),.14),rgba(var(--amber-rgb),.04))}
-  .modal .dsh-hero-fina::before{background:linear-gradient(var(--amber),var(--amber-deep))}
-  .modal .dsh-fraco{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;line-height:1.4;
-        color:var(--amber-text);border-top:1px dashed rgba(var(--amber-rgb),.32);padding-top:7px;margin-top:1px}
-  .modal .fcard-fina{font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;color:var(--amber-text)}
+  .modal .dsh-hero-acima::before{background:linear-gradient(var(--amber),var(--amber-deep))}
+  /* Amostra fina: existe número, mas frágil. Marca NEUTRA (moldura tracejada + texto
+     apagado) e não âmbar — âmbar já quer dizer "mais lento", e um fiscal rápido com 3
+     despachos não pode parecer um problema. A cor do herói continua a do delta. */
+  .modal .dsh-hero-fina{border-style:dashed}
+  .modal .dsh-fraco{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:500;line-height:1.4;
+        color:var(--text-dim);border-top:1px dashed var(--card-border);padding-top:7px;margin-top:1px}
+  .modal .fcard-fina{font-family:Montserrat,sans-serif;font-size:10px;font-weight:500;color:var(--text-dim)}
 
   /* ---- grupos da lista de processos (janela do fiscal) ----
      Cada grupo é uma faixa, não um cartão: os cartões já são os processos lá dentro, e
      aninhar cartão em cartão apagaria a hierarquia. A faixa só delimita e conta. */
   .modal .gproc{border-top:1px dashed var(--card-border);padding-top:12px;margin-top:12px}
   .modal .gproc:first-of-type{border-top:0;padding-top:0;margin-top:0}
-  /* dentro de .dsh-plot (fila de hoje) o grupo não tem cabeçalho nem divisa própria */
-  .modal .gproc-nu{border-top:0;padding-top:0;margin-top:2px}
   .modal .gproc-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
         font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;
         text-transform:uppercase;color:var(--text-label)}
@@ -1403,14 +1446,18 @@
         color:var(--text-brightest);letter-spacing:0}
   .modal .gproc-s{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;
         color:var(--text-dim);margin-top:3px}
+  /* Análise Fiscal injeta a barra de atraso (e a nota do mais antigo) entre o cabeçalho
+     do grupo e o toggle — mesma folga que .adToggle já usa abaixo. */
+  .modal .gproc-h+.sbar,.modal .gproc-s+.sbar{margin-top:9px}
+  .modal .gproc .dsh-nota{margin-top:7px}
   .modal .gproc .adToggle{margin-top:9px}
   .modal .gproc .proc{margin-top:10px}
   /* O único tipo grande dos dois painéis: é o que se lê do fundo de uma sala de reunião. */
-  .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:42px;font-weight:700;line-height:1;
+  .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:42px;font-weight:600;line-height:1;
         color:var(--text-brightest);display:flex;align-items:baseline;gap:8px;margin-top:2px}
-  .modal .dsh-un{font-family:Montserrat,sans-serif;font-size:13px;font-weight:700;color:var(--text-muted)}
+  .modal .dsh-un{font-family:Montserrat,sans-serif;font-size:13px;font-weight:600;color:var(--text-muted)}
   .modal .dsh-delta{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;
-        font-size:11.5px;font-weight:700;line-height:1.35}
+        font-size:11.5px;font-weight:600;line-height:1.35}
   .modal .dsh-delta.acima{color:var(--amber-text)}
   .modal .dsh-delta.abaixo{color:var(--ng-light)}
   :root:not(.theme-dark) .modal .dsh-delta.abaixo{color:var(--badge-text)}
@@ -1418,13 +1465,13 @@
   .modal .dsh-sub{font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-dim);line-height:1.4}
   /* (2) superfície de gráfico */
   .modal .dsh-plot{padding:14px 16px;display:flex;flex-direction:column;gap:9px;min-width:0}
-  .modal .dsh-pos{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text-brightest)}
+  .modal .dsh-pos{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--text-brightest)}
   .modal .dsh-nota{font-family:Montserrat,sans-serif;font-size:11px;line-height:1.45;color:var(--text-dim);font-weight:600}
   /* (3) ladrilhos */
   .modal .dsh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
   .modal .dsh-tile{padding:11px 13px;display:flex;flex-direction:column;gap:3px;background:var(--card-bg-2)}
-  .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--text-brightest);line-height:1.1}
-  .modal .dsh-tl{font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;letter-spacing:.5px;
+  .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text-brightest);line-height:1.1}
+  .modal .dsh-tl{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.5px;
         text-transform:uppercase;color:var(--text-label)}
   .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
 
@@ -1438,7 +1485,10 @@
      próximos escurecem um ao outro em vez de um sumir atrás do outro — a sobreposição
      vira densidade, que é informação, e não perda de dado. */
   .modal .ed-dot{fill:rgba(var(--ng-rgb),.55);stroke:rgba(var(--ng-rgb),.85);stroke-width:1}
-  .modal .ed-dot.on{fill:var(--amber);stroke:var(--amber-deep);stroke-width:1.5}
+  /* "você está aqui": destaque pelo tamanho e contorno, cor pelo sinal — âmbar só quando o
+     ponto está acima da referência (mais lento); verde cheio quando na referência ou abaixo. */
+  .modal .ed-dot.on{fill:var(--ng);stroke:var(--text-brightest);stroke-width:1.5}
+  .modal .ed-dot.on.acima{fill:var(--amber);stroke:var(--amber-deep)}
   /* Marcas verticais: a média de quem a janela é (contínua, verde) e a média geral
      (tracejada, recessiva). A tracejada é referência de fundo, não um dado a mais. */
   .modal .ed-mark{stroke:var(--ng);stroke-width:2}
@@ -1474,8 +1524,8 @@
   :root.theme-dark .modal .fcard:hover{box-shadow:0 10px 24px rgba(var(--shadow-rgb),.38)}
   :root:not(.theme-dark) .modal .fcard:hover{box-shadow:0 2px 4px rgba(var(--shadow-rgb),.08),0 10px 22px rgba(var(--shadow-rgb),.07)}
   .modal .fcard:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
-  .modal .fcard-n{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;color:var(--text-bright);line-height:1.3}
-  .modal .fcard-v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--text-brightest);line-height:1.1}
+  .modal .fcard-n{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-bright);line-height:1.3}
+  .modal .fcard-v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:var(--text-brightest);line-height:1.1}
   .modal .fcard-sem{font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--text-dimmer)}
   .modal .fcard-s{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
   .modal .fcard .rbar{margin-top:2px}

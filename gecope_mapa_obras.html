@@ -123,6 +123,16 @@
           <button data-v="obra">Obra</button>
         </div>
         <div class="ctrl-nota" id="rpReguaNota"></div>
+        <!-- E6 — filtros do próprio modo Replanilhamentos (sobre processos, não contratos):
+             estado em st.rp.filtro, nunca em st.f (que é de Obras e fica guardado abaixo). -->
+        <div class="lbl">Buscar fiscal</div>
+        <input class="fsel" id="fSearchRp" type="search" placeholder="nome ou matrícula do fiscal…" autocomplete="off">
+        <div class="lbl">Filtros</div>
+        <div id="filtersHostRp"></div>
+        <!-- Sem botão de rodapé próprio: o bloco de chips já traz "Limpar tudo" quando há
+             algo pra limpar (mesma solução que Obras usa — o #clearF de lá está morto por
+             CSS, display:none, por essa razão; não repito o botão redundante aqui). -->
+        <div id="filterChipsRp" aria-label="Filtros ativos"></div>
         <div class="ctrl-nota">A busca e os filtros de obras ficam guardados e voltam ao trocar para Obras.</div>
       </div>
       <div id="ctrlObras">
