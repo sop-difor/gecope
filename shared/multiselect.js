@@ -201,7 +201,13 @@
         values.sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
 
         let options = '';
-        options += values.map(v => `<option value="${window.escapeHTML ? window.escapeHTML(v) : String(v)}" selected>${window.formatStatusDisplay ? window.formatStatusDisplay(v) : String(v)}</option>`).join("");
+        // O `value` já ia escapado, mas o RÓTULO não — e ele vem de `processos.status`, texto
+        // livre no banco (sem enum nem CHECK). Achado na revisão de 22/09/2026 do módulo
+        // Processos, corrigido aqui porque é a origem do dado. — ver
+        // docs/revisoes/2026-09-22-processos.md
+        const escapar = v => (window.escapeHTML ? window.escapeHTML(v) : String(v));
+        const rotular = v => escapar(window.formatStatusDisplay ? window.formatStatusDisplay(v) : v);
+        options += values.map(v => `<option value="${escapar(v)}" selected>${rotular(v)}</option>`).join("");
         selectEl.innerHTML = options;
         renderMultiSelectUI(selectEl);
     }

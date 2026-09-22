@@ -507,6 +507,22 @@ function canMarkDateAsMeta() {
     return role === 'admin';
 }
 
+/**
+ * Verifica se o usuário pode excluir um processo (exclusão lógica: status = 'EXCLUÍDO').
+ *
+ * Regra: admin e gerente — decidida em 22/09/2026 e alinhada com a política `processos_update`
+ * do banco (sql/rls_processos_composicoes_orcamentos.sql), que é quem de fato autoriza a
+ * gravação. Como a exclusão é um UPDATE, e não um DELETE, é aquela política que vale.
+ *
+ * ATENÇÃO: se esta regra mudar, a política do banco precisa mudar junto. Antes desta data as
+ * duas discordavam — o HTML marcava o botão como `.admin-only` enquanto o banco aceitava
+ * gerente — e o JS ainda reabilitava o botão para todos, o que dava erro de banco na cara do
+ * usuário em vez de simplesmente esconder a ação.
+ */
+function podeExcluirProcesso() {
+    return ['admin', 'gerente'].includes(getCurrentUserRole());
+}
+
 // --- WIRING DO OVERLAY DE LOGIN/CADASTRO (extraído de main.js) ---
 /* --------------------------------------------------------------
    OVERLAY DE BOAS-VINDAS / LOGIN (TELA INICIAL)
