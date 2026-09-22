@@ -90,6 +90,12 @@ Documentação detalhada do assistente, escopo, segurança e avaliações: `docs
 - `supabase/functions/`: Edge Functions do backend; mudanças de contrato devem ser conferidas no chamador HTML/JS e nas políticas do Supabase.
 - `sql/_aplicados/sql/painel_desempenho_replanilhamentos.sql`: cria a view analitica `vw_painel_desempenho_replanilhamentos` e consultas para carteira, desempenho mensal, analistas e Fiscalizacao. Fonte de status: `processos` no GECOPE.
 - `docs/painel-desempenho-replanilhamentos.md`: objetivo, regras de negocio, entregas e limites conhecidos desse painel.
+- `supabase/functions/sincronizar-suite/index.ts`: job que consulta o SUITE, grava `processos.suite`/`suite_data_chegada`/`status` e o histórico em `historico_suite_eventos`. **É a única automação de status do sistema** — o navegador só lê. Desde 22/09/2026 o arquivo do repositório é a versão real publicada; antes disso divergia dela. Baixe a publicada (`supabase functions download sincronizar-suite`) antes de editar.
+- `supabase/functions/backfill-historico-suite/`: **função morta**, arquivada em 22/09/2026 antes da remoção do servidor. A `sincronizar-suite` faz o mesmo para todos os processos. Não republique sem ler o cabeçalho do arquivo.
+
+## Revisões de código
+
+- `docs/revisoes/`: histórico das revisões sistemáticas por módulo — o que foi visto, corrigido, deixado de fora por decisão e o que ficou pendente. Comece pelo `README.md` da pasta. Antes de revisar um módulo, confira se ele já tem uma revisão registrada ali: as pendências e as decisões conscientes estão documentadas, e retomá-las é mais barato que redescobri-las.
 
 ## Ordem de carregamento da aplicação principal
 
