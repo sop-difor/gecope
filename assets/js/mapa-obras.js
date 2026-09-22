@@ -163,7 +163,8 @@ const PROCESSOS_COLS=['id','processo','status','status_exibicao','tipo','priorit
   'data_compromisso_fiscal','meta_estourada',
   'fiscal_matricula','fiscal_nome','fiscal_gedop','fiscal_gerencia','fiscal_cadastrado',
   'codigo_obra','descricao','obra_descricao','obra_municipio','obra_valor','obra_status',
-  'contratada','contratante','analista','data_recebimento','reperc_fiscal','reperc_gecope'].join(',');
+  'contratada','contratante','analista','data_recebimento','reperc_fiscal','reperc_gecope',
+  'ultima_atualizacao'].join(',');
 // ---- mapa do modo Replanilhamentos (E2) ----
 const RP_METRICA={
   tempo:{label:'Tempo médio de resposta'},
@@ -653,9 +654,18 @@ function mapProcesso(r){
     // valor. null (não 0) para que nenhuma média o conte como "obra de valor zero".
     valorObra:r.obra_valor==null?null:num(r.obra_valor),
     contratada:r.contratada||'—', contratante:r.contratante||'—',
-    analista:r.analista||'', raw:r
+    analista:r.analista||'', ultimaAtualizacao:r.ultima_atualizacao||null, raw:r
   };
 }
+// Maior `ultima_atualizacao` entre os processos carregados — mesmo papel que `lastSync`
+// tem no modo Obras (linhas 572-574): "Base atualizada em" precisa refletir quando os
+// DADOS mudaram de fato, não quando a página foi recarregada. `ultima_atualizacao` só é
+// gravada em transição de status (ver vw_painel_desempenho_fiscais). NÃO usar
+// `arquivado_check_em` pra isso — é o heartbeat de todo run do job `sincronizar-suite`
+// (docs/painel-fiscais/etapa-1-revisao.md), sobrescrito com `now()` mesmo sem mudança
+// real; mostraria sempre "agora", igual ao bug antigo do modo Obras (comentário acima,
+// linha 407-408, antes de trocar pra `atualizado_em`).
+let _procLastSync=null;
 // Carrega uma vez por sessão de página. Não entra no cache de sessionStorage das obras:
 // aquele é chaveado por escopo de carteira, que não existe aqui, e o volume é pequeno
 // (algumas centenas de linhas) — não vale o risco de servir número velho num painel de
@@ -665,6 +675,7 @@ async function loadProcessos(){
   if(!SESSION_TOKEN) return {ok:false,erro:'sem sessão'};
   const rows=await fetchTable(SB_PROCESSOS,{select:PROCESSOS_COLS});
   PROCESSOS=rows.map(mapProcesso);
+  for(const p of PROCESSOS){ if(p.ultimaAtualizacao && (!_procLastSync || p.ultimaAtualizacao>_procLastSync)) _procLastSync=p.ultimaAtualizacao; }
   for(const c in DB.municipios) DB.municipios[c].processos=[];
   _procPorEquipe=new Map(); _procPorObra=new Map();
   const indexa=(m,gid,p)=>{ const k=String(gid); let a=m.get(k); if(!a){ a=[]; m.set(k,a); } a.push(p); };
@@ -4194,7 +4205,10 @@ function atualizarStatusModo(){
     if(_statusObras) setStatus(_statusObras.txt,_statusObras.ok,_statusObras.lastSync);
     return;
   }
-  setStatus('Replanilhamentos', true, null, true);
+  // Achado do usuário (etapa-8-revisao.md): "Base atualizada em" ficava sempre em "—" no
+  // modo Replanilhamentos — `_procLastSync` (o maior `ultima_atualizacao` dos processos
+  // carregados) é o equivalente do `lastSync` de contratos no modo Obras.
+  setStatus('Replanilhamentos', true, _procLastSync, true);
 }
 if(_segControle) _segControle.addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
