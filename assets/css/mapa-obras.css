@@ -1467,8 +1467,23 @@
   .modal .dsh-plot{padding:14px 16px;display:flex;flex-direction:column;gap:9px;min-width:0}
   .modal .dsh-pos{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--text-brightest)}
   .modal .dsh-nota{font-family:Montserrat,sans-serif;font-size:11px;line-height:1.45;color:var(--text-dim);font-weight:600}
-  /* (3) ladrilhos */
-  .modal .dsh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  /* (3) ladrilhos — mínimo de coluna 110px (era 130px): achado rev-design, 2026-09-22,
+     rodada 5 — pré-existente, sem relação com o teto/variante abaixo (a fileira de 4
+     ladrilhos de abreModalDistrito, nunca tocada nesta iniciativa, já quebrava em duas
+     linhas desiguais abaixo de ~550px de largura de conteúdo, matematicamente inevitável
+     com min 130px + gap 10px + 4 itens). 110px empurra o limiar de quebra pra ~465px,
+     cobrindo a largura mínima testada (480px, modal a 96vw numa tela ~554px). Não afeta
+     o card de 2 ladrilhos (usa `.dsh-tiles-cap`, mais específica, abaixo). */
+  .modal .dsh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  /* Variante com teto de 220px/coluna — achado rev-design, 2026-09-22: um teto na classe
+     .dsh-tiles COMPARTILHADA (rodada 3) resolvia o card de 2 ladrilhos, mas sem `1fr` o
+     número de colunas passa a ser calculado pelo teto em vez do mínimo — nas fileiras de
+     3-4 ladrilhos (abreModalDistrito, abreModalFiscal) isso derrubou colunas de menos em
+     larguras médias e QUEBROU a linha em duas desiguais (achado rev-design, rodada 4,
+     pior que o espaço morto original). Fix: teto só nesta classe extra, aplicada só no
+     card "Carga no período" (2 ladrilhos) — os demais usos mantêm `.dsh-tiles` puro,
+     sem teto, como sempre foi. */
+  .modal .dsh-tiles.dsh-tiles-cap{grid-template-columns:repeat(auto-fit,minmax(130px,220px))}
   .modal .dsh-tile{padding:11px 13px;display:flex;flex-direction:column;gap:3px;background:var(--card-bg-2)}
   .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text-brightest);line-height:1.1}
   .modal .dsh-tl{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.5px;
