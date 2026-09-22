@@ -705,15 +705,15 @@
                                                         <input class="form-check-input autorizacao-checkbox" type="checkbox" value="processos_ver_todos" id="autorizacao-processos_ver_todos">
                                                         <label class="form-check-label small" for="autorizacao-processos_ver_todos">Processos: ver todos (não só os vinculados)</label>
                                                     </div>
-                                                    <!-- ATENÇÃO (22/09/2026): esta caixa está INERTE para gravação desde
-                                                         18/09/2026. O script de egress `_aplicados/fix_processos_rw_authenticated_leftover.sql`
-                                                         recriou `processos_insert`/`processos_update` sem o ramo da
-                                                         autorização especial, então o banco recusa a gravação de quem a
-                                                         recebe aqui — ela só continua abrindo o modal em leitura.
-                                                         Decisão pendente: aplicar `sql/restaurar_pode_gravar_processos.sql`
-                                                         (e ajustar podeGravarProcessos() em core/auth.js no mesmo dia),
-                                                         ou remover esta caixa. Enquanto isso, o rótulo promete mais do que
-                                                         entrega. Ver docs/revisoes/2026-09-22-processos-vereditos.md. -->
+                                                    <!-- Esta caixa ficou INERTE entre 18/09 e 22/09/2026: o script de egress
+                                                         `_aplicados/fix_processos_rw_authenticated_leftover.sql` recriou
+                                                         `processos_insert`/`processos_update` sem o ramo da autorização
+                                                         especial, e o banco passou a recusar a gravação de quem a recebia
+                                                         aqui. Restaurado por `sql/restaurar_pode_gravar_processos.sql`
+                                                         (decisão de 22/09/2026). Se o rótulo "igual Gerente" mudar, ou se
+                                                         a política for mexida de novo, `podeGravarProcessos()` em
+                                                         core/auth.js muda no mesmo dia — os dois são um par.
+                                                         Ver docs/revisoes/2026-09-22-processos.md, seção 5.8. -->
                                                     <div class="form-check">
                                                         <input class="form-check-input autorizacao-checkbox" type="checkbox" value="processos_gravar" id="autorizacao-processos_gravar">
                                                         <label class="form-check-label small" for="autorizacao-processos_gravar">Processos: gravar/editar/excluir (igual Gerente)</label>
@@ -3072,8 +3072,9 @@
                         <div class="modal-footer justify-content-between bg-light">
                             <!-- A classe `.admin-only` saiu em 22/09/2026: a exclusão é um
                                  UPDATE (status = 'EXCLUÍDO'), e a política `processos_update`
-                                 do banco autoriza admin E gerente. Quem controla a exibição
-                                 agora é `podeExcluirProcesso()` (core/auth.js), chamada em
+                                 do banco autoriza admin, gerente e a autorização especial
+                                 `processos_gravar`. Quem controla a exibição agora é
+                                 `podeExcluirProcesso()` (core/auth.js), chamada em
                                  `abrirDetalhes()` — antes, o JS reabilitava este botão para
                                  todos, anulando o `.admin-only` daqui. -->
                             <button type="button" class="btn btn-outline-danger btn-sm" id="btn-excluir"
@@ -3086,8 +3087,8 @@
                                     data-bs-dismiss="modal">Fechar</button>
                                 <!-- A classe `.admin-only` saiu em 22/09/2026, pelo mesmo motivo
                                      do botão EXCLUIR acima: a política `processos_update` do
-                                     banco autoriza admin E gerente, e a tela estava mais rígida
-                                     que o banco. Quem controla a exibição agora é
+                                     banco autoriza mais gente do que só admin, e a tela estava
+                                     mais rígida que ele. Quem controla a exibição agora é
                                      `podeEditarProcesso()` (core/auth.js), chamada em
                                      `abrirDetalhes()`. -->
                                 <button type="button" class="btn btn-primary px-4" id="btn-atualizar"

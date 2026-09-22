@@ -259,17 +259,28 @@ anterior à Fase 5. O ramo `tenho_autorizacao('processos_gravar')` foi apagado d
 dias antes desta revisão começar. `processos_select` escapou porque aquele script não o tocou — é
 por isso que `processos_ver_todos` continua funcionando e `processos_gravar` não.
 
-Consequências, todas já aplicadas no código:
+**Decisão do usuário, no mesmo dia: restaurar a intenção da Fase 5.** Antes de decidir, a pergunta
+que importava foi para o banco — quem tem essa autorização hoje? Uma pessoa só, com papel **admin**,
+que já grava pelo papel. Ninguém tinha perdido acesso em 18/09 e ninguém ganha com a restauração; o
+que se conserta é a promessa da caixa para a próxima vez que ela for usada. A alternativa —
+remover a caixa — era igualmente coerente e mais simples, e foi descartada por perder a
+granularidade de autorizar sem promover.
 
-- `podeGravarProcessos()` reflete o banco real (admin e gerente). A correção da rodada 1 continua
-  valendo no que importa — o gerente edita, e a regra vive num lugar só —, mas pelo motivo certo.
-- `canSeeProcessActions()` **não** delega para ela, de propósito: quem tem a autorização especial
-  continua abrindo o modal, em leitura. Ver o processo nunca dependeu de poder gravá-lo.
-- Comentários e documentos que diziam "admin, gerente ou a autorização especial" foram corrigidos —
-  em `core/auth.js`, `modules/processos/processos.js`, `index.html` e no registro da revisão.
-- A caixa "Processos: gravar/editar/excluir (igual Gerente)" em Administração **está inerte**.
-  A decisão — restaurar a política ou remover a caixa — está registrada na seção 5.8 do registro,
-  com o script `sql/restaurar_pode_gravar_processos.sql` pronto para o primeiro caminho.
+Consequências no código, todas aplicadas:
+
+- `podeGravarProcessos()` volta a somar `|| temAutorizacao('processos_gravar')`, e o banco recebe
+  o par disso em `sql/restaurar_pode_gravar_processos.sql` — **aplicação manual pendente, e ela
+  precisa acontecer antes de a branch ir para produção**, senão a tela fica mais permissiva que o
+  banco.
+- `canSeeProcessActions()` passou a **delegar** para ela. As duas regras coincidiram de novo, e
+  manter a expressão repetida seria recriar o problema das quatro cópias que originou esta revisão.
+  O comentário da função registra em que caso elas voltariam a se separar.
+- Comentários e documentos foram acertados duas vezes em 22/09 — primeiro para a regra estreita,
+  depois para a restaurada. Estão em `core/auth.js`, `modules/processos/processos.js`, `index.html`
+  e no registro da revisão.
+
+Ficou registrado à parte, como observação de produto: conceder a um **admin** uma autorização que
+ele já tem pelo papel sugere que a tela de Administração não deixa isso claro na hora de conceder.
 
 **O que isso ensina, e é o motivo de estar registrado aqui e não só no código:** três textos
 diferentes desta revisão afirmaram a regra do banco citando um arquivo do `sql/`, e os três

@@ -1768,9 +1768,9 @@ async function abrirDetalhes(processoStr) {
     // Revisão 22/09/2026 — este trecho reabilitava o botão EXCLUIR para QUALQUER usuário que
     // conseguisse abrir o modal, inclusive quem não tinha autorização nenhuma, desfazendo a
     // intenção do `.admin-only` no HTML e entregando um erro do banco a quem clicasse. Agora o
-    // botão aparece exatamente para quem o banco autoriza a excluir hoje — admin e gerente,
-    // pela política `processos_update` viva. A autorização especial `processos_gravar` NÃO
-    // entra: ver podeGravarProcessos() em core/auth.js.
+    // botão aparece exatamente para quem o banco autoriza a excluir — admin, gerente ou a
+    // autorização especial `processos_gravar`, pela política `processos_update`. A ligação
+    // entre a tela e o banco está documentada em podeGravarProcessos() (core/auth.js).
     const btnExcluirModal = document.getElementById('btn-excluir');
     if (btnExcluirModal) {
         const podeExcluir = podeExcluirProcesso();
@@ -1928,9 +1928,8 @@ async function executarAcaoDetalhes(actionType) {
         // era a classe CSS `.admin-only` no botão, que `abrirDetalhes()` reabilitava para
         // todo mundo que conseguisse abrir o modal. Quem não podia excluir chegava ao botão
         // e levava um erro do banco. A regra abaixo é a MESMA da política `processos_update`
-        // que está viva no banco — admin e gerente (ver podeGravarProcessos() em core/auth.js,
-        // que explica por que a autorização especial `processos_gravar` ficou de fora desde
-        // 18/09/2026). As duas precisam continuar concordando.
+        // no banco — admin, gerente ou a autorização especial `processos_gravar`. As duas
+        // precisam continuar concordando; ver podeGravarProcessos() em core/auth.js.
         if (!podeExcluirProcesso()) {
             alert("Você não tem permissão para excluir processos.");
             return;
@@ -3405,9 +3404,9 @@ function _updateReuniaoInterno() {
         // core/auth.js — três cópias da mesma regra de acesso só podem divergir com o tempo, e
         // foi divergência assim que gerou os achados desta revisão. — 22/09/2026
         //
-        // `canSeeProcessActions()` e não `podeEditarProcesso()` de propósito: quem tem a
-        // autorização especial `processos_gravar` abre o modal em leitura. São regras diferentes
-        // desde 18/09/2026 — ver podeGravarProcessos() em core/auth.js.
+        // `canSeeProcessActions()` e não `podeEditarProcesso()` por intenção, não por efeito:
+        // as duas coincidem hoje, mas quem abre o modal e quem grava são perguntas distintas —
+        // ver os comentários das duas em core/auth.js.
         const canEdit = podeVerDetalhes;
         const btnDetalhes = canEdit ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : '';
 

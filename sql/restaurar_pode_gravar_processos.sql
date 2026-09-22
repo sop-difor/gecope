@@ -1,11 +1,18 @@
 -- ============================================================================
--- restaurar_pode_gravar_processos.sql — OPCIONAL, aguardando decisão.
+-- restaurar_pode_gravar_processos.sql — APLICAR. Decisão do usuário em 22/09/2026: sim, a
+-- caixa "Processos: gravar/editar/excluir (igual Gerente)" deve voltar a valer.
 --
--- Este script NÃO corrige um defeito: ele restaura uma intenção que se perdeu. Só deve ser
--- aplicado se a resposta à pergunta abaixo for "sim".
+-- Este script NÃO corrige um defeito de funcionamento: ele restaura uma intenção que se
+-- perdeu. O par dele no navegador — `|| temAutorizacao('processos_gravar')` em
+-- `podeGravarProcessos()`, core/auth.js — **já está commitado**. Enquanto este script não for
+-- aplicado, a tela fica mais permissiva que o banco: quem tiver a autorização verá SALVAR e
+-- EXCLUIR e levará erro do banco ao clicar. Por isso a ordem importa: **aplique este script
+-- ANTES de a branch `revisao/processos-2026-09-22` ir para produção.**
 --
---     A caixa "Processos: gravar/editar/excluir (igual Gerente)" da tela de Administração
---     deve voltar a valer de verdade?
+-- RAIO DE ALCANCE HOJE: nenhum. Em 22/09/2026 uma única pessoa tinha a autorização
+-- `processos_gravar` ativa, e o papel dela é **admin** — ou seja, já grava pelo papel.
+-- Ninguém perdeu acesso com a quebra de 18/09 e ninguém ganha acesso com esta restauração.
+-- O que se conserta é a promessa da caixa para a próxima vez que ela for usada.
 --
 -- O QUE ACONTECEU (achado de 22/09/2026, durante a revisão do módulo Processos):
 --
@@ -24,23 +31,18 @@
 -- o script mirava a política órfã e levou estas duas de carona. `processos_select` escapou
 -- (aquele script não o tocou) e por isso continua usando `pode_ver_todos_processos()`.
 --
--- CONSEQUÊNCIA HOJE: a autorização `processos_gravar` não grava nada em `processos` desde
--- 18/09/2026, embora a caixa continue sendo oferecida em Administração. Quem a recebe
--- enxerga o processo e abre o modal, mas não vê SALVAR nem EXCLUIR — porque
--- `podeGravarProcessos()` em core/auth.js foi alinhada ao banco REAL, não à intenção da
--- Fase 5.
+-- CONSEQUÊNCIA ENQUANTO ISSO DUROU: a autorização `processos_gravar` não gravou nada em
+-- `processos` entre 18/09 e a aplicação deste script, embora a caixa continuasse sendo
+-- oferecida em Administração.
 --
--- SE VOCÊ APLICAR ESTE SCRIPT, faça a mudança do navegador NO MESMO DIA, senão a tela fica
--- mais rígida que o banco (o problema inverso, que foi o que esta revisão corrigiu):
+-- SE ESTE SCRIPT FOR REVERTIDO um dia, ou se a política for mexida de novo, desfaça também a
+-- linha correspondente em `core/auth.js` (`podeGravarProcessos()`) no mesmo dia. Tela mais
+-- larga que o banco = erro na cara do usuário; tela mais estreita = poder escondido. Os dois
+-- lados são um par.
 --
---     core/auth.js, função podeGravarProcessos():
---       return ['admin', 'gerente'].includes(getCurrentUserRole())
---              || temAutorizacao('processos_gravar');
---
---     ...e o comentário dela, que hoje explica por que a autorização NÃO vale.
---
--- SE VOCÊ NÃO APLICAR, a alternativa honesta é tirar a caixa `processos_gravar` da tela de
--- Administração (index.html) — hoje ela promete "igual Gerente" e não entrega.
+-- A ALTERNATIVA DESCARTADA em 22/09/2026 era remover a caixa `processos_gravar` da tela de
+-- Administração e deixar o banco como estava — coerente também, e mais simples, mas perde a
+-- granularidade de autorizar alguém a editar processos sem promovê-lo a gerente.
 -- ============================================================================
 
 

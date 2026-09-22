@@ -91,8 +91,8 @@ botão, clicava e levava um erro do banco na cara.
 
 Pior: a regra da tela (só administrador) e a do banco discordavam entre si. A do banco autoriza
 administrador **e gerente**, porque a exclusão é um `UPDATE` de status — ver a seção 3.9 para a
-regra exata e para o enredo da autorização especial `processos_gravar`, que parece fazer parte
-dela e hoje não faz.
+regra exata e a 5.8 para o enredo da autorização especial `processos_gravar`, que faz parte dela
+no papel, deixou de fazer no banco em 18/09 e voltou a fazer em 22/09.
 
 ### 2.4 A falha de escrita indevida já estava fechada
 
@@ -222,9 +222,9 @@ Decisão de 22/09/2026: gerente pode excluir.
 
 **A regra final é a da seção 3.9**, não a desta seção. O caminho até ela passou por dois arquivos
 de migração errados — `sql/rls_processos_composicoes_orcamentos.sql`, já substituído, e depois
-`sql/autorizacoes_especiais.sql`, que o banco deixou de refletir em 18/09/2026. O resultado
-coincide com o que esta seção diz (administrador e gerente), mas pelo motivo que a 3.9 explica,
-não por este.
+`sql/autorizacoes_especiais.sql`, que o banco deixou de refletir em 18/09/2026 e voltou a
+refletir em 22/09. A regra final inclui também a autorização especial `processos_gravar` — ver
+3.9 e 5.8.
 
 ### 3.3 Erros que travavam o salvamento (achados 2.5 e 2.6)
 
@@ -268,8 +268,9 @@ foi substituída por uma chamada a `classeBadgeStatus()`, com o valor padrão ex
 ### 3.9 Gerente passa a editar processos (decisão de 22/09/2026)
 
 A tela foi alinhada ao banco: `podeEditarProcesso()` e `podeExcluirProcesso()` em `core/auth.js`
-passaram a ler de `podeGravarProcessos()`, que espelha a política `processos_update` **viva** no
-banco — **admin e gerente**. `abrirDetalhes` libera os campos e exibe o botão SALVAR por essa regra, a classe `.admin-only`
+passaram a ler de `podeGravarProcessos()`, que espelha a política `processos_update` do banco —
+**admin, gerente, ou quem recebeu a autorização especial `processos_gravar`** (esta última
+dependeu de restaurar a política; ver 5.8). `abrirDetalhes` libera os campos e exibe o botão SALVAR por essa regra, a classe `.admin-only`
 saiu do botão no HTML, e `executarAcaoDetalhes('update')` ganhou a mesma guarda que o ramo
 `delete` já tinha, para que quem não pode editar receba um aviso legível em vez de um erro do
 banco.
@@ -291,8 +292,9 @@ vezes, e as duas primeiras erraram por confiar no arquivo de migração em vez d
    `processos_insert` e `processos_update` a partir da definição anterior à Fase 5, apagando o ramo
    da autorização de carona com a remoção de uma política órfã.
 
-A regra viva é a que `pg_policies` responde: `(select public.meu_papel()) in ('admin','gerente')`.
-A consequência para o produto, e a decisão pendente, estão na seção 5. Ver também
+A regra que `pg_policies` respondeu em 22/09 foi `(select public.meu_papel()) in
+('admin','gerente')` — e a decisão foi restaurar a da Fase 5 por cima dela. O enredo inteiro, e o
+que falta aplicar, estão na seção 5.8. Ver também
 [2026-09-22-processos-vereditos.md](2026-09-22-processos-vereditos.md).
 
 **Duas exceções continuam só-administrador**, porque é o trigger quem as impõe — a tela apenas
@@ -385,7 +387,8 @@ Em ordem, com validação entre um e outro:
 |---|---|---|---|
 | 1 | ~~`sql/verificar_backfill_historico_suite.sql`~~ | **Rodado em 22/09/2026, limpo** — ver 5.7 | ✔ feito |
 | 2 | ~~`sql/fix_vinculo_fiscal_matricula.sql`~~ | **Pré-voo rodado em 22/09/2026; [2] e [3] NÃO aplicados** — ver abaixo | ✔ decidido |
-| 3 | `sql/fix_painel_responsavel_atual_suite.sql` | Faz o painel consultar a unidade do SUITE | Único ainda pendente |
+| 3 | `sql/fix_painel_responsavel_atual_suite.sql` | Faz o painel consultar a unidade do SUITE | Pendente |
+| 4 | `sql/restaurar_pode_gravar_processos.sql` | Devolve à política `processos_update` o ramo da autorização especial (ver 5.8) | Pendente — **antes de publicar a branch**, porque o lado do navegador já está commitado |
 
 **O script 2 se autodesqualificou, e isso é um bom resultado.** Os blocos `[0]`, `[1]` e `[1b]`
 são o pré-voo e não alteram nada. O `[1]` voltou **vazio**: não existe hoje um único processo
@@ -490,35 +493,55 @@ O script de verificação foi rodado e voltou **limpo nos quatro blocos**:
 `supabase/functions/backfill-historico-suite/`, com o cabeçalho explicando por que saiu — a
 remoção no servidor não perde nada.
 
-### 5.8 A autorização `processos_gravar` está inerte — DECISÃO PENDENTE
+### 5.8 A autorização `processos_gravar` ficou inerte — RESOLVIDO em 22/09/2026
 
 Achado tardio desta revisão, encontrado ao conferir em `pg_policies` qual política estava de fato
 valendo (o hábito que a seção 3.9 passou a recomendar, depois de errar duas vezes por confiar no
 arquivo de migração).
 
-**Desde 18/09/2026, quem recebe a caixa "Processos: gravar/editar/excluir (igual Gerente)" em
-Administração não grava nada em processos.** O script de egress
+**Entre 18/09/2026 e a aplicação do script de restauração, quem recebe a caixa "Processos:
+gravar/editar/excluir (igual Gerente)" em Administração não grava nada.** O script de egress
 `sql/_aplicados/fix_processos_rw_authenticated_leftover.sql` removeu uma política órfã e, no bloco
 secundário de desempenho, recriou `processos_insert` e `processos_update` a partir da definição
 **anterior** à Fase 5 — o ramo `tenho_autorizacao('processos_gravar')` foi apagado junto, em
 silêncio. `processos_select` escapou porque aquele script não o tocou, e por isso a autorização
 irmã `processos_ver_todos` continua funcionando normalmente.
 
-A tela foi alinhada ao banco real: `podeGravarProcessos()` devolve admin e gerente. Quem tem a
-autorização especial ainda abre o modal (isso é `canSeeProcessActions()`, deliberadamente mais
-larga), porém em leitura — sem SALVAR nem EXCLUIR. Ninguém leva erro de banco na cara; o que sobra
-é uma caixa em Administração que promete mais do que entrega.
+**Quem isso afetou: ninguém.** A consulta a `autorizacoes_especiais` mostrou uma única
+autorização `processos_gravar` ativa, concedida em 08/09/2026 — e o papel de quem a tem é
+**admin**, que já grava pelo papel. Ninguém perdeu acesso em 18/09 e ninguém ganha acesso com a
+restauração. (Vale um comentário à parte: conceder a um admin uma autorização que ele já tem pelo
+papel sugere que a tela de Administração não deixa isso claro na hora de conceder.)
 
-**A decisão é sua, e são dois caminhos:**
+**Decisão do usuário, 22/09/2026: restaurar a intenção da Fase 5.** O que se conserta não é o
+acesso de alguém hoje, é a promessa da caixa para a próxima vez que ela for usada — uma caixa que
+não faz nada é uma armadilha esperando o dia em que alguém contar com ela.
 
-| Caminho | O que fazer | Efeito |
-|---|---|---|
-| Restaurar a intenção da Fase 5 | Aplicar `sql/restaurar_pode_gravar_processos.sql` **e**, no mesmo dia, somar `\|\| temAutorizacao('processos_gravar')` em `podeGravarProcessos()` | A caixa volta a valer; vale o passo 14 da seção 6 |
-| Aceitar o estado atual | Remover a caixa `processos_gravar` de `index.html` (o bloco de autorizações) | A tela para de prometer o que o banco nega; quem precisa gravar vira gerente |
+A alternativa, descartada, era remover a caixa de `index.html` e deixar o banco como estava:
+coerente também, e mais simples, mas perde a granularidade de autorizar alguém a editar processos
+sem promovê-lo a gerente.
 
-Enquanto a decisão não sai, o estado atual é seguro — o banco é quem decide, e ele recusa. O que
-não é seguro é deixar o rótulo como está por tempo indefinido: foi exatamente esse tipo de promessa
-não cumprida que gerou os achados 2.3 e 2.4 desta revisão.
+**Como fica, e é um par que anda junto:**
+
+| Lado | Estado |
+|---|---|
+| Banco | `sql/restaurar_pode_gravar_processos.sql` — **aplicação manual pendente** |
+| Navegador | `podeGravarProcessos()` volta a somar `\|\| temAutorizacao('processos_gravar')` — **já commitado** |
+
+**A ordem importa:** o lado do navegador está no código e o do banco não. Enquanto o script não
+for aplicado, a tela fica mais permissiva que o banco — quem tiver a autorização veria SALVAR e
+levaria erro ao clicar. Como a branch ainda não foi para produção, isso não afeta ninguém; mas
+**o script precisa ser aplicado antes da publicação**.
+
+`canSeeProcessActions()` passou a delegar para `podeGravarProcessos()`: as duas regras
+coincidiram de novo, e manter a expressão repetida era recriar o problema das quatro cópias que
+originou esta revisão. O comentário na função registra em que caso elas voltariam a se separar.
+
+**A verificar antes da publicação:** a política de UPDATE não distingue linhas — ela responde
+"pode gravar" ou "não pode", e o recorte "só os processos dele" vem da política de SELECT. Na
+tela isso basta. Numa chamada direta à API, a leitura da linha na cláusula `WHERE` também passa
+pela política de SELECT, o que deve manter o recorte; vale confirmar empiricamente com um usuário
+de teste antes de conceder a autorização a alguém que não seja admin.
 
 ---
 
@@ -563,18 +586,15 @@ Na tela, com a aplicação rodando:
     linha deve sair de "Consultando" — eram dois sumiços silenciosos, corrigidos em 3.7.
 13. **Salvar uma alteração e conferir que a tabela não recarrega inteira** (a linha atualiza, a
     tabela não pisca).
-14. **A autorização especial `processos_gravar` — hoje ela é só de leitura (ver 5.8).** Em
-    Administração, conceder a um fiscal a caixa "Processos: gravar/editar/excluir (igual
-    Gerente)". Entrar com ele: as linhas dele passam a trazer o botão de detalhes e o modal abre,
-    mas **sem SALVAR e sem EXCLUIR**, com os campos cinzas — é o esperado enquanto o banco não
-    aceitar a gravação dele. A lista continua restrita aos processos dele (a menos que ele também
-    tenha `processos_ver_todos`, que essa sim continua valendo). O que **não** pode acontecer é
-    ele chegar a um botão e levar erro de banco.
-
-    Se a decisão de 5.8 for restaurar a política, este passo muda: depois de aplicar
-    `sql/restaurar_pode_gravar_processos.sql` e ajustar `podeGravarProcessos()`, o esperado passa
-    a ser campos editáveis, SALVAR e EXCLUIR — com "Meta Fiscal" e o bloco da obra ainda cinzas —,
-    e salvar precisa de fato gravar.
+14. **A autorização especial, e este passo só vale DEPOIS de aplicar
+    `sql/restaurar_pode_gravar_processos.sql`** (ver 5.8 — sem o script, a tela oferece SALVAR e
+    o banco recusa). Em Administração, conceder a um fiscal a caixa "Processos:
+    gravar/editar/excluir (igual Gerente)". Entrar com ele: as linhas dele passam a trazer o
+    botão de detalhes, com campos editáveis, SALVAR e EXCLUIR; "Meta Fiscal" e o bloco da obra
+    continuam cinzas; a lista continua restrita aos processos dele (a menos que ele também tenha
+    `processos_ver_todos`). **Salvar precisa de fato gravar** — é o que confirma que os dois
+    lados, banco e tela, estão no mesmo ponto. Use um usuário de teste que não seja admin, senão
+    o teste não prova nada: admin grava pelo papel.
 
 Com o console do navegador aberto (F12), a tela deve ficar **limpa** durante o uso normal — os
 `console.log` de depuração foram removidos. Mensagens que aparecerem agora são sinal real.
