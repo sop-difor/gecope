@@ -1638,13 +1638,27 @@ function fmtDateBR(v){
   const d=new Date(s); if(!isNaN(d)) return d.toLocaleDateString('pt-BR');
   return escHtml(s);
 }
+// Achado do usuário, 2026-09-22: a versão anterior extraía os dígitos do texto na marra
+// (regex, sem `Date`), então um `timestamptz` devolvido em UTC pelo PostgREST (é o padrão
+// — `ultima_atualizacao`/`atualizado_em` são `timestamptz`, que o PostgREST sempre
+// serializa com offset UTC explícito, `Z` ou `+00:00`, não importa se a coluna foi
+// gravada via `.toISOString()` do JS deste repo — caso de `processos.ultima_atualizacao`
+// — ou por um sync externo, como `contratos_edificacao.atualizado_em`, escrito pelo
+// script Python `sigsop_contratos.py`) aparecia com a HORA de UTC rotulada como se já
+// fosse horário do Ceará — 3h adiantado (sem horário de verão no Brasil desde 2019, a
+// diferença é sempre exata).
+// Passou despercebido porque as datas mostradas (contrato atualizado há dias/semanas) não
+// deixavam o desvio óbvio; ficou claro só quando "Base atualizada em" (achado do painel
+// de fiscais) passou a mostrar um horário de HOJE, à frente do relógio de quem via a tela.
+// Fix: `Date` de verdade + `timeZone:'America/Fortaleza'` explícito — corrige também o
+// "Atualizado em" da ficha de obra (mesma função, mesmo bug).
 function fmtDateTimeBR(v){
   if(!v) return '—';
-  const s=String(v);
-  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-  if(m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
-  const d=new Date(s); if(!isNaN(d)) return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  return escHtml(s);
+  const d=new Date(v);
+  if(isNaN(d)) return escHtml(String(v));
+  const data=d.toLocaleDateString('pt-BR',{timeZone:'America/Fortaleza'});
+  const hora=d.toLocaleTimeString('pt-BR',{timeZone:'America/Fortaleza',hour:'2-digit',minute:'2-digit'});
+  return `${data} ${hora}`;
 }
 function fmtVal(v){ return (v===null||v===undefined||v==='') ? '—' : escHtml(String(v)); }
 function fmtCNPJ(v){
