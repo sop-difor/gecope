@@ -279,3 +279,15 @@ a conferência em produção que pegou. Daí o bloco `[0]` obrigatório nos scri
 
 Nenhum dos quatro vereditos muda: os achados que eles levantaram continuam fechados, e este é um
 fato do banco que nenhum deles tinha como alcançar.
+
+### A ressalva do `rev-seguranca` que condicionava o SQL — resolvida
+
+Aquela ressalva pedia para ler o `[1]` com uma lente específica (nome do fiscal no processo
+discordando do e-mail do fiscal casado, sinal de linha legada que o `[1b]` não pegaria). **O `[1]`
+voltou vazio**, então não há o que ler com lente nenhuma: nenhum processo casa por matrícula
+normalizada sem casar também pela crua. O `[1b]` também voltou vazio.
+
+Com isso os blocos [2] e [3] deixaram de ser necessários e **não foram aplicados** — o pré-voo
+desqualificou o próprio script, que era exatamente a função dele. O raciocínio completo está na
+seção 5.1 do registro. O revisor estava certo em condicionar; a condição simplesmente não se
+materializou.

@@ -18,9 +18,30 @@
 -- modules/processos/processos.js (a revisão usa `normalizarMatriculaFiscal`, que
 -- descarta ponto, hífen, barra e espaço — a mesma regra da função criada no bloco [2]).
 --
--- ORDEM DE EXECUÇÃO: rode [0], [1] e [1b] primeiro e me mande o resultado. Nenhum dos
--- três altera nada. Os blocos [2] e [3] só valem a pena se o [1] mostrar divergência, e
+-- ORDEM DE EXECUÇÃO: rode [0], [1], [1b] e [1c] primeiro e me mande o resultado. Nenhum dos
+-- quatro altera nada. Os blocos [2] e [3] só valem a pena se o [1] mostrar divergência, e
 -- só são SEGUROS se o [1b] voltar VAZIO.
+--
+-- ----------------------------------------------------------------------------
+-- RESULTADO DO PRÉ-VOO EM 22/09/2026 — **[2] E [3] NÃO FORAM APLICADOS.**
+--
+--   [0]  as quatro políticas esperadas, e `processos_select` idêntica à que o [3] recria
+--        (fora o ramo novo). Nenhum ajuste feito direto no banco.
+--   [1]  **VAZIO** — nenhum processo está invisível para o fiscal dele por formato de
+--        matrícula. O defeito que este arquivo conserta não está acontecendo.
+--   [1b] **VAZIO** — nenhuma colisão de matrícula normalizada entre pessoas.
+--
+-- Decisão: **não aplicar**. Com o [1] vazio, os blocos [2] e [3] alargariam a política de
+-- SELECT e criariam um índice para tolerar uma divergência que não existe. E o [1b] é uma
+-- FOTO, não uma garantia: ele diz que hoje não há colisão, não que não haverá — uma
+-- matrícula cadastrada amanhã que colapse na chave de outra pessoa faria o ramo normalizado
+-- entregar processos de um fiscal a outro, coisa que a comparação crua de hoje impede.
+--
+-- O arquivo fica no repositório porque o [1] é o diagnóstico para rodar de novo se o
+-- sintoma aparecer (fiscal reclamando de processo que não vê). Se aparecer, a cura durável
+-- é a da OBSERVAÇÃO SOBRE A CAUSA DE ORIGEM, no fim deste arquivo — normalizar na gravação
+-- —, e não alargar a leitura.
+-- ----------------------------------------------------------------------------
 -- ============================================================================
 
 
@@ -104,6 +125,40 @@ from public.app_users u
 where nullif(upper(regexp_replace(coalesce(u.matricula, ''), '[.\-/[:space:]]+', '', 'g')), '') is not null
 group by 1
 having count(distinct lower(u.email)) > 1;
+
+
+-- ----------------------------------------------------------------------------
+-- [1c] O OUTRO CAMINHO PARA O MESMO SINTOMA — SOMENTE LEITURA.
+--
+--      O [1] só enxerga processos cuja matrícula casa com ALGUÉM depois de normalizada. Um
+--      processo com matrícula que não bate com cadastro nenhum — dígito trocado, matrícula
+--      antiga, servidor que saiu — não aparece lá, e **some da tela do fiscal do mesmo
+--      jeito**: a política exige `fiscal_matricula = minha_matricula()` ou NULL, e essa
+--      linha não atende a nenhum dos dois. Admin e gerente continuam vendo, então o
+--      processo não some do sistema — some de quem deveria tocá-lo.
+--
+--      Normalizar a comparação NÃO resolve esse caso. A correção é no dado: acertar a
+--      matrícula do processo, ou apagá-la (com `fiscal_matricula IS NULL` a política já
+--      entrega a linha a todos os fiscais, que foi decisão anterior).
+--
+--      Traz `fiscal` e `status` de propósito: é por eles que se reconhece se a linha é um
+--      processo vivo que alguém deveria estar tocando ou resíduo antigo.
+-- ----------------------------------------------------------------------------
+select
+  p.processo         as nup,
+  p.fiscal           as fiscal_no_processo,
+  p.fiscal_matricula as matricula_no_processo,
+  p.status
+from public.processos p
+where p.fiscal_matricula is not null
+  and p.excluido_por is null
+  and not exists (
+    select 1
+    from public.app_users u
+    where nullif(upper(regexp_replace(coalesce(u.matricula, ''),        '[.\-/[:space:]]+', '', 'g')), '')
+        = nullif(upper(regexp_replace(coalesce(p.fiscal_matricula, ''), '[.\-/[:space:]]+', '', 'g')), '')
+  )
+order by p.fiscal, p.processo;
 
 
 -- ----------------------------------------------------------------------------

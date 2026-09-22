@@ -384,13 +384,30 @@ Em ordem, com validação entre um e outro:
 | Ordem | Script | O que faz | Quando |
 |---|---|---|---|
 | 1 | ~~`sql/verificar_backfill_historico_suite.sql`~~ | **Rodado em 22/09/2026, limpo** — ver 5.7 | ✔ feito |
-| 2 | `sql/fix_vinculo_fiscal_matricula.sql` | Blocos [0], [1] e [1b] só leem; [2] e [3] corrigem a RLS, numa transação só | Depois de ver o resultado de [0], [1] e [1b] |
-| 3 | `sql/fix_painel_responsavel_atual_suite.sql` | Faz o painel consultar a unidade do SUITE | Por último, depois de validar o resto |
+| 2 | ~~`sql/fix_vinculo_fiscal_matricula.sql`~~ | **Pré-voo rodado em 22/09/2026; [2] e [3] NÃO aplicados** — ver abaixo | ✔ decidido |
+| 3 | `sql/fix_painel_responsavel_atual_suite.sql` | Faz o painel consultar a unidade do SUITE | Único ainda pendente |
 
-No script 2, os blocos `[0]`, `[1]` e `[1b]` são o pré-voo e **não alteram nada**. O `[1b]`
-é o que autoriza ou veta a aplicação: ele procura duas pessoas cujas matrículas colapsem na mesma
-chave normalizada. Se voltar qualquer linha, os blocos [2] e [3] **não** devem ser aplicados — um
-fiscal passaria a enxergar processos de outro. Ver
+**O script 2 se autodesqualificou, e isso é um bom resultado.** Os blocos `[0]`, `[1]` e `[1b]`
+são o pré-voo e não alteram nada. O `[1]` voltou **vazio**: não existe hoje um único processo
+invisível para o fiscal dele por diferença de formato de matrícula — o defeito que o script
+tolera não está acontecendo neste banco. O `[1b]` também voltou vazio (nenhuma colisão de
+matrícula normalizada entre pessoas), o que tornaria a aplicação segura, mas segura e
+**necessária** são coisas diferentes.
+
+Decisão: **não aplicar**. Alargar a política de SELECT e criar um índice para tolerar uma
+divergência inexistente tem custo e tem risco futuro — o `[1b]` é uma foto, não uma garantia:
+uma matrícula cadastrada amanhã que colapse na chave de outra pessoa faria o ramo normalizado
+entregar processos de um fiscal a outro, coisa que a comparação crua impede hoje. Se o sintoma
+aparecer (fiscal reclamando de processo que não vê), o `[1]` é o diagnóstico para rodar de novo,
+e a cura durável é a da seção 4.2 — normalizar na gravação —, não alargar a leitura.
+
+O `[0]` confirmou, de quebra, o achado da seção 5.8 por um terceiro caminho: `processos_update`
+é `meu_papel() in ('admin','gerente')`, sem `pode_gravar_processos()`.
+
+O script ganhou um bloco `[1c]`, também só de leitura, para o caso que o `[1]` não enxerga:
+processo cuja matrícula não bate com **cadastro nenhum**. Ele some da tela do fiscal pelo mesmo
+motivo, e normalizar a comparação não resolveria — a correção seria no dado. Vale rodar junto do
+`[1]` sempre que a pergunta "o fiscal está vendo tudo que é dele?" voltar. Ver
 [2026-09-22-processos-vereditos.md](2026-09-22-processos-vereditos.md).
 
 ### 5.2 Gerente pode excluir mas não pode editar — RESOLVIDO em 22/09/2026
@@ -528,8 +545,9 @@ Na tela, com a aplicação rodando:
    ou a autorização especial; gravar é mais estreito que isso (ver 5.8).
 6. **Entrar como fiscal.** Conferir se a lista traz os processos esperados. Se algum aparecer com
    um triângulo laranja ⚠ ao lado do nome do fiscal, passe o mouse: a mensagem explica que o
-   vínculo foi reconhecido pelo nome, não pela matrícula — é exatamente o caso que o script
-   `fix_vinculo_fiscal_matricula.sql` resolve.
+   vínculo foi reconhecido pelo nome, não pela matrícula. Pelo pré-voo de 22/09 (seção 5.1) isso
+   não deveria acontecer por divergência de formato — se acontecer, rode os blocos `[1]` e `[1c]`
+   de `fix_vinculo_fiscal_matricula.sql` para ver qual dos dois casos é.
 7. **Trocar o status de um processo pelo seletor.** A cor do selo deve continuar correta para
    todos os status (a regra de cor era duplicada e foi unificada).
 8. **Abrir o modal de meta** de alguns processos, conferir que o histórico aparece.
