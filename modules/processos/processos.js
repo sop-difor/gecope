@@ -117,6 +117,13 @@ function montarAlertaIconeHTML(d) {
 let _indiceAllDataPorProcesso = null;
 let _indiceAllDataOrigem = null;
 
+/** Força a reconstrução do índice. Necessário para quem MUTA window.allData no lugar
+ *  (push/unshift/splice), porque a invalidação abaixo compara identidade de vetor. */
+function invalidarIndiceAllData() {
+    _indiceAllDataPorProcesso = null;
+    _indiceAllDataOrigem = null;
+}
+
 function linhaGlobalPorProcesso(numeroProcesso) {
     const base = window.allData;
     if (!base) return null;
@@ -803,7 +810,6 @@ async function limparArquivosComentariosResolvidos(table, storageBucket, comenta
             const { error } = await sbClient.storage.from(storageBucket).remove(arquivosParaDeletar);
             if (error) {
                 console.error('Erro ao deletar arquivos:', error);
-            } else {
             }
         } catch (err) {
             console.error('Erro ao limpar arquivos:', err);
@@ -999,8 +1005,15 @@ async function atualizarLinhaProcessoLocal(id) {
         const fresh = mapProcessoRow(data);
         window.allData = window.allData || [];
         const idx = window.allData.findIndex(d => d.id === id);
-        if (idx === -1) window.allData.unshift(fresh);
-        else Object.assign(window.allData[idx], fresh);
+        if (idx === -1) {
+            window.allData.unshift(fresh);
+            // `unshift` MUTA o vetor sem trocar a referência, e o índice de
+            // linhaGlobalPorProcesso() invalida por identidade — sem esta linha, o processo
+            // recém-criado fica fora do índice até a próxima carga completa. — 22/09/2026
+            invalidarIndiceAllData();
+        } else {
+            Object.assign(window.allData[idx], fresh);
+        }
     } catch (e) {
         console.error('[ERRO] Falha ao buscar a linha do processo, recarregando tudo:', e);
         await carregarDadosSupabase();
@@ -1048,20 +1061,42 @@ async function _carregarDadosSupabaseInterno() {
         // `not.in.(EXCLUÍDO,EXCLUIDO)` também descartaria as linhas com status NULO, porque em
         // SQL `NOT (NULL IN (...))` não é verdadeiro — esconderia processos sem status
         // preenchido. Ver a pendência registrada em docs/revisoes/2026-09-22-processos.md.
+        // O desempate por `id` NÃO é decorativo: `created_at` não é único, e cada bloco é uma
+        // consulta nova. Em Postgres `now()` é por transação, então carga em lote grava dezenas
+        // de linhas com o mesmo instante; se um grupo empatado cruzar a fronteira do bloco, a
+        // ordem entre as duas consultas é indefinida e a mesma linha pode vir duas vezes
+        // enquanto outra não vem nenhuma — em silêncio, que é a falha que esta paginação veio
+        // justamente matar.
+        //
+        // O passo do laço é `bloco.length`, e não `TAMANHO_BLOCO`: se o `max-rows` do servidor
+        // for MENOR que 1000, o primeiro bloco volta curto e um laço que comparasse com 1000
+        // pararia ali, ressuscitando a truncagem silenciosa. Assim funciona com qualquer
+        // `max-rows`, inclusive um que mude no servidor sem ninguém avisar. — 22/09/2026
         const TAMANHO_BLOCO = 1000;
+        // Teto de segurança: o laço só sai sozinho com bloco vazio. Se o `Range` deixar de ser
+        // honrado em algum ponto do caminho (proxy, CDN, mudança de configuração do PostgREST),
+        // toda volta devolveria o MESMO conjunto não vazio e a aba travaria acumulando memória.
+        // 200 blocos = 200 mil processos, muito acima de qualquer cenário real desta tabela.
+        const MAX_BLOCOS = 200;
         const acumulado = [];
-        for (let inicio = 0; ; inicio += TAMANHO_BLOCO) {
+        for (let inicio = 0, volta = 0; ; volta++) {
+            if (volta >= MAX_BLOCOS) {
+                throw new Error('Carga de processos interrompida: limite de blocos atingido. '
+                    + 'A paginação não está avançando — avise o administrador do sistema.');
+            }
             const { data: bloco, error } = await sbClient
                 .from('processos')
                 .select('*')
                 .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
                 .range(inicio, inicio + TAMANHO_BLOCO - 1);
 
             if (error) throw new Error(`Tabela "processos" não acessível: ${error.message}`);
             if (!Array.isArray(bloco)) throw new Error('Tipo de dados inválido: esperado array');
 
             acumulado.push(...bloco);
-            if (bloco.length < TAMANHO_BLOCO) break;
+            if (bloco.length === 0) break;
+            inicio += bloco.length;
         }
 
         data = acumulado.filter(d => d.status !== 'EXCLUÍDO' && d.status !== 'EXCLUIDO');
@@ -1164,12 +1199,15 @@ async function _carregarDadosSupabaseInterno() {
                     ? (row.dataDevolucaoCorrecoes || row.created_at || new Date())
                     : (row.created_at || new Date());
 
-                const metaDate = calcularDataMeta(base, dias);
-                if (!metaDate) continue;
-
-                // Só estabelece automaticamente quem ainda não tem meta.
+                // O descarte de quem já tem meta vem ANTES do cálculo de propósito:
+                // `calcularDataMeta` percorre dias úteis consultando a tabela de feriados, e
+                // rodava para todo processo em ANÁLISE FISCAL só para ter o resultado jogado
+                // fora na linha seguinte. — 22/09/2026
                 const jaTemMeta = !!row.dataCompromissoFiscal;
                 if (jaTemMeta) continue;
+
+                const metaDate = calcularDataMeta(base, dias);
+                if (!metaDate) continue;
 
                 const iso = metaDate.toISOString().substring(0, 10);
                 // Atualiza objeto em memória para UI imediata
@@ -1391,7 +1429,7 @@ async function enviarParaPlanilha() {
         console.error('Erro ao inserir processo:', e);
         msg.style.display = 'block';
         msg.className = 'alert alert-danger mt-3';
-        msg.innerHTML = `Erro ao salvar: ${e.message || e}`;
+        msg.innerHTML = `Erro ao salvar: ${escapeHTML(e && e.message ? e.message : String(e))}`;
         btn.disabled = false;
         btn.innerHTML = 'SALVAR';
         return;
@@ -1660,21 +1698,79 @@ async function abrirDetalhes(processoStr) {
 
     // Determina se o usuário atual é admin a partir da role mais recente
     const isAdmin = (getCurrentUserRole() === 'admin');
+    // Revisão 22/09/2026 — os campos eram liberados só para admin, enquanto a política
+    // `processos_update` do banco já autorizava gerente. Decisão do usuário: alinhar a tela
+    // ao banco. As duas exceções só-admin (prioridade e meta manual) continuam valendo e
+    // estão logo abaixo — ver podeEditarProcesso() em core/auth.js.
+    const podeEditar = podeEditarProcesso();
     const inputs = document.querySelectorAll('#formDetalhes input, #formDetalhes select, #formDetalhes textarea');
-    inputs.forEach(el => { el.disabled = !isAdmin; });
+    inputs.forEach(el => { el.disabled = !podeEditar; });
+
+    // "Meta Fiscal" segue só-admin: o trigger `processos_restringir_prioridade_meta` recusa o
+    // UPDATE quando `data_compromisso_fiscal` é a única coluna alterada. Sem este gate, o
+    // gerente que mexesse só nesse campo levaria um erro do banco na cara ao salvar.
+    //
+    // ATENÇÃO — é `readOnly`, NUNCA `disabled`: campo desabilitado não entra no `FormData`,
+    // e o payload de executarAcaoDetalhes é montado com `new FormData(form)`. Com `disabled`,
+    // `formData.get("DATA COMPROMISSO FISCAL")` devolveria `null` e TODO salvamento de gerente
+    // apagaria a meta do processo em silêncio. (O payload também é gateado, mais abaixo — as
+    // duas proteções são deliberadas: esta preserva o valor, aquela garante que ele não seja
+    // reenviado como alteração.) `readOnly` também mantém o `title` funcionando: navegador não
+    // dispara evento de mouse em campo desabilitado, então o tooltip não abriria.
+    const elMetaFiscal = document.getElementById('det_data_compromisso');
+    if (elMetaFiscal) {
+        const metaSoAdmin = !canMarkDateAsMeta();
+        // As três atribuições são incondicionais de propósito: com um `if (metaSoAdmin)` o
+        // estado não seria revertido se o papel mudasse na mesma sessão e o modal reabrisse.
+        elMetaFiscal.readOnly = metaSoAdmin;
+        elMetaFiscal.classList.toggle('bg-body-secondary', metaSoAdmin);
+        elMetaFiscal.title = metaSoAdmin ? 'Definida automaticamente pelo status. Apenas administradores alteram manualmente.' : '';
+    }
+
     // Botão "Vincular/Atualizar Obra" não é input/select/textarea, então precisa do
     // próprio gate — religar um processo legado a um contrato é uma correção de dados,
     // mesmo padrão de restrição a admin usado em excluirChecklistAditivo (contratos.js).
     const btnVincularObra = document.getElementById('btn-vincular-obra');
     if (btnVincularObra) btnVincularObra.disabled = !isAdmin;
 
-    document.getElementById('msg-detalhes').style.display = 'none';
-    document.getElementById('btn-atualizar').innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+    // ...e os três campos do MESMO bloco seguem o botão: são o vínculo com o contrato do
+    // SIGSOP, que o texto fixo do formulário anuncia como restrito a administradores.
+    // O laço acima os havia liberado junto com o resto do formulário quando o gerente passou
+    // a editar (22/09/2026) — abertura não intencional, e pior que a contradição visual:
+    // digitados à mão, eles pulam `buscarObraDetalhes()`, que é quem confere o código contra a
+    // base de contratos e preenche distrito/município a partir do SIGSOP. Um erro de digitação
+    // aqui desfaz o vínculo processo↔obra em silêncio — o mesmo vínculo que alimenta o painel
+    // de desempenho e o mapa de obras.
+    //
+    // Aqui `disabled` é seguro (ao contrário da Meta Fiscal): estes três são lidos por
+    // `getElementById().value` no payload, e `.value` continua legível em campo desabilitado.
+    // Quem sai do FormData é só quem é lido POR ele.
+    ['det_codigo_obra', 'det_distrito', 'det_municipio'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.disabled = !isAdmin;
+            el.title = isAdmin ? '' : 'Restrito a administradores — use o botão Vincular para alterar o vínculo com a obra.';
+        }
+    });
 
-    // Revisão 22/09/2026 — este trecho reabilitava o botão EXCLUIR para QUALQUER usuário
-    // que conseguisse abrir o modal (o que inclui quem tem só a autorização especial
-    // `processos_gravar`), desfazendo a intenção do `.admin-only` no HTML. Agora o botão
-    // aparece exatamente para quem o banco autoriza a excluir: admin e gerente.
+    document.getElementById('msg-detalhes').style.display = 'none';
+
+    // O botão SALVAR era escondido pela classe `.admin-only` no HTML (core/auth.js esconde
+    // tudo que tem essa classe para quem não é admin). Com o gerente autorizado a editar, o
+    // controle passou para cá — mesmo padrão do botão EXCLUIR logo abaixo.
+    const btnSalvarModal = document.getElementById('btn-atualizar');
+    if (btnSalvarModal) {
+        btnSalvarModal.innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+        btnSalvarModal.disabled = !podeEditar;
+        btnSalvarModal.style.display = podeEditar ? '' : 'none';
+    }
+
+    // Revisão 22/09/2026 — este trecho reabilitava o botão EXCLUIR para QUALQUER usuário que
+    // conseguisse abrir o modal, inclusive quem não tinha autorização nenhuma, desfazendo a
+    // intenção do `.admin-only` no HTML e entregando um erro do banco a quem clicasse. Agora o
+    // botão aparece exatamente para quem o banco autoriza a excluir hoje — admin e gerente,
+    // pela política `processos_update` viva. A autorização especial `processos_gravar` NÃO
+    // entra: ver podeGravarProcessos() em core/auth.js.
     const btnExcluirModal = document.getElementById('btn-excluir');
     if (btnExcluirModal) {
         const podeExcluir = podeExcluirProcesso();
@@ -1832,7 +1928,9 @@ async function executarAcaoDetalhes(actionType) {
         // era a classe CSS `.admin-only` no botão, que `abrirDetalhes()` reabilitava para
         // todo mundo que conseguisse abrir o modal. Quem não podia excluir chegava ao botão
         // e levava um erro do banco. A regra abaixo é a MESMA da política `processos_update`
-        // no banco (admin e gerente) — as duas precisam continuar concordando.
+        // que está viva no banco — admin e gerente (ver podeGravarProcessos() em core/auth.js,
+        // que explica por que a autorização especial `processos_gravar` ficou de fora desde
+        // 18/09/2026). As duas precisam continuar concordando.
         if (!podeExcluirProcesso()) {
             alert("Você não tem permissão para excluir processos.");
             return;
@@ -1879,6 +1977,14 @@ async function executarAcaoDetalhes(actionType) {
     }
 
     if (actionType === 'update') {
+        // Mesma guarda do ramo 'delete': a trava da tela é cosmética (o botão some), e quem
+        // decide de verdade é a política `processos_update`. Esta checagem existe para que
+        // quem não pode editar receba um aviso legível em vez de um erro do banco. — 22/09/2026
+        if (!podeEditarProcesso()) {
+            alert("Você não tem permissão para editar processos.");
+            return;
+        }
+
         // --- VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS ---
         const camposObrigatorios = [
             { id: 'det_status', nome: 'Status Atual' },
@@ -1965,7 +2071,7 @@ async function executarAcaoDetalhes(actionType) {
 
             data_abertura: dataParaISO(formData.get("DATA DE ABERTURA")),
             data_recebimento: dataParaISO(formData.get("DATA RECEBIMENTO")),
-            data_compromisso_fiscal: dataParaISO(formData.get("DATA COMPROMISSO FISCAL")),
+            // `data_compromisso_fiscal` NÃO entra aqui — ver o gate logo depois do objeto.
             data_aprovacao_gecope: dataParaISO(formData.get("DATA APROVAÇÃO GECOPE")),
             data_devolucao_correcoes: dataParaISO(formData.get("DATA DEVOLUO CORREES")),
 
@@ -1980,6 +2086,17 @@ async function executarAcaoDetalhes(actionType) {
             atualizado_por: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido'
             // A data 'ultima_atualizacao' não é definida aqui para não resetar o contador de dias sem mudança de status
         };
+
+        // A meta é só-admin no banco (trigger `processos_restringir_prioridade_meta`), então
+        // para quem não é admin a coluna nem entra no payload vindo do formulário. Reenviar o
+        // valor seria inofensivo ENQUANTO fosse idêntico ao gravado — mas basta uma diferença
+        // de formatação de data para o banco ler aquilo como alteração manual e recusar o
+        // salvamento inteiro. O recálculo automático logo abaixo continua podendo gravar a
+        // coluna: aí é efeito colateral de troca de status, que o trigger aceita de propósito
+        // (ver o comentário dele em sql/rls_processos_composicoes_orcamentos.sql). — 22/09/2026
+        if (canMarkDateAsMeta()) {
+            updates.data_compromisso_fiscal = dataParaISO(formData.get("DATA COMPROMISSO FISCAL"));
+        }
 
         // NOVA LÓGICA: Recalcular metas automáticas se o status mudar ou se a data de devolução for alterada
         const novoStatus = (updates.status || registroOriginal.status || "").toString().trim().toUpperCase();
@@ -2076,7 +2193,12 @@ async function executarAcaoDetalhes(actionType) {
             const dataLimiteOriginal = registroOriginal.dataCompromissoFiscal
                 ? registroOriginal.dataCompromissoFiscal.toISOString().substring(0, 10)
                 : null;
-            const dataLimiteNova = updates.data_compromisso_fiscal || null;
+            // Quando a coluna não foi ao payload (não-admin — ver o gate acima) e o recálculo
+            // automático também não a definiu, a meta simplesmente NÃO mudou. Ler `undefined`
+            // como `null` faria o histórico registrar uma "meta zerada" que nunca aconteceu no
+            // banco. Por isso o fallback é a data original, não `null`. — 22/09/2026
+            const metaNoPayload = Object.prototype.hasOwnProperty.call(updates, 'data_compromisso_fiscal');
+            const dataLimiteNova = metaNoPayload ? (updates.data_compromisso_fiscal || null) : dataLimiteOriginal;
 
             if (dataLimiteNova !== dataLimiteOriginal) {
                 let dias = null;
@@ -3227,6 +3349,10 @@ function _updateReuniaoInterno() {
     // do status — só o cabeçalho de cada bloco carrega a cor de destaque
     const groupRowBgColor = "rgba(255, 255, 255, 0.035)";
 
+    // Fora do laço de propósito: a permissão não muda de linha para linha, e temAutorizacao()
+    // faz um JSON.parse por chamada — dentro do forEach isso era um parse por processo.
+    const podeVerDetalhes = canSeeProcessActions();
+
     rows.forEach(d => {
         const mIso = getMetaDate(d)?.toISOString().substring(0, 10) || "";
         const mSt = getMetaSt(d);
@@ -3266,14 +3392,23 @@ function _updateReuniaoInterno() {
         const fiscalNome = (d.fiscal || "").toUpperCase();
 
         // Aviso de vínculo reconhecido por nome em vez de matrícula (ver o filtro do papel
-        // 'fiscal', acima). Só aparece pra quem caiu nesse caso — nunca para admin/gerente.
+        // 'fiscal', acima). Só aparece para quem caiu nesse caso, e só para quem enxerga a
+        // lista restrita — ou seja, o papel 'fiscal', inclusive quando ele tem a autorização
+        // `processos_gravar`. Admin e gerente nunca veem.
         const avisoVinculoHTML = d.vinculoFiscalAviso
             ? `<i class="bi bi-exclamation-triangle-fill ms-1" style="color: var(--sop-orange);" title="${escapeHTML(d.vinculoFiscalAviso)}"></i>`
             : '';
 
-        // Preparar botões de ação para evitar aninhamento de template strings
-        // Fase 5: também libera pra quem recebeu a autorização especial "processos_gravar"
-        const canEdit = ['admin', 'gerente'].includes(uRole) || (typeof temAutorizacao === 'function' && temAutorizacao('processos_gravar'));
+        // Preparar botões de ação para evitar aninhamento de template strings.
+        // Era uma terceira cópia literal da regra de quem vê as ações (as outras duas estavam em
+        // canSeeProcessActions e nas funções novas de permissão). Passou a ler da fonte única em
+        // core/auth.js — três cópias da mesma regra de acesso só podem divergir com o tempo, e
+        // foi divergência assim que gerou os achados desta revisão. — 22/09/2026
+        //
+        // `canSeeProcessActions()` e não `podeEditarProcesso()` de propósito: quem tem a
+        // autorização especial `processos_gravar` abre o modal em leitura. São regras diferentes
+        // desde 18/09/2026 — ver podeGravarProcessos() em core/auth.js.
+        const canEdit = podeVerDetalhes;
         const btnDetalhes = canEdit ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : '';
 
         // Link para o SUITE (NUP apenas números para evitar 404).
@@ -3303,7 +3438,7 @@ function _updateReuniaoInterno() {
                 </div>
             </td>
             <td class="text-center"><i class="bi ${isPrioritario(d) ? 'bi-star-fill' : 'bi-star'} proc-star-prioritario" data-proc="${escapeHTML(d.processo)}" style="color: ${isPrioritario(d) ? 'var(--sop-orange)' : 'var(--sop-slate-200)'}; font-size: 1.1rem; cursor: ${uRole === 'admin' ? 'pointer' : 'not-allowed'};" title="${uRole === 'admin' ? (isPrioritario(d) ? 'Remover prioridade' : 'Marcar como prioritário') : 'Você não tem permissão'}"></i></td>
-            <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
+            <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
             <td class="text-center">
                 <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
                 <div style="font-size: 0.74rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
@@ -3653,7 +3788,6 @@ if (typeof verificarAdminSalvo === 'function') verificarAdminSalvo();
 
     if (savedRole !== 'guest') {
         toggleLanding(false);
-    } else {
     }
     applyRoleToUI(savedRole);
 })();

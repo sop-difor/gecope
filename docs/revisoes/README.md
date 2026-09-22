@@ -11,6 +11,7 @@ ficou pendente.
 | Data | Área revisada | Situação | Arquivo |
 |---|---|---|---|
 | 22/09/2026 | Módulo Processos (`modules/processos/processos.js` + fronteiras) | Concluída, com pendências registradas | [2026-09-22-processos.md](2026-09-22-processos.md) |
+| 22/09/2026 | Vereditos dos revisores sobre a revisão acima | Três rodadas, fechada em 4/4 APROVADO; uma decisão pendente (seção 5.8 do registro) | [2026-09-22-processos-vereditos.md](2026-09-22-processos-vereditos.md) |
 
 ## Como registrar uma revisão nova
 

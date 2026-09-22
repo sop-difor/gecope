@@ -170,9 +170,6 @@ select
   c.situacao,
   c.em_tramitacao,
   c.encerrado,
-  c.unidade_suite,                 -- REVISÃO 22/09/2026
-  c.suite_data_chegada,            -- REVISÃO 22/09/2026
-  c.divergencia_status_suite,      -- REVISÃO 22/09/2026
   date_trunc('month', c.data_entrada)::date as mes_entrada,
   date_trunc('month',
     case when c.encerrado then coalesce(c.data_aprovacao_gecope, c.ultima_atualizacao::date) end
@@ -199,7 +196,16 @@ select
            / abs(c.reperc_fiscal)
   end as percentual_impacto_revisao,
   c.data_inicio_status,
-  c.responsavel_atual
+  c.responsavel_atual,
+  -- ATENCAO: as tres colunas novas ficam NO FIM da lista de proposito. O
+  -- `create or replace view` do PostgreSQL so aceita colunas ACRESCENTADAS no fim -- inserir
+  -- uma no meio e' lido como renomeacao e o comando falha com
+  --   ERROR: cannot change name of view column "mes_entrada" to "unidade_suite"
+  -- abortando o script inteiro. Quem for acrescentar mais colunas um dia: acrescente aqui
+  -- embaixo, nunca no meio.
+  c.unidade_suite,                 -- REVISAO 22/09/2026
+  c.suite_data_chegada,            -- REVISAO 22/09/2026
+  c.divergencia_status_suite       -- REVISAO 22/09/2026
 from classificacao c;
 
 comment on view public.vw_painel_desempenho_replanilhamentos is
