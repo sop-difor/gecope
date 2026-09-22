@@ -163,7 +163,8 @@ const PROCESSOS_COLS=['id','processo','status','status_exibicao','tipo','priorit
   'data_compromisso_fiscal','meta_estourada',
   'fiscal_matricula','fiscal_nome','fiscal_gedop','fiscal_gerencia','fiscal_cadastrado',
   'codigo_obra','descricao','obra_descricao','obra_municipio','obra_valor','obra_status',
-  'contratada','contratante','analista','data_recebimento','reperc_fiscal','reperc_gecope'].join(',');
+  'contratada','contratante','analista','data_recebimento','reperc_fiscal','reperc_gecope',
+  'ultima_atualizacao'].join(',');
 // ---- mapa do modo Replanilhamentos (E2) ----
 const RP_METRICA={
   tempo:{label:'Tempo médio de resposta'},
@@ -653,9 +654,18 @@ function mapProcesso(r){
     // valor. null (não 0) para que nenhuma média o conte como "obra de valor zero".
     valorObra:r.obra_valor==null?null:num(r.obra_valor),
     contratada:r.contratada||'—', contratante:r.contratante||'—',
-    analista:r.analista||'', raw:r
+    analista:r.analista||'', ultimaAtualizacao:r.ultima_atualizacao||null, raw:r
   };
 }
+// Maior `ultima_atualizacao` entre os processos carregados — mesmo papel que `lastSync`
+// tem no modo Obras (linhas 572-574): "Base atualizada em" precisa refletir quando os
+// DADOS mudaram de fato, não quando a página foi recarregada. `ultima_atualizacao` só é
+// gravada em transição de status (ver vw_painel_desempenho_fiscais). NÃO usar
+// `arquivado_check_em` pra isso — é o heartbeat de todo run do job `sincronizar-suite`
+// (docs/painel-fiscais/etapa-1-revisao.md), sobrescrito com `now()` mesmo sem mudança
+// real; mostraria sempre "agora", igual ao bug antigo do modo Obras (comentário acima,
+// linha 407-408, antes de trocar pra `atualizado_em`).
+let _procLastSync=null;
 // Carrega uma vez por sessão de página. Não entra no cache de sessionStorage das obras:
 // aquele é chaveado por escopo de carteira, que não existe aqui, e o volume é pequeno
 // (algumas centenas de linhas) — não vale o risco de servir número velho num painel de
@@ -665,6 +675,7 @@ async function loadProcessos(){
   if(!SESSION_TOKEN) return {ok:false,erro:'sem sessão'};
   const rows=await fetchTable(SB_PROCESSOS,{select:PROCESSOS_COLS});
   PROCESSOS=rows.map(mapProcesso);
+  for(const p of PROCESSOS){ if(p.ultimaAtualizacao && (!_procLastSync || p.ultimaAtualizacao>_procLastSync)) _procLastSync=p.ultimaAtualizacao; }
   for(const c in DB.municipios) DB.municipios[c].processos=[];
   _procPorEquipe=new Map(); _procPorObra=new Map();
   const indexa=(m,gid,p)=>{ const k=String(gid); let a=m.get(k); if(!a){ a=[]; m.set(k,a); } a.push(p); };
@@ -810,8 +821,11 @@ function corteDespacho(meses){
 // o nível, mostraria Crateús com 10 despachos logo depois de o mapa ter mostrado 12.
 // E6: filtraRp() aqui dentro é o único lugar que precisa filtrar por régua de equipe —
 // quem lê pela régua de obra (abaixo) ou por município (procsDeMuns) ganha o filtro do
-// próprio ponto de leitura. As versões "Raw" (sem filtro) existem só para
-// resultsSuffixRp() dizer "quantos de quantos" — nunca use Raw fora daquela conta.
+// próprio ponto de leitura. As versões "Raw" (sem filtro) nasceram só para
+// resultsSuffixRp() dizer "quantos de quantos" — desde 2026-09-22 também alimentam as
+// janelas de detalhe (coorteDistritos(), refEstadoPeriodo(), abreModalDistrito()), que
+// mostram o panorama completo do recorte escolhido, sem o filtro do painel lateral
+// (mesmo princípio que já valia para procsEquipeDistrito nessas janelas, herdado da E5).
 function procsDoDistritoRaw(gid){ return (st.rp.regua==='equipe'?_procPorEquipe:_procPorObra).get(String(gid))||[]; }
 function procsDoDistrito(gid){ return filtraRp(procsDoDistritoRaw(gid)); }
 // Já esta responde pelo MAPA: do nível 2 para baixo o mapa mostra cidades, e cidade só
@@ -2559,7 +2573,7 @@ function rpFiscaisRankingHtml(procs,a){
   // está disponível neste recorte, com a causa certa: régua ou nível de navegação.
   if(!reguaEquipe()){
     const motivo = st.rp.regua!=='equipe'
-      ? 'com o Distrito Operacional do(a) em "Obra" cada fiscal apareceria só com a fatia dos processos daquele distrito, não a carga inteira da pessoa — troque para "Fiscal" para comparar pessoas.'
+      ? 'com "Distrito Operacional do(a)" em "Obra": cada fiscal apareceria só com a fatia dos processos daquele distrito, não a carga inteira da pessoa — troque para "Fiscal" para comparar pessoas.'
       : 'dentro de uma cidade ou processo aberto o recorte já não é mais a equipe de um distrito inteiro.';
     return `<div class="statwrap"><div class="sec-h"><span>Fiscais · tempo médio</span></div>`
       +`<div class="qd-aviso">Esta comparação entre fiscais não aparece ${escHtml(motivo)}</div></div>`;
@@ -2721,35 +2735,44 @@ function refGeral(){
   const a=aggProc(PROCESSOS);
   return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null, n:a.nTempo};
 }
-// O time inteiro do ESTADO pela régua da equipe — mesmo universo de coorteDistritos() e
-// refEstadoPeriodo() abaixo, nunca o recorte visível no painel. Não é `aggFiscais(PROCESSOS)`
-// (versão anterior): PROCESSOS é a base bruta, sem excluir quem não tem lotação válida nos
-// 11 distritos (semGedop/gedopSemDistrito) — exatamente quem o ranking lateral, em régua de
-// equipe, já não mostra. Comparar "onde este fiscal está" contra esses fantasmas inflava o
-// denominador e podia dar uma posição que não bate com nada visível na tela (achado do
-// rev-correcao na revisão da E5, 2026-09-18). A carga da pessoa (tiles da janela) segue
-// sempre estadual pelo mesmo motivo dos vizinhos — não é recortada por onde a janela foi
-// aberta (hover/seleção no mapa, ou um cartão dentro de um distrito específico): a pergunta
-// "essa pessoa é rápida ou lenta" não muda com a fatia geográfica de onde alguém entrou.
+// O time inteiro do ESTADO, sempre pela régua da EQUIPE — a janela do fiscal compara
+// pessoas, e régua de obra fatiaria cada uma pela geografia das obras que passou, não
+// pela carga inteira dela (mesmo motivo que já vale para coorteDistritos()/
+// refEstadoPeriodo(), mas que agora seguem a régua ativa — ver abreModalDistrito()).
+// Não é `aggFiscais(PROCESSOS)` (versão anterior): PROCESSOS é a base bruta, sem excluir
+// quem não tem lotação válida nos 11 distritos (semGedop/gedopSemDistrito) — exatamente
+// quem o ranking lateral, em régua de equipe, já não mostra. Comparar "onde este fiscal
+// está" contra esses fantasmas inflava o denominador e podia dar uma posição que não bate
+// com nada visível na tela (achado do rev-correcao na revisão da E5, 2026-09-18). A carga
+// da pessoa (tiles da janela) segue sempre estadual pelo mesmo motivo dos vizinhos — não é
+// recortada por onde a janela foi aberta (hover/seleção no mapa, ou um cartão dentro de um
+// distrito específico): a pergunta "essa pessoa é rápida ou lenta" não muda com a fatia
+// geográfica de onde alguém entrou.
 function coorteFiscais(){
   return aggFiscais(groupsList().flatMap(g=>procsEquipeDistrito(g.id))).lista
     .filter(f=>f.n>=AMOSTRA_MIN)
     .map(f=>({mat:f.mat, nome:f.nome, n:f.n, media:f.tempo}))
     .sort((x,y)=>x.media-y.media);
 }
-// Os 11 distritos pela régua da equipe, NO PERÍODO ATIVO — ao contrário da coorte de
-// fiscais, aqui o recorte é o mesmo que a janela do distrito declara no subtítulo, então
-// as duas pontas da comparação já nascem iguais. Sem cache: o período muda.
+// Os 11 distritos NO PERÍODO ATIVO, pela régua ativa (equipe × local da obra — a mesma
+// que decide como o mapa pinta cada distrito): ao contrário da coorte de fiscais acima
+// (sempre pessoa, nunca geografia), aqui o recorte precisa ser o mesmo que a janela do
+// distrito mostra no corpo, senão "onde este distrito está" compara uma régua contra
+// outra. Usuário, 2026-09-22: a janela de distrito ignorava a régua "Obra" por inteiro —
+// procsDoDistritoRaw() já resolve isso (mesma fonte do mapa), sem aplicar o filtro da E6
+// (não é procsDoDistrito) pelo mesmo motivo do resto desta janela. Sem cache: o período
+// (e agora a régua) mudam.
 function coorteDistritos(){
   return groupsList().map(g=>{
-    const a=aggProc(procsEquipeDistrito(g.id));
+    const a=aggProc(procsDoDistritoRaw(g.id));
     return {gid:String(g.id),nome:g.nome.replace(/^D\.O\.\s*/,''),
             media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null,n:a.nTempo};
   }).filter(d=>d.media!=null).sort((a,b)=>a.media-b.media);
 }
-// Média do estado no período ativo, pela mesma régua da equipe da janela de distrito.
+// Média do estado no período ativo, pela mesma régua ativa da janela de distrito (ver
+// coorteDistritos() acima).
 function refEstadoPeriodo(){
-  const a=aggProc(groupsList().flatMap(g=>procsEquipeDistrito(g.id)));
+  const a=aggProc(groupsList().flatMap(g=>procsDoDistritoRaw(g.id)));
   return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null,n:a.nTempo};
 }
 // "Onde isto está" — a coorte inteira no eixo de dias, com o item da janela destacado.
@@ -2777,10 +2800,11 @@ function posicaoHtml(titulo,coorte,chave,valorChave,ref,rotuloRef,unidade){
     +eixoDias(pts,marcas,{altura:84})+`</div>`;
 }
 
-// Distrito: sempre a EQUIPE lotada ali, não importa a régua ativa no painel (equipe × local
-// da obra). A régua decide como o MAPA pinta o distrito; a janela responde "quem é esse
-// distrito", e isso é a lotação do fiscal — a régua da obra contaria só quem passou por uma
-// obra ali, fatiando cada fiscal do jeito que a E4 já baniu da comparação pessoa a pessoa.
+// Equipe lotada no distrito, sempre — usada só pela coorte de FISCAIS (coorteFiscais(),
+// acima), que compara pessoas e por isso nunca muda com a régua do painel (régua de obra
+// fatiaria cada fiscal pela geografia das obras que passou, não pela carga inteira dela).
+// A janela do distrito em si (abreModalDistrito()) NÃO usa mais esta função — desde
+// 2026-09-22 ela segue a régua ativa via procsDoDistritoRaw(), a mesma fonte do mapa.
 function procsEquipeDistrito(gid){ return _procPorEquipe.get(String(gid))||[]; }
 /* Sobre QUANTOS despachos a média foi tirada — e, quando ela não existe, por quê.
    O corte de AMOSTRA_MIN é sobre despachos COM TEMPO MEDIDO no SUITE, não sobre
@@ -2839,7 +2863,14 @@ function equipeCardsHtml(procs,refMedia){
 }
 function abreModalDistrito(gid){
   const g=grpById(gid); if(!g) return;
-  const procs=procsEquipeDistrito(gid), a=aggProc(procs);
+  // Usuário, 2026-09-22: a janela ignorava a régua "Obra" do painel e sempre mostrava a
+  // equipe lotada no distrito, mesmo com o mapa já pintado pelo local da obra —
+  // inconsistência entre as duas telas. procsDoDistritoRaw() é a mesma fonte do mapa
+  // (respeita st.rp.regua), sem aplicar o filtro da E6 (continua NÃO sendo procsDoDistrito)
+  // pelo mesmo motivo de sempre: a janela mostra o panorama completo do distrito, não a
+  // fatia que o filtro do painel deixou visível (ver comentário de filtraRp()).
+  const eq=st.rp.regua==='equipe';
+  const procs=procsDoDistritoRaw(gid), a=aggProc(procs);
   const nome=g.nome.replace(/^D\.O\.\s*/,'');
   const per=RP_PERIODO[st.rp.periodo].txt;
   // Obras do RECORTE, não da carga inteira da equipe — mesma régua "tudo segue o período"
@@ -2857,7 +2888,9 @@ function abreModalDistrito(gid){
   const noPrazo=Math.max(0,a.comMeta-a.metaEst), semPrazo=Math.max(0,a.fila-a.comMeta);
   const est=refEstadoPeriodo();
   const media=a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
-  const sub=`<div class="msub">${RS_ICO.dist}<span>Equipe do Distrito Operacional · ${escHtml(per)}</span></div>`;
+  // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pela/pelas": a janela
+  // precisa dizer a mesma coisa que o hover já diz, não outra versão da régua.
+  const sub=`<div class="msub">${RS_ICO.dist}<span>${eq?'Equipe lotada no distrito':'Obras localizadas no distrito'} · ${escHtml(per)}</span></div>`;
   const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média do estado')}`
     +posicaoHtml('Onde este distrito está',coorteDistritos(),'gid',String(gid),est.media,'Média do estado','distritos comparáveis')
     +`</div>`;
@@ -2871,20 +2904,35 @@ function abreModalDistrito(gid){
   // do painel lateral diria o mesmo aqui — uma barra a mais, um gráfico a menos.
   // Lista dos processos por trás da barra: usuário relatou (2026-09-21) que dava pra ver
   // "com a fiscalização hoje" mas não QUAIS processos são esses. procCard() (não
-  // fichaProcCard, que omite o fiscal) porque a equipe do distrito tem vários fiscais.
+  // fichaProcCard, que omite o fiscal) porque o recorte do distrito tem vários fiscais.
   const filaDist=procs.filter(p=>p.naFila)
     .sort((x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
   const hoje=a.fila
     ? `<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.pessoa} Com a fiscalização hoje</div>`
       +barraAtraso(a.metaEst,noPrazo,semPrazo)
-      +`<div class="dsh-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} desta equipe `
+      +`<div class="dsh-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} ${eq?'desta equipe':'destas obras'} `
         +`${a.naGecope===1?'está':'estão'} na GECOPE, fora das mãos do fiscal.`)}</div>`
       +grupoProcs('fichaFilaDist','Processos','',filaDist,null,'',procCard)
       +`</div>`
     : '';
+  // A comparação fiscal-a-fiscal só existe na régua da equipe — mesmo banimento do ranking
+  // do painel lateral (rpFiscaisRankingHtml, achado do rev-produto na E5): na régua da
+  // obra cada fiscal apareceria só com a fatia dos processos das obras deste distrito, não
+  // a carga inteira da pessoa, o que compararia gente por uma fração desigual do trabalho.
+  // Texto entre aspas cita o rótulo real do controle ("Distrito Operacional do(a)" + botão
+  // "Fiscal"/"Obra") em vez de flexionar "do(a)" solto — correção 2026-09-22 (rev-produto):
+  // a versão anterior, sem aspas em volta do rótulo, não fechava gramaticalmente. Mesma
+  // correção aplicada ao texto-irmão de rpFiscaisRankingHtml, acima.
+  const equipeSecao=eq
+    ? equipeCardsHtml(procs,est.media)
+    : `<div class="statwrap"><div class="sec-h"><span>A equipe</span></div>`
+      +`<div class="qd-aviso">Esta comparação entre fiscais não aparece com &quot;Distrito `
+      +`Operacional do(a)&quot; em &quot;Obra&quot;: cada fiscal apareceria só com a fatia `
+      +`dos processos das obras deste distrito, não a carga inteira da pessoa — troque para `
+      +`&quot;Fiscal&quot; para comparar pessoas.</div></div>`;
   const corpo=a.total
-    ? topo+tiles+hoje+equipeCardsHtml(procs,est.media)
-    : '<div class="empty">Nenhum processo de replanilhamento nesta equipe.</div>';
+    ? topo+tiles+hoje+equipeSecao
+    : `<div class="empty">Nenhum processo de replanilhamento ${eq?'nesta equipe':'nas obras deste distrito'}.</div>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
@@ -2910,13 +2958,29 @@ function fichaFiscal(mat){
   // contava a carreira, e um ladrilho fora do período no meio de três dentro dele é
   // exatamente a confusão que "tudo segue o período" veio resolver.
   const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
-  const obras=new Set();
-  for(const p of todos){
+  const dentroPeriodo=p=>p.naFila || (p.despachado && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte)));
+  const noPeriodo=todos.filter(dentroPeriodo);
+  // Usuário, 2026-09-22: card "Carga no período" (abreModalFiscal) — quantos processos,
+  // quantas obras e o valor somado delas o fiscal teve DENTRO do período ativo. Obra
+  // deduplicada (um Map por codigo_obra, não soma o valor uma vez por processo — vários
+  // processos da mesma obra não podem inflar o total). Mapa, não Set, porque já guarda o
+  // valor da obra ali mesmo — evita um segundo laço só pra achar de novo o valor de cada
+  // codigo_obra. `obrasComValor` conta só as obras com `valorObra` conhecido (cobertura é
+  // ~99%, não 100% — medido em docs/painel-fiscais/diagnostico-carga-concorrente-tempo.sql,
+  // achado E12): sem isso, `valorObras` somaria 0 pras obras sem match e o card mostraria
+  // um total menor sem avisar que faltou gente na conta (achado rev-correcao, 2026-09-22)
+  // — mesmo princípio do "N de M" já usado em rpFiscaisRanking (nFiscais, acima).
+  const obrasMap=new Map();
+  let obrasComValor=0;
+  for(const p of noPeriodo){
     if(!p.codigo_obra) continue;
-    const dentro=p.naFila || (p.despachado && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte)));
-    if(dentro) obras.add(p.codigo_obra);
+    if(!obrasMap.has(p.codigo_obra)){
+      obrasMap.set(p.codigo_obra, p.valorObra);
+      if(p.valorObra!=null) obrasComValor++;
+    }
   }
-  return {todos, a, obras:obras.size};
+  const valorObras=[...obrasMap.values()].reduce((s,v)=>s+(v||0),0);
+  return {todos, a, obras:obrasMap.size, obrasComValor, processosNoPeriodo:noPeriodo.length, valorObrasNoPeriodo:valorObras};
 }
 // Cartão de processo da ficha: NUP, descrição, contratada e contratante — não é o
 // procCard() da lista por cidade, que repete o nome do fiscal a cada linha (redundante
@@ -3019,6 +3083,42 @@ function abreModalFiscal(mat,voltarGid){
     +tile(NUM.format(a.desp),'Despachos',perTxt)
     +tile(NUM.format(f.obras),'Obras','dos processos acima')
     +`</div>`;
+  // Card "Carga no período" — pedido do usuário em 2026-09-22 (grill sobre a correlação
+  // carga×tempo, docs/painel-fiscais/diagnostico-carga-concorrente-tempo.sql): gestor
+  // quer ver, juntos, quantos processos esse fiscal teve e o valor somado das obras deles
+  // DENTRO do período ativo — não o "instantâneo de hoje" que o ladrilho PROCESSOS
+  // (acima) sempre mostra. Rótulo "no período" nos dois ladrilhos de propósito: mesmo
+  // princípio de nunca deixar dois números de significado diferente (fila de hoje ×
+  // janela de tempo) parecerem a mesma coisa por terem o mesmo nome curto.
+  // Ressalva de não-causalidade e "N de M obras" — achados rev-produto/rev-correcao,
+  // 2026-09-22: a correlação que motivou este card é fraca e, numa regressão com
+  // processos+valor juntos, nenhuma das duas variáveis é significativa isoladamente
+  // (docs/painel-fiscais/, E12) — sem o aviso, um valor alto ao lado de um tempo alto lê
+  // como causa, o que os dados não sustentam. E sem o "N de M", a soma parece completa
+  // mesmo quando faltou valor de alguma obra (cobertura ~99%, não 100%).
+  // Achado rev-design, rodada 2: a ressalva no `sec-sub` (3 frases coladas) sobrecarregava
+  // a hierarquia do card, e o subtítulo longo no ladrilho ("N de M obras com valor
+  // conhecido") estourava `.dsh-ts` em larguras intermediárias, empurrando só aquele
+  // ladrilho pra 2 linhas. Fix: ressalva move pro `.dsh-nota` (mesma legenda secundária já
+  // usada em `hoje`/`fichaProcCard`, abaixo dos tiles, sem orçamento de largura fixo) e o
+  // subtítulo do ladrilho encurta pro mesmo porte de `perTxt`.
+  // Achado rev-produto, rodada 2 (2ª vez que bloqueia — escalado ao usuário, que autorizou
+  // esta correção): o card tinha um terceiro ladrilho "Obras no período" mostrando
+  // `f.obras`, o MESMO valor do ladrilho "Obras" já existente em `tiles` (acima) — este já
+  // era escopado ao período antes deste diff, então "no período" duplicava sem avisar.
+  // Removido; "Obras" continua disponível no card de cima, sem repetição.
+  const covObras=f.obras>f.obrasComValor
+    ? `${NUM.format(f.obrasComValor)}/${NUM.format(f.obras)} com valor`
+    : perTxt;
+  const cargaPeriodo=`<div class="statwrap">
+    <div class="sec-h"><span>Carga no período</span></div>
+    <div class="sec-sub">${escHtml(`${perTxt}. Diferente do ladrilho "Processos" acima, que é sempre a fila de hoje — aqui os números seguem o período escolhido em Controles.`)}</div>
+    <div class="dsh-tiles dsh-tiles-cap">`
+      +tile(NUM.format(f.processosNoPeriodo),'Processos no período',perTxt)
+      +tile(f.valorObrasNoPeriodo>0?BRL.format(f.valorObrasNoPeriodo):'—','Valor das obras',covObras)
+    +`</div>`
+    +`<div class="dsh-nota">${escHtml('Valor é exposição financeira das obras, não medida de desempenho: a relação com o tempo de despacho é fraca e não se sustenta separada da carga de processos.')}</div>`
+    +`</div>`;
   // PROCESSOS: uma seção só, com três subgrupos disjuntos que somam o total do
   // cabeçalho — Análise Fiscal (com o fiscal agora), Despachados (no período ativo) e
   // Fora deste recorte (o resto, pra conta fechar em vez de sumir processo em silêncio).
@@ -3044,7 +3144,7 @@ function abreModalFiscal(mat,voltarGid){
       <div class="mh-titles"><div class="mt">${escHtml(ref.fiscalNome)}</div>${sub}</div>
       <div class="mh-actions">${acoes}</div>
     </div></div>
-    <div class="mbody dsh">${avisoFiltroRpHtml()}${topo}${tira}${tiles}${processos}</div>`;
+    <div class="mbody dsh">${avisoFiltroRpHtml()}${topo}${tira}${tiles}${cargaPeriodo}${processos}</div>`;
   mostraJanelaGenerica();
   const v=document.getElementById('modalVoltar');
   if(v) v.onclick=()=>abreModalDistrito(voltarGid);
@@ -3428,7 +3528,13 @@ function fillFilters(){
       </div>
     </div>`;
   }).join('');
-  document.querySelectorAll('.msel').forEach(m=>{
+  // Escopado a `host` (#filtersHost), não document: sem isso o laço também pega os
+  // .msel do Replanilhamentos (#filtersHostRp, já preenchidos por fillFiltersRp() no
+  // carregamento do script) e tenta st.f['situacao']/st.f['prazo'], que não existem
+  // nesse objeto — TypeError que interrompe o forEach ANTES de chegar em qualquer
+  // filtro de Obras, deixando todos os botões sem rótulo (bug relatado: "sumiram os
+  // nomes" dos filtros).
+  host.querySelectorAll('.msel').forEach(m=>{
     const key=m.dataset.key;
     m.querySelectorAll('.msel-opt input').forEach(cb=>{ cb.checked=st.f[key].has(cb.value); });
     updateMselBtn(key);
@@ -3495,8 +3601,10 @@ document.getElementById('fSearch').addEventListener('input',e=>{
 function clearAllFilters(){
   Object.keys(st.f).forEach(k=>{ if(st.f[k] instanceof Set) st.f[k].clear(); });
   st.f.q=''; const fs=document.getElementById('fSearch'); if(fs) fs.value='';
-  document.querySelectorAll('.msel-opt input').forEach(cb=>cb.checked=false);
-  document.querySelectorAll('.msel').forEach(m=>{updateMselBtn(m.dataset.key); m.classList.remove('on'); mselResetQuery(m);});
+  _fHost.querySelectorAll('.msel-opt input').forEach(cb=>cb.checked=false);
+  // Escopado a _fHost pelo mesmo motivo do laço de fillFilters() acima: sem isso pega
+  // também os .msel do Replanilhamentos e quebra em st.f['situacao']/st.f['prazo'].
+  _fHost.querySelectorAll('.msel').forEach(m=>{updateMselBtn(m.dataset.key); m.classList.remove('on'); mselResetQuery(m);});
   invalidateAggCache(); render(); autoLocateSearch();
 }
 document.getElementById('clearF').onclick=clearAllFilters;
@@ -3885,9 +3993,9 @@ function hasFiltroRp(){ const f=st.rp.filtro; return !!f.q || FILTER_DEFS_RP.som
 // aqui (procsDoDistrito, procsDeMuns, e as duas leituras diretas de
 // DB.municipios[id].processos no nível de cidade) — o mesmo processo nunca aparece
 // filtrado num lugar e não noutro. As janelas de detalhe da E5 (abreModalDistrito/
-// abreModalFiscal) NÃO passam por aqui de propósito: usam procsEquipeDistrito/PROCESSOS
-// direto, porque abrir o painel de uma pessoa/equipe já escolhida mostra o panorama
-// completo dela, não a fatia que o filtro deixou visível no painel — mesmo princípio já
+// abreModalFiscal) NÃO passam por aqui de propósito: usam procsDoDistritoRaw/PROCESSOS
+// direto, porque abrir o painel de um distrito/pessoa já escolhido mostra o panorama
+// completo dele, não a fatia que o filtro deixou visível no painel — mesmo princípio já
 // aplicado à régua/seleção/hover nessas duas janelas (E5, achado do rev-produto).
 function filtraRp(procs){ return hasFiltroRp() ? procs.filter(passFRp) : procs; }
 // Mesma ideia de resultsSuffix() (Obras, mais acima): quando há filtro ativo, a linha de
@@ -4097,7 +4205,10 @@ function atualizarStatusModo(){
     if(_statusObras) setStatus(_statusObras.txt,_statusObras.ok,_statusObras.lastSync);
     return;
   }
-  setStatus('Replanilhamentos', true, null, true);
+  // Achado do usuário (etapa-8-revisao.md): "Base atualizada em" ficava sempre em "—" no
+  // modo Replanilhamentos — `_procLastSync` (o maior `ultima_atualizacao` dos processos
+  // carregados) é o equivalente do `lastSync` de contratos no modo Obras.
+  setStatus('Replanilhamentos', true, _procLastSync, true);
 }
 if(_segControle) _segControle.addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;

@@ -1,0 +1,55 @@
+tablename,policyname,permissive,roles,cmd,qual,with_check
+aditivos_contrato,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+aditivos_contrato,leitura autenticada aditivos_contrato,PERMISSIVE,{authenticated},SELECT,contratos_edificacao_pode_ler(),null
+alerta_retorno_comentarios,alerta_retorno_insert,PERMISSIVE,{public},INSERT,null,alerta_retorno_pode_escrever()
+alerta_retorno_comentarios,alerta_retorno_select,PERMISSIVE,{public},SELECT,alerta_retorno_pode_ler(),null
+app_notifications,app_notifications_delete_admin,PERMISSIVE,{authenticated},DELETE,app_users_is_admin(),null
+app_notifications,app_notifications_insert_signup,PERMISSIVE,"{anon,authenticated}",INSERT,null,(type = 'new_user_request'::text)
+app_notifications,app_notifications_select_admin,PERMISSIVE,{authenticated},SELECT,app_users_is_admin(),null
+app_notifications,app_notifications_update_admin,PERMISSIVE,{authenticated},UPDATE,app_users_is_admin(),app_users_is_admin()
+autorizacoes_especiais,autorizacoes_insert,PERMISSIVE,{authenticated},INSERT,null,(meu_papel() = 'admin'::text)
+autorizacoes_especiais,autorizacoes_select,PERMISSIVE,{authenticated},SELECT,((meu_papel() = 'admin'::text) OR (lower(usuario_email) = lower((auth.jwt() ->> 'email'::text)))),null
+autorizacoes_especiais,autorizacoes_update,PERMISSIVE,{authenticated},UPDATE,(meu_papel() = 'admin'::text),(meu_papel() = 'admin'::text)
+checklist_documentacao_aditivo,checklist_aditivo_delete,PERMISSIVE,{public},DELETE,checklist_aditivo_pode_escrever(),null
+checklist_documentacao_aditivo,checklist_aditivo_insert,PERMISSIVE,{public},INSERT,null,checklist_aditivo_pode_escrever()
+checklist_documentacao_aditivo,checklist_aditivo_select,PERMISSIVE,{public},SELECT,checklist_aditivo_pode_ler(),null
+checklist_documentacao_aditivo,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+comissao_fiscalizacao,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+comissao_fiscalizacao,leitura autenticada comissao_fiscalizacao,PERMISSIVE,{authenticated},SELECT,contratos_edificacao_pode_ler(),null
+composicoes_biblioteca,composicoes_biblioteca_read_public,PERMISSIVE,"{anon,authenticated}",SELECT,true,null
+composicoes_biblioteca,composicoes_biblioteca_write_authenticated,PERMISSIVE,{authenticated},ALL,true,true
+composicoes_biblioteca,composicoes_delete,PERMISSIVE,{authenticated},DELETE,(pode_editar_composicoes_terceiros() OR (lower(criador_email) = lower((auth.jwt() ->> 'email'::text)))),null
+composicoes_biblioteca,composicoes_insert,PERMISSIVE,{authenticated},INSERT,null,(tem_papel_valido() AND (lower(criador_email) = lower((auth.jwt() ->> 'email'::text))))
+composicoes_biblioteca,composicoes_select,PERMISSIVE,{authenticated},SELECT,tem_papel_valido(),null
+composicoes_biblioteca,composicoes_update,PERMISSIVE,{authenticated},UPDATE,tem_papel_valido(),tem_papel_valido()
+config_whatsapp,config_whatsapp_insert_admin,PERMISSIVE,{public},INSERT,null,app_users_is_admin()
+config_whatsapp,config_whatsapp_select_authenticated,PERMISSIVE,{authenticated},SELECT,true,null
+config_whatsapp,config_whatsapp_update_admin,PERMISSIVE,{public},UPDATE,app_users_is_admin(),app_users_is_admin()
+contratos_edificacao,contratos_edificacao_delete,PERMISSIVE,{public},DELETE,contratos_edificacao_pode_escrever(),null
+contratos_edificacao,contratos_edificacao_insert,PERMISSIVE,{public},INSERT,null,contratos_edificacao_pode_escrever()
+contratos_edificacao,contratos_edificacao_select,PERMISSIVE,{public},SELECT,( SELECT contratos_edificacao_pode_ler() AS contratos_edificacao_pode_ler),null
+contratos_edificacao,contratos_edificacao_update,PERMISSIVE,{public},UPDATE,contratos_edificacao_pode_escrever(),contratos_edificacao_pode_escrever()
+contratos_edificacao,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+curva_abc_itens,curva_abc_itens_insert,PERMISSIVE,{public},INSERT,null,curva_abc_pode_escrever()
+curva_abc_itens,curva_abc_itens_select,PERMISSIVE,{public},SELECT,curva_abc_pode_ler(),null
+curva_abc_itens,curva_abc_itens_update,PERMISSIVE,{public},UPDATE,curva_abc_pode_escrever(),curva_abc_pode_escrever()
+curva_abc_itens,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+curva_abc_versoes,curva_abc_versoes_delete,PERMISSIVE,{public},DELETE,curva_abc_pode_escrever(),null
+curva_abc_versoes,curva_abc_versoes_insert,PERMISSIVE,{public},INSERT,null,curva_abc_pode_escrever()
+curva_abc_versoes,curva_abc_versoes_select,PERMISSIVE,{public},SELECT,curva_abc_pode_ler(),null
+curva_abc_versoes,curva_abc_versoes_update,PERMISSIVE,{public},UPDATE,curva_abc_pode_escrever(),curva_abc_pode_escrever()
+curva_abc_versoes,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+ficha_contrato,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+ficha_contrato,leitura autenticada ficha_contrato,PERMISSIVE,{authenticated},SELECT,contratos_edificacao_pode_ler(),null
+medicoes,ia_ro_select,PERMISSIVE,{gecope_ia_readonly},SELECT,true,null
+medicoes,leitura autenticada medicoes,PERMISSIVE,{authenticated},SELECT,contratos_edificacao_pode_ler(),null
+orcamentos_biblioteca,Leitura Publica,PERMISSIVE,{anon},SELECT,true,null
+orcamentos_biblioteca,orcamentos_biblioteca_write_authenticated,PERMISSIVE,{authenticated},ALL,true,true
+orcamentos_biblioteca,orcamentos_delete,PERMISSIVE,{authenticated},DELETE,pode_gravar_orcamentos(),null
+orcamentos_biblioteca,orcamentos_insert,PERMISSIVE,{authenticated},INSERT,null,pode_gravar_orcamentos()
+orcamentos_biblioteca,orcamentos_select,PERMISSIVE,{authenticated},SELECT,tem_papel_valido(),null
+orcamentos_biblioteca,orcamentos_update,PERMISSIVE,{authenticated},UPDATE,tem_papel_valido(),tem_papel_valido()
+whatsapp_logs,whatsapp_logs_delete_admin,PERMISSIVE,{public},DELETE,app_users_is_admin(),null
+whatsapp_logs,whatsapp_logs_insert_authenticated,PERMISSIVE,{authenticated},INSERT,null,(status = 'processando'::text)
+whatsapp_logs,whatsapp_logs_select_admin,PERMISSIVE,{authenticated},SELECT,app_users_is_admin(),null
+whatsapp_logs,whatsapp_logs_update_admin,PERMISSIVE,{authenticated},UPDATE,app_users_is_admin(),null
