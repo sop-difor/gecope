@@ -542,8 +542,8 @@
   /* encosta no seletor logo acima, compensando parte do margin-bottom do .seg. Amarrado
      à adjacência para que, se o aviso mudar de lugar, ele não herde um recuo sem par. */
   .seg + .modo-aviso{margin-top:-6px}
-  /* Régua fora de alcance (dentro de um distrito as cidades só existem pelo local da
-     obra): o botão fica visível e explicado pela .ctrl-nota, não some. */
+  /* Usado por #segControle enquanto o modo troca (ver setModo): o botão fica visível,
+     só sem clique, em vez de sumir. */
   .seg button:disabled{cursor:not-allowed;opacity:.5}
   /* 3–4 botões por linha num painel de 296px: sem isto "Tempo médio" quebra em duas
      linhas no tema claro (gap maior) e o segmento fica com alturas desiguais. */
@@ -838,6 +838,9 @@
         text-align:justify;pointer-events:none;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
   .kpi-tip p{margin:0 0 7px}
   .kpi-tip p:last-child{margin-bottom:0}
+  /* Tooltip da bolinha do eixoDias() (mostraEdTip): mesma casca do .kpi-tip, texto curto
+     e centralizado (é sempre "Nome: N dias" numa linha só, não um parágrafo). */
+  .ed-tip{max-width:200px;text-align:center;pointer-events:none}
   /* linha de recorte sob um .sec-h: de onde vêm os números da seção (período, régua,
      ordem). Encosta no cabeçalho, em corpo menor que o conteúdo que anuncia. */
   .sec-sub,.crumb-pop .pop-sub{line-height:1.4;font-weight:600;color:var(--text-dim)}
@@ -1485,6 +1488,12 @@
      sem teto, como sempre foi. */
   .modal .dsh-tiles.dsh-tiles-cap{grid-template-columns:repeat(auto-fit,minmax(130px,220px))}
   .modal .dsh-tile{padding:11px 13px;display:flex;flex-direction:column;gap:3px;background:var(--card-bg-2)}
+  /* Ladrilhos que abrem/rolam até a lista por trás do número (pedido do usuário,
+     2026-09-23) — mesmo tratamento discreto de .fcard: só muda a borda no hover/foco,
+     sem chevron nem sombra, pra não competir com o número (peso 3, "quase plano"). */
+  .modal .dsh-tile-clic{cursor:pointer;transition:.15s}
+  .modal .dsh-tile-clic:hover{border-color:rgba(var(--ng-rgb),.4)}
+  .modal .dsh-tile-clic:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
   .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text-brightest);line-height:1.1}
   .modal .dsh-tl{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.5px;
         text-transform:uppercase;color:var(--text-label)}
@@ -1499,21 +1508,29 @@
   /* Um ponto = um caso real. Semitransparente de propósito: dois despachos com tempos
      próximos escurecem um ao outro em vez de um sumir atrás do outro — a sobreposição
      vira densidade, que é informação, e não perda de dado. */
-  .modal .ed-dot{fill:rgba(var(--ng-rgb),.55);stroke:rgba(var(--ng-rgb),.85);stroke-width:1}
+  .modal .ed-dot{fill:rgba(var(--ng-rgb),.55);stroke:rgba(var(--ng-rgb),.85);stroke-width:1;cursor:pointer}
   /* "você está aqui": destaque pelo tamanho e contorno, cor pelo sinal — âmbar só quando o
      ponto está acima da referência (mais lento); verde cheio quando na referência ou abaixo. */
   .modal .ed-dot.on{fill:var(--ng);stroke:var(--text-brightest);stroke-width:1.5}
   .modal .ed-dot.on.acima{fill:var(--amber);stroke:var(--amber-deep)}
-  /* Marcas verticais: a média de quem a janela é (contínua, verde) e a média geral
-     (tracejada, recessiva). A tracejada é referência de fundo, não um dado a mais. */
+  /* Marcas verticais: a média de quem a janela é (contínua, verde) e a média de
+     referência (tracejada + bandeirola no topo, ver .ed-flag). Continua atrás dos pontos
+     em peso visual — não é um dado a mais, é a régua contra a qual os pontos se leem —
+     mas precisa ser achada sem procurar. 2ª rodada de destaque (2026-09-23, a 1ª com
+     --text-muted ainda saía próxima demais do verde dos pontos numa captura real da
+     tela): agora usa --text-brightest, a MESMA cor do contorno do ponto "você está aqui"
+     (.ed-dot.on, acima) — as duas marcas mais importantes do gráfico (o ponto e a régua
+     contra a qual ele se lê) passam a competir só entre si pelo neutro mais forte da
+     paleta, com os pontos-vizinho e a grade deliberadamente quietos ao redor. */
   .modal .ed-mark{stroke:var(--ng);stroke-width:2}
-  .modal .ed-mark.ref{stroke:rgba(var(--raise-rgb),.5);stroke-width:2;stroke-dasharray:3 3}
+  .modal .ed-mark.ref{stroke:var(--text-brightest);stroke-width:2.5;stroke-dasharray:5 4}
+  .modal .ed-flag{fill:var(--text-brightest)}
   .modal .ed-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;
         font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
   .modal .ed-leg-i{display:inline-flex;align-items:center;gap:6px}
   .modal .ed-leg-i b{font-family:'Space Grotesk',sans-serif;color:var(--text-bright);font-weight:700}
   .modal .ed-key{width:12px;height:0;border-top:2px solid var(--ng);flex:none}
-  .modal .ed-key.ref{border-top-style:dashed;border-top-color:rgba(var(--raise-rgb),.5)}
+  .modal .ed-key.ref{border-top-style:dashed;border-top-width:2.5px;border-top-color:var(--text-brightest)}
 
   /* ---- barra empilhada da fila de hoje ---- */
   .modal .sbar{display:flex;flex-direction:column;gap:9px}
