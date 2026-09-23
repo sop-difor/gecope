@@ -79,17 +79,23 @@
 | `supabase/functions/gecope-assistant/eval_run.ts` | Runner do harness de avaliação; casos em `docs/assistente/eval/casos.jsonl`. |
 | `supabase/functions/gecope-assistant-painel/index.ts` | Agrega consultas, erros e feedback para o painel administrativo do assistente. |
 | `supabase/functions/consulta-ceara-transparente/index.ts` | Integração separada com a consulta Ceará Transparente. |
-| `supabase/functions/sincronizar-suite/index.ts` | Função de sincronização com a Suite; tratar como integração externa, não como módulo da UI. |
+| `supabase/functions/sincronizar-suite/index.ts` | Função de sincronização com a Suite; tratar como integração externa, não como módulo da UI. **Leia a entrada completa em "Proxy e dados"** antes de editar — há um aviso de procedência do arquivo. |
 
 Documentação detalhada do assistente, escopo, segurança e avaliações: `docs/assistente/README.md`.
 
 ## Proxy e dados
 
 - `server/whatsapp-proxy/`: serviço Node/Docker que recebe chamadas autenticadas do front-end e conversa com a API de WhatsApp; veja `DEPLOY.md` e `web/`/`worker/` antes de alterar deploy ou filas.
-- `sql/`: migrações, políticas RLS, autorizações e reestruturações do banco. Mudanças de tabela ou permissão devem ser avaliadas junto do módulo que consulta os dados.
+- `sql/`: migrações, políticas RLS, autorizações e reestruturações do banco. Mudanças de tabela ou permissão devem ser avaliadas junto do módulo que consulta os dados. **Nenhum arquivo daqui é a regra viva:** ele registra o que foi pedido ao banco em alguma data, e um script posterior pode ter recriado a mesma política com outra definição — foi o que aconteceu com `processos_update` em 18/09/2026 (ver a seção 5.8 de `docs/revisoes/2026-09-22-processos.md`). Antes de afirmar no código ou em documento qual é a política de uma tabela, leia `pg_policies`.
 - `supabase/functions/`: Edge Functions do backend; mudanças de contrato devem ser conferidas no chamador HTML/JS e nas políticas do Supabase.
-- `sql/_aplicados/sql/painel_desempenho_replanilhamentos.sql`: cria a view analitica `vw_painel_desempenho_replanilhamentos` e consultas para carteira, desempenho mensal, analistas e Fiscalizacao. Fonte de status: `processos` no GECOPE.
+- `sql/_aplicados/sql/painel_desempenho_replanilhamentos.sql`: cria a view analitica `vw_painel_desempenho_replanilhamentos` e consultas para carteira, desempenho mensal, analistas e Fiscalizacao. Fonte de status: `processos` no GECOPE. **Atencao:** `sql/fix_painel_responsavel_atual_suite.sql` (revisao de 22/09/2026, aplicacao manual pendente) redefine essa view — `responsavel_atual` passa a consultar `processos.suite` e ganha o valor `OUTRA UNIDADE`, e entram tres colunas novas. Depois de aplicado, a definicao vigente e a do arquivo de fix, nao a deste.
 - `docs/painel-desempenho-replanilhamentos.md`: objetivo, regras de negocio, entregas e limites conhecidos desse painel.
+- `supabase/functions/sincronizar-suite/index.ts`: job que consulta o SUITE, grava `processos.suite`/`suite_data_chegada`/`status` e o histórico em `historico_suite_eventos`. **É a única automação de status do sistema** — o navegador só lê. Desde 22/09/2026 o arquivo do repositório é a versão real publicada; antes disso divergia dela. Baixe a publicada (`supabase functions download sincronizar-suite`) antes de editar.
+- `supabase/functions/backfill-historico-suite/`: **função morta**, arquivada em 22/09/2026 antes da remoção do servidor. A `sincronizar-suite` faz o mesmo para todos os processos. Não republique sem ler o cabeçalho do arquivo.
+
+## Revisões de código
+
+- `docs/revisoes/`: histórico das revisões sistemáticas por módulo — o que foi visto, corrigido, deixado de fora por decisão e o que ficou pendente. Comece pelo `README.md` da pasta. Antes de revisar um módulo, confira se ele já tem uma revisão registrada ali: as pendências e as decisões conscientes estão documentadas, e retomá-las é mais barato que redescobri-las.
 
 ## Ordem de carregamento da aplicação principal
 

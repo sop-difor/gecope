@@ -35,95 +35,17 @@ function calcularDiasDevolucao() {
 }
 
 
-// --- MÓDULO DE AUTOMAÇÃO GLOBAL (StatusSync) ---
-window.StatusSync = {
-    async verificarEAtualizarStatus(processoGecope, dadosSuite) {
-        try {
-            if (!sbClient) return { changed: false };
-            const id = processoGecope.id;
-            const nup = processoGecope.processo;
-            const siglaSuite = String(dadosSuite.sigla || '').toUpperCase().trim();
-            const statusGecope = String(processoGecope.status || '').toUpperCase().trim();
-            let novoStatus = null;
-
-            // Segurança: se o processo foi criado há pouco tempo, respeitar o status definido no GECOPE
-            try {
-                const criado = processoGecope && processoGecope.created_at ? new Date(processoGecope.created_at) : null;
-                if (criado) {
-                    const agora = new Date();
-                    const diff = agora.getTime() - criado.getTime();
-                    // Se criado nos últimos 3 minutos, não aplicar mudanças automáticas
-                    if (diff >= 0 && diff < (3 * 60 * 1000)) {
-                        return { changed: false, reason: 'recently_created' };
-                    }
-                }
-            } catch (e) { /* noop */ }
-
-            const analista = String(processoGecope.analista || '').trim().toUpperCase();
-
-            // Melhoria: Código mais limpo e à prova de falhas para checar a inicial do analista
-            const isAnalistaEspecial = analista ? ["N", "W", "H", "P", "F", "A"].includes(analista.charAt(0)) : false;
-
-            // REGRA 2: ARQUIVAMENTO (Prioridade Máxima)
-            if (siglaSuite === 'ARQUIVADO') {
-                novoStatus = 'ARQUIVADO';
-            }
-            // REGRA 1: Aprovação Automática
-            else if (statusGecope === 'AGUAR. APROVAÇÃO' &&
-                isAnalistaEspecial &&
-                siglaSuite !== 'DIFOR' &&
-                siglaSuite !== 'GECOPE' &&
-                siglaSuite !== '') {
-                novoStatus = 'APROVADO';
-            }
-            // REGRA 3: Entrada para Reanálise (Agora mais robusta, sem depender de cache antigo)
-            else if ((statusGecope === 'REANÁLISE FISCAL' || statusGecope === 'DEVOLVIDO P/ REANÁLISE FISCAL') &&
-                isAnalistaEspecial &&
-                siglaSuite === 'GECOPE') {
-                novoStatus = 'AGUAR. REANÁLISE';
-            }
-            // REGRA 4: Entrada para Análise (Também ajustada)
-            else if (statusGecope === 'ANÁLISE FISCAL' &&
-                !isAnalistaEspecial &&
-                siglaSuite === 'GECOPE') {
-                novoStatus = 'AGUAR. ANÁLISE';
-            }
-            // REGRA 5: Retorno de Processo Aprovado para Diligência
-            // Um processo já APROVADO que volta a tramitar na GECOPE precisa de
-            // correções/diligências adicionais antes de seguir seu fluxo normal.
-            else if (statusGecope === 'APROVADO' && siglaSuite === 'GECOPE') {
-                novoStatus = 'DILIGÊNCIA';
-            }
-
-            // Se encontrou um novo status diferente do atual, envia para o banco
-            if (novoStatus && novoStatus !== statusGecope) {
-
-                // Melhoria: Payload agora atualiza a coluna 'suite' para manter o sistema e o painel consistentes
-                const payload = {
-                    status: novoStatus,
-                    suite: siglaSuite,
-                    ultima_atualizacao: new Date().toISOString(),
-                    atualizado_por: 'AUTOMAÇÃO SUITE'
-                };
-
-                let query = sbClient.from('processos').update(payload);
-                if (id) query = query.eq('id', id); else query = query.eq('processo', nup);
-
-                const { data, error } = await query.select('id, status');
-                if (error) {
-                    console.error("[StatusSync] ERRO DETALHADO:", error.message);
-                    return { changed: false, error: error.message };
-                }
-                return { changed: !!(data && data.length), data: data ? data[0] : null };
-            }
-            return { changed: false };
-
-        } catch (e) {
-            console.error("[StatusSync] Erro:", e);
-            return { changed: false, error: e };
-        }
-    }
-};
+// --- AUTOMAÇÃO DE STATUS: NÃO MORA MAIS AQUI ---
+// O antigo `window.StatusSync.verificarEAtualizarStatus` foi removido na revisão de
+// 22/09/2026. Era uma cópia cliente das REGRA 1-5 de transição de status, sem nenhum
+// chamador desde que o polling saiu do navegador — ou seja, 88 linhas de regra de negócio
+// que só podiam divergir da regra de verdade com o tempo.
+//
+// A automação de status roda hoje SÓ no servidor, no job `sincronizar-suite`
+// (supabase/functions/sincronizar-suite/index.ts, função `decidirNovoStatus`), disparado
+// pelo pg_cron. O navegador apenas LÊ `processos.suite` e `processos.status` da tabela.
+//
+// Se precisar mudar uma regra de status, é lá — e baixe a versão publicada antes de editar.
 
 // --- ALERTA DE PRÉ-DILIGÊNCIA ---
 // Setores da SOP por onde um processo já APROVADO pode voltar a tramitar antes de
@@ -190,7 +112,37 @@ function montarAlertaIconeHTML(d) {
 // e mantém o contador da aba "Aprovados" sincronizado. Um processo já comentado para a
 // sigla atual conta como resolvido (ícone check); se a sigla mudar para outro setor de
 // risco diferente do último comentário, o alerta reabre (ícone exclamação de novo).
-function aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxtParam) {
+// Índice processo -> linha de window.allData, para não varrer o vetor inteiro a cada
+// chamada. Invalidado sempre que window.allData é substituído. — 22/09/2026
+let _indiceAllDataPorProcesso = null;
+let _indiceAllDataOrigem = null;
+
+/** Força a reconstrução do índice. Necessário para quem MUTA window.allData no lugar
+ *  (push/unshift/splice), porque a invalidação abaixo compara identidade de vetor. */
+function invalidarIndiceAllData() {
+    _indiceAllDataPorProcesso = null;
+    _indiceAllDataOrigem = null;
+}
+
+function linhaGlobalPorProcesso(numeroProcesso) {
+    const base = window.allData;
+    if (!base) return null;
+    if (_indiceAllDataOrigem !== base) {
+        _indiceAllDataPorProcesso = new Map();
+        base.forEach(x => { if (x && x.processo) _indiceAllDataPorProcesso.set(x.processo, x); });
+        _indiceAllDataOrigem = base;
+    }
+    return _indiceAllDataPorProcesso.get(numeroProcesso) || null;
+}
+
+/**
+ * @param {boolean} adiarBadge  quando true, NÃO atualiza o contador da aba Aprovados.
+ *   Usado pelos laços que chamam esta função uma vez por linha: o contador varria
+ *   window.allData inteiro a cada chamada (e chamava mais duas varreduras dentro de
+ *   atualizarBadgeAbaAprovados), dando ~3n² varreduras por render. Quem adia é responsável
+ *   por chamar atualizarBadgeAbaAprovados() uma única vez ao terminar.
+ */
+function aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxtParam, adiarBadge) {
     const stTxt = (stTxtParam || d.status || '').toString().toUpperCase();
     const emRiscoBruto = stTxt.includes('APROVADO') && isSetorRiscoDiligencia(sigla);
 
@@ -201,13 +153,11 @@ function aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxtParam) {
     d.alerta_retorno_resolvido = resolvidoParaEstaSigla;
     d.suite_sigla_risco = emRiscoBruto ? sigla : null;
 
-    if (window.allData) {
-        const globalRow = window.allData.find(x => x.processo === d.processo);
-        if (globalRow) {
-            globalRow.alerta_pre_diligencia = d.alerta_pre_diligencia;
-            globalRow.alerta_retorno_resolvido = d.alerta_retorno_resolvido;
-            globalRow.suite_sigla_risco = d.suite_sigla_risco;
-        }
+    const globalRow = linhaGlobalPorProcesso(d.processo);
+    if (globalRow && globalRow !== d) {
+        globalRow.alerta_pre_diligencia = d.alerta_pre_diligencia;
+        globalRow.alerta_retorno_resolvido = d.alerta_retorno_resolvido;
+        globalRow.suite_sigla_risco = d.suite_sigla_risco;
     }
 
     if (tr && alertaIcone) {
@@ -217,8 +167,15 @@ function aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxtParam) {
         tr.classList.toggle('tr-alerta-pre-diligencia', d.alerta_pre_diligencia);
     }
 
-    atualizarBadgeAbaAprovados();
+    if (!adiarBadge) atualizarBadgeAbaAprovados();
 }
+
+// Flag de reentrância: `atualizarBadgeAbaAprovados` pode chamar `updateReuniao()`, que por
+// sua vez remonta a tabela e volta a chamar esta função. Quando isso acontecia no meio de um
+// render, o laço externo continuava escrevendo em <tr> que já tinham sido descartados do DOM
+// — a coluna SUITE e os ícones de alerta das linhas restantes iam parar em nós órfãos.
+// Agora, se o pedido de re-render chegar durante um render, ele é adiado para depois. — 22/09/2026
+let _renderReuniaoEmAndamento = false;
 
 // Contador de alerta exibido no botão da aba "Aprovados"
 function atualizarBadgeAbaAprovados() {
@@ -244,17 +201,24 @@ function atualizarBadgeAbaAprovados() {
         window.filtroSomenteAlertaDiligencia = false;
         const btnFiltroAlerta = document.getElementById('btn-filtro-alerta-diligencia');
         if (btnFiltroAlerta) btnFiltroAlerta.classList.remove('active');
-        if (window.currentProcessesTab === 'aprovados' && typeof updateReuniao === 'function') updateReuniao();
+        if (window.currentProcessesTab === 'aprovados' && typeof updateReuniao === 'function') {
+            // Nunca remontar a tabela no meio de um render: agenda para o próximo tique.
+            if (_renderReuniaoEmAndamento) setTimeout(() => updateReuniao(), 0);
+            else updateReuniao();
+        }
     }
 
-    atualizarVisibilidadeBtnFiltroAlerta();
+    // `qtd` já está calculado — evita a terceira varredura de window.allData por chamada.
+    atualizarVisibilidadeBtnFiltroAlerta(qtd);
 }
 
 // O botão só aparece na aba Aprovados e apenas quando existe ao menos 1 processo com alerta
-function atualizarVisibilidadeBtnFiltroAlerta() {
+function atualizarVisibilidadeBtnFiltroAlerta(qtdConhecida) {
     const btnFiltroAlerta = document.getElementById('btn-filtro-alerta-diligencia');
     if (!btnFiltroAlerta) return;
-    const qtd = (window.allData || []).filter(d => d.alerta_pre_diligencia).length;
+    const qtd = (typeof qtdConhecida === 'number')
+        ? qtdConhecida
+        : (window.allData || []).filter(d => d.alerta_pre_diligencia).length;
     const deveMostrar = window.currentProcessesTab === 'aprovados' && qtd > 0;
     btnFiltroAlerta.style.display = deveMostrar ? 'flex' : 'none';
 }
@@ -336,13 +300,26 @@ async function salvarAlertaRetornoComentario() {
     };
 
     const btn = document.getElementById('btn-salvar-alerta-retorno');
-    btn.disabled = true;
-    btn.innerHTML = 'SALVANDO...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'SALVANDO...';
+    }
 
-    const { data, error } = await sbClient.from('alerta_retorno_comentarios').insert([payload]).select().single();
+    // Sem o try/catch, uma falha de rede deixava o botão preso em "SALVANDO..." e
+    // desabilitado para sempre, sem nenhuma mensagem. — 22/09/2026
+    let data = null, error = null;
+    try {
+        const res = await sbClient.from('alerta_retorno_comentarios').insert([payload]).select().single();
+        data = res.data;
+        error = res.error;
+    } catch (e) {
+        error = { message: (e && e.message) ? e.message : String(e) };
+    }
 
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Registrar Comentário';
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Registrar Comentário';
+    }
 
     if (error) {
         alert('Erro ao salvar comentário: ' + error.message);
@@ -352,7 +329,10 @@ async function salvarAlertaRetornoComentario() {
     d.alertaRetornoUltimo = data;
     textarea.value = '';
 
-    const tr = document.querySelector(`tr[data-numero="${escapeHTML(processoNup)}"]`);
+    // O navegador guarda o atributo já DECODIFICADO, então re-escapar antes de procurar
+    // fazia a busca falhar em silêncio para qualquer NUP com & < > " ' — e ainda abria
+    // espaço para injeção no seletor. `CSS.escape` é o jeito correto. — 22/09/2026
+    const tr = document.querySelector(`tr[data-numero="${CSS.escape(String(processoNup || ''))}"]`);
     const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
     aplicarAlertaPreDiligencia(d, tr, alertaIcone, d.suite_sigla_risco, d.status);
 
@@ -395,8 +375,10 @@ async function varrerRiscoDiligenciaSegundoPlano() {
             if (!sigla) return;
             const tr = trPorNumero.get(d.processo);
             const alertaIcone = tr ? tr.querySelector('.alerta-icone') : null;
-            aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, d.status);
+            // adiarBadge = true: o contador é atualizado uma vez só, ao fim da varredura.
+            aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, d.status, true);
         });
+        atualizarBadgeAbaAprovados();
     } catch (e) {
         console.error('[Alerta Pré-Diligência] erro na varredura:', e);
     } finally {
@@ -548,47 +530,12 @@ function normalizarMatriculaFiscal(matricula) {
     return String(matricula || '').trim().toUpperCase().replace(/[.\-\/\s]+/g, '');
 }
 
-// Funde entradas que representam o mesmo fiscal mas vieram de tabelas diferentes com/sem
-// acentuação — ex.: "AGABE SOUSA LINHARES" (app_users, sem acento) e "ÁGABE SOUSA LINHARES"
-// (comissao_fiscalizacao, com acento) normalizam para a mesma chave e não podem virar duas
-// opções no dropdown. Entre as variantes de uma mesma chave, mantém a que tem acentuação
-// (grafia mais correta em português).
-function mesclarDuplicatasPorAcento(lista) {
-    const porChave = new Map();
-    lista.forEach(nome => {
-        if (!nome) return;
-        const chave = normalizarNomeFiscal(nome);
-        const atual = porChave.get(chave);
-        const nomeTemAcento = normalizarNomeFiscal(nome) !== nome;
-        const atualTemAcento = atual ? normalizarNomeFiscal(atual) !== atual : false;
-        if (!atual || (nomeTemAcento && !atualTemAcento)) porChave.set(chave, nome);
-    });
-    return [...porChave.values()];
-}
-
-// Colapsa variações do "mesmo" fiscal vindas de fontes diferentes — ex.: "DIEGO DEMÉTRIO"
-// (nome curto vindo de app_users) e "DIEGO DEMÉTRIO TORRES" (nome completo vindo de
-// comissao_fiscalizacao) apareciam como duas entradas distintas no dropdown.
-// Heurística conservadora: descarta a variante mais curta só quando todos os seus tokens
-// aparecem, na mesma ordem, dentro de uma variante mais longa já mantida E o primeiro nome
-// bate — assim nomes diferentes que só compartilham o primeiro nome não são fundidos.
-function colapsarVariantesFiscais(lista) {
-    const tokensDe = nome => normalizarNomeFiscal(nome).split(' ').filter(Boolean);
-    const ordenada = [...lista].sort((a, b) => b.length - a.length);
-    const mantidos = [];
-    ordenada.forEach(nome => {
-        const tokensAtual = tokensDe(nome);
-        const eVariacaoDeAlgumMantido = mantidos.some(mantidoNome => {
-            const tokensMantido = tokensDe(mantidoNome);
-            if (tokensAtual.length >= tokensMantido.length || tokensAtual[0] !== tokensMantido[0]) return false;
-            let i = 0;
-            tokensMantido.forEach(tok => { if (tok === tokensAtual[i]) i++; });
-            return i === tokensAtual.length;
-        });
-        if (!eVariacaoDeAlgumMantido) mantidos.push(nome);
-    });
-    return mantidos;
-}
+// REMOVIDAS na revisão de 22/09/2026, ambas sem nenhum chamador no repositório:
+//   - `mesclarDuplicatasPorAcento`: fundia "AGABE SOUSA" (app_users, sem acento) com
+//     "ÁGABE SOUSA" (comissao_fiscalizacao, com acento) numa entrada só do dropdown.
+//   - `colapsarVariantesFiscais`: colapsava "DIEGO DEMÉTRIO" e "DIEGO DEMÉTRIO TORRES".
+// O dropdown de fiscais é montado por matrícula (`fiscalPorMatricula`), não por nome, então
+// a deduplicação por grafia deixou de ser necessária quando essa mudança aconteceu.
 
 // --- INTEGRAÇÃO COM CONTRATOS SOP (SIGSOP) — busca de obra por código para autopreencher o cadastro ---
 
@@ -860,12 +807,9 @@ async function limparArquivosComentariosResolvidos(table, storageBucket, comenta
 
     if (arquivosParaDeletar.length > 0) {
         try {
-            console.log(`Deletando ${arquivosParaDeletar.length} arquivos de comentários resolvidos...`);
             const { error } = await sbClient.storage.from(storageBucket).remove(arquivosParaDeletar);
             if (error) {
                 console.error('Erro ao deletar arquivos:', error);
-            } else {
-                console.log('Arquivos deletados com sucesso');
             }
         } catch (err) {
             console.error('Erro ao limpar arquivos:', err);
@@ -905,7 +849,6 @@ function findFiscalNameInList(nomeCompleto) {
     // 1. Procura exata (depois de normalizar)
     for (const fiscal of window.dynamicUsers) {
         if (normalizar(fiscal) === inputNormal) {
-            console.log('[MATCH-1 EXATO]', nomeCompleto, '->', fiscal);
             return fiscal;
         }
     }
@@ -915,7 +858,6 @@ function findFiscalNameInList(nomeCompleto) {
     for (const fiscal of window.dynamicUsers) {
         const fiscalNormal = normalizar(fiscal);
         if (partes.every(parte => fiscalNormal.includes(parte))) {
-            console.log('[MATCH-2 PALAVRAS]', nomeCompleto, '->', fiscal);
             return fiscal;
         }
     }
@@ -925,7 +867,6 @@ function findFiscalNameInList(nomeCompleto) {
         const fiscalNormal = normalizar(fiscal);
         const partesFiscal = fiscalNormal.split(/\s+/).filter(p => p.length > 0);
         if (partesFiscal.every(parte => inputNormal.includes(parte))) {
-            console.log('[MATCH-3 REVERSO]', nomeCompleto, '->', fiscal);
             return fiscal;
         }
     }
@@ -937,12 +878,10 @@ function findFiscalNameInList(nomeCompleto) {
         const partesFiscal = fiscalNormal.split(/\s+/).filter(p => p.length > 0);
         const iniciaisFiscal = partesFiscal.map(p => p[0]).join('');
         if (iniciaisInput === iniciaisFiscal && inputNormal.length < fiscalNormal.length) {
-            console.log('[MATCH-4 INICIAIS]', nomeCompleto, '->', fiscal);
             return fiscal;
         }
     }
 
-    console.log('[SEM MATCH]', nomeCompleto);
     return null;
 }
 
@@ -953,42 +892,20 @@ let currentTabelaData = []; // Cache para recálculo de BDI/Desconto
 // escapeHTML() é definida em utils.js (carregado antes deste arquivo) e exposta em
 // window.escapeHTML — não redeclarar aqui para evitar duas cópias idênticas.
 
-/**
- * Calcula de forma inteligente quantos dias o processo está no status atual.
- * Considera heurística de transição para dados legados (anteriores a 30/04/2026).
- */
-function calcularDiasNoStatus(d) {
-    if (!d) return 0;
-    const getSafeDate = (val) => {
-        if (val instanceof Date && !isNaN(val.getTime())) return val;
-        if (!val) return null;
-        const dateObj = new Date(val);
-        return isNaN(dateObj.getTime()) ? null : dateObj;
-    };
+// `calcularDiasNoStatus` foi REMOVIDA na revisão de 22/09/2026.
+// Era chamada uma vez por linha no laço que monta a tabela, para preencher a variável
+// `labelDias` — que nunca era usada: a célula destinada a ela está vazia no HTML (a <div>
+// de altura 1.1rem logo abaixo do badge de status). Cada chamada normalizava acentos e
+// alocava três objetos Date, tudo descartado em seguida. Nenhum outro arquivo a chamava.
+// Se o "dias no status" voltar a ser exibido, a regra (com a heurística de transição para
+// dados anteriores a 30/04/2026) está no histórico do git.
 
-    let dStatus = getSafeDate(d.ultima_atualizacao) || getSafeDate(d.created_at) || new Date();
-    const stNormalizado = (d.status || "").toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-    const ehFluxoAnalise = stNormalizado.includes("ANALISE") || stNormalizado.includes("AGUAR") || stNormalizado.includes("EM REANALISE") || stNormalizado.includes("FISCAL");
-
-    if (ehFluxoAnalise) {
-        const dEntrada = d.dataRecebimento || d.dataAbertura;
-        const dataCorte = new Date('2026-04-30T00:00:00');
-        if (dStatus < dataCorte && dEntrada && dEntrada instanceof Date && dEntrada.getTime() < dStatus.getTime()) {
-            dStatus = dEntrada;
-        }
-    }
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0); const dataRef = new Date(dStatus); dataRef.setHours(0, 0, 0, 0); return Math.round((hoje - dataRef) / (1000 * 60 * 60 * 24));
-}
-
-// --- FUNO DEBOUNCE (PERFORMANCE) ---
-function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        const context = this;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(context, args), wait);
-    };
-}
+// `debounce()` é definida em utils.js e exposta em window.debounce — a cópia idêntica que
+// existia aqui foi removida na revisão de 22/09/2026. Como processos.js é o ÚLTIMO script
+// carregado (ver index.html), a cópia daqui sobrescrevia a de utils.js para o aplicativo
+// inteiro (shell.js, composicoes.js e orcamentos.js chamam `debounce`) — duas definições da
+// mesma coisa, com a de menor visibilidade vencendo. Mesmo motivo já documentado logo acima
+// para escapeHTML().
 
 // --- 3. CORE: CARREGAMENTO DE DADOS (READ) ---
 
@@ -1076,6 +993,11 @@ async function atualizarPainelAposEdicaoLocal() {
 // Se a busca falhar, cai para o full reload em vez de arriscar deixar a tela com dado
 // velho. Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, item 5.
 async function atualizarLinhaProcessoLocal(id) {
+    // Revisão 22/09/2026 — `atualizarPainelAposEdicaoLocal()` estava DENTRO deste try, então
+    // qualquer erro de renderização (updateDashboard, updateFinanceiro, populateAllTabFilters)
+    // caía no catch e disparava uma varredura completa da tabela — exatamente o egress que
+    // esta função existe para evitar. Agora o catch cobre só a busca da linha; falha de
+    // renderização é reportada, não vira recarga.
     try {
         const { data, error } = await sbClient.from('processos').select('*').eq('id', id).single();
         if (error || !data) throw error || new Error('Linha não encontrada após salvar.');
@@ -1083,14 +1005,22 @@ async function atualizarLinhaProcessoLocal(id) {
         const fresh = mapProcessoRow(data);
         window.allData = window.allData || [];
         const idx = window.allData.findIndex(d => d.id === id);
-        if (idx === -1) window.allData.unshift(fresh);
-        else Object.assign(window.allData[idx], fresh);
-
-        await atualizarPainelAposEdicaoLocal();
+        if (idx === -1) {
+            window.allData.unshift(fresh);
+            // `unshift` MUTA o vetor sem trocar a referência, e o índice de
+            // linhaGlobalPorProcesso() invalida por identidade — sem esta linha, o processo
+            // recém-criado fica fora do índice até a próxima carga completa. — 22/09/2026
+            invalidarIndiceAllData();
+        } else {
+            Object.assign(window.allData[idx], fresh);
+        }
     } catch (e) {
-        console.error('[ERRO] Falha ao atualizar linha local do processo, recarregando tudo:', e);
+        console.error('[ERRO] Falha ao buscar a linha do processo, recarregando tudo:', e);
         await carregarDadosSupabase();
+        return;
     }
+
+    await atualizarPainelAposEdicaoLocal();
 }
 
 // Exclusão de processo é lógica (status='EXCLUÍDO'): carregarDadosSupabase() já filtra
@@ -1101,32 +1031,82 @@ async function removerProcessoLocal(id) {
     await atualizarPainelAposEdicaoLocal();
 }
 
+// Guarda de chamada concorrente. `carregarDadosSupabase` é disparada de três lugares
+// independentes (core/auth.js após o login, core/shell.js no DOMContentLoaded, e o fallback
+// de erro de `atualizarLinhaProcessoLocal`), que podiam sobrepor-se: duas varreduras
+// completas da tabela ao mesmo tempo, as duas atribuindo `window.allData`, e as alterações
+// locais feitas entre uma e outra perdidas. Mesmo padrão que `garantirFiscaisCarregados` já
+// usava neste arquivo. — 22/09/2026
+let _carregarDadosPromise = null;
+
 async function carregarDadosSupabase() {
+    if (_carregarDadosPromise) return _carregarDadosPromise;
+    _carregarDadosPromise = _carregarDadosSupabaseInterno()
+        .finally(() => { _carregarDadosPromise = null; });
+    return _carregarDadosPromise;
+}
+
+async function _carregarDadosSupabaseInterno() {
     const loader = document.getElementById("load-error");
     if (loader) loader.style.display = "none";
 
-    let data = null, error = null;
+    let data = null;
     try {
-        console.log('[DEBUG] Iniciando carregarDadosSupabase...');
-        const response = await sbClient
-            .from('processos')
-            .select('*')
-            .order('created_at', { ascending: false });
+        // Paginação explícita. Antes era um `select('*')` único, sem `.limit()` nem `.range()`:
+        // o PostgREST corta a resposta no `max-rows` do servidor (tipicamente 1000 linhas) SEM
+        // erro nenhum, então o aplicativo simplesmente pararia de enxergar os processos mais
+        // antigos e ninguém ficaria sabendo. O laço busca em blocos até a tabela acabar.
+        //
+        // O descarte de EXCLUÍDO segue no navegador de propósito: no servidor,
+        // `not.in.(EXCLUÍDO,EXCLUIDO)` também descartaria as linhas com status NULO, porque em
+        // SQL `NOT (NULL IN (...))` não é verdadeiro — esconderia processos sem status
+        // preenchido. Ver a pendência registrada em docs/revisoes/2026-09-22-processos.md.
+        // O desempate por `id` NÃO é decorativo: `created_at` não é único, e cada bloco é uma
+        // consulta nova. Em Postgres `now()` é por transação, então carga em lote grava dezenas
+        // de linhas com o mesmo instante; se um grupo empatado cruzar a fronteira do bloco, a
+        // ordem entre as duas consultas é indefinida e a mesma linha pode vir duas vezes
+        // enquanto outra não vem nenhuma — em silêncio, que é a falha que esta paginação veio
+        // justamente matar.
+        //
+        // O passo do laço é `bloco.length`, e não `TAMANHO_BLOCO`: se o `max-rows` do servidor
+        // for MENOR que 1000, o primeiro bloco volta curto e um laço que comparasse com 1000
+        // pararia ali, ressuscitando a truncagem silenciosa. Assim funciona com qualquer
+        // `max-rows`, inclusive um que mude no servidor sem ninguém avisar. — 22/09/2026
+        const TAMANHO_BLOCO = 1000;
+        // Teto de segurança: o laço só sai sozinho com bloco vazio. Se o `Range` deixar de ser
+        // honrado em algum ponto do caminho (proxy, CDN, mudança de configuração do PostgREST),
+        // toda volta devolveria o MESMO conjunto não vazio e a aba travaria acumulando memória.
+        // 200 blocos = 200 mil processos, muito acima de qualquer cenário real desta tabela.
+        const MAX_BLOCOS = 200;
+        const acumulado = [];
+        for (let inicio = 0, volta = 0; ; volta++) {
+            if (volta >= MAX_BLOCOS) {
+                throw new Error('Carga de processos interrompida: limite de blocos atingido. '
+                    + 'A paginação não está avançando — avise o administrador do sistema.');
+            }
+            const { data: bloco, error } = await sbClient
+                .from('processos')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .range(inicio, inicio + TAMANHO_BLOCO - 1);
 
-        data = response.data;
-        error = response.error;
+            if (error) throw new Error(`Tabela "processos" não acessível: ${error.message}`);
+            if (!Array.isArray(bloco)) throw new Error('Tipo de dados inválido: esperado array');
 
-        if (error) throw new Error(`Tabela "processos" não acessível: ${error.message}`);
-        if (!Array.isArray(data)) throw new Error('Tipo de dados inválido: esperado array');
-
-        if (data.length > 0) {
-            data = data.filter(d => d.status !== 'EXCLUÍDO' && d.status !== 'EXCLUIDO');
+            acumulado.push(...bloco);
+            if (bloco.length === 0) break;
+            inicio += bloco.length;
         }
+
+        data = acumulado.filter(d => d.status !== 'EXCLUÍDO' && d.status !== 'EXCLUIDO');
     } catch (err) {
         console.error('[ERRO] Falha ao carregar dados:', err);
         if (loader) {
             loader.style.display = "block";
-            loader.innerHTML = `<strong>Erro ao carregar dados:</strong><br><code>${err.message}</code>`;
+            // `err.message` pode ecoar valores enviados pelo próprio usuário (o PostgREST faz
+            // isso em erro de sintaxe), então vai escapado. — 22/09/2026
+            loader.innerHTML = `<strong>Erro ao carregar dados:</strong><br><code>${escapeHTML(err.message)}</code>`;
         }
         return;
     }
@@ -1199,56 +1179,43 @@ async function carregarDadosSupabase() {
     try {
         // Auto-estabelecer metas para processos em 'ANÁLISE FISCAL' sem meta
         try {
-            const pendingMeta = [];
+            let pendingMeta = [];
             for (const row of window.allData) {
                 const st = (row.status || "").toString().toUpperCase();
                 const isAnaliseFiscal = st.includes("ANÁLISE FISCAL") || (st.includes("ANALISE") && st.includes("FISCAL"));
                 const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
-                let precisaRecalcular = false;
-                if (isAnaliseFiscal && row.id) {
-                    let base = null;
-                    let dias = 20; // padrão para Análise
-                    if (isReanalise) {
-                        dias = 10;
-                        base = row.dataDevolucaoCorrecoes || row.created_at || new Date();
-                    } else {
-                        dias = 20;
-                        base = row.created_at || new Date();
-                    }
+                // Revisão 22/09/2026 — este trecho calculava `base`, `dias` e
+                // `calcularDataMeta(base, dias)` só para decidir se precisava recalcular, e em
+                // seguida recalculava os TRÊS de novo, com código idêntico copiado.
+                // `calcularDataMeta` percorre dias úteis consultando a tabela de feriados, ou
+                // seja, era o dobro do trabalho para cada processo em ANÁLISE FISCAL.
+                // Agora calcula uma vez só.
+                if (!isAnaliseFiscal || !row.id) continue;
 
-                    const metaDate = calcularDataMeta(base, dias);
-                    if (metaDate) {
-                        // Se não tem meta, estabelece automaticamente
-                        const isoAtual = row.dataCompromissoFiscal ? (row.dataCompromissoFiscal instanceof Date ? row.dataCompromissoFiscal.toISOString().substring(0, 10) : new Date(row.dataCompromissoFiscal).toISOString().substring(0, 10)) : null;
+                // Reanálise: conta a partir da devolução para correção, 10 dias.
+                // Cadastro comum: conta a partir da entrada no GECOPE, 20 dias.
+                const dias = isReanalise ? 10 : 20;
+                const base = isReanalise
+                    ? (row.dataDevolucaoCorrecoes || row.created_at || new Date())
+                    : (row.created_at || new Date());
 
-                        if (!isoAtual) {
-                            precisaRecalcular = true;
-                        }
-                    }
-                }
+                // O descarte de quem já tem meta vem ANTES do cálculo de propósito:
+                // `calcularDataMeta` percorre dias úteis consultando a tabela de feriados, e
+                // rodava para todo processo em ANÁLISE FISCAL só para ter o resultado jogado
+                // fora na linha seguinte. — 22/09/2026
+                const jaTemMeta = !!row.dataCompromissoFiscal;
+                if (jaTemMeta) continue;
 
-                if (precisaRecalcular) {
-                    let base = null;
-                    let dias = 20; // padrão para Análise
-                    if (isReanalise) {
-                        // Regra de Reanálise: Usar data de devolução para correção no cálculo da nova meta
-                        dias = 10;
-                        base = row.dataDevolucaoCorrecoes || row.created_at || new Date();
-                    } else {
-                        // Regra de Cadastro: Usar a data de cadastro no GECOPE (created_at)
-                        dias = 20;
-                        base = row.created_at || new Date();
-                    }
-                    const metaDate = calcularDataMeta(base, dias);
-                    if (metaDate) {
-                        const iso = metaDate.toISOString().substring(0, 10);
-                        // Atualiza objeto em memória para UI imediata
-                        row.dataCompromissoFiscal = isoParaDate(iso);
-                        const baseDate = base instanceof Date ? base : new Date(base);
-                        const est = baseDate.toISOString().substring(0, 10);
-                        pendingMeta.push({ id: row.id, data_compromisso_fiscal: iso, registros: est });
-                    }
-                }
+                const metaDate = calcularDataMeta(base, dias);
+                if (!metaDate) continue;
+
+                const iso = metaDate.toISOString().substring(0, 10);
+                // Atualiza objeto em memória para UI imediata
+                row.dataCompromissoFiscal = isoParaDate(iso);
+                const baseDate = base instanceof Date ? base : new Date(base);
+                if (isNaN(baseDate.getTime())) continue;
+                const est = baseDate.toISOString().substring(0, 10);
+                pendingMeta.push({ id: row.id, data_compromisso_fiscal: iso, registros: est });
             }
             // Achado do rev-correcao (Fase 4): meta é só-Admin no banco agora (RLS) —
             // pra qualquer outro papel, o UPDATE abaixo seria recusado silenciosamente
@@ -1258,12 +1225,34 @@ async function carregarDadosSupabase() {
             // for Admin — pros demais papéis, o cálculo em memória acima já mostra a meta
             // sugerida na tela (só não fica salva até um Admin abrir o painel).
             if (pendingMeta.length > 0 && getCurrentUserRole() === 'admin') {
-                // Persistir no banco (em paralelo)
-                await Promise.all(pendingMeta.map(u => sbClient.from('processos').update({ data_compromisso_fiscal: u.data_compromisso_fiscal }).eq('id', u.id)));
-                console.log(`[AutoMeta] metas automáticas salvas: ${pendingMeta.length}`);
+                // Persistir no banco (em paralelo).
+                // O supabase-js resolve com `{ error }` em vez de rejeitar, então um
+                // `Promise.all` cru dava "salvas com sucesso" mesmo com todas as gravações
+                // recusadas — e o histórico logo abaixo era escrito como se tivesse dado certo.
+                // Agora as falhas são contadas e o histórico só registra o que realmente foi
+                // gravado. — 22/09/2026
+                const resultados = await Promise.all(pendingMeta.map(async u => {
+                    try {
+                        const { error } = await sbClient.from('processos')
+                            .update({ data_compromisso_fiscal: u.data_compromisso_fiscal })
+                            .eq('id', u.id);
+                        return { u, ok: !error, erro: error ? error.message : null };
+                    } catch (e) {
+                        return { u, ok: false, erro: (e && e.message) ? e.message : String(e) };
+                    }
+                }));
+
+                const falhas = resultados.filter(r => !r.ok);
+                if (falhas.length > 0) {
+                    console.error(`[AutoMeta] ${falhas.length} de ${pendingMeta.length} metas NÃO foram salvas. `
+                        + `Primeiro erro: ${falhas[0].erro}`);
+                }
+
+                // Só entra no histórico o que de fato foi gravado.
+                pendingMeta = resultados.filter(r => r.ok).map(r => r.u);
 
                 // Gravar histórico de metas em lote
-                try {
+                if (pendingMeta.length > 0) try {
                     const logs = pendingMeta.map(u => {
                         const row = window.allData.find(r => r.id === u.id);
                         const st = row ? (row.status || "").toString().toUpperCase() : "";
@@ -1440,7 +1429,7 @@ async function enviarParaPlanilha() {
         console.error('Erro ao inserir processo:', e);
         msg.style.display = 'block';
         msg.className = 'alert alert-danger mt-3';
-        msg.innerHTML = `Erro ao salvar: ${e.message || e}`;
+        msg.innerHTML = `Erro ao salvar: ${escapeHTML(e && e.message ? e.message : String(e))}`;
         btn.disabled = false;
         btn.innerHTML = 'SALVAR';
         return;
@@ -1450,7 +1439,9 @@ async function enviarParaPlanilha() {
         console.error(error);
         msg.style.display = 'block';
         msg.className = 'alert alert-danger mt-3';
-        msg.innerHTML = `Erro ao salvar: ${error.message}`;
+        // A mensagem do PostgREST costuma ecoar o valor que o usuário enviou, então vai
+        // escapada antes de entrar como HTML. — 22/09/2026
+        msg.innerHTML = `Erro ao salvar: ${escapeHTML(error.message)}`;
         btn.disabled = false;
         btn.innerHTML = 'SALVAR';
     } else {
@@ -1707,19 +1698,86 @@ async function abrirDetalhes(processoStr) {
 
     // Determina se o usuário atual é admin a partir da role mais recente
     const isAdmin = (getCurrentUserRole() === 'admin');
+    // Revisão 22/09/2026 — os campos eram liberados só para admin, enquanto a política
+    // `processos_update` do banco já autorizava gerente. Decisão do usuário: alinhar a tela
+    // ao banco. As duas exceções só-admin (prioridade e meta manual) continuam valendo e
+    // estão logo abaixo — ver podeEditarProcesso() em core/auth.js.
+    const podeEditar = podeEditarProcesso();
     const inputs = document.querySelectorAll('#formDetalhes input, #formDetalhes select, #formDetalhes textarea');
-    inputs.forEach(el => { el.disabled = !isAdmin; });
+    inputs.forEach(el => { el.disabled = !podeEditar; });
+
+    // "Meta Fiscal" segue só-admin: o trigger `processos_restringir_prioridade_meta` recusa o
+    // UPDATE quando `data_compromisso_fiscal` é a única coluna alterada. Sem este gate, o
+    // gerente que mexesse só nesse campo levaria um erro do banco na cara ao salvar.
+    //
+    // ATENÇÃO — é `readOnly`, NUNCA `disabled`: campo desabilitado não entra no `FormData`,
+    // e o payload de executarAcaoDetalhes é montado com `new FormData(form)`. Com `disabled`,
+    // `formData.get("DATA COMPROMISSO FISCAL")` devolveria `null` e TODO salvamento de gerente
+    // apagaria a meta do processo em silêncio. (O payload também é gateado, mais abaixo — as
+    // duas proteções são deliberadas: esta preserva o valor, aquela garante que ele não seja
+    // reenviado como alteração.) `readOnly` também mantém o `title` funcionando: navegador não
+    // dispara evento de mouse em campo desabilitado, então o tooltip não abriria.
+    const elMetaFiscal = document.getElementById('det_data_compromisso');
+    if (elMetaFiscal) {
+        const metaSoAdmin = !canMarkDateAsMeta();
+        // As três atribuições são incondicionais de propósito: com um `if (metaSoAdmin)` o
+        // estado não seria revertido se o papel mudasse na mesma sessão e o modal reabrisse.
+        elMetaFiscal.readOnly = metaSoAdmin;
+        elMetaFiscal.classList.toggle('bg-body-secondary', metaSoAdmin);
+        elMetaFiscal.title = metaSoAdmin ? 'Definida automaticamente pelo status. Apenas administradores alteram manualmente.' : '';
+    }
+
     // Botão "Vincular/Atualizar Obra" não é input/select/textarea, então precisa do
     // próprio gate — religar um processo legado a um contrato é uma correção de dados,
     // mesmo padrão de restrição a admin usado em excluirChecklistAditivo (contratos.js).
     const btnVincularObra = document.getElementById('btn-vincular-obra');
     if (btnVincularObra) btnVincularObra.disabled = !isAdmin;
 
+    // ...e os três campos do MESMO bloco seguem o botão: são o vínculo com o contrato do
+    // SIGSOP, que o texto fixo do formulário anuncia como restrito a administradores.
+    // O laço acima os havia liberado junto com o resto do formulário quando o gerente passou
+    // a editar (22/09/2026) — abertura não intencional, e pior que a contradição visual:
+    // digitados à mão, eles pulam `buscarObraDetalhes()`, que é quem confere o código contra a
+    // base de contratos e preenche distrito/município a partir do SIGSOP. Um erro de digitação
+    // aqui desfaz o vínculo processo↔obra em silêncio — o mesmo vínculo que alimenta o painel
+    // de desempenho e o mapa de obras.
+    //
+    // Aqui `disabled` é seguro (ao contrário da Meta Fiscal): estes três são lidos por
+    // `getElementById().value` no payload, e `.value` continua legível em campo desabilitado.
+    // Quem sai do FormData é só quem é lido POR ele.
+    ['det_codigo_obra', 'det_distrito', 'det_municipio'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.disabled = !isAdmin;
+            el.title = isAdmin ? '' : 'Restrito a administradores — use o botão Vincular para alterar o vínculo com a obra.';
+        }
+    });
+
     document.getElementById('msg-detalhes').style.display = 'none';
-    document.getElementById('btn-atualizar').innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+
+    // O botão SALVAR era escondido pela classe `.admin-only` no HTML (core/auth.js esconde
+    // tudo que tem essa classe para quem não é admin). Com o gerente autorizado a editar, o
+    // controle passou para cá — mesmo padrão do botão EXCLUIR logo abaixo.
+    const btnSalvarModal = document.getElementById('btn-atualizar');
+    if (btnSalvarModal) {
+        btnSalvarModal.innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+        btnSalvarModal.disabled = !podeEditar;
+        btnSalvarModal.style.display = podeEditar ? '' : 'none';
+    }
+
+    // Revisão 22/09/2026 — este trecho reabilitava o botão EXCLUIR para QUALQUER usuário que
+    // conseguisse abrir o modal, inclusive quem não tinha autorização nenhuma, desfazendo a
+    // intenção do `.admin-only` no HTML e entregando um erro do banco a quem clicasse. Agora o
+    // botão aparece exatamente para quem o banco autoriza a excluir — admin, gerente ou a
+    // autorização especial `processos_gravar`, pela política `processos_update`. A ligação
+    // entre a tela e o banco está documentada em podeGravarProcessos() (core/auth.js).
     const btnExcluirModal = document.getElementById('btn-excluir');
-    btnExcluirModal.innerHTML = '<i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO';
-    btnExcluirModal.disabled = false;
+    if (btnExcluirModal) {
+        const podeExcluir = podeExcluirProcesso();
+        btnExcluirModal.innerHTML = '<i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO';
+        btnExcluirModal.disabled = !podeExcluir;
+        btnExcluirModal.style.display = podeExcluir ? '' : 'none';
+    }
 
     // Audit Info Display
     const dtCriacao = row.created_at ? new Date(row.created_at).toLocaleString('pt-BR') : '';
@@ -1866,10 +1924,24 @@ async function executarAcaoDetalhes(actionType) {
     const idUnico = registroOriginal.id;
 
     if (actionType === 'delete') {
+        // Revisão 22/09/2026 — antes, esta função não checava papel nenhum: a única barreira
+        // era a classe CSS `.admin-only` no botão, que `abrirDetalhes()` reabilitava para
+        // todo mundo que conseguisse abrir o modal. Quem não podia excluir chegava ao botão
+        // e levava um erro do banco. A regra abaixo é a MESMA da política `processos_update`
+        // no banco — admin, gerente ou a autorização especial `processos_gravar`. As duas
+        // precisam continuar concordando; ver podeGravarProcessos() em core/auth.js.
+        if (!podeExcluirProcesso()) {
+            alert("Você não tem permissão para excluir processos.");
+            return;
+        }
         if (!confirm("TEM CERTEZA? O processo será movido para EXCLUÍDOS e sairá da lista principal.")) return;
+
         const btn = document.getElementById('btn-excluir');
-        btn.innerHTML = "EXCLUINDO...";
-        btn.disabled = true;
+        const rotuloOriginal = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = "EXCLUINDO...";
+            btn.disabled = true;
+        }
 
         // Soft Delete com Auditoria
         const userName = sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido';
@@ -1879,21 +1951,39 @@ async function executarAcaoDetalhes(actionType) {
             data_exclusao: new Date().toISOString()
         };
 
-        const { error } = await sbClient.from('processos').update(updates).eq('id', idUnico);
+        try {
+            const { error } = await sbClient.from('processos').update(updates).eq('id', idUnico);
+            if (error) throw new Error(error.message);
 
-        if (error) {
-            alert("Erro ao excluir: " + error.message);
-            btn.disabled = false;
-        } else {
             alert("Excluído com sucesso!");
-            bootstrap.Modal.getInstance(document.getElementById('modalDetalhes')).hide();
+            const modalEl = document.getElementById('modalDetalhes');
+            if (modalEl) {
+                const instancia = bootstrap.Modal.getInstance(modalEl);
+                if (instancia) instancia.hide();
+            }
             // Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, item 5.
             removerProcessoLocal(idUnico);
+        } catch (e) {
+            // Sem este catch, uma falha de rede deixava o botão preso em "EXCLUINDO..."
+            // desabilitado para sempre, sem nenhuma mensagem ao usuário.
+            alert("Erro ao excluir: " + (e && e.message ? e.message : e));
+            if (btn) {
+                btn.innerHTML = rotuloOriginal;
+                btn.disabled = false;
+            }
         }
         return;
     }
 
     if (actionType === 'update') {
+        // Mesma guarda do ramo 'delete': a trava da tela é cosmética (o botão some), e quem
+        // decide de verdade é a política `processos_update`. Esta checagem existe para que
+        // quem não pode editar receba um aviso legível em vez de um erro do banco. — 22/09/2026
+        if (!podeEditarProcesso()) {
+            alert("Você não tem permissão para editar processos.");
+            return;
+        }
+
         // --- VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS ---
         const camposObrigatorios = [
             { id: 'det_status', nome: 'Status Atual' },
@@ -1909,7 +1999,9 @@ async function executarAcaoDetalhes(actionType) {
             if (!el || !el.value.trim()) {
                 if (campo.tab) mostrarAbaGerenciarProcesso(campo.tab);
                 alert(`O campo "${campo.nome}" é obrigatório.`);
-                el.focus();
+                // `el.focus()` sem guarda estourava justamente no caso `!el` (campo ausente
+                // no HTML), trocando o aviso legível por um erro de script. — 22/09/2026
+                if (el) el.focus();
                 return;
             }
         }
@@ -1978,7 +2070,7 @@ async function executarAcaoDetalhes(actionType) {
 
             data_abertura: dataParaISO(formData.get("DATA DE ABERTURA")),
             data_recebimento: dataParaISO(formData.get("DATA RECEBIMENTO")),
-            data_compromisso_fiscal: dataParaISO(formData.get("DATA COMPROMISSO FISCAL")),
+            // `data_compromisso_fiscal` NÃO entra aqui — ver o gate logo depois do objeto.
             data_aprovacao_gecope: dataParaISO(formData.get("DATA APROVAÇÃO GECOPE")),
             data_devolucao_correcoes: dataParaISO(formData.get("DATA DEVOLUO CORREES")),
 
@@ -1994,12 +2086,32 @@ async function executarAcaoDetalhes(actionType) {
             // A data 'ultima_atualizacao' não é definida aqui para não resetar o contador de dias sem mudança de status
         };
 
+        // A meta é só-admin no banco (trigger `processos_restringir_prioridade_meta`), então
+        // para quem não é admin a coluna nem entra no payload vindo do formulário. Reenviar o
+        // valor seria inofensivo ENQUANTO fosse idêntico ao gravado — mas basta uma diferença
+        // de formatação de data para o banco ler aquilo como alteração manual e recusar o
+        // salvamento inteiro. O recálculo automático logo abaixo continua podendo gravar a
+        // coluna: aí é efeito colateral de troca de status, que o trigger aceita de propósito
+        // (ver o comentário dele em sql/rls_processos_composicoes_orcamentos.sql). — 22/09/2026
+        if (canMarkDateAsMeta()) {
+            updates.data_compromisso_fiscal = dataParaISO(formData.get("DATA COMPROMISSO FISCAL"));
+        }
+
         // NOVA LÓGICA: Recalcular metas automáticas se o status mudar ou se a data de devolução for alterada
         const novoStatus = (updates.status || registroOriginal.status || "").toString().trim().toUpperCase();
         const statusAntigo = (registroOriginal.status || "").toString().trim().toUpperCase();
         const dataDevNova = updates.data_devolucao_correcoes;
-        const dataDevAntiga = registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes ?
-            (isoParaDate(registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes).toISOString().substring(0, 10)) : null;
+        // Revisão 22/09/2026 — esta linha chamava `.toISOString()` direto no retorno de
+        // `isoParaDate()`, que devolve null para valor não reconhecido: bastava uma data
+        // inválida no registro para o salvamento estourar no meio, com o botão já em
+        // "SALVANDO..." e nenhuma mensagem. Agora a conversão é verificada antes de usar.
+        // (`registroOriginal.data_devolucao_correcoes` nunca existe — `mapProcessoRow` só
+        //  produz `dataDevolucaoCorrecoes` —, mas o operando fica por segurança.)
+        const dataDevOriginalBruta = registroOriginal.data_devolucao_correcoes || registroOriginal.dataDevolucaoCorrecoes || null;
+        const dataDevOriginalDate = dataDevOriginalBruta ? isoParaDate(dataDevOriginalBruta) : null;
+        const dataDevAntiga = (dataDevOriginalDate && !isNaN(dataDevOriginalDate.getTime()))
+            ? dataDevOriginalDate.toISOString().substring(0, 10)
+            : null;
 
         const statusMudou = novoStatus && novoStatus !== statusAntigo;
         const dataDevMudou = dataDevNova && dataDevNova !== dataDevAntiga;
@@ -2017,21 +2129,26 @@ async function executarAcaoDetalhes(actionType) {
             }
         }
 
+        // `calcularDataMeta` devolve null quando a data base não é reconhecida, e o código
+        // antigo chamava `.toISOString()` no resultado sem conferir — o salvamento estourava
+        // no meio, com o botão travado em "SALVANDO..." e sem mensagem nenhuma ao usuário.
+        // Agora a meta só é gravada se a conta tiver dado certo. — 22/09/2026
+        const metaISOouNulo = (base, dias) => {
+            const d = base ? calcularDataMeta(base, dias) : null;
+            return (d && !isNaN(d.getTime())) ? d.toISOString().substring(0, 10) : null;
+        };
+
         if (statusMudou || dataDevMudou) {
             // Automação GECOPE: definir metas automáticas
             if (novoStatus === 'ANÁLISE FISCAL') {
-                const base = registroOriginal.created_at || new Date();
-                const metaAuto = calcularDataMeta(base, 20);
-                updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
+                updates.data_compromisso_fiscal = metaISOouNulo(registroOriginal.created_at || new Date(), 20);
             } else if (novoStatus === 'DEVOLVIDO P/ REANÁLISE FISCAL' || novoStatus === 'REANÁLISE FISCAL') {
-                // Para reanálises, usar a data de devolução informada no formulário
-                let base = null;
+                // Para reanálises, usar a data de devolução informada no formulário.
+                // `REANÁLISE FISCAL` (forma curta) não existe em nenhum dropdown, mas é aceita
+                // aqui e na regra 3 do job sincronizar-suite — dado legado.
                 const devolucaoFinal = updates.data_devolucao_correcoes || dataDevAntiga;
-                if (devolucaoFinal) base = isoParaDate(devolucaoFinal);
-                else base = new Date();
-
-                const metaAuto = calcularDataMeta(base, 10);
-                updates.data_compromisso_fiscal = metaAuto.toISOString().substring(0, 10);
+                const base = devolucaoFinal ? isoParaDate(devolucaoFinal) : new Date();
+                updates.data_compromisso_fiscal = metaISOouNulo(base, 10);
             } else if (statusMudou) {
                 // Remove a meta se o status mudou para algo que não tem meta automática
                 updates.data_compromisso_fiscal = null;
@@ -2041,16 +2158,25 @@ async function executarAcaoDetalhes(actionType) {
         }
 
         const btn = document.getElementById('btn-atualizar');
-        btn.innerHTML = "SALVANDO...";
-        btn.disabled = true;
+        if (btn) {
+            btn.innerHTML = "SALVANDO...";
+            btn.disabled = true;
+        }
 
-        const { error } = await sbClient
-            .from('processos')
-            .update(updates)
-            .eq('id', idUnico);
+        // Um erro de rede aqui (fetch rejeitado) não voltava como `{ error }`: era exceção,
+        // e sem try/catch o botão ficava preso em "SALVANDO..." desabilitado, sem aviso.
+        let error = null;
+        try {
+            const res = await sbClient.from('processos').update(updates).eq('id', idUnico);
+            error = res.error;
+        } catch (e) {
+            error = { message: (e && e.message) ? e.message : String(e) };
+        }
 
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+        }
 
         if (error) {
             alert("Erro ao atualizar: " + error.message);
@@ -2066,7 +2192,12 @@ async function executarAcaoDetalhes(actionType) {
             const dataLimiteOriginal = registroOriginal.dataCompromissoFiscal
                 ? registroOriginal.dataCompromissoFiscal.toISOString().substring(0, 10)
                 : null;
-            const dataLimiteNova = updates.data_compromisso_fiscal || null;
+            // Quando a coluna não foi ao payload (não-admin — ver o gate acima) e o recálculo
+            // automático também não a definiu, a meta simplesmente NÃO mudou. Ler `undefined`
+            // como `null` faria o histórico registrar uma "meta zerada" que nunca aconteceu no
+            // banco. Por isso o fallback é a data original, não `null`. — 22/09/2026
+            const metaNoPayload = Object.prototype.hasOwnProperty.call(updates, 'data_compromisso_fiscal');
+            const dataLimiteNova = metaNoPayload ? (updates.data_compromisso_fiscal || null) : dataLimiteOriginal;
 
             if (dataLimiteNova !== dataLimiteOriginal) {
                 let dias = null;
@@ -2170,28 +2301,9 @@ async function executarAcaoDetalhes(actionType) {
 
 // --- FUNES AUXILIARES RECUPERADAS ---
 
-function parseMoneyInput(val) {
-    if (val === null || val === undefined || val === '') return 0;
-    let s = val.toString().trim();
-    // Normaliza múltiplos tipos de traços para o hífen padrão (ASCII 45)
-    s = s.replace(/[\u2212\u2013\u2014]/g, '-');
-    // Se estiver entre parênteses, trata como negativo: (1.000,00) => -1.000,00
-    if (/^\(.*\)$/.test(s)) { s = '-' + s.replace(/^\(|\)$/g, ''); }
-    // Remove R$, espaços normais e NBSP
-    s = s.replace(/R\$|\s|\u00A0/g, '');
-    // Remove quaisquer caracteres que não sejam dígito, vírgula, ponto ou sinal de menos
-    s = s.replace(/[^0-9\-,.]/g, '');
-    if (!s || s === '-') return 0;
-    // Se formato brasileiro (com vírgula), converte para formato parseable
-    if (s.includes(',')) {
-        s = s.replace(/\./g, '').replace(',', '.');
-    } else if (s.split('.').length > 2) {
-        // Caso tenha mais de um ponto (ex: 1.250.00), remove todos os pontos
-        s = s.replace(/\./g, '');
-    }
-    const res = parseFloat(s);
-    return isFinite(res) ? res : 0;
-}
+// `parseMoneyInput()` é definida em utils.js e exposta em window.parseMoneyInput — a cópia
+// idêntica que existia aqui foi removida na revisão de 22/09/2026, pelo mesmo motivo do
+// debounce() acima: processos.js carrega por último e sobrescrevia a versão de utils.js.
 
 function calcularRepercussao() {
     try {
@@ -2413,10 +2525,10 @@ function statusPriority(status) {
     return 99;
 }
 
-// Ordem REVISADA (aplicada apenas ao "filtro"/setinha da coluna Status quando clicada)
-function statusFilterPriority(status) {
-    return statusPriority(status);
-}
+// A função statusFilterPriority foi removida na revisão de 22/09/2026: era um repasse puro
+// para statusPriority (`return statusPriority(status);`), e o comentário que a acompanhava
+// dizia ser uma "ordem REVISADA, aplicada apenas ao filtro da coluna Status" — o que deixou
+// de ser verdade quando as duas ordens foram unificadas. A chamada passou a ser direta.
 
 // Funções para gerenciar processos prioritários
 function isPrioritario(row) {
@@ -2809,10 +2921,21 @@ async function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
     }
 
     const ids = linhasFiltro.map(d => d.id).filter(id => id != null);
-    const { data, error } = await sbClient
-        .from('vw_painel_desempenho_fiscais')
-        .select('id, obra_distrito_operacional, fiscal_nome')
-        .in('id', ids);
+
+    // Sem o try/catch, uma falha de rede deixava o modal parado em "Carregando…" para
+    // sempre. Agora a exceção vira a mesma mensagem de erro do caminho `{ error }`.
+    // — 22/09/2026
+    let data = null, error = null;
+    try {
+        const res = await sbClient
+            .from('vw_painel_desempenho_fiscais')
+            .select('id, obra_distrito_operacional, fiscal_nome')
+            .in('id', ids);
+        data = res.data;
+        error = res.error;
+    } catch (e) {
+        error = { message: (e && e.message) ? e.message : String(e) };
+    }
 
     if (meuReqId !== _breakdownReqId) return; // outro clique já assumiu a tela — descarta esta resposta
 
@@ -2833,10 +2956,18 @@ async function abrirBreakdownFiscal(statusFiltro, titulo, iconClass) {
         // (achado do rev-correcao). Uma sonda sem filtro de id decide: se a view
         // devolve QUALQUER linha pra este usuário, ele tem acesso — só estes ids
         // específicos não bateram, e o motivo é dado, não permissão.
-        const { data: sonda, error: erroSonda } = await sbClient
-            .from('vw_painel_desempenho_fiscais')
-            .select('id')
-            .limit(1);
+        // Mesmo motivo do try/catch acima: exceção de rede deixaria o modal em "Carregando…".
+        let sonda = null, erroSonda = null;
+        try {
+            const res = await sbClient
+                .from('vw_painel_desempenho_fiscais')
+                .select('id')
+                .limit(1);
+            sonda = res.data;
+            erroSonda = res.error;
+        } catch (e) {
+            erroSonda = { message: (e && e.message) ? e.message : String(e) };
+        }
         if (meuReqId !== _breakdownReqId) return;
 
         if (erroSonda) {
@@ -2892,13 +3023,26 @@ function updateReuniaoFilters(rows) { mtBase = rows; updateReuniao(); }
 function updateReuniao() {
     if (window.isResettingFilters) return; // Evita loop de re-render ao resetar filtros
     if (!mt.body) return;
+    _renderReuniaoEmAndamento = true;
+    try {
+        _updateReuniaoInterno();
+    } finally {
+        _renderReuniaoEmAndamento = false;
+    }
+}
+
+function _updateReuniaoInterno() {
     const uRole = (sessionStorage.getItem('sop_role') || "").toLowerCase();
 
     // Prioriza sop_fiscal_name (derivado do email) sobre sop_user_name
     let uName = (sessionStorage.getItem('sop_fiscal_name') || sessionStorage.getItem('sop_user_name') || "").toUpperCase().trim();
 
-    const fs = Array.from(new Set(mtBase.map(d => d.fiscal).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    if (mt.fiscal.options.length <= 1) fillSelect(mt.fiscal, fs);
+    // `fs` só é usado dentro do if logo abaixo — construir e ordenar a lista de fiscais a
+    // cada render, para descartá-la na maioria das vezes, era trabalho puro. — 22/09/2026
+    if (mt.fiscal.options.length <= 1) {
+        const fs = Array.from(new Set(mtBase.map(d => d.fiscal).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        fillSelect(mt.fiscal, fs);
+    }
     let rows = mtBase.slice();
 
     // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
@@ -2937,29 +3081,58 @@ function updateReuniao() {
         // ao aprovar esta troca): quando falta de um dos lados, cai de volta pro
         // casamento por nome de sempre, pra não esconder processos de quem só
         // tem o vínculo antigo (por nome).
-        const uMatricula = (sessionStorage.getItem('sop_matricula') || '').trim().toUpperCase();
+        // Revisão 22/09/2026 — a matrícula NORMALIZADA (`normalizarMatriculaFiscal`, que
+        // descarta ponto/hífen/barra/espaço) é a única chave de decisão. Antes, este filtro
+        // usava `.trim().toUpperCase()` cru, uma terceira normalização diferente da do resto
+        // do arquivo, e um casamento por nome nos dois sentidos que sobrava: um fiscal
+        // "ANA SOUSA LIMA" enxergava tudo que era de "ANA SOUSA". O sentido reverso saiu.
+        //
+        // IMPORTANTE: este filtro NÃO é a fronteira de segurança — quem decide é a política
+        // `processos_select` no banco, que só entrega ao fiscal as linhas com a matrícula
+        // dele ou sem matrícula nenhuma. Aqui é só apresentação. Por isso, quando o vínculo
+        // é reconhecido por um caminho que não a matrícula, o processo APARECE com aviso, em
+        // vez de sumir calado — sumir sem avisar foi o defeito que motivou esta correção.
+        const uMatriculaRaw = (sessionStorage.getItem('sop_matricula') || '').trim();
+        const uMatricula = normalizarMatriculaFiscal(uMatriculaRaw);
         const nameParts = uName.trim().split(/[\s\.\-]+/).filter(p => p.length > 0);
+        const nomeBateCom = (nomeDoProcesso) => nomeDoProcesso
+            && (nomeDoProcesso === uName || nameParts.every(part => nomeDoProcesso.includes(part)));
+
         rows = rows.filter(d => {
             const dFiscal = (d.fiscal || "").toUpperCase().trim();
             const dFiscalNormalizado = dFiscal.replace(/[\.\-]+/g, ' ').trim();
-            if (uMatricula && d.fiscalMatricula) {
-                const bate = String(d.fiscalMatricula).trim().toUpperCase() === uMatricula;
-                // Achado do rev-produto (Fase 3): diagnóstico barato pro piloto — se a
-                // matrícula não bateu mas o nome bateria (jeito antigo), a matrícula do
-                // processo provavelmente está dessincronizada do cadastro do fiscal.
-                // Não muda o resultado (matrícula continua tendo prioridade), só ajuda a
-                // investigar rápido se alguém reclamar "sumiu um processo".
-                if (!bate && (dFiscalNormalizado === uName || nameParts.every(part => dFiscalNormalizado.includes(part)))) {
-                    console.warn(`[permissões] Processo ${d.processo}: fiscal_matricula (${d.fiscalMatricula}) não bate com a matrícula logada (${uMatricula}), mas o nome bateria — confira o cadastro.`);
+            const dMatricula = normalizarMatriculaFiscal(d.fiscalMatricula);
+
+            // Limpa a marca da rodada anterior — este filtro roda a cada re-render.
+            d.vinculoFiscalAviso = null;
+
+            if (uMatricula && dMatricula) {
+                if (dMatricula === uMatricula) return true;
+                // Matrícula não confere. Se o nome confere, o cadastro está dessincronizado
+                // e o processo é mesmo deste fiscal: mostra e explica, não esconde.
+                if (nomeBateCom(dFiscalNormalizado)) {
+                    d.vinculoFiscalAviso = `A matrícula gravada neste processo (${d.fiscalMatricula}) não confere com a sua (${uMatriculaRaw}). `
+                        + `O vínculo foi reconhecido pelo seu nome. Peça ao administrador para acertar o cadastro.`;
+                    return true;
                 }
-                return bate;
+                return false;
             }
-            if (dFiscalNormalizado === uName) return true;
-            if (nameParts.every(part => dFiscalNormalizado.includes(part))) return true;
-            const dFiscalParts = dFiscalNormalizado.split(/\s+/).filter(p => p.length > 0);
-            if (dFiscalParts.every(part => uName.includes(part))) return true;
+
+            // Processo sem matrícula de fiscal gravada (legado). O vínculo só pode ser pelo
+            // nome; sinaliza para que o cadastro seja completado.
+            if (nomeBateCom(dFiscalNormalizado)) {
+                d.vinculoFiscalAviso = 'Este processo não tem a matrícula do fiscal gravada; o vínculo foi reconhecido pelo nome. '
+                    + 'Peça ao administrador para gravar a matrícula.';
+                return true;
+            }
             return false;
         });
+
+        const comAviso = rows.filter(d => d.vinculoFiscalAviso).length;
+        if (comAviso > 0) {
+            console.warn(`[permissões] ${comAviso} processo(s) vinculados a você pelo nome, não pela matrícula. `
+                + `Veja o aviso ⚠ ao lado do nome do fiscal em cada linha.`);
+        }
         if (mt.fiscal && mt.fiscal.closest('.col-12.col-md-2')) {
             mt.fiscal.closest('.col-12.col-md-2').style.display = 'none';
         }
@@ -3100,7 +3273,7 @@ function updateReuniao() {
                     valB = mB ? mB.getTime() : 0;
                     break;
                 }
-                case 'status': valA = statusFilterPriority(a.status); valB = statusFilterPriority(b.status); break;
+                case 'status': valA = statusPriority(a.status); valB = statusPriority(b.status); break;
                 case 'analista': valA = a.analista || ""; valB = b.analista || ""; break;
                 case 'abertura': valA = a.dataAbertura instanceof Date ? a.dataAbertura.getTime() : 0; valB = b.dataAbertura instanceof Date ? b.dataAbertura.getTime() : 0; break;
                 case 'dias': valA = a.dataAbertura instanceof Date ? -(new Date() - a.dataAbertura) : 1; valB = b.dataAbertura instanceof Date ? -(new Date() - b.dataAbertura) : 1; break;
@@ -3175,6 +3348,10 @@ function updateReuniao() {
     // do status — só o cabeçalho de cada bloco carrega a cor de destaque
     const groupRowBgColor = "rgba(255, 255, 255, 0.035)";
 
+    // Fora do laço de propósito: a permissão não muda de linha para linha, e temAutorizacao()
+    // faz um JSON.parse por chamada — dentro do forEach isso era um parse por processo.
+    const podeVerDetalhes = canSeeProcessActions();
+
     rows.forEach(d => {
         const mIso = getMetaDate(d)?.toISOString().substring(0, 10) || "";
         const mSt = getMetaSt(d);
@@ -3183,21 +3360,12 @@ function updateReuniao() {
         else if (mSt === "No prazo") mCls = "badge-meta-prazo";
         else if (mSt === "Atrasado") mCls = "badge-meta-atrasado";
 
+        // Revisão 22/09/2026 — aqui existia uma cópia byte-a-byte da cascata de
+        // `classeBadgeStatus()`, com um detalhe divergente: o padrão era "text-bg-light" nesta
+        // cópia e "" na função. Duas implementações da mesma regra que precisavam ser editadas
+        // juntas; agora a função é a fonte única, e o padrão fica explícito aqui.
         const stTxt = (d.status || "").toString().toUpperCase().trim();
-        let stCls = "text-bg-light";
-        if (stTxt.includes("DEVOLVIDO")) { stCls = "badge-status-devolvido"; }
-        else if (stTxt.includes("DILIG")) { stCls = "badge-status-diligencia"; }
-        else if (stTxt.includes("CONTRATANTE")) { stCls = "badge-status-contratante"; }
-        else if (stTxt.includes("APROVAÇÃO")) { stCls = "badge-status-dark-blue"; }
-        else if (stTxt.includes("FISCAL") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-fiscal"; }
-        else if (stTxt.includes("AGUAR")) {
-            if (stTxt.includes("REAN")) { stCls = "badge-status-aguar-reanalise"; }
-            else { stCls = "badge-status-light-blue"; }
-        }
-        else if (stTxt.startsWith("EM") && stTxt.includes("REANÁLISE")) { stCls = "badge-status-em-reanalise"; }
-        else if (stTxt.startsWith("EM") && (stTxt.includes("ANÁLISE") || stTxt.includes("ANALISE"))) { stCls = "badge-status-em-analise"; }
-        else if (stTxt.includes("APROVADO") || stTxt === "SEDUC") { stCls = "badge-status-aprovado"; }
-        else if (stTxt.includes("ARQUIVADO")) { stCls = "badge-status-arquivado"; }
+        const stCls = classeBadgeStatus(stTxt) || "text-bg-light";
 
         // Cabeçalho de grupo: insere uma linha divisória sempre que o status muda,
         // mantendo a ordenação já aplicada (mesma regra de data de abertura dentro do grupo)
@@ -3210,7 +3378,7 @@ function updateReuniao() {
             <td colspan="${columns.length}" style="background: ${bgColor}; padding: 9px 16px; border-top: 1px solid var(--sop-slate-200, #e2e8f0); border-left: 4px solid ${accentColor};">
                 <span class="d-inline-flex align-items-center" style="gap: 7px;">
                     <span style="width: 7px; height: 7px; border-radius: 50%; background: ${accentColor}; flex-shrink: 0;"></span>
-                    <span class="text-uppercase" style="font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-heading);">${statusGroupLabel}</span>
+                    <span class="text-uppercase" style="font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-heading);">${escapeHTML(statusGroupLabel)}</span>
                     <span class="text-muted" style="font-size: 0.74rem; font-weight: 500;">${statusGroupCounts[statusGroupLabel]} processo${statusGroupCounts[statusGroupLabel] === 1 ? '' : 's'}</span>
                 </span>
             </td>
@@ -3222,16 +3390,31 @@ function updateReuniao() {
         const dias = (d.dataAbertura instanceof Date) ? Math.floor((new Date() - d.dataAbertura) / (1000 * 60 * 60 * 24)) : "";
         const fiscalNome = (d.fiscal || "").toUpperCase();
 
-        const diasNoStatus = calcularDiasNoStatus(d);
-        const labelDias = diasNoStatus <= 0 ? "Hoje" : (diasNoStatus === 1 ? "1 dia" : `${diasNoStatus} dias`);
+        // Aviso de vínculo reconhecido por nome em vez de matrícula (ver o filtro do papel
+        // 'fiscal', acima). Só aparece para quem caiu nesse caso, e só para quem enxerga a
+        // lista restrita — ou seja, o papel 'fiscal', inclusive quando ele tem a autorização
+        // `processos_gravar`. Admin e gerente nunca veem.
+        const avisoVinculoHTML = d.vinculoFiscalAviso
+            ? `<i class="bi bi-exclamation-triangle-fill ms-1" style="color: var(--sop-orange);" title="${escapeHTML(d.vinculoFiscalAviso)}"></i>`
+            : '';
 
-        // Preparar botões de ação para evitar aninhamento de template strings
-        // Fase 5: também libera pra quem recebeu a autorização especial "processos_gravar"
-        const canEdit = ['admin', 'gerente'].includes(uRole) || (typeof temAutorizacao === 'function' && temAutorizacao('processos_gravar'));
+        // Preparar botões de ação para evitar aninhamento de template strings.
+        // Era uma terceira cópia literal da regra de quem vê as ações (as outras duas estavam em
+        // canSeeProcessActions e nas funções novas de permissão). Passou a ler da fonte única em
+        // core/auth.js — três cópias da mesma regra de acesso só podem divergir com o tempo, e
+        // foi divergência assim que gerou os achados desta revisão. — 22/09/2026
+        //
+        // `canSeeProcessActions()` e não `podeEditarProcesso()` por intenção, não por efeito:
+        // as duas coincidem hoje, mas quem abre o modal e quem grava são perguntas distintas —
+        // ver os comentários das duas em core/auth.js.
+        const canEdit = podeVerDetalhes;
         const btnDetalhes = canEdit ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(d.processo)}')" title="Ver detalhes"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : '';
 
-        // Link para o SUITE (NUP apenas números para evitar 404)
-        const nupLimpo = escapeHTML(d.processo).replace(/\D/g, '');
+        // Link para o SUITE (NUP apenas números para evitar 404).
+        // A ordem importa: `escapeHTML` primeiro transformava ' em &#39;, e o 39 SOBREVIVIA ao
+        // replace(/\D/g,''), entrando no meio do NUP e gerando uma URL corrompida. Tirar os
+        // não-dígitos já deixa a string segura para interpolar. — 22/09/2026
+        const nupLimpo = String(d.processo || '').replace(/\D/g, '');
         const btnSuite = `<a href="https://suite.ce.gov.br/consultar-processo/${nupLimpo}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-light border" title="Abrir no SUITE"><i class="bi bi-box-arrow-up-right" style="color: var(--sop-green);"></i></a>`;
 
         // Lógica da Meta
@@ -3254,7 +3437,7 @@ function updateReuniao() {
                 </div>
             </td>
             <td class="text-center"><i class="bi ${isPrioritario(d) ? 'bi-star-fill' : 'bi-star'} proc-star-prioritario" data-proc="${escapeHTML(d.processo)}" style="color: ${isPrioritario(d) ? 'var(--sop-orange)' : 'var(--sop-slate-200)'}; font-size: 1.1rem; cursor: ${uRole === 'admin' ? 'pointer' : 'not-allowed'};" title="${uRole === 'admin' ? (isPrioritario(d) ? 'Remover prioridade' : 'Marcar como prioritário') : 'Você não tem permissão'}"></i></td>
-            <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}</div></td>
+            <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
             <td class="text-center">
                 <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
                 <div style="font-size: 0.74rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
@@ -3262,7 +3445,7 @@ function updateReuniao() {
                 </div>
             </td>
             <td class="text-center">
-                <div style="white-space: nowrap;"><span class="badge rounded-pill ${stCls} badge-custom-size">${formatStatusDisplay(d.status)}</span><span class="alerta-icone" style="${temAlertaDiligencia ? '' : 'display:none;'}">${alertaIconeHTML}</span></div>
+                <div style="white-space: nowrap;"><span class="badge rounded-pill ${stCls} badge-custom-size">${escapeHTML(formatStatusDisplay(d.status))}</span><span class="alerta-icone" style="${temAlertaDiligencia ? '' : 'display:none;'}">${alertaIconeHTML}</span></div>
                 <div class=\"mt-1 text-muted px-1\" style=\"font-size: 0.7rem; font-weight: 500; height: 1.1rem;\"></div>
             </td>
             <td class="suite-cell text-center">
@@ -3286,17 +3469,21 @@ function updateReuniao() {
 
         let historicoHTML = '';
         try {
-            const { data: pData } = await sbClient.from('processos').select('id').eq('processo', processo).maybeSingle();
-            if (pData && pData.id) {
+            // Revisão 22/09/2026 — aqui havia uma ida à rede só para descobrir o `id` do
+            // processo, que já está carregado em window.allData (e era buscado localmente duas
+            // linhas abaixo, no `pRow`). Uma viagem de rede por abertura do modal de meta, à
+            // toa. Agora o id sai do próprio objeto em memória.
+            const pRow = (window.allData || []).find(r => r.processo === processo);
+            const processoId = pRow ? pRow.id : null;
+            if (processoId) {
                 const { data: rawHistorico } = await sbClient
                     .from('historico_metas')
                     .select('*')
-                    .eq('processo_id', pData.id)
+                    .eq('processo_id', processoId)
                     .order('registros', { ascending: false });
 
                 const historico = [];
                 if (rawHistorico) {
-                    const pRow = (window.allData || []).find(r => r.processo === processo);
                     const chavesVistas = new Set();
                     for (const h of rawHistorico) {
                         let estDate = h.registros;
@@ -3424,7 +3611,7 @@ function updateReuniao() {
                     `;
 
         const { value: formValues, isConfirmed, isDenied } = await Swal.fire({
-            title: `<div style="font-size: 1.3rem; font-weight: 700; color: #1B5E20; display: flex; align-items: center;"><i class="bi bi-calendar-check text-success me-2" style="font-size: 1.5rem;"></i> ${isAdmin ? 'Definir Meta' : 'Visualizar Meta'}</div><div style="font-size: 0.9rem; color: #666; margin-top: 6px; font-weight: 500;">Processo: <span class="text-dark fw-bold">${processo}</span></div>`,
+            title: `<div style="font-size: 1.3rem; font-weight: 700; color: #1B5E20; display: flex; align-items: center;"><i class="bi bi-calendar-check text-success me-2" style="font-size: 1.5rem;"></i> ${isAdmin ? 'Definir Meta' : 'Visualizar Meta'}</div><div style="font-size: 0.9rem; color: #666; margin-top: 6px; font-weight: 500;">Processo: <span class="text-dark fw-bold">${escapeHTML(processo)}</span></div>`,
             html: htmlContent,
             showCancelButton: true,
             showConfirmButton: isAdmin,
@@ -3491,7 +3678,10 @@ function atualizarTabelaSuite(rows) {
     });
 
     rows.forEach(d => {
-        const tr = trPorNumero.get(escapeHTML(d.processo));
+        // Mesmo caso do querySelector lá em cima: o Map é indexado pelo valor DECODIFICADO
+        // que o navegador devolve em getAttribute, então re-escapar aqui só fazia a busca
+        // devolver undefined em silêncio para NUPs com caractere especial. — 22/09/2026
+        const tr = trPorNumero.get(d.processo);
         if (!tr) return;
 
         const suiteCell = tr.querySelector('.suite-badge-container');
@@ -3524,8 +3714,13 @@ function atualizarTabelaSuite(rows) {
         // guarda) depende só de status/sigla, nunca de suite_data_chegada. Mantê-lo preso
         // ao "if" acima fazia o ícone/contagem da aba Aprovados sumir sempre que a tabela
         // `processos` ainda não tinha a data de chegada preenchida para aquele processo.
-        aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxt);
+        // adiarBadge = true: o contador é atualizado uma vez só, depois do laço — antes ele
+        // varria window.allData a cada linha, e ainda podia disparar um novo render no meio
+        // deste (ver `_renderReuniaoEmAndamento`).
+        aplicarAlertaPreDiligencia(d, tr, alertaIcone, sigla, stTxt, true);
     });
+
+    atualizarBadgeAbaAprovados();
 }
 
 function fillCommonStatusFilters() {
@@ -3592,9 +3787,6 @@ if (typeof verificarAdminSalvo === 'function') verificarAdminSalvo();
 
     if (savedRole !== 'guest') {
         toggleLanding(false);
-        console.log('[DEBUG] IIFE: Landing ocultado (usuário já autenticado)');
-    } else {
-        console.log('[DEBUG] IIFE: Nenhum usuário autenticado. Landing será exibida.');
     }
     applyRoleToUI(savedRole);
 })();

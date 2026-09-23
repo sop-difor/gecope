@@ -481,10 +481,18 @@ function canDeleteComposition(item) {
  * Verifica se o usuário pode ver ações em processos (botões de ação)
  * Regra: Admin e Gerente. Fiscal/Externo também, se tiverem a autorização
  * especial "processos_gravar" (concedida individualmente em Administração).
+ *
+ * Isto é quem ABRE o modal (o botão do olho); quem GRAVA é podeGravarProcessos(). As duas
+ * regras coincidem desde 22/09/2026, então esta delega — em vez de repetir a expressão, que
+ * foi como a mesma regra acabou em quatro cópias divergentes até aquela revisão.
+ *
+ * Elas já estiveram separadas: entre 18/09 e 22/09/2026 o banco recusava a gravação de quem
+ * tinha a autorização especial, e quem a tinha abria o modal em LEITURA. Se um dia voltarem a
+ * divergir, é aqui que se separa de novo — ver um processo não precisa depender de poder
+ * gravá-lo.
  */
 function canSeeProcessActions() {
-    const role = getCurrentUserRole();
-    return ['admin', 'gerente'].includes(role) || temAutorizacao('processos_gravar');
+    return podeGravarProcessos();
 }
 
 /**
@@ -505,6 +513,83 @@ function canMarkDateAsMeta() {
     const role = getCurrentUserRole();
     // gerentes não têm essa permissão
     return role === 'admin';
+}
+
+/**
+ * Verifica se o usuário pode excluir um processo (exclusão lógica: status = 'EXCLUÍDO').
+ *
+ * Regra: a mesma de podeGravarProcessos(), porque é a mesma política `processos_update` do
+ * banco que autoriza as duas coisas — a exclusão é um UPDATE de status, não um DELETE. Leia o
+ * comentário daquela função antes de mexer aqui: ele explica de que a regra depende no banco.
+ *
+ * Duas versões desta função erraram no mesmo ponto em 22/09/2026, em direções opostas — a
+ * primeira citando `sql/rls_processos_composicoes_orcamentos.sql`, já substituído, e a segunda
+ * `sql/autorizacoes_especiais.sql`, cuja definição o banco deixou de refletir em 18/09. A lição é
+ * a mesma: o arquivo de migração diz o que foi PEDIDO ao banco, não o que ele responde hoje.
+ * Quem decide é `pg_policies`.
+ *
+ * ATENÇÃO: se esta regra mudar, a política do banco precisa mudar junto. Antes de 22/09/2026 as
+ * duas discordavam — o HTML marcava o botão como `.admin-only` enquanto o banco aceitava
+ * gerente — e o JS ainda reabilitava o botão para todos, o que dava erro de banco na cara do
+ * usuário em vez de simplesmente esconder a ação.
+ */
+function podeExcluirProcesso() {
+    return podeGravarProcessos();
+}
+
+/**
+ * Espelho, no navegador, da política `processos_update` que está VIVA no banco. Editar e
+ * excluir são a mesma autorização lá (a exclusão é um UPDATE), então `podeEditarProcesso()` e
+ * `podeExcluirProcesso()` leem daqui, para não poderem divergir entre si nem do banco.
+ *
+ * REGRA ESPERADA NO BANCO (`sql/autorizacoes_especiais.sql`, Fase 5):
+ *     USING (public.pode_gravar_processos())
+ *     -- = meu_papel() IN ('admin','gerente') OR tenho_autorizacao('processos_gravar')
+ *
+ * **DEPENDE DE `sql/restaurar_pode_gravar_processos.sql` TER SIDO APLICADO.** Entre 18/09 e
+ * 22/09/2026 esta função NÃO pôde incluir a autorização especial, porque o banco não a
+ * aceitava: `sql/_aplicados/fix_processos_rw_authenticated_leftover.sql`, aplicado em
+ * 18/09/2026 durante a correção de egress, recriou `processos_insert` e `processos_update` a
+ * partir da definição ANTERIOR à Fase 5 e apagou o ramo da autorização sem que ninguém
+ * notasse — o script mirava outra coisa (uma política órfã) e levou estas duas junto.
+ * `processos_select` escapou, e por isso a autorização irmã `processos_ver_todos` nunca
+ * parou de funcionar.
+ *
+ * Decisão de 22/09/2026: restaurar a intenção da Fase 5. A linha abaixo e a política do banco
+ * são UM PAR — se um dia a política for alterada de novo, esta função muda no mesmo dia, nas
+ * duas direções: mais larga que o banco dá erro na cara do usuário, mais estreita esconde um
+ * poder que ele tem.
+ *
+ * **Confira em `pg_policies`, não no arquivo de migração.** Foi por confiar no arquivo que
+ * esta função errou duas vezes em 22/09/2026, uma para cada lado. Arquivo do `sql/` diz o que
+ * foi PEDIDO ao banco em alguma data; só o banco diz o que vale hoje.
+ */
+function podeGravarProcessos() {
+    return ['admin', 'gerente'].includes(getCurrentUserRole())
+        || temAutorizacao('processos_gravar');
+}
+
+/**
+ * Verifica se o usuário pode editar um processo (o "SALVAR ALTERAÇÕES" do modal de detalhes).
+ *
+ * Mesma regra de podeExcluirProcesso() — é a mesma política `processos_update` que autoriza as
+ * duas coisas, então as duas funções andam juntas e ambas leem de podeGravarProcessos():
+ * admin, gerente ou a autorização especial. Antes de 22/09/2026 a tela era MAIS rígida que o
+ * banco: abria o modal com
+ * todos os campos desabilitados para o gerente, embora o banco o autorizasse a gravar. O próprio
+ * SQL já supunha isso — o comentário do trigger `processos_restringir_prioridade_meta` fala em
+ * não "quebrar o Salvar do Gerente".
+ *
+ * Duas exceções continuam só-admin, e são impostas pelo banco naquele trigger — a tela precisa
+ * espelhá-las para não oferecer um campo cuja gravação o banco vai recusar:
+ *   - prioridade  → canMarkProcessAsPriority() (o trigger recusa qualquer mudança em
+ *                   `prioritario` vinda de não-admin, mesmo junto com outras colunas);
+ *   - meta manual → canMarkDateAsMeta() (o trigger recusa quando `data_compromisso_fiscal` é a
+ *                   ÚNICA coluna alterada; quando ela muda por efeito colateral de uma troca de
+ *                   status, passa).
+ */
+function podeEditarProcesso() {
+    return podeGravarProcessos();
 }
 
 // --- WIRING DO OVERLAY DE LOGIN/CADASTRO (extraído de main.js) ---
