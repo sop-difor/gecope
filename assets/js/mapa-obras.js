@@ -3428,6 +3428,11 @@ function sincronizaModoRp(){
   if(_lastStatus) setStatus(_lastStatus.txt,_lastStatus.ok,_lastStatus.lastSync,_lastStatus.replan);
 }
 function render(){
+  // E2 — reavalia se o filtro Prazo pode ficar visível/aplicado ANTES de qualquer leitura
+  // de processo (rpPreparaMapa/filtraRp, logo abaixo): se Situação deixou de ser só
+  // "Fiscalização", syncPrazoRp() já limpa st.rp.filtro.prazo neste mesmo render, em vez
+  // de deixar um filtro fantasma valer por mais um ciclo.
+  syncPrazoRp();
   // Ganchos de CSS do modo Replanilhamentos (rótulos do mapa e escala de peso; ver body.modo-rp).
   sincronizaModoRp();
   if(modoReplan()) rpPreparaMapa();
@@ -3950,10 +3955,21 @@ const FILTER_DEFS_RP=[
   // calculado em mapProcesso, não reinventa a partição por ausência de naFila/despachado
   // (achado do rev-correcao e do rev-aderencia na mesma rodada: a versão anterior
   // fundia os dois grupos sob "Fora do ciclo", contradizendo o card GxF do mesmo painel).
+  // Rótulos renomeados a pedido do usuário (2026-09-23), os valores internos (`v`) não
+  // mudaram: "Na fila" -> "Fiscalização" (está com o fiscal agora), "Na GECOPE" ->
+  // "GECOPE" (em trâmite: Diligência, Em Análise, Aguar. Aprovação…), "Despachado"
+  // mantido, "Fora do ciclo" -> "Dado Incompleto" (o nome antigo não dizia que o processo
+  // fica de fora de toda métrica por falta de data/situação consistente).
   {key:'situacao',label:'Situação',cats:[
-    {v:'na_fila',label:'Na fila'},{v:'na_gecope',label:'Na GECOPE'},
-    {v:'despachado',label:'Despachado'},{v:'fora_do_ciclo',label:'Fora do ciclo'}],
+    {v:'na_fila',label:'Fiscalização'},{v:'na_gecope',label:'GECOPE'},
+    {v:'despachado',label:'Despachado'},{v:'fora_do_ciclo',label:'Dado Incompleto'}],
    get:p=>p.naFila?'na_fila':p.despachado?'despachado':p.foraDoCiclo?'fora_do_ciclo':'na_gecope'},
+  // O filtro Prazo só é significativo para processos "Fiscalização" (na_fila): só eles
+  // têm data_compromisso_fiscal ativa — em Despachado/GECOPE/Dado Incompleto o campo vem
+  // nulo e cai tudo em "Sem prazo", esvaziando a amostra das métricas Tempo médio e
+  // Despachos (bug relatado pelo usuário, 2026-09-23: o mapa "perdia os dados" ao marcar
+  // Atrasado/No prazo). Por isso ele só aparece na UI quando Situação tem exatamente
+  // "Fiscalização" marcada — ver prazoDisponivel()/syncPrazoRp() mais abaixo.
   {key:'prazo',label:'Prazo',cats:[
     {v:'atrasado',label:'Atrasado'},{v:'no_prazo',label:'No prazo'},{v:'sem_prazo',label:'Sem prazo'}],
    get:p=>p.metaEstourada===true?'atrasado':p.metaEstourada===false?'no_prazo':'sem_prazo'},
@@ -4033,6 +4049,26 @@ function fillFiltersRp(){
     m.querySelectorAll('.msel-opt input').forEach(cb=>{ cb.checked=st.rp.filtro[key].has(cb.value); });
     updateMselBtnRp(key);
   });
+  syncPrazoRp();
+}
+// E2 — Prazo só é um filtro significativo com Situação em "Fiscalização" (ver o comentário
+// em FILTER_DEFS_RP): fora disso, esconde o botão e limpa a seleção, para nunca deixar um
+// filtro escondido continuar valendo sem o usuário perceber quando ele reaparecer.
+function prazoDisponivel(){ return st.rp.filtro.situacao.size===1 && st.rp.filtro.situacao.has('na_fila'); }
+function syncPrazoRp(){
+  const m=document.querySelector('#filtersHostRp .msel[data-key="prazo"]'); if(!m) return;
+  const disp=prazoDisponivel();
+  m.hidden=!disp;
+  if(!disp){
+    // Fecha o painel (se estava aberto) e limpa a seleção — nunca deixa um filtro
+    // escondido continuar valendo sem o usuário perceber quando ele reaparecer.
+    m.classList.remove('on'); mselResetQuery(m);
+    if(st.rp.filtro.prazo.size){
+      st.rp.filtro.prazo.clear();
+      m.querySelectorAll('.msel-opt input').forEach(cb=>cb.checked=false);
+      updateMselBtnRp('prazo');
+    }
+  }
 }
 const _fHostRp=document.getElementById('filtersHostRp');
 if(_fHostRp){
