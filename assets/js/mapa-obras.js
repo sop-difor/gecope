@@ -2696,7 +2696,7 @@ function eixoDias(pts,marcas,opts){
   const linhas=marcas.map(m=>{
     const xn=X(m.v), x=xn.toFixed(1);
     const bandeira=m.cls==='ref'
-      ?`<polygon class="ed-flag" points="${(xn-4).toFixed(1)},2 ${(xn+4).toFixed(1)},2 ${x},9"/>`
+      ?`<polygon class="ed-flag" points="${(xn-5).toFixed(1)},1 ${(xn+5).toFixed(1)},1 ${x},10"/>`
       :'';
     return `${bandeira}<line class="ed-mark ${escHtml(m.cls||'')}" x1="${x}" x2="${x}" y1="6" y2="${yBase}"/>`;
   }).join('');
@@ -2929,12 +2929,16 @@ function abreModalDistrito(gid){
   // que a seção Fiscalização sempre lista todo o histórico do distrito, esse ladrilho e o
   // cabeçalho dela mostram números de escopos diferentes com o mesmo nome curto — o
   // rótulo precisa dizer sozinho qual dos dois é.
+  // A janela do fiscal já tinha uma nota explicando que "Processos" é sempre hoje,
+  // diferente dos demais ladrilhos que seguem o período — aqui os 4 ladrilhos ficavam
+  // lado a lado sem nenhuma pista de que um deles (Processos) não muda com o seletor de
+  // período em Controles, achado ao revisar os prints reais desta janela (2026-09-23).
   const tiles=`<div class="dsh-tiles">`
     +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
     +tile(NUM.format(a.desp),'Despachos',per)
     +tile(NUM.format(a.fiscais),'Fiscais no período',per)
     +tile(NUM.format(obras.size),'Obras atendidas','dos processos acima')
-    +`</div>`;
+    +`</div><div class="dsh-nota">Processos é sempre a fila de hoje; despachos, fiscais e obras seguem o período escolhido em Controles.</div>`;
   // A fila de hoje, na mesma linguagem horizontal do resto da janela. O donut de atraso
   // do painel lateral diria o mesmo aqui — uma barra a mais, um gráfico a menos.
   // Lista dos processos por trás da barra: usuário relatou (2026-09-21) que dava pra ver
