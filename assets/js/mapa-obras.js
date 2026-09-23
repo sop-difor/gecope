@@ -2305,12 +2305,23 @@ function wireModalTabs(){
 // lista de aditivo (valor/prazo) — reconstruído a cada openModal(), então não precisa
 // de delegação de evento nem de limpar listener velho.
 function wireAdToggles(){
-  document.querySelectorAll('.modal .adToggle').forEach(btn=>{
+  document.querySelectorAll('.modal .adToggle, .modal .dsh-tile[data-target]').forEach(btn=>{
     btn.onclick=()=>{
       const el=document.getElementById(btn.dataset.target); if(!el) return;
       const willOpen=el.hidden;
       el.hidden=!willOpen; btn.setAttribute('aria-expanded',String(willOpen));
-      btn.querySelector('.adToggle-car').textContent=willOpen?'▴':'▾';
+      const car=btn.querySelector('.adToggle-car'); if(car) car.textContent=willOpen?'▴':'▾';
+      // Abriu por um ladrilho lá em cima, a lista pode estar fora da tela — sem isso o
+      // clique "não faz nada" aos olhos de quem não rolou a janela primeiro.
+      if(willOpen) requestAnimationFrame(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}));
+    };
+  });
+  // Ladrilho que só aponta pra uma seção JÁ visível (ex.: "Fiscais no período" → os
+  // cartões de Fiscalização, que nunca ficam escondidos) — sem esconder/mostrar, só rola.
+  document.querySelectorAll('.modal .dsh-tile[data-scrollto]').forEach(btn=>{
+    btn.onclick=()=>{
+      const el=document.getElementById(btn.dataset.scrollto); if(!el) return;
+      el.scrollIntoView({behavior:'smooth',block:'start'});
     };
   });
 }
@@ -2346,7 +2357,9 @@ document.getElementById('modal').addEventListener('keydown',e=>{
   const abre=e.target.closest('.chip.abre');
   if(abre){ e.preventDefault(); abrirJanela(abre); return; }
   const fc=e.target.closest('.fcard');
-  if(fc){ e.preventDefault(); abreModalFiscal(fc.dataset.mat,document.getElementById('modal').dataset.rpDistrito); }
+  if(fc){ e.preventDefault(); abreModalFiscal(fc.dataset.mat,document.getElementById('modal').dataset.rpDistrito); return; }
+  const tl=e.target.closest('.dsh-tile[role="button"]');
+  if(tl){ e.preventDefault(); tl.click(); }
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharOuVoltar(); });
 // Esc limpa a seleção combinada (Ctrl+clique) — mas só quando não há nada "mais
@@ -2739,8 +2752,19 @@ function heroTempo(valor,n,referencia,rotuloRef){
 }
 // Ladrilho pequeno: o terceiro e mais leve peso de superfície da janela (herói → gráfico →
 // ladrilho). Não repete o .mkpi do modal de obra para não herdar o tamanho dele aqui.
-function tile(valor,label,sub){
-  return `<div class="dsh-tile"><div class="dsh-tv">${escHtml(valor)}</div>`
+// `opts.target` faz do ladrilho um gatilho a mais para uma lista que já existe escondida
+// no resto da janela (mesmo mecanismo de .adToggle, ver wireAdToggles) — abre a lista por
+// trás do número. `opts.scrollTo` é para o caso do ladrilho "Fiscais no período": a lista
+// (os .fcard da seção Fiscalização) já fica sempre visível, então o clique só rola a
+// janela até ela, sem esconder/mostrar nada.
+function tile(valor,label,sub,opts){
+  opts=opts||{};
+  const attrs=opts.target
+    ? ` role="button" tabindex="0" data-target="${escHtml(opts.target)}" aria-expanded="false" aria-controls="${escHtml(opts.target)}"`
+    : opts.scrollTo
+      ? ` role="button" tabindex="0" data-scrollto="${escHtml(opts.scrollTo)}"`
+      : '';
+  return `<div class="dsh-tile${attrs?' dsh-tile-clic':''}"${attrs}><div class="dsh-tv">${escHtml(valor)}</div>`
     +`<div class="dsh-tl">${escHtml(label)}</div>`+(sub?`<div class="dsh-ts">${escHtml(sub)}</div>`:'')+`</div>`;
 }
 // Barra empilhada da fila de hoje. Mesmo tri-estado do donut GECOPE × Fiscalização, e
@@ -2889,7 +2913,10 @@ function equipeCardsHtml(procs,refMedia){
     ? `<div class="foot-note">${escHtml(`${NUM.format(semFiscal)} processo${semFiscal===1?'':'s'} destas obras `
       +`${semFiscal===1?'está':'estão'} sem matrícula de fiscal gravada e ${semFiscal===1?'fica':'ficam'} fora dos cartões.`)}</div>`
     : '';
-  return `<div class="statwrap"><div class="sec-h"><span>Fiscalização</span>`
+  // id fixo: só existe um chamador (abreModalDistrito) — é o alvo do ladrilho "Fiscais no
+  // período" (data-scrollto), que só precisa rolar até aqui, já que os cartões nunca
+  // ficam escondidos.
+  return `<div class="statwrap" id="secFiscalizacaoDist"><div class="sec-h"><span>Fiscalização</span>`
     +`<span>${NUM.format(lista.length)} ${lista.length===1?'fiscal':'fiscais'}</span></div>`
     +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média dos distritos operacionais (${escHtml(fmtDias(avg))})`:''}. Clique num cartão para abrir o painel do fiscal.</div>`
     +`<div class="fcards">${comMedia.map(card).join('')}${sem.map(card).join('')}</div>${nota}</div>`;
@@ -2908,12 +2935,16 @@ function abreModalDistrito(gid){
   // contava a carreira toda, e não reagia às trocas de período como os três vizinhos.
   // (achado do rev-correcao na revisão da E5, 2026-09-18)
   const corteObras=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
-  const obras=new Set();
+  // Mapa (não Set): guarda um processo representante de cada obra, é dele que sai a lista
+  // por trás do ladrilho "Obras atendidas" (obraResumoCard usa codigo_obra/objeto/
+  // município/valor, todos já presentes no próprio processo — ver mapProcesso).
+  const obrasMapDist=new Map();
   for(const p of procs){
     if(!p.codigo_obra) continue;
     const dentro=p.naFila || (p.despachado && (corteObras==null || (!!p.dataDespacho && p.dataDespacho>=corteObras)));
-    if(dentro) obras.add(p.codigo_obra);
+    if(dentro && !obrasMapDist.has(p.codigo_obra)) obrasMapDist.set(p.codigo_obra,p);
   }
+  const obrasListDist=[...obrasMapDist.values()].sort((x,y)=>(y.valorObra??-1)-(x.valorObra??-1));
   // Mesmo tri-estado do card/donut GECOPE × Fiscalização: sem prazo não é "no prazo".
   const noPrazo=Math.max(0,a.comMeta-a.metaEst), semPrazo=Math.max(0,a.fila-a.comMeta);
   const est=refEstadoPeriodo();
@@ -2933,11 +2964,15 @@ function abreModalDistrito(gid){
   // diferente dos demais ladrilhos que seguem o período — aqui os 4 ladrilhos ficavam
   // lado a lado sem nenhuma pista de que um deles (Processos) não muda com o seletor de
   // período em Controles, achado ao revisar os prints reais desta janela (2026-09-23).
+  // Cada ladrilho aponta para a lista correspondente mais abaixo na mesma janela (pedido
+  // do usuário, 2026-09-23): Processos/Despachos/Obras abrem uma lista escondida (mesmo
+  // mecanismo do .adToggle); Fiscais no período só rola até a seção Fiscalização, que já
+  // fica sempre visível — não há o que abrir/esconder ali.
   const tiles=`<div class="dsh-tiles">`
-    +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
-    +tile(NUM.format(a.desp),'Despachos',per)
-    +tile(NUM.format(a.fiscais),'Fiscais no período',per)
-    +tile(NUM.format(obras.size),'Obras atendidas','dos processos acima')
+    +tile(NUM.format(a.procs),'Processos',rpQuandoProc(),{target:'fichaFilaDist'})
+    +tile(NUM.format(a.desp),'Despachos',per,{target:'fichaDespDist'})
+    +tile(NUM.format(a.fiscais),'Fiscais no período',per,{scrollTo:'secFiscalizacaoDist'})
+    +tile(NUM.format(obrasMapDist.size),'Obras atendidas','dos processos acima',{target:'fichaObrasDist'})
     +`</div><div class="dsh-nota">Processos é sempre a fila de hoje; despachos, fiscais e obras seguem o período escolhido em Controles.</div>`;
   // A fila de hoje, na mesma linguagem horizontal do resto da janela. O donut de atraso
   // do painel lateral diria o mesmo aqui — uma barra a mais, um gráfico a menos.
@@ -2954,13 +2989,28 @@ function abreModalDistrito(gid){
       +grupoProcs('fichaFilaDist','Processos','',filaDist,null,'',procCard)
       +`</div>`
     : '';
+  // Despachados do período — mesmo corte de aggProc() (corteObras), então a contagem bate
+  // com o ladrilho Despachos acima. Não existia lista nenhuma aqui antes: o distrito só
+  // mostrava a fila de hoje, nunca quem já tinha despachado no período.
+  const despDist=procs.filter(p=>p.despachado && (corteObras==null || (!!p.dataDespacho && p.dataDespacho>=corteObras)))
+    .sort((x,y)=>String(y.dataDespacho||'').localeCompare(String(x.dataDespacho||'')));
+  const rotDespDist=p=>p.dataDespacho?fmtDateBR(p.dataDespacho):'sem data';
+  const despSecao=despDist.length
+    ? `<div class="dsh-plot">${grupoProcs('fichaDespDist',`Despachados · ${per}`,
+        'Do mais recente para o mais antigo.',despDist,rotDespDist,'',procCard)}</div>`
+    : '';
+  // Obras atendidas: uma obra por linha (não um processo), agrupadas em obrasMapDist —
+  // mesmo recorte "hoje na fila OU despachado no período" que soma o número do ladrilho.
+  const obrasSecao=obrasListDist.length
+    ? `<div class="dsh-plot">${grupoProcs('fichaObrasDist','Obras atendidas','',obrasListDist,null,'',obraResumoCard,['obra','obras'])}</div>`
+    : '';
   // A régua "Fiscal × Obra" que restringia esta seção à lotação do fiscal foi removida
   // (2026-09-23): o painel considera sempre o distrito da obra, então a comparação passa a
   // ser sobre quem trabalhou nas obras deste distrito — mesmo critério do ranking lateral
   // (rpFiscaisRankingHtml, ajustado junto).
   const equipeSecao=equipeCardsHtml(procs,est.media);
   const corpo=a.total
-    ? topo+tiles+hoje+equipeSecao
+    ? topo+tiles+hoje+despSecao+obrasSecao+equipeSecao
     : `<div class="empty">Nenhum processo de replanilhamento nas obras deste distrito.</div>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(nome)}</div>${sub}</div>
@@ -2999,17 +3049,20 @@ function fichaFiscal(mat){
   // achado E12): sem isso, `valorObras` somaria 0 pras obras sem match e o card mostraria
   // um total menor sem avisar que faltou gente na conta (achado rev-correcao, 2026-09-22)
   // — mesmo princípio do "N de M" já usado em rpFiscaisRanking (nFiscais, acima).
+  // Guarda o PROCESSO representante (não só o valor): é dele que sai o cartão da lista por
+  // trás do ladrilho "Obras" (obraResumoCard, mesmo padrão de abreModalDistrito).
   const obrasMap=new Map();
   let obrasComValor=0;
   for(const p of noPeriodo){
     if(!p.codigo_obra) continue;
     if(!obrasMap.has(p.codigo_obra)){
-      obrasMap.set(p.codigo_obra, p.valorObra);
+      obrasMap.set(p.codigo_obra, p);
       if(p.valorObra!=null) obrasComValor++;
     }
   }
-  const valorObras=[...obrasMap.values()].reduce((s,v)=>s+(v||0),0);
-  return {todos, a, obras:obrasMap.size, obrasComValor, processosNoPeriodo:noPeriodo.length, valorObrasNoPeriodo:valorObras};
+  const obrasList=[...obrasMap.values()].sort((x,y)=>(y.valorObra??-1)-(x.valorObra??-1));
+  const valorObras=obrasList.reduce((s,p)=>s+(p.valorObra||0),0);
+  return {todos, a, obras:obrasMap.size, obrasComValor, obrasList, processosNoPeriodo:noPeriodo.length, valorObrasNoPeriodo:valorObras};
 }
 // Cartão de processo da ficha: NUP, descrição, contratada e contratante — não é o
 // procCard() da lista por cidade, que repete o nome do fiscal a cada linha (redundante
@@ -3021,6 +3074,21 @@ function fichaProcCard(p,estado){
     +(estado?`<span class="proc-s">${escHtml(estado)}</span>`:'')+`</div>`
     +(p.objeto&&p.objeto!=='—'?`<div class="proc-o">${escHtml(p.objeto)}</div>`:'')
     +`<div class="proc-m"><span>${escHtml(p.contratada)}</span><span>${escHtml(p.contratante)}</span></div></div>`;
+}
+// Cartão da lista "Obras" (ladrilho Obras/Obras atendidas): `o` é um PROCESSO qualquer
+// daquela obra (o primeiro achado ao agrupar por codigo_obra em fichaFiscal/
+// abreModalDistrito) — não é o cartão de contrato completo (obraCard, linha 1601), que
+// pede o array CONTRATOS/OBRAS carregado à parte; aqui os campos já vêm de
+// vw_painel_desempenho_fiscais (mapProcesso), então reaproveita-se o próprio processo.
+// Reusa a classe .proc (mesmo visual de fichaProcCard/procCard) para não abrir uma
+// terceira variante de cartão só para isto.
+function obraResumoCard(o){
+  return `<div class="proc">`
+    +`<div class="proc-h"><span class="proc-n">${escHtml(o.codigo_obra||'—')}</span>`
+    +(o.municipioTxt?`<span class="proc-s">${escHtml(o.municipioTxt)}</span>`:'')+`</div>`
+    +(o.objeto&&o.objeto!=='—'?`<div class="proc-o">${escHtml(o.objeto)}</div>`:'')
+    +`<div class="proc-m"><span>${escHtml(o.contratada)}</span>`
+    +`<span>${o.valorObra!=null?BRL.format(o.valorObra):'valor não informado'}</span></div></div>`;
 }
 // Rótulo de prazo de um processo que está com o fiscal agora. Tri-estado preservado: sem
 // data de compromisso não é "no prazo", é "sem prazo" (mesma regra do donut e da barra).
@@ -3042,14 +3110,17 @@ function ordemMeta(p){ return p.metaEstourada===true?0:p.metaEstourada===false?1
    `cardFn`, se vier, substitui o cartão padrão (fichaProcCard+rotulo): a janela do
    fiscal omite o nome dele nos cartões (é sempre o mesmo); a janela do distrito cobre
    VÁRIOS fiscais e precisa do procCard() que já imprime o nome de cada um. */
-function grupoProcs(id,titulo,sub,procs,rotulo,extra,cardFn){
+// `nome`, se vier, é [singular,plural] do item da lista para o texto do toggle — só a
+// janela de Obras usa (não são "processos" ali, mesmo vindo do mesmo cartão/lista).
+function grupoProcs(id,titulo,sub,procs,rotulo,extra,cardFn,nome){
   if(!procs.length) return '';
   const mostra=procs.slice(0,PROC_LISTA_MAX);
+  const sing=nome?nome[0]:'processo', plur=nome?nome[1]:'processos';
   return `<div class="gproc">`
     +`<div class="gproc-h"><span>${escHtml(titulo)}</span><b>${NUM.format(procs.length)}</b></div>`
     +(sub?`<div class="gproc-s">${escHtml(sub)}</div>`:'')
     +(extra||'')
-    +verToggle(id,`Ver ${NUM.format(procs.length)} processo${procs.length===1?'':'s'}`)
+    +verToggle(id,`Ver ${NUM.format(procs.length)} ${procs.length===1?sing:plur}`)
     +`<div id="${id}" hidden>`
     +mostra.map(p=>cardFn?cardFn(p):fichaProcCard(p,rotulo?rotulo(p):'')).join('')
     +(procs.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(procs.length)}.</div>`:'')
@@ -3107,10 +3178,14 @@ function abreModalFiscal(mat,voltarGid){
   // sempre a posição de hoje (fila), qualquer que seja o período — por isso não tem mais
   // ladrilho "Em tramitação" ao lado: seria sempre o mesmo número (2026-09-21). Despachos
   // e Obras continuam seguindo o período.
+  // Cada ladrilho abre a lista correspondente mais abaixo (pedido do usuário, 2026-09-23):
+  // Processos → o grupo Análise Fiscal (fichaFila); Despachos → o grupo Despachados
+  // (fichaDesp), ambos já existentes em `processos`; Obras → o grupo novo dentro de
+  // "Carga no período" (fichaObrasFiscal), mesmo recorte que soma f.obras.
   const tiles=`<div class="dsh-tiles">`
-    +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
-    +tile(NUM.format(a.desp),'Despachos',perTxt)
-    +tile(NUM.format(f.obras),'Obras','dos processos acima')
+    +tile(NUM.format(a.procs),'Processos',rpQuandoProc(),{target:'fichaFila'})
+    +tile(NUM.format(a.desp),'Despachos',perTxt,{target:'fichaDesp'})
+    +tile(NUM.format(f.obras),'Obras','dos processos acima',{target:'fichaObrasFiscal'})
     +`</div>`;
   // Card "Carga no período" — pedido do usuário em 2026-09-22 (grill sobre a correlação
   // carga×tempo, docs/painel-fiscais/diagnostico-carga-concorrente-tempo.sql): gestor
@@ -3139,6 +3214,11 @@ function abreModalFiscal(mat,voltarGid){
   const covObras=f.obras>f.obrasComValor
     ? `${NUM.format(f.obrasComValor)}/${NUM.format(f.obras)} com valor`
     : perTxt;
+  // Lista por trás do ladrilho "Obras" (acima) e do ladrilho "Valor das obras" logo
+  // abaixo — mesmo Map (f.obrasList, de fichaFiscal) que soma os dois números.
+  const obrasGrupo=f.obrasList.length
+    ? grupoProcs('fichaObrasFiscal','Obras','',f.obrasList,null,'',obraResumoCard,['obra','obras'])
+    : '';
   const cargaPeriodo=`<div class="statwrap">
     <div class="sec-h"><span>Carga no período</span></div>
     <div class="sec-sub">${escHtml(`${perTxt}. Diferente do ladrilho "Processos" acima, que é sempre a fila de hoje — aqui os números seguem o período escolhido em Controles.`)}</div>
@@ -3147,6 +3227,7 @@ function abreModalFiscal(mat,voltarGid){
       +tile(f.valorObrasNoPeriodo>0?BRL.format(f.valorObrasNoPeriodo):'—','Valor das obras',covObras)
     +`</div>`
     +`<div class="dsh-nota">${escHtml('Valor é exposição financeira das obras, não medida de desempenho: a relação com o tempo de despacho é fraca e não se sustenta separada da carga de processos.')}</div>`
+    +obrasGrupo
     +`</div>`;
   // PROCESSOS: uma seção só, com três subgrupos disjuntos que somam o total do
   // cabeçalho — Análise Fiscal (com o fiscal agora), Despachados (no período ativo) e
