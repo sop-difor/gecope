@@ -2689,7 +2689,17 @@ function eixoDias(pts,marcas,opts){
     grade+=`<line class="ed-tick" x1="${X(v).toFixed(1)}" x2="${X(v).toFixed(1)}" y1="10" y2="${yBase}"/>`
       +`<text class="ed-tlab" x="${X(v).toFixed(1)}" y="${H-6}" text-anchor="${v===max?'end':'middle'}">${rot}</text>`;
   }
-  const linhas=marcas.map(m=>`<line class="ed-mark ${escHtml(m.cls||'')}" x1="${X(m.v).toFixed(1)}" x2="${X(m.v).toFixed(1)}" y1="6" y2="${yBase}"/>`).join('');
+  // E5, 2026-09-23 — destaque maior da marca de referência: uma bandeirola no topo além
+  // da linha tracejada. Antes a única pista de qual linha era "a média" ficava na legenda
+  // abaixo do gráfico; a bandeirola torna a marca reconhecível de cara, sem precisar ler
+  // a legenda primeiro.
+  const linhas=marcas.map(m=>{
+    const xn=X(m.v), x=xn.toFixed(1);
+    const bandeira=m.cls==='ref'
+      ?`<polygon class="ed-flag" points="${(xn-4).toFixed(1)},2 ${(xn+4).toFixed(1)},2 ${x},9"/>`
+      :'';
+    return `${bandeira}<line class="ed-mark ${escHtml(m.cls||'')}" x1="${x}" x2="${x}" y1="6" y2="${yBase}"/>`;
+  }).join('');
   // data-label alimenta o tooltip por clique/toque (mostraEdTip(), mais abaixo) — o
   // <title> nativo continua para quem passa o mouse; nenhum dos dois é exclusivo do outro.
   const dots=pts.map(p=>`<circle class="ed-dot${p.on?' on':''}${p.on&&p.acima?' acima':''}" cx="${X(p.v).toFixed(1)}" cy="${yPt}" r="${p.on?6.5:5}" data-label="${escHtml(p.label||'')}">`
@@ -2914,10 +2924,15 @@ function abreModalDistrito(gid){
   const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média dos distritos operacionais')}`
     +posicaoHtml('Desempenho do Distrito Operacional',coorteDistritos(),'gid',String(gid),est.media,'Média dos Distritos Operacionais','distritos comparáveis')
     +`</div>`;
+  // E5, 2026-09-23 — "Fiscais" virou "Fiscais no período" (mesma convenção já usada em
+  // "Processos no período" no card Carga no período da janela do fiscal, abaixo): agora
+  // que a seção Fiscalização sempre lista todo o histórico do distrito, esse ladrilho e o
+  // cabeçalho dela mostram números de escopos diferentes com o mesmo nome curto — o
+  // rótulo precisa dizer sozinho qual dos dois é.
   const tiles=`<div class="dsh-tiles">`
     +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
     +tile(NUM.format(a.desp),'Despachos',per)
-    +tile(NUM.format(a.fiscais),'Fiscais','despacharam no período')
+    +tile(NUM.format(a.fiscais),'Fiscais no período',per)
     +tile(NUM.format(obras.size),'Obras atendidas','dos processos acima')
     +`</div>`;
   // A fila de hoje, na mesma linguagem horizontal do resto da janela. O donut de atraso

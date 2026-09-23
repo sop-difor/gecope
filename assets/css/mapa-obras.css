@@ -1507,16 +1507,22 @@
      ponto está acima da referência (mais lento); verde cheio quando na referência ou abaixo. */
   .modal .ed-dot.on{fill:var(--ng);stroke:var(--text-brightest);stroke-width:1.5}
   .modal .ed-dot.on.acima{fill:var(--amber);stroke:var(--amber-deep)}
-  /* Marcas verticais: a média de quem a janela é (contínua, verde) e a média geral
-     (tracejada, recessiva). A tracejada é referência de fundo, não um dado a mais. */
+  /* Marcas verticais: a média de quem a janela é (contínua, verde) e a média de
+     referência (tracejada + bandeirola no topo, ver .ed-flag). Continua atrás dos pontos
+     em peso visual — não é um dado a mais, é a régua contra a qual os pontos se leem —
+     mas precisa ser achada sem procurar: destaque reforçado a pedido do usuário
+     (2026-09-23), com uma cor de conteúdo (--text-muted) em vez do véu estrutural que
+     o resto da tela usa pra bordas/fundo (--raise-rgb), que ficava opaco demais para
+     carregar significado sozinho. */
   .modal .ed-mark{stroke:var(--ng);stroke-width:2}
-  .modal .ed-mark.ref{stroke:rgba(var(--raise-rgb),.5);stroke-width:2;stroke-dasharray:3 3}
+  .modal .ed-mark.ref{stroke:var(--text-muted);stroke-width:2.5;stroke-dasharray:5 4}
+  .modal .ed-flag{fill:var(--text-muted)}
   .modal .ed-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;
         font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
   .modal .ed-leg-i{display:inline-flex;align-items:center;gap:6px}
   .modal .ed-leg-i b{font-family:'Space Grotesk',sans-serif;color:var(--text-bright);font-weight:700}
   .modal .ed-key{width:12px;height:0;border-top:2px solid var(--ng);flex:none}
-  .modal .ed-key.ref{border-top-style:dashed;border-top-color:rgba(var(--raise-rgb),.5)}
+  .modal .ed-key.ref{border-top-style:dashed;border-top-width:2.5px;border-top-color:var(--text-muted)}
 
   /* ---- barra empilhada da fila de hoje ---- */
   .modal .sbar{display:flex;flex-direction:column;gap:9px}
