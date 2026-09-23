@@ -596,8 +596,11 @@ async function loadData(){
    os rótulos e o enquadramento que já existem.
    ============================================================ */
 let PROCESSOS=[], _procCarregado=false, _procDiag=null;
-// Processos por distrito nas duas réguas (String(gid) -> processos). Montados uma vez na
-// carga: o nível 1 consulta um deles a cada hover e a cada render.
+// Processos por distrito, indexados nas duas chaves possíveis (String(gid) -> processos).
+// Montados uma vez na carga. `_procPorObra` é a fonte do mapa e das janelas de detalhe
+// (sempre pelo local da obra); `_procPorEquipe` (lotação do fiscal, gedop) sobrevive só
+// para a coorte de fiscais da janela individual (coorteFiscais()), que nunca foi pelo
+// local da obra — não é mais alternativa de régua do painel (removida em 2026-09-23).
 let _procPorEquipe=new Map(), _procPorObra=new Map();
 function modoReplan(){ return st.modo==='replanilhamentos'; }
 
@@ -738,16 +741,19 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
   // E1 — 'obras' (comportamento de sempre) ou 'replanilhamentos'. Tudo que é específico
   // do modo novo fica atrás de modoReplan(); o modo Obras não enxerga nada disso.
   modo:'obras',
-  // E2 — lente do mapa no modo Replanilhamentos. `regua` decide para qual distrito um
-  // processo conta: 'equipe' (lotação do fiscal, app_users.gedop) ou 'obra' (município da
-  // obra). Vale só no nível 1: cidade não existe pela lotação, então do nível 2 para
-  // baixo tudo conta pelo local da obra (ver reguaEquipe()).
+  // E2 — lente do mapa no modo Replanilhamentos. Todo processo conta para o distrito
+  // onde fica a obra (município do processo) — nunca pela lotação do fiscal
+  // (app_users.gedop): o seletor "Fiscal × Obra" que existia aqui foi removido em
+  // 2026-09-23 a pedido do usuário, para a leitura do painel deixar de mudar de
+  // significado conforme o controle. `_procPorEquipe` continua indexado (ver
+  // loadProcessos) só para a coorte de fiscais da janela individual (coorteFiscais()),
+  // que sempre foi pela lotação, nunca por esta lente.
   // E4 — `fiscal` é a matrícula escolhida no quadrante despachos × tempo (null = nenhuma).
   // Vive aqui, junto do resto da lente do modo novo, para que nenhum estado dele exista
   // fora de st. Sobrevive à volta a Obras (inerte: só o painel do modo novo a lê).
   // E6 — filtros do modo Replanilhamentos, sobre PROCESSOS: estado próprio (nunca `f`
   // abaixo, que é de contratos e fica intacto na troca de modo). Ver FILTER_DEFS_RP.
-  rp:{metrica:'tempo', periodo:'12m', regua:'equipe', filtro:{q:'', situacao:new Set(), prazo:new Set()}},
+  rp:{metrica:'tempo', periodo:'6m', filtro:{q:'', situacao:new Set(), prazo:new Set()}},
   sel:null, // Ctrl+clique em vários distritos/municípios: {kind:'group'|'city', ids:Set}
   // Etapa C: chaves novas declaradas já como Set (as defs em FILTER_DEFS e a UI
   // entram no Bloco 2 — até lá ficam vazias e inertes).
@@ -816,27 +822,25 @@ function corteDespacho(meses){
   const d=Math.min(h.getDate(), new Date(y,m+1,0).getDate());
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
-// A régua vale para a entidade DISTRITO, em qualquer nível: a lista de irmãos da trilha
-// ("Outros distritos") abre no nível 2 e continua listando distritos — se ela consultasse
-// o nível, mostraria Crateús com 10 despachos logo depois de o mapa ter mostrado 12.
-// E6: filtraRp() aqui dentro é o único lugar que precisa filtrar por régua de equipe —
-// quem lê pela régua de obra (abaixo) ou por município (procsDeMuns) ganha o filtro do
-// próprio ponto de leitura. As versões "Raw" (sem filtro) nasceram só para
-// resultsSuffixRp() dizer "quantos de quantos" — desde 2026-09-22 também alimentam as
-// janelas de detalhe (coorteDistritos(), refEstadoPeriodo(), abreModalDistrito()), que
-// mostram o panorama completo do recorte escolhido, sem o filtro do painel lateral
-// (mesmo princípio que já valia para procsEquipeDistrito nessas janelas, herdado da E5).
-function procsDoDistritoRaw(gid){ return (st.rp.regua==='equipe'?_procPorEquipe:_procPorObra).get(String(gid))||[]; }
+// O distrito vale para a entidade DISTRITO (local da obra), em qualquer nível: a lista de
+// irmãos da trilha ("Outros distritos") abre no nível 2 e continua listando distritos — se
+// ela consultasse o nível, mostraria Crateús com 10 despachos logo depois de o mapa ter
+// mostrado 12.
+// E6: filtraRp() aqui dentro é o único lugar que precisa filtrar por distrito — quem lê
+// por município (procsDeMuns) ganha o filtro do próprio ponto de leitura. As versões "Raw"
+// (sem filtro) nasceram só para resultsSuffixRp() dizer "quantos de quantos" — desde
+// 2026-09-22 também alimentam as janelas de detalhe (coorteDistritos(), refEstadoPeriodo(),
+// abreModalDistrito()), que mostram o panorama completo do recorte escolhido, sem o filtro
+// do painel lateral (mesmo princípio que já valia para procsEquipeDistrito nessas janelas,
+// herdado da E5).
+function procsDoDistritoRaw(gid){ return _procPorObra.get(String(gid))||[]; }
 function procsDoDistrito(gid){ return filtraRp(procsDoDistritoRaw(gid)); }
-// Já esta responde pelo MAPA: do nível 2 para baixo o mapa mostra cidades, e cidade só
-// existe pelo local da obra.
-function reguaEquipe(){ return st.rp.regua==='equipe' && st.level<=1; }
 function procsDeMunsRaw(ids){ const out=[]; ids.forEach(id=>{ for(const p of DB.municipios[id].processos) out.push(p); }); return out; }
 function procsDeMuns(ids){ return filtraRp(procsDeMunsRaw(ids)); }
-// Espelha scopeIds(), mas devolve PROCESSOS: na régua da equipe o recorte de um distrito
+// Espelha scopeIds(), mas devolve PROCESSOS: o recorte de um distrito (pelo local da obra)
 // não é um conjunto de municípios. No nível 1 sem destaque, o total é a soma dos 11
-// distritos da régua ativa — assim o estado bate com a soma do que o mapa pinta, e o que
-// fica de fora aparece na "Conferência da carga".
+// distritos — assim o estado bate com a soma do que o mapa pinta, e o que fica de fora
+// aparece na "Conferência da carga".
 function procsDoRecorte(){
   if(st.sel && st.sel.ids.size){
     return st.sel.kind==='group' ? [...st.sel.ids].flatMap(procsDoDistrito) : procsDeMuns([...st.sel.ids]);
@@ -977,7 +981,7 @@ const NOMATCH_STYLE=()=>({fillColor:TOKENS.nomatchFill,color:TOKENS.nomatchBorde
 // ---- pintura do modo Replanilhamentos (E2) ----
 // Calculado 1x por render(), como _groupValByGid: groupStyle/styleFeature/declutter só
 // consultam (declutter chama a prioridade dentro de um sort). Nível 1 = os 11 distritos
-// na régua ativa; níveis 2 e 3 = as cidades do distrito aberto, pelo local da obra.
+// pelo local da obra; níveis 2 e 3 = as cidades do distrito aberto, mesma régua.
 // Cada entrada: {v, n, tot} — valor pintado (null = amostra insuficiente), amostra, e
 // total de processos (prioridade de rótulo, estável entre métricas).
 let _rpGrp=new Map(), _rpMun=new Map(), _rpMaxGrp=1, _rpMaxMun=1, _rpTemEscala=true;
@@ -1020,14 +1024,12 @@ function rpTip(nome,r,onde){
 // Controles — ver o comentário de `procs` em aggProc(). Despachos e Tempo médio usam
 // RP_PERIODO[st.rp.periodo].txt diretamente, não esta função.
 function rpQuandoProc(){ return 'hoje'; }
-function rpOndeGrupo(){ return reguaEquipe()?'Contado pela equipe lotada no distrito':'Contado pelas obras localizadas no distrito'; }
+function rpOndeGrupo(){ return 'Contado pelas obras localizadas no distrito'; }
 // "o que está sendo contado, e como" — uma frase só, usada pela legenda do mapa e pela
 // lista de irmãos da trilha, para as duas nunca discordarem.
 function rpRecorteTxt(porDistrito){
   const quando = st.rp.metrica==='fila' ? rpQuandoProc() : RP_PERIODO[st.rp.periodo].txt;
-  const alvo = porDistrito
-    ? (st.rp.regua==='equipe'?'distritos pela equipe do fiscal':'distritos pelo local da obra')
-    : 'cidades pelo local da obra';
+  const alvo = `${porDistrito?'distritos':'cidades'} pelo local da obra`;
   return `${quando} · ${alvo}`;
 }
 function styleFeature(f){
@@ -2384,11 +2386,9 @@ function escopoReplanTxt(){
     const k=st.sel.kind==='group'?'distrito':'município', n=st.sel.ids.size;
     return `${NUM.format(n)} ${k}${n===1?'':'s'} selecionado${n===1?'':'s'}`;
   }
-  // No nível 1 o nome diz também a régua: "Equipe de Sobral" e "Obras em Sobral" são
-  // conjuntos diferentes de processos, e o mesmo nome para os dois esconderia isso.
   if(st.level===1 && st.hoverGroup!=null){
     const nome=grpById(st.hoverGroup).nome.replace(/^D\.O\.\s*/,'');
-    return reguaEquipe()?`Equipe de ${nome}`:`Obras em ${nome}`;
+    return `Obras em ${nome}`;
   }
   if(st.level<=1) return 'Ceará . Todos os Distritos Operacionais';
   if(st.level===2) return `Obras em ${grpById(st.group).nome.replace(/^D\.O\.\s*/,'')}`;
@@ -2429,7 +2429,7 @@ function donutLeg(segs){
   ).join('')}</div>`;
 }
 // ---- painel do modo Replanilhamentos (E3) ----
-// Ranking do recorte: distritos no nível 1 (na régua ativa), cidades dentro de um
+// Ranking do recorte: distritos no nível 1 (pelo local da obra), cidades dentro de um
 // distrito. Ordenado pela métrica, do maior para o menor — é o que o mapa pinta, em
 // forma de lista navegável. Área sem número comparável (amostra curta) vai para o fim,
 // mas continua na lista: ela existe e é navegável, só não tem média.
@@ -2572,30 +2572,21 @@ function fiscaisRankingLista(q,avg){
   }).join('');
 }
 function rpFiscaisRankingHtml(procs,a){
-  // Duas condições, a mesma razão. (1) Do nível 2 para baixo o recorte é geográfico: os
-  // fiscais que aparecem ali são os que atuaram naquelas obras, não uma equipe, e a fatia
-  // de cada um fica pequena demais para comparar pessoa com pessoa. (2) No nível dos
-  // distritos com a régua do LOCAL DA OBRA vale exatamente o mesmo: cada fiscal entraria
-  // só com os despachos cujas obras caem naquele distrito — uma fatia do trabalho dele,
-  // que a barra e o rodapé chamariam de "despachos no período", absoluto. Comparar pessoa
-  // com pessoa exige a carga inteira de cada uma, então a seção só existe na régua da
-  // equipe, onde o distrito É o conjunto de fiscais. Decisão do usuário em 2026-09-16.
-  // reguaEquipe() já é "regua==='equipe' && level<=1": as duas condições num só teste.
-  // Antes a seção simplesmente desaparecia aqui (return '') — usuário relatou que "some"
-  // sem explicação ao trocar a régua para Obra ou descer a navegação. Em vez de nada,
-  // um aviso âmbar (mesmo tom do .modo-aviso do seletor de modo) diz por que ela não
-  // está disponível neste recorte, com a causa certa: régua ou nível de navegação.
-  if(!reguaEquipe()){
-    const motivo = st.rp.regua!=='equipe'
-      ? 'com "Distrito Operacional do(a)" em "Obra": cada fiscal apareceria só com a fatia dos processos daquele distrito, não a carga inteira da pessoa — troque para "Fiscal" para comparar pessoas.'
-      : 'dentro de uma cidade ou processo aberto o recorte já não é mais a equipe de um distrito inteiro.';
+  // Do nível 2 para baixo o recorte é geográfico (município/cidade): os fiscais que
+  // aparecem ali são só os que atuaram naquelas obras, uma fatia pequena demais do
+  // trabalho de cada um para comparar pessoa com pessoa. No nível dos distritos a régua
+  // "Fiscal × Obra" que existia aqui foi removida (2026-09-23): o painel considera sempre
+  // o distrito da obra, e a seção passou a existir também nesse recorte — mede quem está
+  // resolvendo o trabalho deste distrito, não a carreira inteira de cada fiscal (o mesmo
+  // critério que a janela do distrito usa desde a mesma mudança).
+  if(st.level>1){
     return `<div class="statwrap"><div class="sec-h"><span>Fiscais · tempo médio</span></div>`
-      +`<div class="qd-aviso">Esta comparação entre fiscais não aparece ${escHtml(motivo)}</div></div>`;
+      +`<div class="qd-aviso">Esta comparação entre fiscais não aparece dentro de uma cidade ou processo aberto: o recorte já não é mais um distrito inteiro.</div></div>`;
   }
   return fiscaisRankingBlockHtml(procs,a);
 }
 // E5 — núcleo do ranking de fiscais, separado de rpFiscaisRankingHtml() porque este
-// devolve, antes dele, o aviso de por que a comparação não existe fora da régua da equipe.
+// devolve, antes dele, o aviso de por que a comparação não existe fora do nível distrito.
 function fiscaisRankingBlockHtml(procs,a){
   const q=rpFiscaisRanking(procs);
   if(!q.nFiscais && !q.semFiscal) return '';
@@ -2749,15 +2740,14 @@ function refGeral(){
   const a=aggProc(PROCESSOS);
   return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null, n:a.nTempo};
 }
-// O time inteiro do ESTADO, sempre pela régua da EQUIPE — a janela do fiscal compara
-// pessoas, e régua de obra fatiaria cada uma pela geografia das obras que passou, não
-// pela carga inteira dela (mesmo motivo que já vale para coorteDistritos()/
-// refEstadoPeriodo(), mas que agora seguem a régua ativa — ver abreModalDistrito()).
-// Não é `aggFiscais(PROCESSOS)` (versão anterior): PROCESSOS é a base bruta, sem excluir
-// quem não tem lotação válida nos 11 distritos (semGedop/gedopSemDistrito) — exatamente
-// quem o ranking lateral, em régua de equipe, já não mostra. Comparar "onde este fiscal
-// está" contra esses fantasmas inflava o denominador e podia dar uma posição que não bate
-// com nada visível na tela (achado do rev-correcao na revisão da E5, 2026-09-18). A carga
+// O time inteiro do ESTADO, sempre pela LOTAÇÃO do fiscal (gedop) — a janela do fiscal
+// compara pessoas, e agrupar pelo local da obra (como o mapa e a janela de distrito fazem
+// desde 2026-09-23) fatiaria cada uma pela geografia das obras que passou, não pela carga
+// inteira dela. Não é `aggFiscais(PROCESSOS)` (versão anterior): PROCESSOS é a base bruta,
+// sem excluir quem não tem lotação válida nos 11 distritos (semGedop/gedopSemDistrito) —
+// exatamente quem o ranking lateral também não mostra. Comparar "onde este fiscal está"
+// contra esses fantasmas inflava o denominador e podia dar uma posição que não bate com
+// nada visível na tela (achado do rev-correcao na revisão da E5, 2026-09-18). A carga
 // da pessoa (tiles da janela) segue sempre estadual pelo mesmo motivo dos vizinhos — não é
 // recortada por onde a janela foi aberta (hover/seleção no mapa, ou um cartão dentro de um
 // distrito específico): a pergunta "essa pessoa é rápida ou lenta" não muda com a fatia
@@ -2768,14 +2758,12 @@ function coorteFiscais(){
     .map(f=>({mat:f.mat, nome:f.nome, n:f.n, media:f.tempo}))
     .sort((x,y)=>x.media-y.media);
 }
-// Os 11 distritos NO PERÍODO ATIVO, pela régua ativa (equipe × local da obra — a mesma
-// que decide como o mapa pinta cada distrito): ao contrário da coorte de fiscais acima
-// (sempre pessoa, nunca geografia), aqui o recorte precisa ser o mesmo que a janela do
-// distrito mostra no corpo, senão "onde este distrito está" compara uma régua contra
-// outra. Usuário, 2026-09-22: a janela de distrito ignorava a régua "Obra" por inteiro —
-// procsDoDistritoRaw() já resolve isso (mesma fonte do mapa), sem aplicar o filtro da E6
-// (não é procsDoDistrito) pelo mesmo motivo do resto desta janela. Sem cache: o período
-// (e agora a régua) mudam.
+// Os 11 distritos NO PERÍODO ATIVO, sempre pelo local da obra — a mesma fonte que decide
+// como o mapa pinta cada distrito: ao contrário da coorte de fiscais acima (sempre pessoa,
+// nunca geografia), aqui o recorte precisa ser o mesmo que a janela do distrito mostra no
+// corpo, senão "onde este distrito está" compara uma coisa contra outra. procsDoDistritoRaw()
+// é essa mesma fonte, sem aplicar o filtro da E6 (não é procsDoDistrito) pelo mesmo motivo
+// do resto desta janela. Sem cache: o período muda.
 function coorteDistritos(){
   return groupsList().map(g=>{
     const a=aggProc(procsDoDistritoRaw(g.id));
@@ -2783,8 +2771,8 @@ function coorteDistritos(){
             media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null,n:a.nTempo};
   }).filter(d=>d.media!=null).sort((a,b)=>a.media-b.media);
 }
-// Média do estado no período ativo, pela mesma régua ativa da janela de distrito (ver
-// coorteDistritos() acima).
+// Média do estado no período ativo, pela mesma fonte (pelo local da obra) da janela de
+// distrito (ver coorteDistritos() acima).
 function refEstadoPeriodo(){
   const a=aggProc(groupsList().flatMap(g=>procsDoDistritoRaw(g.id)));
   return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null,n:a.nTempo};
@@ -2815,10 +2803,11 @@ function posicaoHtml(titulo,coorte,chave,valorChave,ref,rotuloRef,unidade){
 }
 
 // Equipe lotada no distrito, sempre — usada só pela coorte de FISCAIS (coorteFiscais(),
-// acima), que compara pessoas e por isso nunca muda com a régua do painel (régua de obra
-// fatiaria cada fiscal pela geografia das obras que passou, não pela carga inteira dela).
-// A janela do distrito em si (abreModalDistrito()) NÃO usa mais esta função — desde
-// 2026-09-22 ela segue a régua ativa via procsDoDistritoRaw(), a mesma fonte do mapa.
+// acima), que compara pessoas e por isso nunca muda com o modo como o mapa agrupa (pelo
+// local da obra fatiaria cada fiscal pela geografia das obras que passou, não pela carga
+// inteira dela). A janela do distrito em si (abreModalDistrito()) NÃO usa mais esta função
+// — desde 2026-09-22 ela segue sempre o local da obra via procsDoDistritoRaw(), a mesma
+// fonte do mapa.
 function procsEquipeDistrito(gid){ return _procPorEquipe.get(String(gid))||[]; }
 /* Sobre QUANTOS despachos a média foi tirada — e, quando ela não existe, por quê.
    O corte de AMOSTRA_MIN é sobre despachos COM TEMPO MEDIDO no SUITE, não sobre
@@ -2867,7 +2856,7 @@ function equipeCardsHtml(procs,refMedia){
       +`<div class="fcard-s">${escHtml(`${NUM.format(f.desp)} despacho${f.desp===1?'':'s'} · ${NUM.format(f.fila)} em tramitação`)}</div></div>`;
   };
   const nota=semFiscal
-    ? `<div class="foot-note">${escHtml(`${NUM.format(semFiscal)} processo${semFiscal===1?'':'s'} desta equipe `
+    ? `<div class="foot-note">${escHtml(`${NUM.format(semFiscal)} processo${semFiscal===1?'':'s'} destas obras `
       +`${semFiscal===1?'está':'estão'} sem matrícula de fiscal gravada e ${semFiscal===1?'fica':'ficam'} fora dos cartões.`)}</div>`
     : '';
   return `<div class="statwrap"><div class="sec-h"><span>A equipe</span>`
@@ -2877,13 +2866,10 @@ function equipeCardsHtml(procs,refMedia){
 }
 function abreModalDistrito(gid){
   const g=grpById(gid); if(!g) return;
-  // Usuário, 2026-09-22: a janela ignorava a régua "Obra" do painel e sempre mostrava a
-  // equipe lotada no distrito, mesmo com o mapa já pintado pelo local da obra —
-  // inconsistência entre as duas telas. procsDoDistritoRaw() é a mesma fonte do mapa
-  // (respeita st.rp.regua), sem aplicar o filtro da E6 (continua NÃO sendo procsDoDistrito)
-  // pelo mesmo motivo de sempre: a janela mostra o panorama completo do distrito, não a
-  // fatia que o filtro do painel deixou visível (ver comentário de filtraRp()).
-  const eq=st.rp.regua==='equipe';
+  // procsDoDistritoRaw() é a mesma fonte do mapa (sempre pelo local da obra), sem aplicar
+  // o filtro da E6 (continua NÃO sendo procsDoDistrito) pelo mesmo motivo de sempre: a
+  // janela mostra o panorama completo do distrito, não a fatia que o filtro do painel
+  // deixou visível (ver comentário de filtraRp()).
   const procs=procsDoDistritoRaw(gid), a=aggProc(procs);
   const nome=g.nome.replace(/^D\.O\.\s*/,'');
   const per=RP_PERIODO[st.rp.periodo].txt;
@@ -2902,9 +2888,9 @@ function abreModalDistrito(gid){
   const noPrazo=Math.max(0,a.comMeta-a.metaEst), semPrazo=Math.max(0,a.fila-a.comMeta);
   const est=refEstadoPeriodo();
   const media=a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
-  // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pela/pelas": a janela
-  // precisa dizer a mesma coisa que o hover já diz, não outra versão da régua.
-  const sub=`<div class="msub">${RS_ICO.dist}<span>${eq?'Equipe lotada no distrito':'Obras localizadas no distrito'} · ${escHtml(per)}</span></div>`;
+  // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pelas": a janela precisa
+  // dizer a mesma coisa que o hover já diz.
+  const sub=`<div class="msub">${RS_ICO.dist}<span>Obras localizadas no distrito · ${escHtml(per)}</span></div>`;
   const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média do estado')}`
     +posicaoHtml('Onde este distrito está',coorteDistritos(),'gid',String(gid),est.media,'Média do estado','distritos comparáveis')
     +`</div>`;
@@ -2924,29 +2910,19 @@ function abreModalDistrito(gid){
   const hoje=a.fila
     ? `<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.pessoa} Com a fiscalização hoje</div>`
       +barraAtraso(a.metaEst,noPrazo,semPrazo)
-      +`<div class="dsh-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} ${eq?'desta equipe':'destas obras'} `
+      +`<div class="dsh-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} destas obras `
         +`${a.naGecope===1?'está':'estão'} na GECOPE, fora das mãos do fiscal.`)}</div>`
       +grupoProcs('fichaFilaDist','Processos','',filaDist,null,'',procCard)
       +`</div>`
     : '';
-  // A comparação fiscal-a-fiscal só existe na régua da equipe — mesmo banimento do ranking
-  // do painel lateral (rpFiscaisRankingHtml, achado do rev-produto na E5): na régua da
-  // obra cada fiscal apareceria só com a fatia dos processos das obras deste distrito, não
-  // a carga inteira da pessoa, o que compararia gente por uma fração desigual do trabalho.
-  // Texto entre aspas cita o rótulo real do controle ("Distrito Operacional do(a)" + botão
-  // "Fiscal"/"Obra") em vez de flexionar "do(a)" solto — correção 2026-09-22 (rev-produto):
-  // a versão anterior, sem aspas em volta do rótulo, não fechava gramaticalmente. Mesma
-  // correção aplicada ao texto-irmão de rpFiscaisRankingHtml, acima.
-  const equipeSecao=eq
-    ? equipeCardsHtml(procs,est.media)
-    : `<div class="statwrap"><div class="sec-h"><span>A equipe</span></div>`
-      +`<div class="qd-aviso">Esta comparação entre fiscais não aparece com &quot;Distrito `
-      +`Operacional do(a)&quot; em &quot;Obra&quot;: cada fiscal apareceria só com a fatia `
-      +`dos processos das obras deste distrito, não a carga inteira da pessoa — troque para `
-      +`&quot;Fiscal&quot; para comparar pessoas.</div></div>`;
+  // A régua "Fiscal × Obra" que restringia esta seção à lotação do fiscal foi removida
+  // (2026-09-23): o painel considera sempre o distrito da obra, então a comparação passa a
+  // ser sobre quem trabalhou nas obras deste distrito — mesmo critério do ranking lateral
+  // (rpFiscaisRankingHtml, ajustado junto).
+  const equipeSecao=equipeCardsHtml(procs,est.media);
   const corpo=a.total
     ? topo+tiles+hoje+equipeSecao
-    : `<div class="empty">Nenhum processo de replanilhamento ${eq?'nesta equipe':'nas obras deste distrito'}.</div>`;
+    : `<div class="empty">Nenhum processo de replanilhamento nas obras deste distrito.</div>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
@@ -3221,9 +3197,7 @@ function renderPanelReplan(scope,body){
   const tempo = a.nTempo>=AMOSTRA_MIN ? fmtDias(a.tempoMedio) : '—';
   const nota = st.level>=2
     ? 'Dentro do distrito, cidades e totais contam pelo local da obra; os fiscais são os que atuaram nesses processos, não necessariamente a equipe lotada aqui.'
-    : reguaEquipe()
-      ? 'Distritos contados pela equipe: cada processo entra no distrito onde o fiscal está lotado, onde quer que esteja a obra.'
-      : 'Distritos contados pelo local da obra; os fiscais são os que atuaram nesses processos, não a equipe lotada no distrito.';
+    : 'Distritos contados pelo local da obra; os fiscais são os que atuaram nesses processos, não a equipe lotada no distrito.';
   // PROCESSOS é sempre a posição de HOJE, nunca o período de Controles (usuário,
   // 2026-09-21 — ver aggProc()). TEMPO MÉDIO, DESPACHOS e FISCAIS sempre seguem o
   // período (em "Hoje" o corte é nulo = todo o histórico). O resto é contexto e vem
@@ -3867,7 +3841,7 @@ const _segControle=document.getElementById('segControle'), _lblControle=document
 // Declarados antes de `layer`: todo render() — que chama as duas funções abaixo — só
 // acontece depois que ele existe (mesma garantia de _asideEl).
 const _ctrlReplan=document.getElementById('ctrlReplan'), _ctrlObras=document.getElementById('ctrlObras');
-const _rpReguaNota=document.getElementById('rpReguaNota'), _rpLeg=document.getElementById('rpLegenda');
+const _rpLeg=document.getElementById('rpLegenda');
 // Alterna os blocos de controle pelo modo. Chamada em todo render(), e não em setModo,
 // para que reverterParaObras() e qualquer outro caminho de volta a cubram sozinhos.
 // Busca e filtros de Obras saem de cena no modo novo (operam sobre contratos); os
@@ -3876,15 +3850,6 @@ function syncControlesModo(){
   if(!_ctrlReplan||!_ctrlObras) return;
   const rp=modoReplan(), trocou=_ctrlReplan.hidden===rp;
   _ctrlReplan.hidden=!rp; _ctrlObras.hidden=rp;
-  if(rp){
-    const foraDeAlcance=st.level>=2;
-    _ctrlReplan.querySelectorAll('#segRpRegua button').forEach(b=>{ b.disabled=foraDeAlcance; });
-    _rpReguaNota.textContent = foraDeAlcance
-      ? 'Dentro de um distrito, as cidades contam sempre pelo local da obra.'
-      : st.rp.regua==='equipe'
-        ? 'Cada processo conta para o distrito onde o fiscal está lotado, onde quer que esteja a obra.'
-        : 'Cada processo conta para o distrito onde fica a obra, qualquer que seja a lotação do fiscal.';
-  }
   if(trocou && _ctrl.classList.contains('show')) fitCtrlHeight();
 }
 // Legenda da escala. Os extremos são os da escala EM USO (0 até o máximo do nível), para
@@ -3946,8 +3911,8 @@ document.addEventListener('focusout',e=>{ if(e.target===_rpTipAlvo) escondeRpTip
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && _rpTipAlvo) escondeRpTip(); });
 // o painel rola: a âncora sai do lugar e a janelinha ficaria solta sobre outra coisa
 window.addEventListener('scroll',()=>{ if(_rpTipAlvo) escondeRpTip(); },true);
-// Seletores de métrica, período e régua. Um handler para os três: todos só trocam uma
-// chave de st.rp e redesenham.
+// Seletores de métrica e período. Um handler para os dois: cada um só troca uma chave de
+// st.rp e redesenha.
 function ligaSegRp(id,chave){
   const seg=document.getElementById(id); if(!seg) return;
   seg.addEventListener('click',e=>{
@@ -3957,7 +3922,7 @@ function ligaSegRp(id,chave){
     render();
   });
 }
-ligaSegRp('segRpMetrica','metrica'); ligaSegRp('segRpPeriodo','periodo'); ligaSegRp('segRpRegua','regua');
+ligaSegRp('segRpMetrica','metrica'); ligaSegRp('segRpPeriodo','periodo');
 
 /* ---- E6 — filtros do modo Replanilhamentos ----
    Mesma mecânica de multi-seleção do modo Obras (FILTER_DEFS/msel/chips: busca por

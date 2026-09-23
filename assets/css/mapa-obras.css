@@ -542,8 +542,8 @@
   /* encosta no seletor logo acima, compensando parte do margin-bottom do .seg. Amarrado
      à adjacência para que, se o aviso mudar de lugar, ele não herde um recuo sem par. */
   .seg + .modo-aviso{margin-top:-6px}
-  /* Régua fora de alcance (dentro de um distrito as cidades só existem pelo local da
-     obra): o botão fica visível e explicado pela .ctrl-nota, não some. */
+  /* Usado por #segControle enquanto o modo troca (ver setModo): o botão fica visível,
+     só sem clique, em vez de sumir. */
   .seg button:disabled{cursor:not-allowed;opacity:.5}
   /* 3–4 botões por linha num painel de 296px: sem isto "Tempo médio" quebra em duas
      linhas no tema claro (gap maior) e o segmento fica com alturas desiguais. */
