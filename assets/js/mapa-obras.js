@@ -196,6 +196,8 @@ function amostraFina(n){ return n>=AMOSTRA_MIN && n<AMOSTRA_SOLIDA; }
 // janelinha do botão "i" dos KPIs (mostraRpTip). Declarada aqui, e não junto das funções,
 // porque renderPanelReplan pode rodar antes de o script chegar lá.
 let _rpTip=null, _rpTipAlvo=null;
+// janelinha de identificação da bolinha do eixoDias() (mostraEdTip), mesma razão acima.
+let _edTip=null, _edTipAlvo=null;
 
 // monta o objeto que o app consome (obras entram depois, no loadData).
 // O módulo opera exclusivamente por Distrito Operacional — os dados de "Região"
@@ -2312,7 +2314,7 @@ function wireAdToggles(){
     };
   });
 }
-function closeModal(){ document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; }
+function closeModal(){ escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; }
 // Fecha OU volta um nível: se a janela do fiscal está aberta por cima de um distrito
 // (o botão "#modalVoltar" existe), Esc e clicar fora devem se comportar como o próprio
 // "← Voltar" faria — não só o clique nele. Sem isso os dois gestos mais comuns de
@@ -2636,6 +2638,7 @@ function fiscaisRankingBlockHtml(procs,a){
    vez, e o padrão de abrir/fechar/clicar fora já existe e já foi revisado. */
 
 function mostraJanelaGenerica(){
+  escondeEdTip();   // o innerHTML já trocou; a bolinha-âncora de uma tooltip antiga sumiu junto
   document.getElementById('modalBg').classList.add('show');
   const x=document.getElementById('modalX'); if(x) x.onclick=closeModal;
   wireAdToggles();   // listas recolhidas das duas janelas (ver verToggle)
@@ -2677,7 +2680,9 @@ function eixoDias(pts,marcas,opts){
       +`<text class="ed-tlab" x="${X(v).toFixed(1)}" y="${H-6}" text-anchor="${v===max?'end':'middle'}">${rot}</text>`;
   }
   const linhas=marcas.map(m=>`<line class="ed-mark ${escHtml(m.cls||'')}" x1="${X(m.v).toFixed(1)}" x2="${X(m.v).toFixed(1)}" y1="6" y2="${yBase}"/>`).join('');
-  const dots=pts.map(p=>`<circle class="ed-dot${p.on?' on':''}${p.on&&p.acima?' acima':''}" cx="${X(p.v).toFixed(1)}" cy="${yPt}" r="${p.on?6.5:5}">`
+  // data-label alimenta o tooltip por clique/toque (mostraEdTip(), mais abaixo) — o
+  // <title> nativo continua para quem passa o mouse; nenhum dos dois é exclusivo do outro.
+  const dots=pts.map(p=>`<circle class="ed-dot${p.on?' on':''}${p.on&&p.acima?' acima':''}" cx="${X(p.v).toFixed(1)}" cy="${yPt}" r="${p.on?6.5:5}" data-label="${escHtml(p.label||'')}">`
     +`<title>${escHtml(p.label||'')}</title></circle>`).join('');
   const aria=`${NUM.format(pts.length)} pontos entre 0 e ${max} dias`
     +marcas.map(m=>`; ${m.label}: ${fmtDias(m.v)}`).join('');
@@ -2891,8 +2896,8 @@ function abreModalDistrito(gid){
   // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pelas": a janela precisa
   // dizer a mesma coisa que o hover já diz.
   const sub=`<div class="msub">${RS_ICO.dist}<span>Obras localizadas no distrito · ${escHtml(per)}</span></div>`;
-  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média do estado')}`
-    +posicaoHtml('Onde este distrito está',coorteDistritos(),'gid',String(gid),est.media,'Média do estado','distritos comparáveis')
+  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média dos distritos operacionais')}`
+    +posicaoHtml('Desempenho do Distrito Operacional',coorteDistritos(),'gid',String(gid),est.media,'Média dos Distritos Operacionais','distritos comparáveis')
     +`</div>`;
   const tiles=`<div class="dsh-tiles">`
     +tile(NUM.format(a.procs),'Processos',rpQuandoProc())
@@ -3916,6 +3921,35 @@ document.addEventListener('focusout',e=>{ if(e.target===_rpTipAlvo) escondeRpTip
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && _rpTipAlvo) escondeRpTip(); });
 // o painel rola: a âncora sai do lugar e a janelinha ficaria solta sobre outra coisa
 window.addEventListener('scroll',()=>{ if(_rpTipAlvo) escondeRpTip(); },true);
+// E3 — identifica a bolinha do eixoDias() (distrito ou fiscal) ao clicar/tocar: o <title>
+// nativo do SVG já diz quem é no hover do mouse, mas não existe hover em touch. Mesmo
+// mecanismo de _rpTip acima (um elemento só no <body>, position:fixed, sobrevive ao
+// innerHTML do modal ser refeito), só que disparado por clique — clicar na MESMA bolinha
+// fecha, clicar noutra troca, clicar fora/Esc/rolar fecha.
+function mostraEdTip(dot){
+  if(!_edTip){
+    _edTip=document.createElement('div');
+    _edTip.className='kpi-tip ed-tip'; _edTip.id='edTip'; _edTip.setAttribute('role','tooltip');
+    document.body.appendChild(_edTip);
+  }
+  _edTipAlvo=dot;
+  _edTip.textContent=dot.dataset.label||'';
+  _edTip.hidden=false;
+  const r=dot.getBoundingClientRect(), w=_edTip.offsetWidth, h=_edTip.offsetHeight, m=10;
+  const x=Math.min(Math.max(m, r.left+r.width/2-w/2), innerWidth-w-m);
+  // Prioridade para cima da bolinha (não tampa a marca/eixo logo abaixo dela); só desce
+  // se não couber em cima.
+  let y=r.top-h-8; if(y<m) y=r.bottom+8;
+  _edTip.style.left=`${x}px`; _edTip.style.top=`${y}px`;
+}
+function escondeEdTip(){ _edTipAlvo=null; if(_edTip) _edTip.hidden=true; }
+document.addEventListener('click',e=>{
+  const dot=e.target.closest&&e.target.closest('.ed-dot');
+  if(dot){ if(_edTipAlvo===dot) escondeEdTip(); else mostraEdTip(dot); return; }
+  if(_edTipAlvo) escondeEdTip();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && _edTipAlvo) escondeEdTip(); });
+window.addEventListener('scroll',()=>{ if(_edTipAlvo) escondeEdTip(); },true);
 // Seletores de métrica e período. Um handler para os dois: cada um só troca uma chave de
 // st.rp e redesenha.
 function ligaSegRp(id,chave){

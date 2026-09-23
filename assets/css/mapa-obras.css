@@ -838,6 +838,9 @@
         text-align:justify;pointer-events:none;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
   .kpi-tip p{margin:0 0 7px}
   .kpi-tip p:last-child{margin-bottom:0}
+  /* Tooltip da bolinha do eixoDias() (mostraEdTip): mesma casca do .kpi-tip, texto curto
+     e centralizado (é sempre "Nome: N dias" numa linha só, não um parágrafo). */
+  .ed-tip{max-width:200px;text-align:center;pointer-events:none}
   /* linha de recorte sob um .sec-h: de onde vêm os números da seção (período, régua,
      ordem). Encosta no cabeçalho, em corpo menor que o conteúdo que anuncia. */
   .sec-sub,.crumb-pop .pop-sub{line-height:1.4;font-weight:600;color:var(--text-dim)}
@@ -1499,7 +1502,7 @@
   /* Um ponto = um caso real. Semitransparente de propósito: dois despachos com tempos
      próximos escurecem um ao outro em vez de um sumir atrás do outro — a sobreposição
      vira densidade, que é informação, e não perda de dado. */
-  .modal .ed-dot{fill:rgba(var(--ng-rgb),.55);stroke:rgba(var(--ng-rgb),.85);stroke-width:1}
+  .modal .ed-dot{fill:rgba(var(--ng-rgb),.55);stroke:rgba(var(--ng-rgb),.85);stroke-width:1;cursor:pointer}
   /* "você está aqui": destaque pelo tamanho e contorno, cor pelo sinal — âmbar só quando o
      ponto está acima da referência (mais lento); verde cheio quando na referência ou abaixo. */
   .modal .ed-dot.on{fill:var(--ng);stroke:var(--text-brightest);stroke-width:1.5}
