@@ -2507,7 +2507,15 @@ const QUAD_LISTA_ROLA=8;
 // (2026-09-21: só despacho no período), de propósito: o ranking também é onde um gestor
 // vê alguém com fila parada mas nenhum despacho ainda no período, e essa pessoa não pode
 // sumir da lista só porque não contribui pro card.
-function aggFiscais(procs){
+// `opts.todosLotados` (E4, 2026-09-23) desliga esse corte por período: usada só pelos
+// cartões de fiscais da janela do distrito (equipeCardsHtml()), que precisam listar todo
+// fiscal que já atuou nas obras do distrito, mesmo sem fila nem despacho no período ativo
+// — a lista de PESSOAS fica estável, só os números de cada cartão seguem o período
+// (pedido do usuário: "os cards de todos os fiscais fiquem, independente do período").
+// `procs` já não é filtrado por período (vem de procsDoDistritoRaw/PROCESSOS, histórico
+// completo) — o corte de período mora inteiramente dentro de aggProc(), nunca aqui.
+function aggFiscais(procs,opts){
+  const todosLotados=!!(opts&&opts.todosLotados);
   const porMat=new Map(); let semFiscal=0;
   for(const p of procs){
     // Processo sem matrícula não vira linha: "(sem fiscal)" não é uma pessoa, e juntar
@@ -2520,7 +2528,9 @@ function aggFiscais(procs){
   const lista=[];
   porMat.forEach((ps,mat)=>{
     const a=aggProc(ps);
-    if(!a.fila && !a.desp) return;   // mesma regra do KPI: só GECOPE não conta como presença
+    // mesma regra do KPI: só GECOPE não conta como presença — exceto com todosLotados,
+    // onde ter QUALQUER processo histórico (ps.length>0, já garantido por porMat) basta.
+    if(!todosLotados && !a.fila && !a.desp) return;
     lista.push({mat, nome:ps[0].fiscalNome, gedop:ps[0].gedop,
                 fila:a.fila, desp:a.desp, n:a.nTempo, tempo:a.tempoMedio,
                 prontos:a.prontos, semTempo:a.semTempo});
@@ -2835,8 +2845,13 @@ function baseDaMedia(f){
 // 2026-09-17). Do mais lento ao mais rápido — a mesma pergunta que o painel inteiro faz.
 // Quem ainda não tem amostra comparável vai para o fim com "sem média", e não com um
 // número: a régua de AMOSTRA_MIN vale aqui igual ao mapa, ao ranking e aos KPIs.
+// `todosLotados:true` (E4, 2026-09-23): a lista de PESSOAS é sempre o histórico completo
+// do distrito, nunca recortada pelo período ativo — só os números de cada cartão (f.desp,
+// f.fila, f.tempo…) seguem o período, porque vêm de aggProc() dentro de aggFiscais(), que
+// sempre respeita st.rp.periodo. Pedido do usuário: os cartões não podem sumir/reaparecer
+// ao trocar o período, só os números dentro deles mudam.
 function equipeCardsHtml(procs,refMedia){
-  const {lista,semFiscal}=aggFiscais(procs);
+  const {lista,semFiscal}=aggFiscais(procs,{todosLotados:true});
   if(!lista.length) return '';
   const comMedia=lista.filter(f=>f.n>=AMOSTRA_MIN).sort((a,b)=>b.tempo-a.tempo);
   const sem=lista.filter(f=>f.n<AMOSTRA_MIN)
@@ -2864,9 +2879,9 @@ function equipeCardsHtml(procs,refMedia){
     ? `<div class="foot-note">${escHtml(`${NUM.format(semFiscal)} processo${semFiscal===1?'':'s'} destas obras `
       +`${semFiscal===1?'está':'estão'} sem matrícula de fiscal gravada e ${semFiscal===1?'fica':'ficam'} fora dos cartões.`)}</div>`
     : '';
-  return `<div class="statwrap"><div class="sec-h"><span>A equipe</span>`
+  return `<div class="statwrap"><div class="sec-h"><span>Fiscalização</span>`
     +`<span>${NUM.format(lista.length)} ${lista.length===1?'fiscal':'fiscais'}</span></div>`
-    +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média do estado (${escHtml(fmtDias(avg))})`:''}. Clique num cartão para abrir o painel do fiscal.</div>`
+    +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média dos distritos operacionais (${escHtml(fmtDias(avg))})`:''}. Clique num cartão para abrir o painel do fiscal.</div>`
     +`<div class="fcards">${comMedia.map(card).join('')}${sem.map(card).join('')}</div>${nota}</div>`;
 }
 function abreModalDistrito(gid){
@@ -3133,7 +3148,7 @@ function abreModalFiscal(mat,voltarGid){
         'Na GECOPE, despachados antes do período ou arquivados no meio do trâmite.',resto,null)
     +`</div>`;
   const acoes=voltarGid
-    ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para a equipe do distrito">${RS_ICO.voltar}<span>Voltar</span></button>`
+    ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para o distrito">${RS_ICO.voltar}<span>Voltar</span></button>`
     : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(ref.fiscalNome)}</div>${sub}</div>
@@ -3410,7 +3425,7 @@ function renderFoot(){
   // para as cidades, em Replanilhamentos abre o painel do distrito. O rodapé é o único
   // lugar que explica o gesto, então precisa dizer o que ele faz AQUI.
   const txt=modoReplan()
-    ? `Clique num <b>Distrito Operacional</b> no mapa para abrir o painel da equipe; use o ranking ao lado para descer até as cidades.
+    ? `Clique num <b>Distrito Operacional</b> no mapa para abrir o painel do distrito; use o ranking ao lado para descer até as cidades.
        Divisão oficial dos 11 D.Os (SOP). Processos de replanilhamento do GECOPE; tempo de resposta pelo histórico do SUITE.`
     : `Fluxo: <b>Distritos Operacionais → cidades</b>. Clique numa área para descer; use a trilha no topo para voltar.
        Divisão oficial dos 11 D.Os (SOP). Dados oficiais da base de contratos de obras da SOP-CE.`;
