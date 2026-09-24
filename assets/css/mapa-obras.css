@@ -953,14 +953,26 @@
   /* resumo (em atenção / vistoriadas / a vistoriar) no topo do bloco — só aparece com a
      métrica Elétrica selecionada (ver renderAtencaoEletrica). Mesma casca de .kpi, numa
      tira de 3 compacta em vez do grid inteiro de KPIs de Obras/Valor. */
-  .ele-resumo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-  .ele-resumo-i{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--card-border);
-        border-radius:11px;background:var(--card-bg-2)}
-  .ele-resumo-i .v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--text-brightest)}
-  .ele-resumo-i .l{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim);
-        text-transform:uppercase;letter-spacing:.3px}
+  .ele-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+  /* cada card filtra a lista abaixo pra só aquela categoria ao clicar
+     (wireEleResumoFiltro) — .on marca o filtro ativo. */
+  .ele-resumo-i{display:flex;flex-direction:column;gap:2px;padding:9px 8px;border:1px solid var(--card-border);
+        border-radius:11px;background:var(--card-bg-2);cursor:pointer;transition:border-color .15s,background .15s}
+  .ele-resumo-i:hover,.ele-resumo-i:focus-visible{border-color:rgba(var(--amber-rgb),.4);outline:none}
+  .ele-resumo-i.on{border-color:var(--amber-deep);background:rgba(var(--amber-rgb),.12)}
+  .ele-resumo-i .v{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest)}
+  .ele-resumo-i .l{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:600;color:var(--text-dim);
+        text-transform:uppercase;letter-spacing:.2px}
   .ele-resumo-i.ok .v{color:var(--ng-light)}
   .ele-resumo-i.warn .v{color:var(--amber-text)}
+  .ele-resumo-i.info .v{color:var(--text-brightest)}
+  /* Distrito Operacional → Município (pedido do usuário, 24/09/2026): cabeçalhos
+     leves só pra separar visualmente, sem virar outro componente colapsável. */
+  .ele-grupo-do+.ele-grupo-do{margin-top:10px}
+  .ele-grupo-do-h{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;color:var(--amber-text);
+        text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+  .ele-grupo-mun-h{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim);
+        margin:6px 0 4px 2px}
   /* "Atenção elétrica" (Fase 1) — mesma casca de .rrow, mas com acento lateral âmbar:
      é a única lista da barra lateral que representa uma ação da equipe de campo, não
      uma métrica de leitura, e o acento marca essa diferença sem inventar um
@@ -977,6 +989,9 @@
         border:1px dashed var(--card-border);border-radius:10px;background:transparent;color:var(--text-dim);
         font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700}
   .ele-alert-ver:hover{border-color:rgba(var(--amber-rgb),.4);color:var(--amber-text)}
+  /* chip de agendamento — só informativo aqui na lista; agendar/cancelar de verdade
+     vive dentro do modal da obra (aba Elétrica), ver .ele-agenda-info abaixo. */
+  .ele-agenda-chip{margin-top:5px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--ng-light)}
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
   /* Barra VAZADA = média sobre menos de AMOSTRA_SOLIDA despachos (ver amostraFina no JS).
      Hachura no lugar do preenchimento sólido: mantém a cor (que continua significando
@@ -1255,17 +1270,60 @@
   .modal .elelist{margin-top:10px;border:1px solid var(--card-border);border-radius:12px;padding:4px 14px;background:var(--card-bg-2)}
   .modal .elerow{padding:10px 0;font-size:12.5px}
   .modal .elerow+.elerow{border-top:1px solid rgba(var(--raise-rgb),.06)}
-  .modal .elerow-main{display:flex;justify-content:space-between;gap:12px;font-family:Montserrat,sans-serif}
-  .modal .elerow-data{color:var(--text-bright);font-weight:700}
-  .modal .elerow-resp{color:var(--text-dim)}
-  .modal .elerow-obs{margin-top:4px;color:var(--text-data);line-height:1.4}
-  .modal .elerow-link{display:inline-block;margin-top:6px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;color:var(--amber-text)}
+  /* uma linha só (pedido do usuário, 24/09/2026: antes vinha em 2, com "enviado em"
+     sempre visível) — resp/link encolhem com reticências antes de quebrar; a data de
+     envio (criado_em) não some, só muda de lugar: vira o title do .elerow inteiro. */
+  .modal .elerow-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Montserrat,sans-serif}
+  .modal .elerow-ver{flex:none;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--amber-text);
+        border:1px solid rgba(var(--amber-rgb),.35);border-radius:6px;padding:1px 6px}
+  .modal .elerow-data{flex:none;color:var(--text-bright);font-weight:700}
+  /* o responsável nunca trunca (é o dado que mais importa identificar de relance,
+     achado do usuário 24/09/2026: um max-width curto cortava até nomes comuns) — só o
+     nome do arquivo (menos crítico, sempre com o link/título completo por trás) encolhe
+     com reticências, e a linha quebra pro nome do responsável se não sobrar espaço. */
+  .modal .elerow-resp{flex:none;white-space:nowrap;color:var(--text-dim)}
+  .modal .elerow-link{flex:1 1 auto;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;color:var(--amber-text);text-decoration:none}
   .modal .elerow-link:hover{text-decoration:underline}
   .modal .elerow-link.off{color:var(--text-dim);font-weight:600}
+  .modal .elerow-excluir{flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;
+        width:24px;height:24px;padding:0;border:0;background:transparent;color:var(--text-dim);cursor:pointer;border-radius:6px;transition:.15s}
+  .modal .elerow-excluir svg{width:14px;height:14px}
+  .modal .elerow-excluir:hover{color:var(--status-stop);background:rgba(var(--raise-rgb),.08)}
+  .modal .elerow-obs{margin-top:4px;color:var(--text-data);line-height:1.4}
+  .modal .ele-insert-btn{margin-top:14px}
+  /* agendamento de vistoria (independente do relatório, ver .ele-agenda-info abaixo) —
+     mesmo botão .ele-insert-btn/.ele-btn do "Inserir relatório". */
+  .modal .ele-agenda-info{margin-top:10px;display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;
+        padding:10px 14px;border:1px solid rgba(var(--amber-rgb),.3);border-radius:11px;background:rgba(var(--amber-rgb),.06);
+        font-family:Montserrat,sans-serif;font-size:12.5px;color:var(--text-bright)}
+  .modal .ele-agenda-cancelar-btn{border:0;background:transparent;padding:0;color:var(--text-dim);
+        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;text-decoration:underline;cursor:pointer}
+  .modal .ele-agenda-cancelar-btn:hover{color:var(--status-stop)}
+  .modal .ele-agenda-cancelar-btn:disabled{opacity:.5;cursor:not-allowed}
+  /* diálogo de "novo relatório"/"agendar vistoria" — camada própria por cima do
+     .modal (z-index acima de 2000, ver .modal-bg), pedido do usuário (24/09/2026):
+     antes o formulário ficava sempre aberto na aba. position:fixed cobre a viewport
+     inteira mesmo aninhado dentro do .modal (nenhum ancestral usa transform/filter
+     aqui). [hidden] explícito: `display` de autor vence o [hidden] da folha do
+     navegador por origem, não especificidade (mesmo padrão de .seg[hidden] acima) —
+     sem esta regra, hidden=true não escondia o diálogo (bug reportado pelo usuário:
+     o X não fechava, porque a camada nunca tinha realmente sumido). */
+  .modal .ele-dialog-bg{position:fixed;inset:0;z-index:2100;background:rgba(3,10,7,.72);backdrop-filter:blur(4px);
+        display:flex;align-items:center;justify-content:center;padding:24px}
+  .modal .ele-dialog-bg[hidden]{display:none}
+  .modal .ele-dialog{width:min(520px,100%);max-height:90vh;overflow:auto;background:linear-gradient(180deg,var(--bg-modal),var(--bg-modal-2));
+        border:1px solid var(--card-border);border-radius:16px;padding:20px 22px 22px}
+  .modal .ele-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+        font-family:Montserrat,sans-serif;font-size:14px;font-weight:700;color:var(--text-bright)}
+  .modal .ele-dialog-x{flex:none;width:28px;height:28px;border:0;background:transparent;color:var(--text-dim);
+        font-size:20px;line-height:1;cursor:pointer;border-radius:8px}
+  .modal .ele-dialog-x:hover{color:var(--text-bright);background:rgba(var(--raise-rgb),.08)}
+  .modal .ele-dialog .eleform{margin-top:16px}
   /* formulário de novo relatório — só renderizado para eletrica/admin
      (PAPEIS_ELETRICA_ESCRITA). Dropzone no mesmo padrão do único drag-and-drop já
      existente no sistema (#cv-drop, Curva ABC), reskinada em âmbar. */
-  .modal .eleform{margin-top:14px;display:flex;flex-direction:column;gap:14px;max-width:560px}
+  .modal .eleform{display:flex;flex-direction:column;gap:14px}
   .modal .edrop{border:1.5px dashed var(--card-border);border-radius:12px;background:var(--card-bg-2);
         padding:26px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
   .modal .edrop:hover,.modal .edrop.over{border-color:var(--amber-deep);background:rgba(var(--amber-rgb),.08)}

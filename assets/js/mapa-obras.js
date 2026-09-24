@@ -143,6 +143,8 @@ const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,val
 // fica no Google Drive — ver supabase/functions/eletrica-drive-token). excluido_em
 // filtrado aqui (não é policy: soft delete, ver sql/create_eletrica_vistorias.sql).
 const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,drive_web_view_link,criado_em';
+const SB_ELETRICA_AGENDA='eletrica_vistorias_agendadas'; // agendamento de vistoria (obra+data+responsável), pedido do usuário 24/09/2026
+const ELETRICA_AGENDA_COLS='id,id_obra,data_planejada,responsavel_nome,criado_em';
 // referência estática dos códigos de situação da medição (STM) exibida na aba
 // Medições — só rótulos, não vem do banco (o modelo do usuário traz esta lista).
 const STM_LEGENDA=[
@@ -429,6 +431,16 @@ async function fetchEletricaVistorias(idFilter){
   for(const k in m) m[k].sort((a,b)=>String(b.data_vistoria||'').localeCompare(String(a.data_vistoria||'')));
   return m;
 }
+// agendamento de vistoria (id_obra -> agendamento ativo mais recente, ou undefined).
+// Só 1 por obra é exibido mesmo que existisse mais de um ativo no banco (a UI evita
+// criar 2, ver sql/create_eletrica_vistorias_agendadas.sql) — pega o mais recente.
+async function fetchEletricaAgendamentos(idFilter){
+  const filtroObra=inListFilter('id_obra',idFilter,false);
+  const filter=(filtroObra?filtroObra+'&':'')+'excluido_em=is.null';
+  const rows=await fetchTable(SB_ELETRICA_AGENDA,{select:ELETRICA_AGENDA_COLS,filter}); const m={};
+  for(const r of rows){ const k=r.id_obra; if(k==null) continue; if(!m[k]||r.criado_em>m[k].criado_em) m[k]=r; }
+  return m;
+}
 // `lastSync` é o maior `atualizado_em` dos contratos carregados (ver chamada em loadData),
 // não o horário em que o navegador buscou os dados — "Base atualizada em" precisa refletir
 // quando a BASE mudou de fato, não quando a página foi recarregada (antes usava
@@ -505,9 +517,10 @@ const CACHE_TTL_MS=60*60*1000;
 // de `ficha` ganhou valor_original/valor_atual (contexto do contrato, multi-obra).
 // v10: cada linha de `medic` ganhou valor_ref_glosa (glosa por período).
 // v11: novo campo `vist` (relatórios de vistoria elétrica, aba "Elétrica" — Fase 1).
+// v12: novo campo `agend` (agendamento de vistoria por obra, continuação da Fase 1).
 // O bump de versão garante que um objeto de formato antigo nunca seja reidratado como
 // se fosse completo.
-function cacheKey(scope){ return 'gecope_mapa_cache_v11_'+scope; }
+function cacheKey(scope){ return 'gecope_mapa_cache_v12_'+scope; }
 function readCache(scope){
   try{
     const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
@@ -516,8 +529,8 @@ function readCache(scope){
     return obj;
   }catch{ return null; }
 }
-function writeCache(scope,rows,fisc,adit,ficha,medic,vist){
-  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows,fisc,adit,ficha,medic,vist})); }
+function writeCache(scope,rows,fisc,adit,ficha,medic,vist,agend){
+  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows,fisc,adit,ficha,medic,vist,agend})); }
   catch(e){ /* quota/privacidade — cache é só um bônus de velocidade, ignora e segue sem ele */ }
 }
 
@@ -535,39 +548,41 @@ async function loadData(){
   try{
     const scope=st.dataScope;
     const cached=readCache(scope);
-    let rows, fisc, adit, ficha, medic, vist;
+    let rows, fisc, adit, ficha, medic, vist, agend;
     if(cached){
-      rows=cached.rows; fisc=cached.fisc; adit=cached.adit||{}; ficha=cached.ficha||{}; medic=cached.medic||{}; vist=cached.vist||{};
+      rows=cached.rows; fisc=cached.fisc; adit=cached.adit||{}; ficha=cached.ficha||{}; medic=cached.medic||{}; vist=cached.vist||{}; agend=cached.agend||{};
     } else if(scope==='ativa'){
       // carteira ativa: filtra no servidor (só ~348 linhas) e, com os ids/números já em
-      // mãos, busca comissão/aditivos/ficha/medições/vistorias elétricas só desses
-      // contratos — evita baixar as tabelas inteiras quando 90% delas são de obras já
-      // encerradas, fora da carteira ativa.
+      // mãos, busca comissão/aditivos/ficha/medições/vistorias elétricas/agendamentos só
+      // desses contratos — evita baixar as tabelas inteiras quando 90% delas são de obras
+      // já encerradas, fora da carteira ativa.
       const filter=`status_obra=in.(${ACTIVE_STATUSES.map(s=>`"${s}"`).join(',')})`;
       rows=await fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter});
       const ids=[...new Set(rows.map(r=>r.id_obra).filter(v=>v!=null))];
       const nrs=[...new Set(rows.map(r=>r.nr_contrato_sop).filter(Boolean))];
-      [fisc,adit,ficha,medic,vist]=await Promise.all([
+      [fisc,adit,ficha,medic,vist,agend]=await Promise.all([
         fetchFiscais(ids).catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
         fetchAditivos(nrs).catch(e=>{ console.warn('aditivos_contrato indisponível:',e.message); return {}; }),
         fetchFichas(nrs).catch(e=>{ console.warn('ficha_contrato indisponível:',e.message); return {}; }),
         fetchMedicoes(ids).catch(e=>{ console.warn('medicoes indisponível:',e.message); return {}; }),
         fetchEletricaVistorias(ids).catch(e=>{ console.warn('eletrica_vistorias indisponível:',e.message); return {}; }),
+        fetchEletricaAgendamentos(ids).catch(e=>{ console.warn('eletrica_vistorias_agendadas indisponível:',e.message); return {}; }),
       ]);
-      writeCache(scope,rows,fisc,adit,ficha,medic,vist);
+      writeCache(scope,rows,fisc,adit,ficha,medic,vist,agend);
     } else {
       // histórico completo: os ids/números não cabem numa query in.(...), então busca
       // as tabelas inteiras (só com as colunas usadas) em paralelo.
-      const [rowsR,fiscR,aditR,fichaR,medicR,vistR]=await Promise.all([
+      const [rowsR,fiscR,aditR,fichaR,medicR,vistR,agendR]=await Promise.all([
         fetchTable(SB_TABLE,{select:CONTRATOS_COLS}),
         fetchFiscais().catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
         fetchAditivos().catch(e=>{ console.warn('aditivos_contrato indisponível:',e.message); return {}; }),
         fetchFichas().catch(e=>{ console.warn('ficha_contrato indisponível:',e.message); return {}; }),
         fetchMedicoes().catch(e=>{ console.warn('medicoes indisponível:',e.message); return {}; }),
         fetchEletricaVistorias().catch(e=>{ console.warn('eletrica_vistorias indisponível:',e.message); return {}; }),
+        fetchEletricaAgendamentos().catch(e=>{ console.warn('eletrica_vistorias_agendadas indisponível:',e.message); return {}; }),
       ]);
-      rows=rowsR; fisc=fiscR; adit=aditR; ficha=fichaR; medic=medicR; vist=vistR;
-      writeCache(scope,rows,fisc,adit,ficha,medic,vist);
+      rows=rowsR; fisc=fiscR; adit=aditR; ficha=fichaR; medic=medicR; vist=vistR; agend=agendR;
+      writeCache(scope,rows,fisc,adit,ficha,medic,vist,agend);
     }
     // 1 contrato : N obras — conta quantas obras de cada contrato estão CARREGADAS
     // (na carteira ativa é só as ativas; no histórico completo é todas). Só usado como
@@ -579,6 +594,7 @@ async function loadData(){
       const nrKey=r.nr_contrato_sop; o.aditivos=(nrKey&&adit[nrKey])||[]; o.ficha=(nrKey&&ficha[nrKey])||null;
       o.medicoes=medic[o.id_obra]||[];
       o.relatoriosEletrica=vist[o.id_obra]||[];
+      o.agendamentoEletrica=agend[o.id_obra]||null;
       o.nObras=(nrKey&&obraCountBySop[nrKey])||1;
       // valor original DO CONTRATO: a ficha tem o valor real (1 linha por contrato,
       // agrega todas as obras). Sem ficha: obra única → o próprio valor_original;
@@ -790,7 +806,7 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
   // entram no Bloco 2 — até lá ficam vazias e inertes).
   f:{ano:new Set(),status:new Set(),contratada:new Set(),contratante:new Set(),fiscal:new Set(),
      distrito:new Set(),municipio:new Set(),tipo:new Set(),faixaValor:new Set(),
-     prazoExec:new Set(),vigencia:new Set(),paralisada:new Set(),medicao:new Set(),q:''}};
+     prazoExec:new Set(),vigencia:new Set(),paralisada:new Set(),medicao:new Set(),vistoria:new Set(),q:''}};
 
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
               valor:{label:'Valor total',fmt:v=>BRL.format(v)},
@@ -840,6 +856,16 @@ let _obrasOfCache=new Map();
 // não depende do hover: é a carteira inteira, ver obrasComAtencaoEletrica()).
 let _atencaoEletricaDirty=true;
 function invalidateAggCache(){ _obrasOfCache=new Map(); _atencaoEletricaDirty=true; }
+// como invalidateAggCache(), mas também descarta o cache de sessionStorage (ver
+// CACHE_TTL_MS/cacheKey) — necessário sempre que uma mutação grava no banco por fora
+// do fluxo normal de loadData() (agendar/cancelar vistoria, excluir/enviar relatório).
+// Sem isto, um F5 dentro da 1h de TTL reidrata o dado velho (ex.: agendamento já
+// cancelado reaparece com o checkbox habilitado de novo) e reabre a duplicidade que a
+// UI deveria evitar.
+function invalidateSessionCache(){
+  invalidateAggCache();
+  try{ sessionStorage.removeItem(cacheKey(st.dataScope)); }catch(e){ /* privacidade/quota — segue sem cache mesmo */ }
+}
 function obrasOf(id){
   let hit=_obrasOfCache.get(id);
   if(hit===undefined){ hit=DB.municipios[id].obras.filter(passF); _obrasOfCache.set(id,hit); }
@@ -1519,6 +1545,11 @@ function renderStatusChart(ids){
 // o valor original dos contratos com o total já incorporado em aditivos — pergunta que a
 // cúpula faz na prática: "quanto do valor atual da carteira é aditivo, não orçamento original?"
 function renderAditivoChart(ids){
+  const wrap=document.getElementById('aditivoWrap');
+  // sem sentido na métrica Elétrica (pedido do usuário, 24/09/2026): a comparação de
+  // valor original vs. aditivos não tem relação com vistoria elétrica.
+  if(wrap) wrap.hidden=st.metric==='eletrica';
+  if(st.metric==='eletrica') return;
   const bar=document.getElementById('aditivoBar'), leg=document.getElementById('aditivoLeg');
   if(!bar||!leg) return;
   const a=aggIds(ids), total=a.valorOriginal+a.adit;
@@ -1536,29 +1567,52 @@ function renderAditivoChart(ids){
     `<span class="sit"><span class="dot" style="background:var(--ng-deep)"></span>Original <b>${BRL.format(a.valorOriginal)}</b></span>`
     +(a.adit>0?`<span class="sit"><span class="dot" style="background:var(--amber)"></span>Aditivos <b>${BRL.format(a.adit)}</b> (${pctAditReal.toFixed(0)}%)</span>`:'');
 }
-// mini gráfico de barras (SVG) com a contagem de contratos por ano de assinatura no
-// recorte atual — dá noção de safra/tendência que nenhum KPI isolado mostra.
+const MESES_ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+// mini gráfico de barras (HTML/flex) — genérico: recebe pares [chave,label,contagem]
+// já prontos e desenha, sem saber se é ano de contrato ou mês de vistoria. Barras em
+// flex (não SVG com preserveAspectRatio="none", que esticava barras e rótulos): o
+// painel tem largura fluida, então flex resolve a distribuição sozinho, o texto fica
+// nítido em qualquer largura, e cada coluna ganha o valor acima da barra, um trilho
+// de fundo e destaque quando é o pico. Altura mínima de 6% pra colunas baixas não
+// sumirem.
+function renderBarChart(host,cols,unidadeSingular,unidadePlural,ariaLabel){
+  if(!cols.length){ host.innerHTML=`<div class="empty" style="padding:2px 0">Sem ${unidadePlural} neste recorte.</div>`; return; }
+  const max=Math.max(...cols.map(c=>c[2]));
+  const html=cols.map(([,label,n])=>{
+    const pct=Math.max(6, n/max*100);
+    const peak=n===max ? ' peak' : '';
+    return `<div class="ycol${peak}" title="${label}: ${NUM.format(n)} ${n===1?unidadeSingular:unidadePlural}">`
+      +`<div class="yval">${NUM.format(n)}</div>`
+      +`<div class="ytrack"><div class="ybar" style="height:${pct.toFixed(1)}%"></div></div>`
+      +`<div class="ylab">${label}</div></div>`;
+  }).join('');
+  host.innerHTML=`<div class="ychart" role="img" aria-label="${ariaLabel}">${html}</div>`;
+}
+// contagem de contratos por ano de assinatura no recorte atual — dá noção de
+// safra/tendência que nenhum KPI isolado mostra. Na métrica Elétrica vira "Vistorias
+// realizadas (mês a mês)" (pedido do usuário, 24/09/2026): o ano de assinatura não diz
+// nada sobre o ritmo de vistorias, que é o que a equipe de elétrica quer acompanhar.
 function renderYearChart(ids){
   const host=document.getElementById('yearChart'); if(!host) return;
+  const titulo=document.getElementById('yearChartTitulo');
+  if(st.metric==='eletrica'){
+    if(titulo) titulo.textContent='Vistorias realizadas (mês a mês)';
+    const counts={};
+    ids.forEach(id=>obrasOf(id).forEach(o=>(o.relatoriosEletrica||[]).forEach(r=>{
+      const m=String(r.data_vistoria||'').slice(0,7); // 'YYYY-MM'
+      if(m.length===7) counts[m]=(counts[m]||0)+1;
+    })));
+    const meses=Object.keys(counts).sort();
+    const cols=meses.map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), counts[m]]);
+    renderBarChart(host,cols,'vistoria','vistorias','Vistorias realizadas por mês');
+    return;
+  }
+  if(titulo) titulo.textContent='Contratos por ano de assinatura';
   const counts={};
   ids.forEach(id=>obrasOf(id).forEach(o=>{ if(o.ano) counts[o.ano]=(counts[o.ano]||0)+1; }));
   const anos=Object.keys(counts).map(Number).sort((a,b)=>a-b);
-  if(!anos.length){ host.innerHTML='<div class="empty" style="padding:2px 0">Sem data de assinatura neste recorte.</div>'; return; }
-  const max=Math.max(...anos.map(a=>counts[a]));
-  // Barras em HTML/flex (não mais SVG com preserveAspectRatio="none", que esticava
-  // barras e rótulos): o painel tem largura fluida, então flex resolve a distribuição
-  // sozinho, o texto fica nítido em qualquer largura, e cada ano ganha o valor acima
-  // da barra, um trilho de fundo e destaque quando é o pico. Altura mínima de 6% pra
-  // anos com poucos contratos não sumirem.
-  const cols=anos.map(a=>{
-    const pct=Math.max(6, counts[a]/max*100);
-    const peak=counts[a]===max ? ' peak' : '';
-    return `<div class="ycol${peak}" title="${a}: ${NUM.format(counts[a])} contrato${counts[a]===1?'':'s'}">`
-      +`<div class="yval">${NUM.format(counts[a])}</div>`
-      +`<div class="ytrack"><div class="ybar" style="height:${pct.toFixed(1)}%"></div></div>`
-      +`<div class="ylab">’${String(a).slice(2)}</div></div>`;
-  }).join('');
-  host.innerHTML=`<div class="ychart" role="img" aria-label="Contratos por ano de assinatura">${cols}</div>`;
+  const cols=anos.map(a=>[a, '’'+String(a).slice(2), counts[a]]);
+  renderBarChart(host,cols,'contrato','contratos','Contratos por ano de assinatura');
 }
 function setKPIs(){
   const ids=scopeIds(); const a=aggIds(ids);
@@ -1587,7 +1641,11 @@ function obrasComAtencaoEletrica(){
       if(!marco) continue;
       const rel=o.relatoriosEletrica||[];
       const ultimo=rel[0]; // já ordenado mais-recente-primeiro (fetchEletricaVistorias)
-      arr.push({o, pct, marco, totalRelatorios:rel.length, ultimaData:ultimo?ultimo.data_vistoria:null});
+      // agendamento só é relevante enquanto não há relatório — depois disso a obra já
+      // saiu do "a vistoriar" e o agendamento correspondente é ignorado aqui (não é
+      // apagado no banco, ver sql/create_eletrica_vistorias_agendadas.sql).
+      const agendamento=rel.length?null:(o.agendamentoEletrica||null);
+      arr.push({o, pct, marco, totalRelatorios:rel.length, ultimaData:ultimo?ultimo.data_vistoria:null, agendamento});
     }
   }
   // sem relatório primeiro (quem mais precisa de atenção), depois por % desc
@@ -1596,6 +1654,35 @@ function obrasComAtencaoEletrica(){
 }
 let CUR_ELETRICA_ATENCAO=[];
 let eleAtencaoExpandido=false;
+// filtro por card do resumo (null | 'atencao' | 'vistoriadas' | 'avistoriar' |
+// 'agendadas') — clicar de novo no card já ativo limpa o filtro. 'atencao' é o
+// universo inteiro (mesmo efeito de null), mas precisa de valor próprio pra o card
+// saber que está "ativo" quando clicado.
+let eleFiltroCategoria=null;
+// agrupa itens (já filtrados/visíveis) por Distrito Operacional → Município, na
+// mesma ordem numérica fixa dos distritos usada em groupEntries() (grpById/gid) —
+// o distrito da obra vem do município (NAMEIDX+DB.municipios[cod].do), não do texto
+// bruto distrito_operacional da linha, pra usar o mesmo nome/ordem que o resto do
+// app (evita divergência de grafia entre a tabela e o GeoJSON).
+function agruparPorDistritoMunicipio(lista){
+  const porDistrito=new Map();
+  for(const it of lista){
+    const cod=NAMEIDX[normTxt(it.o.municipioTxt)];
+    const gid=(cod!=null&&DB.municipios[cod])?DB.municipios[cod].do:null;
+    const g=grpById(gid);
+    const distKey=gid!=null?gid:'—';
+    const distNome=g?g.nome.replace(/^D\.O\.\s*/,''):'Sem distrito';
+    if(!porDistrito.has(distKey)) porDistrito.set(distKey,{ordem:gid!=null?gid:999,nome:distNome,municipios:new Map()});
+    const grupo=porDistrito.get(distKey);
+    const munNome=it.o.municipioTxt||'Sem município';
+    if(!grupo.municipios.has(munNome)) grupo.municipios.set(munNome,[]);
+    grupo.municipios.get(munNome).push(it);
+  }
+  return [...porDistrito.values()].sort((a,b)=>a.ordem-b.ordem).map(g=>({
+    nome:g.nome,
+    municipios:[...g.municipios.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR')).map(([nome,itensMun])=>({nome,itensMun})),
+  }));
+}
 // Bloco "Atenção elétrica": só faz sentido enquanto a métrica do mapa é Elétrica — o
 // resto do tempo fica fora do painel (pedido do usuário, 24/09/2026: antes ficava
 // sempre visível, competindo por espaço com os KPIs de Obras/Valor). Guarda a
@@ -1620,26 +1707,78 @@ function renderAtencaoEletrica(forceReflow){
   _atencaoEletricaDirty=false;
   const titulo=document.getElementById('eleAtencaoTitulo');
   const itens=obrasComAtencaoEletrica();
-  CUR_ELETRICA_ATENCAO=itens.map(it=>it.o);
-  if(titulo) titulo.textContent=itens.length?`Atenção elétrica (${itens.length})`:'Atenção elétrica';
-  if(!itens.length){ corpo.innerHTML='<div class="empty">Nenhuma obra acima de 50% de medição no momento.</div>'; return; }
+  if(titulo) titulo.textContent=itens.length?`Atenção, Elétrica! (${itens.length})`:'Atenção, Elétrica!';
+  if(!itens.length){ CUR_ELETRICA_ATENCAO=[]; corpo.innerHTML='<div class="empty">Nenhuma obra acima de 50% de medição no momento.</div>'; return; }
   const vistoriadas=itens.filter(it=>it.totalRelatorios>0).length;
-  const resumo=`<div class="ele-resumo">
-    <div class="ele-resumo-i"><span class="v">${NUM.format(itens.length)}</span><span class="l">em atenção</span></div>
-    <div class="ele-resumo-i ok"><span class="v">${NUM.format(vistoriadas)}</span><span class="l">vistoriadas</span></div>
-    <div class="ele-resumo-i warn"><span class="v">${NUM.format(itens.length-vistoriadas)}</span><span class="l">a vistoriar</span></div>
-  </div>`;
+  const agendadas=itens.filter(it=>it.agendamento).length;
+  const avistoriar=itens.length-vistoriadas;
+  // cada card filtra a lista abaixo pra só aquela categoria — clicar no card já
+  // ativo limpa o filtro (mesmo padrão de toggle de outros chips no app). 'em
+  // atenção' representa o universo inteiro (equivalente a nenhum filtro).
+  const cardDef=[
+    {k:'atencao',v:itens.length,l:'em atenção',cls:''},
+    {k:'vistoriadas',v:vistoriadas,l:'vistoriadas',cls:'ok'},
+    {k:'avistoriar',v:avistoriar,l:'a vistoriar',cls:'warn'},
+    {k:'agendadas',v:agendadas,l:'agendadas',cls:'info'},
+  ];
+  const resumo=`<div class="ele-resumo">${cardDef.map(c=>
+    `<div class="ele-resumo-i${c.cls?' '+c.cls:''}${eleFiltroCategoria===c.k?' on':''}" role="button" tabindex="0" data-filtro="${c.k}">`
+    +`<span class="v">${NUM.format(c.v)}</span><span class="l">${c.l}</span></div>`).join('')}</div>`;
+  const CATEGORIA_TESTE={
+    atencao:()=>true,
+    vistoriadas:it=>it.totalRelatorios>0,
+    avistoriar:it=>!it.totalRelatorios,
+    agendadas:it=>!!it.agendamento,
+  };
+  const itensFiltrados=eleFiltroCategoria?itens.filter(CATEGORIA_TESTE[eleFiltroCategoria]):itens;
+  CUR_ELETRICA_ATENCAO=itensFiltrados.map(it=>it.o);
+  if(!itensFiltrados.length){
+    corpo.innerHTML=resumo+'<div class="empty">Nenhuma obra nesta categoria.</div>';
+    wireEleResumoFiltro();
+    return;
+  }
   const MOSTRAR=6;
-  const mostrar=eleAtencaoExpandido?itens:itens.slice(0,MOSTRAR);
-  const linha=(it,i)=>`<div class="ele-alert-row" role="button" tabindex="0" data-oid="${i}">
-    <div class="ele-alert-main"><span class="ele-alert-nome">${escHtml(it.o.codigo_obra||it.o.contrato)}</span><span class="ele-alert-marco">${it.marco}%</span></div>
-    <div class="ele-alert-sub">${it.totalRelatorios?`${it.totalRelatorios} relatório${it.totalRelatorios===1?'':'s'}${it.ultimaData?' · último em '+fmtDateBR(it.ultimaData):''}`:'sem relatório enviado'}</div>
-  </div>`;
-  const verBtn=itens.length>MOSTRAR
-    ?`<button type="button" class="ele-alert-ver" id="eleAtencaoVer">${eleAtencaoExpandido?'ver menos':'ver todas ('+itens.length+')'}</button>`:'';
-  corpo.innerHTML=resumo+mostrar.map(linha).join('')+verBtn;
+  const mostrar=(eleAtencaoExpandido?itensFiltrados:itensFiltrados.slice(0,MOSTRAR)).map((it,i)=>({...it,_i:i}));
+  const linha=(it)=>{
+    const chipAgenda=it.agendamento
+      ?`<div class="ele-agenda-chip">Agendada p/ ${fmtDateBR(it.agendamento.data_planejada)} · ${escHtml(it.agendamento.responsavel_nome)}</div>`:'';
+    return `<div class="ele-alert-row" role="button" tabindex="0" data-oid="${it._i}">
+      <div class="ele-alert-body">
+        <div class="ele-alert-main"><span class="ele-alert-nome">${escHtml(it.o.objeto||it.o.codigo_obra||it.o.contrato)}</span><span class="ele-alert-marco">${it.marco}%</span></div>
+        <div class="ele-alert-sub">${it.totalRelatorios?`${it.totalRelatorios} relatório${it.totalRelatorios===1?'':'s'}${it.ultimaData?' · último em '+fmtDateBR(it.ultimaData):''}`:'sem relatório enviado'}</div>
+        ${chipAgenda}
+      </div>
+    </div>`;
+  };
+  // Distrito Operacional → Município (pedido do usuário, 24/09/2026): só agrupa o
+  // que está visível (`mostrar`) — `_i` já carrega o índice em itensFiltrados, que é
+  // o mesmo espaço de índice de CUR_ELETRICA_ATENCAO, então o agrupamento visual não
+  // muda o que data-oid resolve.
+  const grupos=agruparPorDistritoMunicipio(mostrar);
+  const listaHtml=grupos.map(g=>
+    `<div class="ele-grupo-do"><div class="ele-grupo-do-h">${escHtml(g.nome)}</div>`
+    +g.municipios.map(m=>`<div class="ele-grupo-mun"><div class="ele-grupo-mun-h">${escHtml(m.nome)}</div>${m.itensMun.map(linha).join('')}</div>`).join('')
+    +`</div>`).join('');
+  const verBtn=itensFiltrados.length>MOSTRAR
+    ?`<button type="button" class="ele-alert-ver" id="eleAtencaoVer">${eleAtencaoExpandido?'ver menos':'ver todas ('+itensFiltrados.length+')'}</button>`:'';
+  corpo.innerHTML=resumo+listaHtml+verBtn;
   const verEl=document.getElementById('eleAtencaoVer');
   if(verEl) verEl.onclick=()=>{ eleAtencaoExpandido=!eleAtencaoExpandido; renderAtencaoEletrica(true); };
+  wireEleResumoFiltro();
+}
+// liga o clique/teclado dos 4 cards do resumo (filtro de categoria) — chamada de
+// novo a cada reflow (innerHTML reconstruído, listeners velhos morrem junto).
+function wireEleResumoFiltro(){
+  const corpo=document.getElementById('eleAtencaoBody'); if(!corpo) return;
+  corpo.querySelectorAll('.ele-resumo-i').forEach(card=>{
+    card.addEventListener('click',()=>{
+      const k=card.dataset.filtro;
+      eleFiltroCategoria=(eleFiltroCategoria===k)?null:k;
+      eleAtencaoExpandido=false; // troca de filtro reabre no recorte curto, senão "ver todas" de uma categoria vazaria pra outra
+      renderAtencaoEletrica(true);
+    });
+    card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); card.click(); } });
+  });
 }
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
 // ({k,nome,sub,v}). Compartilhadas entre renderPanel() e o popover de navegação
@@ -2145,6 +2284,7 @@ const RS_ICO={
   clock:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   chart:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l3-3 3 2 4-5"/></svg>',
   voltar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+  lixeira:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/></svg>',
 };
 // medição NO NÍVEL DA OBRA: Σ do `total` LÍQUIDO das medições desta obra (já com as
 // glosas descontadas — não `valor_medido`, que é o bruto) ÷ valor da obra. Denominador =
@@ -2430,46 +2570,91 @@ function buildEletricaPane(o){
     <div class="rs-card-sub">${statusInfo.sub}</div>
   </div>`;
   const topRow=`<div class="ele-top-row">${progCard}${statusCard}</div>`;
-
-  const lista=rel.length
-    ? `<div class="elelist">${rel.map(r=>`<div class="elerow">
-        <div class="elerow-main">
-          <span class="elerow-data">${fmtDateBR(r.data_vistoria)}</span>
-          <span class="elerow-resp">${escHtml(r.responsavel_nome)}</span>
-        </div>
-        ${r.observacao?`<div class="elerow-obs">${escHtml(r.observacao)}</div>`:''}
-        ${r.drive_web_view_link
-          ?`<a class="elerow-link" href="${escHtml(r.drive_web_view_link)}" target="_blank" rel="noopener">${escHtml(r.arquivo_nome_original||'Abrir relatório')}</a>`
-          :`<span class="elerow-link off">${escHtml(r.arquivo_nome_original||'Arquivo')}</span>`}
-      </div>`).join('')}</div>`
-    : `<div class="empty">Nenhum relatório de vistoria enviado para esta obra ainda.</div>`;
-
-  // formulário de novo relatório: só para eletrica/admin (PAPEIS_ELETRICA_ESCRITA) —
-  // a trava real é a RLS de eletrica_vistorias; isto só evita OFERECER o formulário a
-  // quem não pode gravar (mesmo espírito de PAPEIS_REPLAN). wireEletricaPane() faz o
-  // wiring de eventos depois que este HTML entra no DOM (openModal não repete sozinho).
+  // só eletrica/admin (PAPEIS_ELETRICA_ESCRITA) veem os botões de agendar/inserir/
+  // excluir — a trava real é a RLS de eletrica_vistorias/eletrica_vistorias_agendadas;
+  // isto só evita OFERECER a ação a quem não pode gravar (mesmo espírito de
+  // PAPEIS_REPLAN). wireEletricaPane() liga abrir/fechar dos diálogos depois que este
+  // HTML entra no DOM.
   const podeEnviar=PAPEIS_ELETRICA_ESCRITA.includes(USER_PAPEL);
   const hoje=new Date().toISOString().slice(0,10);
   const nomeSessao=sessionStorage.getItem('sop_user_name')||'';
-  const formulario=podeEnviar?`<div class="msec">Novo relatório de vistoria</div>
-    <form id="eleForm" class="eleform" novalidate>
-      <div id="eleDrop" class="edrop" tabindex="0" role="button" aria-label="Selecionar relatório">
-        <svg class="edrop-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
-        <p class="edrop-txt">Arraste o relatório aqui ou clique para selecionar</p>
-        <div class="edrop-fmt"><span>.pdf</span><span>.doc</span><span>.docx</span></div>
-        <div class="edrop-nome" id="eleArquivoNome" hidden></div>
-        <input type="file" id="eleFile" accept=".pdf,.doc,.docx" hidden>
-      </div>
-      <div class="elefields">
-        <label>Data da vistoria<input type="date" id="eleData" required value="${hoje}"></label>
-        <label>Responsável<input type="text" id="eleResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
-        <label class="span2">Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
-      </div>
-      <div class="ele-erro" id="eleErro" hidden></div>
-      <button type="submit" class="ele-btn" id="eleBtnEnviar" disabled>Enviar relatório</button>
-    </form>`:'';
+  // agendamento de vistoria: independente do relatório (tabelas irmãs, sem FK — ver
+  // sql/create_eletrica_vistorias_agendadas.sql). Clicar na obra na lista "Atenção,
+  // Elétrica!" abre esta aba direto (pedido do usuário, 24/09/2026) — daqui o
+  // usuário escolhe agendar OU inserir um relatório, sem UI própria na lista.
+  // Cancelamento é soft-delete (UPDATE excluido_em), nunca DELETE físico.
+  const agenda=o.agendamentoEletrica;
+  const agendaSecao=!podeEnviar?'':agenda
+    ?`<div class="msec">Agendamento de vistoria</div>
+      <div class="ele-agenda-info">
+        <span>Agendada p/ <b>${fmtDateBR(agenda.data_planejada)}</b> · ${escHtml(agenda.responsavel_nome)}</span>
+        <button type="button" class="ele-agenda-cancelar-btn" id="eleAgendaCancelarBtn">Cancelar agendamento</button>
+      </div>`
+    :`<div class="msec">Agendamento de vistoria</div>
+      <button type="button" class="ele-btn ele-insert-btn" id="eleAbrirAgenda">Agendar vistoria</button>
+      <div class="ele-dialog-bg" id="eleAgendaDialogBg" hidden>
+        <div class="ele-dialog" role="dialog" aria-modal="true" aria-label="Agendar vistoria">
+          <div class="ele-dialog-head"><span>Agendar vistoria</span>
+            <button type="button" class="ele-dialog-x" id="eleAgendaDialogX" aria-label="Fechar">&times;</button></div>
+          <form id="eleAgendaForm" class="eleform" novalidate>
+            <div class="elefields">
+              <label>Data planejada<input type="date" id="eleAgendaData" required value="${hoje}"></label>
+              <label>Responsável<input type="text" id="eleAgendaResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
+            </div>
+            <div class="ele-erro" id="eleAgendaErro" hidden></div>
+            <button type="submit" class="ele-btn" id="eleAgendaBtnSalvar">Agendar vistoria</button>
+          </form>
+        </div>
+      </div>`;
 
-  return topRow+`<div class="msec">Relatórios enviados (${rel.length})</div>`+lista+formulario;
+  // versão do relatório (V1, V2, …) = ordem de ENVIO (criado_em), não a ordem de
+  // exibição da lista (que é por data_vistoria desc, ver fetchEletricaVistorias) —
+  // um relatório de vistoria retroativa não deve "roubar" o número de um mais antigo.
+  const versaoPorId={};
+  [...rel].sort((a,b)=>String(a.criado_em||'').localeCompare(String(b.criado_em||''))).forEach((r,idx)=>{ versaoPorId[r.id]=idx+1; });
+  const lista=rel.length
+    ? `<div class="elelist">${rel.map(r=>`<div class="elerow" title="Enviado em ${fmtDateTimeBR(r.criado_em)}">
+        <div class="elerow-line">
+          <span class="elerow-ver">V${versaoPorId[r.id]}</span>
+          <span class="elerow-data">${fmtDateBR(r.data_vistoria)}</span>
+          <span class="elerow-resp">${escHtml(r.responsavel_nome)}</span>
+          ${r.drive_web_view_link
+            ?`<a class="elerow-link" href="${escHtml(r.drive_web_view_link)}" target="_blank" rel="noopener">${escHtml(r.arquivo_nome_original||'Abrir relatório')}</a>`
+            :`<span class="elerow-link off">${escHtml(r.arquivo_nome_original||'Arquivo')}</span>`}
+          ${podeEnviar?`<button type="button" class="elerow-excluir" data-id="${r.id}" title="Excluir relatório" aria-label="Excluir relatório de ${fmtDateBR(r.data_vistoria)}">${RS_ICO.lixeira}</button>`:''}
+        </div>
+        ${r.observacao?`<div class="elerow-obs">${escHtml(r.observacao)}</div>`:''}
+      </div>`).join('')}</div>`
+    : `<div class="empty">Nenhum relatório de vistoria enviado para esta obra ainda.</div>`;
+
+  // formulário de novo relatório mora dentro de um diálogo próprio (pedido do
+  // usuário, 24/09/2026: antes ficava sempre aberto na aba, ocupando espaço mesmo
+  // quando ninguém ia enviar nada agora) — o botão "Inserir relatório" abre.
+  const trigger=podeEnviar?`<button type="button" class="ele-btn ele-insert-btn" id="eleAbrirForm">Inserir relatório</button>`:'';
+  const dialog=podeEnviar?`<div class="ele-dialog-bg" id="eleDialogBg" hidden>
+    <div class="ele-dialog" role="dialog" aria-modal="true" aria-label="Novo relatório de vistoria">
+      <div class="ele-dialog-head"><span>Novo relatório de vistoria</span>
+        <button type="button" class="ele-dialog-x" id="eleDialogX" aria-label="Fechar">&times;</button></div>
+      <form id="eleForm" class="eleform" novalidate>
+        <div id="eleDrop" class="edrop" tabindex="0" role="button" aria-label="Selecionar relatório">
+          <svg class="edrop-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+          <p class="edrop-txt">Arraste o relatório aqui ou clique para selecionar</p>
+          <div class="edrop-fmt"><span>.pdf</span><span>.doc</span><span>.docx</span></div>
+          <div class="edrop-nome" id="eleArquivoNome" hidden></div>
+          <input type="file" id="eleFile" accept=".pdf,.doc,.docx" hidden>
+        </div>
+        <div class="elefields">
+          <label>Data da vistoria<input type="date" id="eleData" required value="${hoje}"></label>
+          <label>Responsável<input type="text" id="eleResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
+          <label class="span2">Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
+        </div>
+        <div class="ele-erro" id="eleErro" hidden></div>
+        <button type="submit" class="ele-btn" id="eleBtnEnviar" disabled>Enviar relatório</button>
+      </form>
+    </div>
+  </div>`:'';
+
+  return topRow+agendaSecao+`<div class="msec">Relatórios enviados (${rel.length})</div>`+lista+trigger+dialog;
 }
 // upload multipart/related direto pra API do Google Drive v3, com o access_token de
 // curta duração devolvido por eletrica-drive-token (Fase 1 — ver comentário no topo
@@ -2499,6 +2684,84 @@ const ELE_TAMANHO_MAX=20*1024*1024; // 20MB — mesmo teto validado em eletrica-
 // antigos morrem com o innerHTML velho — mesmo padrão de wireModalTabs/openModal.
 function wireEletricaPane(o){
   const pane=document.getElementById('mPaneEletrica'); if(!pane) return;
+  // botão "Excluir" de cada relatório: soft delete (mesma UPDATE+excluido_em de
+  // sql/create_eletrica_vistorias.sql) — não depende do formulário existir, mas só
+  // é renderizado junto com ele (mesma trava PAPEIS_ELETRICA_ESCRITA).
+  pane.querySelectorAll('.elerow-excluir').forEach(btnDel=>{
+    btnDel.addEventListener('click',async()=>{
+      if(!window.confirm('Excluir este relatório de vistoria? Essa ação não pode ser desfeita pelo app.')) return;
+      btnDel.disabled=true;
+      const{error}=await window.sbClient.from('eletrica_vistorias').update({excluido_em:new Date().toISOString()}).eq('id',btnDel.dataset.id);
+      if(error){ window.alert('Não consegui excluir o relatório agora. Tente novamente.'); btnDel.disabled=false; return; }
+      const novo=await fetchEletricaVistorias([o.id_obra]).catch(()=>null);
+      o.relatoriosEletrica=novo?(novo[o.id_obra]||[]):(o.relatoriosEletrica||[]).filter(r=>String(r.id)!==String(btnDel.dataset.id));
+      pane.innerHTML=buildEletricaPane(o);
+      wireEletricaPane(o);
+      invalidateSessionCache(); renderAtencaoEletrica();
+    });
+  });
+  // "Cancelar agendamento": soft delete (mesma UPDATE+excluido_em de
+  // sql/create_eletrica_vistorias_agendadas.sql).
+  const btnCancelarAgenda=pane.querySelector('#eleAgendaCancelarBtn');
+  if(btnCancelarAgenda) btnCancelarAgenda.addEventListener('click',async()=>{
+    if(!o.agendamentoEletrica) return;
+    if(!window.confirm('Cancelar o agendamento de vistoria desta obra?')) return;
+    btnCancelarAgenda.disabled=true;
+    const{error}=await window.sbClient.from(SB_ELETRICA_AGENDA).update({excluido_em:new Date().toISOString()}).eq('id',o.agendamentoEletrica.id);
+    if(error){ window.alert('Não consegui cancelar o agendamento agora. Tente novamente.'); btnCancelarAgenda.disabled=false; return; }
+    o.agendamentoEletrica=null;
+    pane.innerHTML=buildEletricaPane(o);
+    wireEletricaPane(o);
+    invalidateSessionCache(); renderAtencaoEletrica();
+  });
+  // "Agendar vistoria" abre um diálogo próprio (mesmo padrão do de "Inserir
+  // relatório" logo abaixo) com data planejada + responsável.
+  const agendaDialogBg=pane.querySelector('#eleAgendaDialogBg');
+  const agendaTrigger=pane.querySelector('#eleAbrirAgenda');
+  if(agendaTrigger&&agendaDialogBg){
+    const agendaDialogX=pane.querySelector('#eleAgendaDialogX');
+    agendaTrigger.onclick=()=>{ agendaDialogBg.hidden=false; };
+    if(agendaDialogX) agendaDialogX.onclick=()=>{ agendaDialogBg.hidden=true; };
+    agendaDialogBg.addEventListener('click',e=>{ if(e.target===agendaDialogBg) agendaDialogBg.hidden=true; });
+  }
+  const agendaForm=pane.querySelector('#eleAgendaForm');
+  if(agendaForm) agendaForm.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const data=pane.querySelector('#eleAgendaData').value;
+    const resp=pane.querySelector('#eleAgendaResp').value.trim();
+    const elErroAgenda=pane.querySelector('#eleAgendaErro');
+    const setErroAgenda=m=>{ if(elErroAgenda){ elErroAgenda.textContent=m||''; elErroAgenda.hidden=!m; } };
+    if(!data){ setErroAgenda('Informe a data planejada.'); return; }
+    if(!resp){ setErroAgenda('Informe o responsável.'); return; }
+    setErroAgenda('');
+    const btnSalvar=pane.querySelector('#eleAgendaBtnSalvar');
+    btnSalvar.disabled=true; const txtOriginal=btnSalvar.textContent; btnSalvar.textContent='Agendando…';
+    try{
+      const{data:sessao}=await window.sbClient.auth.getSession();
+      const email=sessao&&sessao.session&&sessao.session.user?sessao.session.user.email:'';
+      const{data:inserida,error}=await window.sbClient.from(SB_ELETRICA_AGENDA)
+        .insert({id_obra:o.id_obra,data_planejada:data,responsavel_nome:resp,criado_por_email:email||''})
+        .select(ELETRICA_AGENDA_COLS).single();
+      if(error) throw error;
+      o.agendamentoEletrica=inserida;
+      pane.innerHTML=buildEletricaPane(o);
+      wireEletricaPane(o);
+      invalidateSessionCache(); renderAtencaoEletrica();
+    }catch(err){
+      setErroAgenda('Não consegui salvar o agendamento agora. Tente novamente.');
+      btnSalvar.disabled=false; btnSalvar.textContent=txtOriginal;
+    }
+  });
+  // "Inserir relatório" abre o diálogo com o formulário/dropzone — antes ficava
+  // sempre aberto na aba (pedido do usuário, 24/09/2026).
+  const dialogBg=pane.querySelector('#eleDialogBg');
+  const trigger=pane.querySelector('#eleAbrirForm');
+  if(trigger&&dialogBg){
+    const dialogX=pane.querySelector('#eleDialogX');
+    trigger.onclick=()=>{ dialogBg.hidden=false; };
+    if(dialogX) dialogX.onclick=()=>{ dialogBg.hidden=true; };
+    dialogBg.addEventListener('click',e=>{ if(e.target===dialogBg) dialogBg.hidden=true; });
+  }
   const form=pane.querySelector('#eleForm'); if(!form) return; // sem permissão: formulário não existe
   const drop=form.querySelector('#eleDrop'), input=form.querySelector('#eleFile');
   const btn=form.querySelector('#eleBtnEnviar'), elErro=form.querySelector('#eleErro');
@@ -2573,7 +2836,7 @@ function wireEletricaPane(o){
       o.relatoriosEletrica=novo[o.id_obra]||[];
       pane.innerHTML=buildEletricaPane(o);
       wireEletricaPane(o);
-      invalidateAggCache(); renderAtencaoEletrica(); // painel "Atenção elétrica" reflete o novo relatório
+      invalidateSessionCache(); renderAtencaoEletrica(); // painel "Atenção elétrica" reflete o novo relatório
     }catch(err){
       setErro('Relatório enviado com sucesso, mas não consegui atualizar a lista aqui. Feche e reabra esta obra para ver.');
       btn.textContent=txtOriginal;
@@ -2632,6 +2895,14 @@ function closeModal(){ escondeEdTip(); document.getElementById('modalBg').classL
 // este guard, apertar Esc DEPOIS de já ter fechado tudo clicaria nesse botão fantasma e
 // REABRIRIA o modal — pior que o beco original. Só age com o modal de fato visível.
 function fecharOuVoltar(){
+  // diálogos da aba Elétrica ("novo relatório"/"agendar vistoria") são uma camada
+  // acima do modal — Esc fecha o que estiver aberto primeiro, mesmo padrão de
+  // early-return por camada já usado no handler de Esc que limpa a seleção combinada
+  // (checa modalBg/.msel.on/fullscreen abaixo).
+  for(const id of ['eleDialogBg','eleAgendaDialogBg']){
+    const dlg=document.getElementById(id);
+    if(dlg&&!dlg.hidden){ dlg.hidden=true; return; }
+  }
   if(!document.getElementById('modalBg').classList.contains('show')) return;
   const v=document.getElementById('modalVoltar'); if(v){ v.click(); return; } closeModal();
 }
@@ -3781,8 +4052,14 @@ function renderPanel(){
         +`<div class="scope" style="margin-top:8px">${ids.length} municípios neste distrito</div>`;
     } else {
       scope.innerHTML=`Estado dividido por <b>${methodName}</b> — passe o mouse ou clique para entrar`; // Etapa D: nível 0 removido
-      const ents=groupEntries();
-      body.innerHTML=`<div class="sec-h"><span>${methodName}</span><span>${ents.length}</span></div>`+rankRows(ents,'group');
+      // na métrica Elétrica o ranking por distrito some daqui (pedido do usuário,
+      // 24/09/2026): o mesmo dado já está pintado no mapa por distrito, a lista de
+      // texto seria redundante.
+      if(st.metric==='eletrica'){ body.innerHTML=''; }
+      else{
+        const ents=groupEntries();
+        body.innerHTML=`<div class="sec-h"><span>${methodName}</span><span>${ents.length}</span></div>`+rankRows(ents,'group');
+      }
     }
   } else if(st.level===2){
     const g=grpById(st.group);
@@ -3884,26 +4161,35 @@ function render(){
 // como Contratada) OU "de categoria fixa" (get:o=>chave do bucket; opções fixas em
 // `cats`, com rótulo próprio — faixas e derivados). passF() trata as duas igual;
 // só fillFilters() difere. Ordem: navegação → atributos do contrato → pessoas/empresas.
+// ocultoEletrica: filtro some do painel na métrica Elétrica (pedido do usuário,
+// 24/09/2026 — esses 5 não fazem sentido pra quem está planejando vistoria). soEletrica:
+// o oposto, só aparece NESSA métrica (caso único hoje: 'vistoria'). filterDefsVisiveis()
+// decide qual conjunto mostrar; o clique no seletor de métrica (mais abaixo) limpa o
+// valor selecionado de quem estiver saindo de cena, pra nunca sobrar filtro escondido
+// recortando resultado sem nenhum chip/selo visível explicando por quê.
 const FILTER_DEFS=[
-  {key:'distrito',label:'Distrito Operacional',get:o=>o.distrito||null},
+  {key:'distrito',label:'Distrito Operacional',get:o=>o.distrito||null,ocultoEletrica:true},
   {key:'municipio',label:'Município',get:o=>o.municipioTxt||null},
-  {key:'tipo',label:'Tipo de contrato',get:o=>o.tipo||null},
+  {key:'tipo',label:'Tipo de contrato',get:o=>o.tipo||null,ocultoEletrica:true},
   {key:'ano',label:'Ano',get:o=>o.ano?String(o.ano):null,numeric:true},
   {key:'status',label:'Status da obra',get:o=>(o.statusObra&&o.statusObra!=='—')?o.statusObra:null},
-  {key:'prazoExec',label:'Prazo de execução',get:o=>o.prazoExecBucket,cats:[
+  {key:'prazoExec',label:'Prazo de execução',get:o=>o.prazoExecBucket,ocultoEletrica:true,cats:[
     {v:'ok',label:'No prazo'},{v:'avencer',label:'A vencer (≤ 30 dias)'},{v:'vencido',label:'Vencido'},{v:'semdata',label:'Sem data'}]},
-  {key:'vigencia',label:'Vigência do contrato',get:o=>o.vigenciaBucket,cats:[
+  {key:'vigencia',label:'Vigência do contrato',get:o=>o.vigenciaBucket,ocultoEletrica:true,cats:[
     {v:'ok',label:'Vigente'},{v:'avencer',label:'A vencer (≤ 30 dias)'},{v:'vencido',label:'Vencida'},{v:'semdata',label:'Sem data'}]},
   {key:'paralisada',label:'Obra paralisada',get:o=>o.paralisadaBucket,cats:[
     {v:'sim',label:'Sim'},{v:'nao',label:'Não'}]},
-  {key:'faixaValor',label:'Faixa de valor',get:o=>o.faixaValorBucket,cats:[
+  {key:'faixaValor',label:'Faixa de valor',get:o=>o.faixaValorBucket,ocultoEletrica:true,cats:[
     {v:'ate1m',label:'Até R$ 1 mi'},{v:'1a5m',label:'R$ 1–5 mi'},{v:'5a20m',label:'R$ 5–20 mi'},{v:'acima20m',label:'Acima de R$ 20 mi'}]},
   {key:'medicao',label:'Medição (% executado)',get:o=>o.medicaoBucket,cats:[
     {v:'0a25',label:'0–25%'},{v:'25a50',label:'25–50%'},{v:'50a75',label:'50–75%'},{v:'75a100',label:'75–100%'},{v:'acima100',label:'Acima de 100%'},{v:'semficha',label:'Sem ficha'}]},
+  {key:'vistoria',label:'Vistorias',get:o=>(o.relatoriosEletrica&&o.relatoriosEletrica.length)?'realizada':'arealizar',soEletrica:true,cats:[
+    {v:'realizada',label:'Realizadas'},{v:'arealizar',label:'A realizar'}]},
   {key:'contratada',label:'Contratada',get:o=>(o.contratada&&o.contratada!=='—')?o.contratada:null},
   {key:'contratante',label:'Contratante',get:o=>(o.contratante&&o.contratante!=='—')?o.contratante:null},
   {key:'fiscal',label:'Fiscal',get:o=>(o.fiscal&&o.fiscal!=='—')?o.fiscal:null},
 ];
+function filterDefsVisiveis(){ return FILTER_DEFS.filter(d=>st.metric==='eletrica'?!d.ocultoEletrica:!d.soEletrica); }
 function updateMselBtn(key){
   const m=document.querySelector(`.msel[data-key="${key}"]`); if(!m) return;
   const btn=m.querySelector('.msel-btn'); const label=btn.dataset.label; const n=st.f[key].size;
@@ -3912,7 +4198,7 @@ function updateMselBtn(key){
 function fillFilters(){
   const all=[]; allIds.forEach(id=>DB.municipios[id].obras.forEach(o=>all.push(o)));
   const host=document.getElementById('filtersHost');
-  host.innerHTML=FILTER_DEFS.map(d=>{
+  host.innerHTML=filterDefsVisiveis().map(d=>{
     let vals; // [{v,label}]
     if(d.cats){
       // categoria fixa: opções sempre as mesmas; rótulo próprio.
@@ -4680,7 +4966,18 @@ if(_segControle) _segControle.addEventListener('click',e=>{
 document.getElementById('segMetric').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return;
   document.querySelectorAll('#segMetric button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
-  st.metric=b.dataset.v; render();
+  const metricAntiga=st.metric; st.metric=b.dataset.v;
+  if(st.metric!==metricAntiga){
+    // troca de métrica pode esconder/revelar filtros (ver FILTER_DEFS.ocultoEletrica/
+    // soEletrica) — limpa o valor de quem está saindo de cena antes de reconstruir o
+    // painel, senão um filtro escondido continuaria recortando resultado sem nenhum
+    // chip/selo visível explicando por quê.
+    FILTER_DEFS.forEach(d=>{
+      if(st.metric==='eletrica'?d.ocultoEletrica:d.soEletrica) st.f[d.key].clear();
+    });
+    fillFilters();
+  }
+  render();
 });
 document.getElementById('crumb').addEventListener('click',e=>{
   const a=e.target.closest('a'); if(!a)return; const n=a.dataset.nav;
