@@ -806,7 +806,8 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
   // entram no Bloco 2 — até lá ficam vazias e inertes).
   f:{ano:new Set(),status:new Set(),contratada:new Set(),contratante:new Set(),fiscal:new Set(),
      distrito:new Set(),municipio:new Set(),tipo:new Set(),faixaValor:new Set(),
-     prazoExec:new Set(),vigencia:new Set(),paralisada:new Set(),medicao:new Set(),vistoria:new Set(),q:''}};
+     prazoExec:new Set(),vigencia:new Set(),paralisada:new Set(),medicao:new Set(),vistoria:new Set(),
+     vistoriaMes:new Set(),q:''}};
 
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
               valor:{label:'Valor total',fmt:v=>BRL.format(v)},
@@ -838,7 +839,12 @@ function passF(o){const f=st.f;
   }
   for(let i=0;i<FILTER_DEFS.length;i++){
     const d=FILTER_DEFS[i], set=f[d.key];
-    if(set && set.size){ const v=d.get(o); if(v==null || !set.has(v)) return false; }
+    if(!set || !set.size) continue;
+    // `multi`: get() devolve uma LISTA de valores (ex.: vistoriaMes — obra pode ter
+    // vistoria em vários meses); passa se QUALQUER um estiver selecionado. Os demais
+    // filtros continuam com valor único, comparado direto contra o Set.
+    if(d.multi){ if(!d.get(o).some(v=>set.has(v))) return false; }
+    else { const v=d.get(o); if(v==null || !set.has(v)) return false; }
   }
   if(f.q){
     // busca livre em TODOS os campos textuais da obra; ";" separa termos com lógica OU
@@ -1579,6 +1585,9 @@ function renderAditivoChart(ids){
     +(a.adit>0?`<span class="sit"><span class="dot" style="background:var(--amber)"></span>Aditivos <b>${BRL.format(a.adit)}</b> (${pctAditReal.toFixed(0)}%)</span>`:'');
 }
 const MESES_ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+// nome por extenso — só para o rótulo do filtro "Mês da vistoria" (FILTER_DEFS),
+// onde "julho/2026" lê melhor que a abreviação usada no gráfico.
+const MESES_NOME=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 // mini gráfico de barras (HTML/flex) — genérico: recebe pares [chave,label,contagem]
 // já prontos e desenha, sem saber se é ano de contrato ou mês de vistoria. Barras em
 // flex (não SVG com preserveAspectRatio="none", que esticava barras e rótulos): o
@@ -1626,6 +1635,11 @@ function renderYearChart(ids){
   renderBarChart(host,cols,'contrato','contratos','Contratos por ano de assinatura');
 }
 function setKPIs(){
+  // Métrica Elétrica: os KPIs de Obras/Valor não fazem sentido nesse contexto — o
+  // resumo "Atenção, Elétrica!" (renderAtencaoEletrica) vira o KPI principal do
+  // painel (pedido do usuário, 24/09/2026, pra tirar a competição visual entre os
+  // dois blocos).
+  if(kpisWrap) kpisWrap.hidden = st.metric==='eletrica';
   const ids=scopeIds(); const a=aggIds(ids);
   kObras.textContent=NUM.format(a.obras); kValor.textContent=BRL.format(a.valor); kPar.textContent=NUM.format(a.par);
   kMedio.textContent=a.obras?BRL.format(a.valor/a.obras):'—';
@@ -1694,6 +1708,14 @@ function agruparPorDistritoMunicipio(lista){
     municipios:[...g.municipios.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR')).map(([nome,itensMun])=>({nome,itensMun})),
   }));
 }
+// Ícones dos 4 cards do resumo "Atenção, Elétrica!" (mesma linguagem visual dos ícones
+// de .kpi — stroke 1.8, viewBox 24×24). Só o miolo do <svg>, a moldura fica no template.
+const ICONS_ELE_RESUMO={
+  atencao:'<path d="M12 3.5 2.4 20a1 1 0 0 0 .86 1.5h17.48a1 1 0 0 0 .86-1.5z"/><path d="M12 9.5v5"/><path d="M12 17.5h.01"/>',
+  vistoriadas:'<circle cx="12" cy="12" r="9"/><path d="M8.3 12.4l2.4 2.4L16 9.3"/>',
+  avistoriar:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  agendadas:'<rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M8 3.2v4M16 3.2v4M3.5 10h17"/>',
+};
 // Bloco "Atenção elétrica": só faz sentido enquanto a métrica do mapa é Elétrica — o
 // resto do tempo fica fora do painel (pedido do usuário, 24/09/2026: antes ficava
 // sempre visível, competindo por espaço com os KPIs de Obras/Valor). Guarda a
@@ -1727,14 +1749,16 @@ function renderAtencaoEletrica(forceReflow){
   // ativo limpa o filtro (mesmo padrão de toggle de outros chips no app). 'em
   // atenção' representa o universo inteiro (equivalente a nenhum filtro).
   const cardDef=[
-    {k:'atencao',v:itens.length,l:'em atenção',cls:''},
-    {k:'vistoriadas',v:vistoriadas,l:'vistoriadas',cls:'ok'},
-    {k:'avistoriar',v:avistoriar,l:'a vistoriar',cls:'warn'},
-    {k:'agendadas',v:agendadas,l:'agendadas',cls:'info'},
+    {k:'atencao',v:itens.length,l:'em atenção',cls:'',ic:ICONS_ELE_RESUMO.atencao},
+    {k:'vistoriadas',v:vistoriadas,l:'vistoriadas',cls:'ok',ic:ICONS_ELE_RESUMO.vistoriadas},
+    {k:'avistoriar',v:avistoriar,l:'a vistoriar',cls:'warn',ic:ICONS_ELE_RESUMO.avistoriar},
+    {k:'agendadas',v:agendadas,l:'agendadas',cls:'info',ic:ICONS_ELE_RESUMO.agendadas},
   ];
   const resumo=`<div class="ele-resumo">${cardDef.map(c=>
     `<div class="ele-resumo-i${c.cls?' '+c.cls:''}${eleFiltroCategoria===c.k?' on':''}" role="button" tabindex="0" data-filtro="${c.k}">`
-    +`<span class="v">${NUM.format(c.v)}</span><span class="l">${c.l}</span></div>`).join('')}</div>`;
+    +`<div class="eri-txt"><span class="l">${c.l}</span><span class="v">${NUM.format(c.v)}</span></div>`
+    +`<span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${c.ic}</svg></span>`
+    +`</div>`).join('')}</div>`;
   const CATEGORIA_TESTE={
     atencao:()=>true,
     vistoriadas:it=>it.totalRelatorios>0,
@@ -4203,6 +4227,17 @@ const FILTER_DEFS=[
     {v:'0a25',label:'0–25%'},{v:'25a50',label:'25–50%'},{v:'50a75',label:'50–75%'},{v:'75a100',label:'75–100%'},{v:'acima100',label:'Acima de 100%'},{v:'semficha',label:'Sem ficha'}]},
   {key:'vistoria',label:'Vistorias',get:o=>(o.relatoriosEletrica&&o.relatoriosEletrica.length)?'realizada':'arealizar',soEletrica:true,cats:[
     {v:'realizada',label:'Realizadas'},{v:'arealizar',label:'A realizar'}]},
+  // Mês da vistoria (pedido do usuário, 24/09/2026): "quais obras foram fiscalizadas em
+  // julho/2026". `multi:true` porque uma obra pode ter vários relatórios em meses
+  // diferentes — get() devolve a LISTA de meses (YYYY-MM, sem repetição) em que ela teve
+  // pelo menos 1 vistoria, e passF()/fillFilters() tratam esse caso à parte do valor
+  // único que os demais filtros devolvem (ver `d.multi` nos dois). fmtLabel/sortFn
+  // trocam "2026-07" bruto por "Julho/2026" e ordenam do mês mais recente pro mais
+  // antigo — sort lexicográfico funciona porque a chave já é zero-padded (YYYY-MM).
+  {key:'vistoriaMes',label:'Mês da vistoria',soEletrica:true,multi:true,
+    get:o=>[...new Set((o.relatoriosEletrica||[]).map(r=>String(r.data_vistoria||'').slice(0,7)).filter(m=>m.length===7))],
+    fmtLabel:v=>`${MESES_NOME[+v.slice(5,7)-1]}/${v.slice(0,4)}`,
+    sortFn:(a,b)=>b.localeCompare(a)},
   {key:'contratada',label:'Contratada',get:o=>(o.contratada&&o.contratada!=='—')?o.contratada:null},
   {key:'contratante',label:'Contratante',get:o=>(o.contratante&&o.contratante!=='—')?o.contratante:null},
   {key:'fiscal',label:'Fiscal',get:o=>(o.fiscal&&o.fiscal!=='—')?o.fiscal:null},
@@ -4222,11 +4257,15 @@ function fillFilters(){
       // categoria fixa: opções sempre as mesmas; rótulo próprio.
       vals=d.cats.map(c=>({v:c.v,label:c.label}));
     } else {
-      const set=new Set(); all.forEach(o=>{const v=d.get(o); if(v)set.add(v);});
+      const set=new Set();
+      // `multi`: get() devolve uma lista (ex.: vistoriaMes) — cada valor da lista vira
+      // uma opção própria, em vez da lista inteira virar 1 opção só.
+      all.forEach(o=>{ if(d.multi) d.get(o).forEach(v=>{if(v)set.add(v);}); else {const v=d.get(o); if(v)set.add(v);} });
       // poda "fantasma": valor selecionado que não existe mais no recorte carregado
       // (ex.: troca Carteira↔Histórico) não pode continuar recortando.
       if(st.f[d.key].size) st.f[d.key]=new Set([...st.f[d.key]].filter(v=>set.has(v)));
-      vals=[...set].sort(d.numeric?(a,b)=>b-a:(a,b)=>a.localeCompare(b,'pt-BR')).map(v=>({v,label:v}));
+      const sortFn=d.sortFn||(d.numeric?(a,b)=>b-a:(a,b)=>a.localeCompare(b,'pt-BR'));
+      vals=[...set].sort(sortFn).map(v=>({v,label:d.fmtLabel?d.fmtLabel(v):v}));
     }
     const empty=vals.length===0;
     const opts=vals.map(x=>`<label class="msel-opt"><input type="checkbox" value="${escHtml(x.v)}">${escHtml(x.label)}</label>`).join('')
@@ -4324,7 +4363,7 @@ document.getElementById('clearF').onclick=clearAllFilters;
 // Etapa C — bloco "Filtros ativos": um chip por valor selecionado (× remove só
 // aquele valor), + "Limpar tudo". Some quando não há filtro. Acende o selo do
 // #ctrlToggle. Chamado no fim de render(), então acompanha qualquer mudança.
-function fchipLabel(d,v){ const c=d.cats&&d.cats.find(x=>x.v===v); return c?c.label:v; }
+function fchipLabel(d,v){ if(d.fmtLabel) return d.fmtLabel(v); const c=d.cats&&d.cats.find(x=>x.v===v); return c?c.label:v; }
 function renderFilterChips(){
   const host=document.getElementById('filterChips'); if(!host) return;
   const chips=[];
