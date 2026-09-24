@@ -162,11 +162,9 @@
      aberta quando #statLeg virou classe. */
   :root:not(.theme-dark) .statleg:not(.cards){gap:10px 14px}
 
-  /* cabeçalho: bordas mais delicadas; "Carteira ativa" sem a ênfase âmbar */
+  /* cabeçalho: bordas mais delicadas */
   :root:not(.theme-dark) .btn-voltar,
   :root:not(.theme-dark) .btn-present{border-color:rgba(var(--raise-rgb),.10)}
-  :root:not(.theme-dark) .btn-scope{border-color:rgba(var(--raise-rgb),.10)}
-  :root:not(.theme-dark) .btn-scope:hover{border-color:rgba(var(--raise-rgb),.20);background:rgba(var(--raise-rgb),.04)}
 
   /* rótulos do mapa — camada secundária: peso leve, cor grafite-esverdeada bem
      escura, halo claro discreto (sem o brilho verde). Sem redução de opacidade:
@@ -386,11 +384,6 @@
   .synctime{display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-family:Montserrat,sans-serif}
   .synctime .l{font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dimmer)}
   .synctime .v{font-size:11px;font-weight:700;color:var(--text-value);font-variant-numeric:tabular-nums}
-  .badge{display:flex;align-items:center;gap:7px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
-         background:rgba(var(--ng-rgb),.10);color:var(--badge-text);padding:7px 13px;border-radius:999px;border:1px solid rgba(var(--ng-rgb),.25);flex:none}
-  .badge .d{width:6px;height:6px;border-radius:50%;background:var(--ng);box-shadow:0 0 8px var(--ng);animation:pulse 1.6s infinite;flex:none}
-  .badge.demo{background:rgba(var(--amber-rgb),.10);color:var(--amber-text);border-color:rgba(var(--amber-rgb),.28)}
-  .badge.demo .d{background:var(--amber);box-shadow:0 0 8px var(--amber)}
   .btn-voltar,.btn-present{display:flex;align-items:center;gap:7px;background:rgba(var(--raise-rgb),.05);border:1px solid rgba(var(--raise-rgb),.14);
         color:var(--text-base);border-radius:10px;padding:8px 13px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;
         cursor:pointer;flex:none;transition:.15s}
@@ -408,26 +401,10 @@
   .btn-theme .ic-sun{display:none}
   body.theme-dark .btn-theme .ic-sun{display:block}
   body.theme-dark .btn-theme .ic-moon{display:none}
-  /* diferencia visualmente do botão de tela cheia ao lado — os dois usam a mesma
-     forma de "pill", mas este controla o ESCOPO DOS DADOS (carteira ativa vs.
-     histórico completo), então um clique errado numa apresentação ao vivo troca
-     o que a plateia está vendo, não só o modo de exibição. Cor âmbar (mesma
-     linguagem já usada para "atenção/estado não-padrão" no resto do painel)
-     enquanto no modo padrão (carteira ativa); vira verde quando alternado para
-     histórico completo (via .on, já herdado de .btn-present.on acima) */
-  .btn-scope{border-color:rgba(var(--amber-rgb),.35)}
-  .btn-scope:hover{border-color:rgba(var(--amber-rgb),.55);background:rgba(var(--amber-rgb),.10)}
-  /* achado do revisor final: sem isso, passar o mouse no botão já em "Histórico
-     completo" (.on) fazia a borda "piscar" de volta pra âmbar — .btn-scope:hover
-     e .btn-present.on empatam em especificidade e a ordem de declaração decidia
-     o empate a favor do estado errado. Precisa vir depois de .btn-scope:hover
-     para vencer o empate a favor do estado "on" (correto: verde = histórico). */
-  .btn-scope.on:hover{border-color:rgba(var(--ng-rgb),.55);background:rgba(var(--ng-rgb),.14)}
   /* ---- Modo Apresentação (layout padrão fixo desta página) ---- */
   body.presentation header.top{padding:19px 30px}
   body.presentation .top h1{font-size:17px}
   body.presentation .top .sub{font-size:10.5px}
-  body.presentation .badge{font-size:10.5px;padding:8px 15px}
   body.presentation .crumb{font-size:13.5px;padding:9px 18px}
   body.presentation .obra .ob{font-size:13px}
   /* tamanho dos valores de KPI em modo apresentação (sempre ativo nesta página)
@@ -709,6 +686,10 @@
   .live{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-label);margin-bottom:18px}
   .live .d{width:7px;height:7px;border-radius:50%;background:var(--ng);box-shadow:0 0 10px var(--ng);animation:pulse 1.6s infinite}
   .kpis{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  /* `display` de autor vence o [hidden] da folha do navegador por ORIGEM, não
+     especificidade (mesmo padrão de .seg[hidden] etc. já usado neste arquivo) — sem
+     esta regra explícita, o hidden=true da métrica Elétrica (setKPIs) não escondia nada. */
+  .kpis[hidden]{display:none}
   /* redesign: cartão plano por padrão (superfície sólida --card-bg, borda neutra,
      sem barra lateral brilhante nem glow no número) — a barra + glow voltam só nos
      2 KPIs "hero" (.wide, ver abaixo) e no estado de alerta (.alert), onde a cor
@@ -950,22 +931,48 @@
   .rrow.warm .vv{color:var(--amber-text)}
   .rbar{position:relative;height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.07);margin-top:9px;overflow:hidden}
   .rbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--ng),var(--ng-deep))}
-  /* resumo (em atenção / vistoriadas / a vistoriar) no topo do bloco — só aparece com a
-     métrica Elétrica selecionada (ver renderAtencaoEletrica). Mesma casca de .kpi, numa
-     tira de 3 compacta em vez do grid inteiro de KPIs de Obras/Valor. */
-  .ele-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+  /* resumo (em atenção / vistoriadas / a vistoriar / agendadas) — só aparece com a
+     métrica Elétrica selecionada (ver renderAtencaoEletrica). Com os KPIs de
+     Obras/Valor ocultos nessa métrica (ver .kpis[hidden]), este bloco vira o KPI
+     principal do painel e ganha o mesmo tratamento "hero" deles: cartão elevado,
+     ícone em círculo, barra de acento lateral por categoria (pedido do usuário,
+     24/09/2026). --acc/--acc-deep/--acc-rgb dão a cor de destaque (barra + ícone +
+     valor), redefinidos por categoria via .ok/.info — .warn e o card base ('em
+     atenção', sem classe extra) ficam no âmbar padrão, que já era a cor de
+     destaque/hover deste bloco antes do redesenho. */
+  .ele-resumo{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
   /* cada card filtra a lista abaixo pra só aquela categoria ao clicar
      (wireEleResumoFiltro) — .on marca o filtro ativo. */
-  .ele-resumo-i{display:flex;flex-direction:column;gap:2px;padding:9px 8px;border:1px solid var(--card-border);
-        border-radius:11px;background:var(--card-bg-2);cursor:pointer;transition:border-color .15s,background .15s}
-  .ele-resumo-i:hover,.ele-resumo-i:focus-visible{border-color:rgba(var(--amber-rgb),.4);outline:none}
-  .ele-resumo-i.on{border-color:var(--amber-deep);background:rgba(var(--amber-rgb),.12)}
-  .ele-resumo-i .v{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest)}
-  .ele-resumo-i .l{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:600;color:var(--text-dim);
-        text-transform:uppercase;letter-spacing:.2px}
+  .ele-resumo-i{--acc:var(--amber);--acc-deep:var(--amber-deep);--acc-rgb:var(--amber-rgb);
+        position:relative;overflow:hidden;display:grid;grid-template-columns:1fr auto;align-items:center;
+        column-gap:12px;padding:16px 16px 16px 19px;border:1px solid var(--card-border);border-radius:14px;
+        background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));cursor:pointer;
+        transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+  .ele-resumo-i::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+        background:linear-gradient(var(--acc),var(--acc-deep))}
+  .ele-resumo-i.ok{--acc:var(--ng);--acc-deep:var(--ng-deep);--acc-rgb:var(--ng-rgb)}
+  .ele-resumo-i.info{--acc:#5B9FDB;--acc-deep:#2E6DA4;--acc-rgb:60,135,201}
+  .eri-txt{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .ele-resumo-i .l{font-family:Montserrat,sans-serif;font-size:10px;font-weight:700;color:var(--text-label);
+        text-transform:uppercase;letter-spacing:.4px}
+  .ele-resumo-i .v{font-family:'Space Grotesk',sans-serif;font-size:25px;font-weight:700;color:var(--text-brightest);
+        line-height:1;text-shadow:0 0 16px rgba(var(--acc-rgb),.18)}
   .ele-resumo-i.ok .v{color:var(--ng-light)}
   .ele-resumo-i.warn .v{color:var(--amber-text)}
-  .ele-resumo-i.info .v{color:var(--text-brightest)}
+  .ele-resumo-i .ic{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
+        color:var(--acc);background:rgba(var(--acc-rgb),.15);border:1px solid rgba(var(--acc-rgb),.22)}
+  .ele-resumo-i .ic svg{width:18px;height:18px;display:block}
+  .ele-resumo-i:hover,.ele-resumo-i:focus-visible{transform:translateY(-2px);border-color:rgba(var(--acc-rgb),.5);outline:none}
+  .ele-resumo-i.on{border-color:var(--acc-deep);background:rgba(var(--acc-rgb),.12)}
+  /* mesma elevação por tema já usada em .kpi — sombra suave e um fio de luz no topo
+     do card no escuro; camadas mais marcadas embaixo no claro. */
+  :root:not(.theme-dark) .ele-resumo-i{border-color:rgba(20,40,33,.12);border-top-color:rgba(20,40,33,.05);
+        box-shadow:0 1px 2px rgba(20,40,33,.05),0 4px 10px rgba(20,40,33,.045),0 10px 22px rgba(20,40,33,.03)}
+  :root:not(.theme-dark) .ele-resumo-i:hover{box-shadow:0 2px 5px rgba(20,40,33,.07),0 8px 18px rgba(20,40,33,.06),0 16px 32px rgba(20,40,33,.05)}
+  :root.theme-dark .ele-resumo-i{border-top-color:rgba(255,255,255,.16);
+        box-shadow:0 1px 2px rgba(0,0,0,.22),0 6px 16px rgba(0,0,0,.16)}
+  :root.theme-dark .ele-resumo-i:hover{border-color:rgba(var(--acc-rgb),.5);box-shadow:0 2px 5px rgba(0,0,0,.28),0 10px 24px rgba(0,0,0,.22)}
+  @media (max-width:420px){.ele-resumo{grid-template-columns:1fr}}
   /* Distrito Operacional → Município (pedido do usuário, 24/09/2026): cabeçalhos
      leves só pra separar visualmente, sem virar outro componente colapsável. */
   .ele-grupo-do+.ele-grupo-do{margin-top:10px}
