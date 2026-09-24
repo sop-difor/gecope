@@ -447,8 +447,6 @@
   main.aside-collapsed aside{padding:0;border-left:0;overflow:hidden}
   @media (max-width:860px){main.aside-collapsed{grid-template-rows:1fr 0}}
   #map{width:100%;height:100%;background:var(--map-field);outline:none}
-  #mapWrap{opacity:0;transform:scale(1.045);transition:opacity 1.5s cubic-bezier(.16,.8,.2,1),transform 1.5s cubic-bezier(.16,.8,.2,1)}
-  #mapWrap.in{opacity:1;transform:scale(1)}
   /* .ctrl-toggle e .aside-toggle são o mesmo bloco visual (pílula flutuante com blur),
      só o lado que ocupam muda — uma regra combinada evita duas cópias divergindo aos
      poucos (Fase 9: harmonizar, não fundir num único elemento) */
@@ -702,11 +700,6 @@
   .mun-label.nomatch .lbl,.grp-label.nomatch .lbl{opacity:.4}
   .mun-label.nomatch .lbl-count,.grp-label.nomatch .lbl-count{color:var(--nomatch-label);text-shadow:none}
 
-  /* Etapa D — fade de entrada dos 11 distritos (classes postas/retiradas por
-     enterGroupFade/revealGroupFade; multiplica sobre o estilo do Leaflet). */
-  #map path.grp-enter{opacity:0}
-  #map path.grp-enter.grp-enter-in{opacity:1;transition:opacity .35s ease-out}
-
   aside{position:relative;height:100%;overflow-y:auto;padding:24px 20px 30px;color:var(--text-base);
         border-left:1px solid rgba(var(--ng-rgb),.16);
         background:radial-gradient(130% 55% at 50% -8%, rgba(var(--ng-rgb),.10), transparent 60%),linear-gradient(180deg,var(--bg-panel),var(--bg-panel-2))}
@@ -957,6 +950,17 @@
   .rrow.warm .vv{color:var(--amber-text)}
   .rbar{position:relative;height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.07);margin-top:9px;overflow:hidden}
   .rbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--ng),var(--ng-deep))}
+  /* resumo (em atenção / vistoriadas / a vistoriar) no topo do bloco — só aparece com a
+     métrica Elétrica selecionada (ver renderAtencaoEletrica). Mesma casca de .kpi, numa
+     tira de 3 compacta em vez do grid inteiro de KPIs de Obras/Valor. */
+  .ele-resumo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .ele-resumo-i{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--card-border);
+        border-radius:11px;background:var(--card-bg-2)}
+  .ele-resumo-i .v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--text-brightest)}
+  .ele-resumo-i .l{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim);
+        text-transform:uppercase;letter-spacing:.3px}
+  .ele-resumo-i.ok .v{color:var(--ng-light)}
+  .ele-resumo-i.warn .v{color:var(--amber-text)}
   /* "Atenção elétrica" (Fase 1) — mesma casca de .rrow, mas com acento lateral âmbar:
      é a única lista da barra lateral que representa uma ação da equipe de campo, não
      uma métrica de leitura, e o acento marca essa diferença sem inventar um
@@ -1232,8 +1236,18 @@
      sistema (badge "demo"); fica reservada só a esta aba, nunca vazando pro resto
      do cromo, pra se ler como "trabalho de campo ativo" sem brigar com o verde de
      identidade geral do GECOPE. */
-  .modal .ele-prog{max-width:360px}
+  /* progresso da medição + situação da vistoria lado a lado — antes o cartão de
+     progresso ficava sozinho, travado em 360px, deixando um vão vazio à direita
+     numa aba com 1180px de largura disponível. */
+  .modal .ele-top-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+  @media (max-width:640px){ .modal .ele-top-row{grid-template-columns:1fr} }
   .modal .ele-bar-wrap{position:relative}
+  .modal .ele-status{justify-content:center}
+  .modal .ele-status-chip{display:inline-flex;align-self:flex-start;padding:4px 11px;border-radius:999px;
+        font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;
+        background:rgba(var(--raise-rgb),.10);color:var(--text-bright)}
+  .modal .ele-status-chip.ok{background:rgba(var(--ng-rgb),.15);color:var(--ng-deep)}
+  .modal .ele-status-chip.warn{background:rgba(var(--amber-rgb),.15);color:var(--amber-text)}
   /* top:2px casa com o margin-top:2px próprio de .rs-bar — tick e barra começam no
      mesmo pixel dentro do wrapper */
   .modal .ele-tick{position:absolute;top:2px;width:2px;height:6px;background:rgba(var(--raise-rgb),.28);transform:translateX(-1px)}
@@ -1251,7 +1265,7 @@
   /* formulário de novo relatório — só renderizado para eletrica/admin
      (PAPEIS_ELETRICA_ESCRITA). Dropzone no mesmo padrão do único drag-and-drop já
      existente no sistema (#cv-drop, Curva ABC), reskinada em âmbar. */
-  .modal .eleform{margin-top:14px;display:flex;flex-direction:column;gap:14px;max-width:420px}
+  .modal .eleform{margin-top:14px;display:flex;flex-direction:column;gap:14px;max-width:560px}
   .modal .edrop{border:1.5px dashed var(--card-border);border-radius:12px;background:var(--card-bg-2);
         padding:26px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
   .modal .edrop:hover,.modal .edrop.over{border-color:var(--amber-deep);background:rgba(var(--amber-rgb),.08)}
@@ -1261,8 +1275,10 @@
   .modal .edrop-fmt{margin-top:10px;display:inline-flex;gap:6px}
   .modal .edrop-fmt span{border:1px solid var(--card-border);border-radius:6px;padding:2px 8px;font-size:10.5px;color:var(--text-dim);font-weight:600}
   .modal .edrop-nome{margin-top:10px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;color:var(--amber-text)}
-  .modal .elefields{display:flex;flex-direction:column;gap:10px}
+  .modal .elefields{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  @media (max-width:480px){ .modal .elefields{grid-template-columns:1fr} }
   .modal .elefields label{display:flex;flex-direction:column;gap:4px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-label)}
+  .modal .elefields label.span2{grid-column:1/-1}
   .modal .elefields input,.modal .elefields textarea{font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-bright);
         background:var(--card-bg-2);border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;resize:vertical}
   .modal .elefields input:focus,.modal .elefields textarea:focus{outline:2px solid var(--amber-deep);outline-offset:1px}

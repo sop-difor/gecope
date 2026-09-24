@@ -130,10 +130,10 @@
         <div class="ctrl-nota">A busca e os filtros de obras ficam guardados e voltam ao trocar para Obras.</div>
       </div>
       <div id="ctrlObras">
-      <div class="lbl">Métrica (obra · valor)</div>
+      <div class="lbl">Métrica (obra · elétrica)</div>
       <div class="seg" id="segMetric">
         <button data-v="obras" class="on">Obra</button>
-        <button data-v="valor">Valor</button>
+        <button data-v="eletrica">Elétrica</button>
       </div>
       <div class="lbl">Buscar</div>
       <input class="fsel" id="fSearch" type="search" placeholder="descrição, município, fiscal, contratada, contratante, ano, status…" autocomplete="off">
@@ -175,7 +175,10 @@
       <div class="kpi k-adit"><div class="k">Total em aditivos</div><div class="v" id="kAdit">–</div>
         <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6"/><path d="M9 15h6"/></svg></span></div>
     </div>
-    <div class="statwrap" id="eleAtencaoWrap">
+    <!-- Só aparece com a métrica Elétrica selecionada (ver renderAtencaoEletrica em
+         mapa-obras.js) — hidden por padrão pra não piscar na primeira pintura, antes
+         do primeiro render() decidir a métrica ativa. -->
+    <div class="statwrap" id="eleAtencaoWrap" hidden>
       <div class="sec-h"><span id="eleAtencaoTitulo">Atenção elétrica</span></div>
       <div id="eleAtencaoBody"></div>
     </div>
