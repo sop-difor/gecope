@@ -158,6 +158,7 @@
                             <select class="form-select form-select-sm" style="width: 120px;" id="role-pending-${u.id}">
                                 <option value="externo">EXTERNO</option>
                                 <option value="fiscal">FISCAL</option>
+                                <option value="eletrica">ELÉTRICA</option>
                                 <option value="gerente">GERENTE</option>
                                 <option value="admin">ADMIN</option>
                             </select>
@@ -191,6 +192,7 @@
                             <select class="form-select form-select-sm" style="width: 120px;" id="${selectId}">
                                 <option value="externo">EXTERNO</option>
                                 <option value="fiscal">FISCAL</option>
+                                <option value="eletrica">ELÉTRICA</option>
                                 <option value="gerente">GERENTE</option>
                                 <option value="admin">ADMIN</option>
                             </select>

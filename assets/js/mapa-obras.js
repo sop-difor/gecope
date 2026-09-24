@@ -108,6 +108,7 @@ const SB_COMISSAO='comissao_fiscalizacao';
 const SB_ADITIVOS='aditivos_contrato';
 const SB_FICHA='ficha_contrato';
 const SB_MEDICOES='medicoes'; // Etapa B: curva de evolução da medição na aba Resumo
+const SB_ELETRICA='eletrica_vistorias'; // Fase 1 da aba "Elétrica" — relatórios de vistoria elétrica por obra
 // só as colunas realmente usadas em mapRow()/openModal() — evita select=* (a tabela
 // tem ~38 colunas, várias nunca lidas pelo app) e o payload extra que vem junto.
 const CONTRATOS_COLS=['id_obra','nr_contrato_sop','codigo_obra','descricao_obra','descricao_tipo_contrato',
@@ -138,6 +139,10 @@ const FICHA_COLS='nr_contrato_sop,total_medido,percentual_total_medido,valor_ori
 // A situação da medição é sigla_status_medicao (a coluna "status" não existe — o SELECT
 // com ela fazia o PostgREST devolver 400 e a aba Medições/curva ficavam sempre vazias).
 const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,valor_atual,nr_protocolo,total,sigla_status_medicao';
+// eletrica_vistorias: metadados dos relatórios de vistoria elétrica (o arquivo em si
+// fica no Google Drive — ver supabase/functions/eletrica-drive-token). excluido_em
+// filtrado aqui (não é policy: soft delete, ver sql/create_eletrica_vistorias.sql).
+const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,drive_web_view_link,criado_em';
 // referência estática dos códigos de situação da medição (STM) exibida na aba
 // Medições — só rótulos, não vem do banco (o modelo do usuário traz esta lista).
 const STM_LEGENDA=[
@@ -148,6 +153,15 @@ const STM_LEGENDA=[
 // que a SOP-CE de fato gerencia; os outros ~90% do histórico só aparecem sob demanda
 // (toggle "Histórico completo"), porque não mudam mais e só diluiriam os KPIs/gráficos.
 const ACTIVE_STATUSES=['Em Execução','Aguardando OS','Paralisada'];
+
+// aba "Elétrica" (Fase 1) — só eletrica/admin veem o formulário de novo relatório
+// (a trava real é a RLS de eletrica_vistorias, ver sql/create_eletrica_vistorias.sql;
+// isso aqui só evita OFERECER o formulário a quem não pode gravar — mesmo espírito
+// de PAPEIS_REPLAN, algumas linhas abaixo).
+const PAPEIS_ELETRICA_ESCRITA=['eletrica','admin'];
+// marcos de medição que disparam "atenção elétrica" (Q2 do grill de 24/09/2026):
+// só informativo, não bloqueia nada, não exige exatamente 1 relatório por marco.
+const MARCOS_ELETRICA=[50,70,90];
 
 // ---- modo Replanilhamentos (E1) ----
 // Fonte única: a view já resolve fila/despacho/data de despacho/fiscal/obra, para que
@@ -405,6 +419,16 @@ async function fetchMedicoes(idFilter){
   for(const k in m) m[k].sort((a,b)=>(num(a.nr_medicao)-num(b.nr_medicao)) || String(a.periodo||'').localeCompare(String(b.periodo||'')));
   return m;
 }
+// id_obra -> relatórios de vistoria elétrica (mais recente primeiro). Mesmo padrão de
+// escopo de fetchFiscais/fetchMedicoes (idFilter só na carteira ativa).
+async function fetchEletricaVistorias(idFilter){
+  const filtroObra=inListFilter('id_obra',idFilter,false);
+  const filter=(filtroObra?filtroObra+'&':'')+'excluido_em=is.null';
+  const rows=await fetchTable(SB_ELETRICA,{select:ELETRICA_COLS,filter}); const m={};
+  for(const r of rows){ const k=r.id_obra; if(k==null) continue; (m[k]=m[k]||[]).push(r); }
+  for(const k in m) m[k].sort((a,b)=>String(b.data_vistoria||'').localeCompare(String(a.data_vistoria||'')));
+  return m;
+}
 // `lastSync` é o maior `atualizado_em` dos contratos carregados (ver chamada em loadData),
 // não o horário em que o navegador buscou os dados — "Base atualizada em" precisa refletir
 // quando a BASE mudou de fato, não quando a página foi recarregada (antes usava
@@ -480,9 +504,10 @@ const CACHE_TTL_MS=60*60*1000;
 // matricula por integrante. v8: cada linha de `adit` ganhou observacao. v9: cada linha
 // de `ficha` ganhou valor_original/valor_atual (contexto do contrato, multi-obra).
 // v10: cada linha de `medic` ganhou valor_ref_glosa (glosa por período).
+// v11: novo campo `vist` (relatórios de vistoria elétrica, aba "Elétrica" — Fase 1).
 // O bump de versão garante que um objeto de formato antigo nunca seja reidratado como
 // se fosse completo.
-function cacheKey(scope){ return 'gecope_mapa_cache_v10_'+scope; }
+function cacheKey(scope){ return 'gecope_mapa_cache_v11_'+scope; }
 function readCache(scope){
   try{
     const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
@@ -491,8 +516,8 @@ function readCache(scope){
     return obj;
   }catch{ return null; }
 }
-function writeCache(scope,rows,fisc,adit,ficha,medic){
-  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows,fisc,adit,ficha,medic})); }
+function writeCache(scope,rows,fisc,adit,ficha,medic,vist){
+  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows,fisc,adit,ficha,medic,vist})); }
   catch(e){ /* quota/privacidade — cache é só um bônus de velocidade, ignora e segue sem ele */ }
 }
 
@@ -510,36 +535,39 @@ async function loadData(){
   try{
     const scope=st.dataScope;
     const cached=readCache(scope);
-    let rows, fisc, adit, ficha, medic;
+    let rows, fisc, adit, ficha, medic, vist;
     if(cached){
-      rows=cached.rows; fisc=cached.fisc; adit=cached.adit||{}; ficha=cached.ficha||{}; medic=cached.medic||{};
+      rows=cached.rows; fisc=cached.fisc; adit=cached.adit||{}; ficha=cached.ficha||{}; medic=cached.medic||{}; vist=cached.vist||{};
     } else if(scope==='ativa'){
       // carteira ativa: filtra no servidor (só ~348 linhas) e, com os ids/números já em
-      // mãos, busca comissão/aditivos/ficha/medições só desses contratos — evita baixar as
-      // tabelas inteiras quando 90% delas são de obras já encerradas, fora da carteira ativa.
+      // mãos, busca comissão/aditivos/ficha/medições/vistorias elétricas só desses
+      // contratos — evita baixar as tabelas inteiras quando 90% delas são de obras já
+      // encerradas, fora da carteira ativa.
       const filter=`status_obra=in.(${ACTIVE_STATUSES.map(s=>`"${s}"`).join(',')})`;
       rows=await fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter});
       const ids=[...new Set(rows.map(r=>r.id_obra).filter(v=>v!=null))];
       const nrs=[...new Set(rows.map(r=>r.nr_contrato_sop).filter(Boolean))];
-      [fisc,adit,ficha,medic]=await Promise.all([
+      [fisc,adit,ficha,medic,vist]=await Promise.all([
         fetchFiscais(ids).catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
         fetchAditivos(nrs).catch(e=>{ console.warn('aditivos_contrato indisponível:',e.message); return {}; }),
         fetchFichas(nrs).catch(e=>{ console.warn('ficha_contrato indisponível:',e.message); return {}; }),
         fetchMedicoes(ids).catch(e=>{ console.warn('medicoes indisponível:',e.message); return {}; }),
+        fetchEletricaVistorias(ids).catch(e=>{ console.warn('eletrica_vistorias indisponível:',e.message); return {}; }),
       ]);
-      writeCache(scope,rows,fisc,adit,ficha,medic);
+      writeCache(scope,rows,fisc,adit,ficha,medic,vist);
     } else {
       // histórico completo: os ids/números não cabem numa query in.(...), então busca
       // as tabelas inteiras (só com as colunas usadas) em paralelo.
-      const [rowsR,fiscR,aditR,fichaR,medicR]=await Promise.all([
+      const [rowsR,fiscR,aditR,fichaR,medicR,vistR]=await Promise.all([
         fetchTable(SB_TABLE,{select:CONTRATOS_COLS}),
         fetchFiscais().catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
         fetchAditivos().catch(e=>{ console.warn('aditivos_contrato indisponível:',e.message); return {}; }),
         fetchFichas().catch(e=>{ console.warn('ficha_contrato indisponível:',e.message); return {}; }),
         fetchMedicoes().catch(e=>{ console.warn('medicoes indisponível:',e.message); return {}; }),
+        fetchEletricaVistorias().catch(e=>{ console.warn('eletrica_vistorias indisponível:',e.message); return {}; }),
       ]);
-      rows=rowsR; fisc=fiscR; adit=aditR; ficha=fichaR; medic=medicR;
-      writeCache(scope,rows,fisc,adit,ficha,medic);
+      rows=rowsR; fisc=fiscR; adit=aditR; ficha=fichaR; medic=medicR; vist=vistR;
+      writeCache(scope,rows,fisc,adit,ficha,medic,vist);
     }
     // 1 contrato : N obras — conta quantas obras de cada contrato estão CARREGADAS
     // (na carteira ativa é só as ativas; no histórico completo é todas). Só usado como
@@ -550,6 +578,7 @@ async function loadData(){
     for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); const com=fisc[o.id_obra]||[]; o.comissao=com; const _fi=pickFiscal(com); o.fiscal=_fi?_fi.nome:'—'; o.fiscalTipo=_fi?_fi.tipo:'FISCAL';
       const nrKey=r.nr_contrato_sop; o.aditivos=(nrKey&&adit[nrKey])||[]; o.ficha=(nrKey&&ficha[nrKey])||null;
       o.medicoes=medic[o.id_obra]||[];
+      o.relatoriosEletrica=vist[o.id_obra]||[];
       o.nObras=(nrKey&&obraCountBySop[nrKey])||1;
       // valor original DO CONTRATO: a ficha tem o valor real (1 linha por contrato,
       // agrega todas as obras). Sem ficha: obra única → o próprio valor_original;
@@ -804,7 +833,12 @@ function passF(o){const f=st.f;
 // próximo obrasOf(id) recalcula e guarda de novo. Município tem no máximo algumas
 // dezenas de obras, então o custo de popular o cache inteiro é desprezível.
 let _obrasOfCache=new Map();
-function invalidateAggCache(){ _obrasOfCache=new Map(); }
+// _atencaoEletricaDirty acompanha o mesmo evento que zera _obrasOfCache (dado de obra
+// mudou) — reaproveitado por renderAtencaoEletrica() pra não recalcular a cada hover
+// de distrito no mapa (setKPIs()/renderPanel() rodam nisso, e o resultado da Fase 1
+// não depende do hover: é a carteira inteira, ver obrasComAtencaoEletrica()).
+let _atencaoEletricaDirty=true;
+function invalidateAggCache(){ _obrasOfCache=new Map(); _atencaoEletricaDirty=true; }
 function obrasOf(id){
   let hit=_obrasOfCache.get(id);
   if(hit===undefined){ hit=DB.municipios[id].obras.filter(passF); _obrasOfCache.set(id,hit); }
@@ -1535,6 +1569,58 @@ function setKPIs(){
   renderStatusChart(ids);
   renderAditivoChart(ids);
   renderYearChart(ids);
+  renderAtencaoEletrica();
+}
+// Fase 1 da aba "Elétrica" — obras que passaram de 50/70/90% de medição (Q2 do grill
+// de 24/09/2026). Olha TODA a carteira carregada, não o recorte de filtro do painel:
+// é um alerta do módulo inteiro pra equipe se planejar, não do que está em foco no
+// mapa agora. Só informativo (Q10): nenhum julgamento de "pendente", nenhuma
+// exigência de 1 relatório por marco — expõe o dado bruto (marco + quantos
+// relatórios + data do último) e deixa a leitura pra equipe.
+function obrasComAtencaoEletrica(){
+  const arr=[];
+  for(const cod in DB.municipios){
+    for(const o of DB.municipios[cod].obras){
+      const pct=medObraStats(o).pct;
+      if(pct==null) continue;
+      const marco=[...MARCOS_ELETRICA].reverse().find(m=>pct>=m);
+      if(!marco) continue;
+      const rel=o.relatoriosEletrica||[];
+      const ultimo=rel[0]; // já ordenado mais-recente-primeiro (fetchEletricaVistorias)
+      arr.push({o, pct, marco, totalRelatorios:rel.length, ultimaData:ultimo?ultimo.data_vistoria:null});
+    }
+  }
+  // sem relatório primeiro (quem mais precisa de atenção), depois por % desc
+  arr.sort((a,b)=>(a.totalRelatorios>0)-(b.totalRelatorios>0) || b.pct-a.pct);
+  return arr;
+}
+let CUR_ELETRICA_ATENCAO=[];
+let eleAtencaoExpandido=false;
+// forceReflow: ignora o cache "sujo"/"limpo" e redesenha mesmo sem invalidateAggCache()
+// ter rodado — usado só pelo toggle "ver todas/ver menos" (dado não mudou, só a
+// quantidade exibida). Toda outra chamada (setKPIs a cada render) é barata: se nada
+// mudou desde o último cálculo (_atencaoEletricaDirty===false), não recalcula nem
+// reescreve o innerHTML — evita custo e perda de foco de teclado a cada hover no mapa.
+function renderAtencaoEletrica(forceReflow){
+  const corpo=document.getElementById('eleAtencaoBody'); if(!corpo) return;
+  if(!forceReflow && !_atencaoEletricaDirty) return;
+  _atencaoEletricaDirty=false;
+  const titulo=document.getElementById('eleAtencaoTitulo');
+  const itens=obrasComAtencaoEletrica();
+  CUR_ELETRICA_ATENCAO=itens.map(it=>it.o);
+  if(titulo) titulo.textContent=itens.length?`Atenção elétrica (${itens.length})`:'Atenção elétrica';
+  if(!itens.length){ corpo.innerHTML='<div class="empty">Nenhuma obra acima de 50% de medição no momento.</div>'; return; }
+  const MOSTRAR=6;
+  const mostrar=eleAtencaoExpandido?itens:itens.slice(0,MOSTRAR);
+  const linha=(it,i)=>`<div class="ele-alert-row" role="button" tabindex="0" data-oid="${i}">
+    <div class="ele-alert-main"><span class="ele-alert-nome">${escHtml(it.o.codigo_obra||it.o.contrato)}</span><span class="ele-alert-marco">${it.marco}%</span></div>
+    <div class="ele-alert-sub">${it.totalRelatorios?`${it.totalRelatorios} relatório${it.totalRelatorios===1?'':'s'}${it.ultimaData?' · último em '+fmtDateBR(it.ultimaData):''}`:'sem relatório enviado'}</div>
+  </div>`;
+  const verBtn=itens.length>MOSTRAR
+    ?`<button type="button" class="ele-alert-ver" id="eleAtencaoVer">${eleAtencaoExpandido?'ver menos':'ver todas ('+itens.length+')'}</button>`:'';
+  corpo.innerHTML=mostrar.map(linha).join('')+verBtn;
+  const verEl=document.getElementById('eleAtencaoVer');
+  if(verEl) verEl.onclick=()=>{ eleAtencaoExpandido=!eleAtencaoExpandido; renderAtencaoEletrica(true); };
 }
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
 // ({k,nome,sub,v}). Compartilhadas entre renderPanel() e o popover de navegação
@@ -2224,6 +2310,7 @@ function openModal(o){
   const adValorHTML=buildAdValorPane(o,raw);
   const adPrazoHTML=buildAdPrazoPane(o,raw);
   const medicoesHTML=buildMedicoesPane(o,raw);
+  const eletricaHTML=buildEletricaPane(o);
   // "Localizar no mapa": fecha o modal e navega até o município da obra (nível 3),
   // pelo mesmo goCity() de um clique no mapa — não altera filtros, métrica nem escopo.
   const munCod=o.municipioTxt?NAMEIDX[normTxt(o.municipioTxt)]:null;
@@ -2244,6 +2331,7 @@ function openModal(o){
          <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneAdPrazo" data-tab="aditivos-prazo">Aditivos de prazo</button>
          <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneMedicoes" data-tab="medicoes">Medições</button>
          <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneFiscalizacao" data-tab="fiscalizacao">Fiscalização</button>
+         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneEletrica" data-tab="eletrica">Elétrica</button>
        </div>
      </div>
      <div class="mbody" data-tab="resumo">
@@ -2253,6 +2341,7 @@ function openModal(o){
        <div class="mpane" id="mPaneAdPrazo" role="tabpanel" data-pane="aditivos-prazo" hidden>${adPrazoHTML}</div>
        <div class="mpane" id="mPaneMedicoes" role="tabpanel" data-pane="medicoes" hidden>${medicoesHTML}</div>
        <div class="mpane" id="mPaneFiscalizacao" role="tabpanel" data-pane="fiscalizacao" hidden>${fiscalizacaoHTML}</div>
+       <div class="mpane" id="mPaneEletrica" role="tabpanel" data-pane="eletrica" hidden>${eletricaHTML}</div>
        <div class="mupd">Atualizado em ${fmtDateTimeBR(raw.atualizado_em)}</div>
      </div>`;
   document.getElementById('modalBg').classList.add('show');
@@ -2263,6 +2352,7 @@ function openModal(o){
   if(_vc) _vc.onclick=()=>{ const t=document.querySelector('.modal .mtab[data-tab="fiscalizacao"]'); if(t) t.click(); };
   wireModalTabs();
   wireAdToggles();
+  wireEletricaPane(o);
 }
 // Aba "Fiscalização": fiscal titular em destaque + suplente (se houver) + comissão
 // completa. Ordenação/classificação já vêm prontas de fetchFiscais (rank desc via
@@ -2285,6 +2375,178 @@ function buildFiscalizacaoPane(o){
     +`<div class="mcomlist">${com.map(m=>`<div class="mcomrow"><span class="mcomtipo">${escHtml(m.tipo)}</span><span class="mcomnome">${escHtml(m.nome)}${matTag(m)}</span></div>`).join('')}</div>`;
   return top+list;
 }
+// Aba "Elétrica" (Fase 1, grill de 24/09/2026): progresso de medição da obra (mesmo
+// medObraStats do Resumo/Medições, nunca duplicado em SQL — única fonte de verdade,
+// ver plano da Fase 1) + relatórios de vistoria já enviados. Marcos de 50/70/90% são
+// só informativos (Q2/Q10 do grill): não bloqueiam nada, não exigem 1 relatório por
+// marco — servem pra equipe se planejar. O formulário de novo relatório é montado à
+// parte (Frontend parte 2), porque precisa de wiring de eventos (dropzone) que
+// openModal() não repete depois de já ter montado o innerHTML.
+function buildEletricaPane(o){
+  const med=medObraStats(o);
+  const pct=med.pct;
+  const pR=pct==null?0:Math.max(0,Math.min(100,pct));
+  const marcoAtingido=[...MARCOS_ELETRICA].reverse().find(m=>pR>=m);
+  const progCard=`<div class="rs-card ele-prog">
+    <div class="rs-lbl">${RS_ICO.chart} Medição da obra</div>
+    <div class="rs-num big">${pct==null?'—':fmtPct1(pct)+'%'}</div>
+    <div class="rs-card-sub">${pct==null?'sem medições registradas':marcoAtingido?`passou de ${marcoAtingido}% de medição`:'abaixo de 50% de medição'}</div>
+    <div class="ele-bar-wrap">
+      <div class="rs-bar"><i class="amber" style="width:${pR.toFixed(1)}%"></i></div>
+      ${MARCOS_ELETRICA.map(m=>`<span class="ele-tick${pR>=m?' on':''}" style="left:${m}%" title="${m}% de medição"></span>`).join('')}
+    </div>
+  </div>`;
+
+  const rel=o.relatoriosEletrica||[];
+  const lista=rel.length
+    ? `<div class="elelist">${rel.map(r=>`<div class="elerow">
+        <div class="elerow-main">
+          <span class="elerow-data">${fmtDateBR(r.data_vistoria)}</span>
+          <span class="elerow-resp">${escHtml(r.responsavel_nome)}</span>
+        </div>
+        ${r.observacao?`<div class="elerow-obs">${escHtml(r.observacao)}</div>`:''}
+        ${r.drive_web_view_link
+          ?`<a class="elerow-link" href="${escHtml(r.drive_web_view_link)}" target="_blank" rel="noopener">${escHtml(r.arquivo_nome_original||'Abrir relatório')}</a>`
+          :`<span class="elerow-link off">${escHtml(r.arquivo_nome_original||'Arquivo')}</span>`}
+      </div>`).join('')}</div>`
+    : `<div class="empty">Nenhum relatório de vistoria enviado para esta obra ainda.</div>`;
+
+  // formulário de novo relatório: só para eletrica/admin (PAPEIS_ELETRICA_ESCRITA) —
+  // a trava real é a RLS de eletrica_vistorias; isto só evita OFERECER o formulário a
+  // quem não pode gravar (mesmo espírito de PAPEIS_REPLAN). wireEletricaPane() faz o
+  // wiring de eventos depois que este HTML entra no DOM (openModal não repete sozinho).
+  const podeEnviar=PAPEIS_ELETRICA_ESCRITA.includes(USER_PAPEL);
+  const hoje=new Date().toISOString().slice(0,10);
+  const nomeSessao=sessionStorage.getItem('sop_user_name')||'';
+  const formulario=podeEnviar?`<div class="msec">Novo relatório de vistoria</div>
+    <form id="eleForm" class="eleform" novalidate>
+      <div id="eleDrop" class="edrop" tabindex="0" role="button" aria-label="Selecionar relatório">
+        <svg class="edrop-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>
+        <p class="edrop-txt">Arraste o relatório aqui ou clique para selecionar</p>
+        <div class="edrop-fmt"><span>.pdf</span><span>.doc</span><span>.docx</span></div>
+        <div class="edrop-nome" id="eleArquivoNome" hidden></div>
+        <input type="file" id="eleFile" accept=".pdf,.doc,.docx" hidden>
+      </div>
+      <div class="elefields">
+        <label>Data da vistoria<input type="date" id="eleData" required value="${hoje}"></label>
+        <label>Responsável<input type="text" id="eleResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
+        <label>Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
+      </div>
+      <div class="ele-erro" id="eleErro" hidden></div>
+      <button type="submit" class="ele-btn" id="eleBtnEnviar" disabled>Enviar relatório</button>
+    </form>`:'';
+
+  return progCard+`<div class="msec">Relatórios enviados (${rel.length})</div>`+lista+formulario;
+}
+// upload multipart/related direto pra API do Google Drive v3, com o access_token de
+// curta duração devolvido por eletrica-drive-token (Fase 1 — ver comentário no topo
+// dessa Edge Function: o arquivo NUNCA passa pelo backend do GECOPE, só pelo Drive).
+async function uploadParaDrive(accessToken,folderId,arquivo,nomeArquivo){
+  const boundary='-------eletrica'+Math.random().toString(36).slice(2);
+  const metadata={name:nomeArquivo,parents:[folderId]};
+  const corpo=new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
+    `--${boundary}\r\nContent-Type: ${arquivo.type}\r\n\r\n`,
+    arquivo,
+    `\r\n--${boundary}--`,
+  ]);
+  const resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+accessToken,'Content-Type':`multipart/related; boundary=${boundary}`},
+    body:corpo,
+  });
+  if(!resp.ok) throw new Error('O Google Drive recusou o upload (HTTP '+resp.status+'). Tente novamente.');
+  return resp.json(); // {id, webViewLink}
+}
+const ELE_TIPOS_ACEITOS={'application/pdf':1,'application/msword':1,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':1};
+const ELE_TAMANHO_MAX=20*1024*1024; // 20MB — mesmo teto validado em eletrica-drive-token
+// liga a dropzone e o submit do formulário de novo relatório. Chamada de novo a cada
+// re-render da aba (sucesso de envio redesenha só #mPaneEletrica), então os listeners
+// antigos morrem com o innerHTML velho — mesmo padrão de wireModalTabs/openModal.
+function wireEletricaPane(o){
+  const pane=document.getElementById('mPaneEletrica'); if(!pane) return;
+  const form=pane.querySelector('#eleForm'); if(!form) return; // sem permissão: formulário não existe
+  const drop=form.querySelector('#eleDrop'), input=form.querySelector('#eleFile');
+  const btn=form.querySelector('#eleBtnEnviar'), elErro=form.querySelector('#eleErro');
+  const elNome=form.querySelector('#eleArquivoNome');
+  let arquivo=null;
+
+  function setErro(msg){ elErro.textContent=msg||''; elErro.hidden=!msg; }
+  function limparSelecao(){ arquivo=null; elNome.hidden=true; elNome.textContent=''; btn.disabled=true; }
+  function selecionarArquivo(f){
+    setErro('');
+    if(!ELE_TIPOS_ACEITOS[f.type]){ limparSelecao(); setErro('Envie um arquivo PDF, DOC ou DOCX.'); return; }
+    if(f.size>ELE_TAMANHO_MAX){ limparSelecao(); setErro('Arquivo maior que o limite de 20MB.'); return; }
+    arquivo=f; elNome.textContent=f.name; elNome.hidden=false; btn.disabled=false;
+  }
+
+  drop.onclick=()=>input.click();
+  drop.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); input.click(); } };
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) selecionarArquivo(e.dataTransfer.files[0]); });
+  input.addEventListener('change',()=>{ if(input.files[0]) selecionarArquivo(input.files[0]); });
+  // solto fora da caixa mas ainda dentro da aba: sem isso o navegador navega pro
+  // arquivo (sai do SPA) — mesmo guard de curva_abc.js:943-944, aplicado ao pane.
+  pane.addEventListener('dragover',e=>e.preventDefault());
+  pane.addEventListener('drop',e=>{ e.preventDefault(); if(e.target===drop||drop.contains(e.target)) return; if(e.dataTransfer.files[0]) selecionarArquivo(e.dataTransfer.files[0]); });
+
+  form.onsubmit=async(e)=>{
+    e.preventDefault();
+    const dataVistoria=form.querySelector('#eleData').value;
+    const responsavel=form.querySelector('#eleResp').value.trim();
+    const observacao=form.querySelector('#eleObs').value.trim();
+    if(!arquivo){ setErro('Selecione um arquivo.'); return; }
+    if(!dataVistoria){ setErro('Informe a data da vistoria.'); return; }
+    if(!responsavel){ setErro('Informe o responsável.'); return; }
+    setErro('');
+    btn.disabled=true; const txtOriginal=btn.textContent; btn.textContent='Enviando…';
+    let drive, tokenJson;
+    try{
+      const {data:sessao}=await window.sbClient.auth.getSession();
+      const token=sessao&&sessao.session?sessao.session.access_token:null;
+      const emailUsuario=sessao&&sessao.session&&sessao.session.user?sessao.session.user.email:'';
+      if(!token) throw new Error('Sua sessão do GECOPE expirou. Entre novamente.');
+      const tokenResp=await fetch(`${SB_URL}/functions/v1/eletrica-drive-token`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,apikey:SB_KEY},
+        body:JSON.stringify({id_obra:o.id_obra,arquivo_mime:arquivo.type,arquivo_tamanho_bytes:arquivo.size}),
+      });
+      tokenJson=await tokenResp.json().catch(()=>({}));
+      if(!tokenResp.ok||!tokenJson.ok) throw new Error(tokenJson.erro||'Não consegui autorizar o envio agora. Tente novamente.');
+
+      const nomeSeguro=responsavel.replace(/[\\/:*?"<>|]/g,'-');
+      const nomeNoDrive=`${dataVistoria}_${nomeSeguro}_${arquivo.name}`;
+      drive=await uploadParaDrive(tokenJson.accessToken,tokenJson.folderId,arquivo,nomeNoDrive);
+
+      const {error:erroInsert}=await window.sbClient.from('eletrica_vistorias').insert({
+        id_obra:o.id_obra, data_vistoria:dataVistoria, responsavel_nome:responsavel, observacao:observacao||null,
+        arquivo_nome_original:arquivo.name, arquivo_mime:arquivo.type, arquivo_tamanho_bytes:arquivo.size,
+        drive_file_id:drive.id, drive_folder_id:tokenJson.folderId, drive_web_view_link:drive.webViewLink||null,
+        criado_por_email:emailUsuario||'',
+      });
+      if(erroInsert) throw new Error('O arquivo foi enviado ao Drive, mas não consegui salvar o registro: '+erroInsert.message);
+    }catch(err){
+      setErro((err&&err.message)||'Não consegui enviar o relatório agora. Tente novamente.');
+      btn.disabled=false; btn.textContent=txtOriginal;
+      return;
+    }
+    // Envio e gravação JÁ confirmados neste ponto — uma falha daqui em diante é só de
+    // ATUALIZAÇÃO DA TELA, não do envio. Tratada à parte para não fazer o usuário
+    // reenviar (e duplicar) um relatório que já foi salvo com sucesso.
+    try{
+      const novo=await fetchEletricaVistorias([o.id_obra]);
+      o.relatoriosEletrica=novo[o.id_obra]||[];
+      pane.innerHTML=buildEletricaPane(o);
+      wireEletricaPane(o);
+      invalidateAggCache(); renderAtencaoEletrica(); // painel "Atenção elétrica" reflete o novo relatório
+    }catch(err){
+      setErro('Relatório enviado com sucesso, mas não consegui atualizar a lista aqui. Feche e reabra esta obra para ver.');
+      btn.textContent=txtOriginal;
+    }
+  };
+}
 // troca de aba: cada openModal() reconstrói o innerHTML do zero, então os listeners
 // são refeitos a cada abertura — igual ao padrão já usado pro botão de fechar/comissão.
 function wireModalTabs(){
@@ -2296,7 +2558,7 @@ function wireModalTabs(){
     document.querySelectorAll('.modal .mpane').forEach(p=>{ p.hidden=p.dataset.pane!==t.dataset.tab; });
     if(body) body.dataset.tab=t.dataset.tab; // a aba Resumo esconde a linha .mobj (o objeto já está no cartão)
     if(top) top.dataset.tab=t.dataset.tab;   // e o subtítulo "Resumo executivo do contrato" no cabeçalho
-    // telas estreitas: 5 abas não cabem; traz a aba ativa para dentro da faixa
+    // telas estreitas: as abas não cabem todas; traz a aba ativa para dentro da faixa
     // rolável (block:'nearest' evita pulo vertical da página).
     try{ t.scrollIntoView({inline:'nearest',block:'nearest'}); }catch(_){}
   });
@@ -4540,6 +4802,21 @@ document.getElementById('body').addEventListener('click',e=>{
   const loc=e.target.closest('.chip.mun.locate');
   if(loc){ goCity(loc.dataset.cod); return; }
   const ob=e.target.closest('.obra'); if(ob){ const o=CUROBRAS[+ob.dataset.oid]; if(o) openModal(o); }
+});
+// bloco "Atenção elétrica" (Fase 1) — vive no <aside>, fora do #body que os listeners
+// acima cobrem (aquele é o painel que troca de conteúdo a cada navegação; este é fixo).
+// Array próprio (CUR_ELETRICA_ATENCAO), não CUROBRAS: reaproveitar o array da lista
+// principal seria arriscado — ele é reatribuído a cada render() com outra ordem/recorte.
+if(_asideEl) _asideEl.addEventListener('click',e=>{
+  const row=e.target.closest('.ele-alert-row'); if(!row) return;
+  const o=CUR_ELETRICA_ATENCAO[+row.dataset.oid]; if(!o) return;
+  openModal(o);
+  const t=document.querySelector('.modal .mtab[data-tab="eletrica"]'); if(t) t.click();
+});
+if(_asideEl) _asideEl.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ') return;
+  const row=e.target.closest('.ele-alert-row'); if(!row) return;
+  e.preventDefault(); row.click();
 });
 // mesmas ações acima, via teclado (Enter/Espaço) — os cards (.rrow/.obra/
 // .chip.mun.locate/.chip-sel/.chip.abre) são <div>/<span> com role="button" e tabindex,
