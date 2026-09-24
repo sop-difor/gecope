@@ -240,7 +240,7 @@ function applyRoleToUI(rawRole) {
     const role = (rawRole || 'guest').toLowerCase();
 
     // Remove role classes
-    document.body.classList.remove('role-admin', 'role-gerente', 'role-fiscal', 'role-externo', 'role-pending', 'is-admin');
+    document.body.classList.remove('role-admin', 'role-gerente', 'role-fiscal', 'role-externo', 'role-eletrica', 'role-pending', 'is-admin');
     document.body.classList.add(`role-${role}`);
     if (role === 'admin') document.body.classList.add('is-admin');
 
