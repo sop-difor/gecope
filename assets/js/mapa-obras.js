@@ -825,6 +825,17 @@ function grpById(g){return groupsList().find(x=>String(x.id)===String(g));}
 // valor, Prazo…) usam o mesmo caminho — a diferença está só em como fillFilters()
 // monta a lista de opções. A busca livre `q` continua um caso à parte.
 function passF(o){const f=st.f;
+  // cards do resumo "Atenção, Elétrica!" (eleFiltroCategoria, ver mais abaixo): mesmo
+  // critério de CATEGORIA_TESTE em renderAtencaoEletrica(), aplicado aqui pra que o
+  // clique no card recorte também o que o mapa pinta/soma — não só a listinha do
+  // painel. Só entra em jogo na métrica Elétrica; 'atencao' representa o universo
+  // inteiro (pedido do usuário, 24/09/2026 — antes o clique só filtrava a lista).
+  if(st.metric==='eletrica' && eleFiltroCategoria && eleFiltroCategoria!=='atencao'){
+    const rel=o.relatoriosEletrica||[];
+    if(eleFiltroCategoria==='vistoriadas' && !rel.length) return false;
+    if(eleFiltroCategoria==='avistoriar' && rel.length) return false;
+    if(eleFiltroCategoria==='agendadas' && !(!rel.length && o.agendamentoEletrica)) return false;
+  }
   for(let i=0;i<FILTER_DEFS.length;i++){
     const d=FILTER_DEFS[i], set=f[d.key];
     if(set && set.size){ const v=d.get(o); if(v==null || !set.has(v)) return false; }
@@ -1775,7 +1786,13 @@ function wireEleResumoFiltro(){
       const k=card.dataset.filtro;
       eleFiltroCategoria=(eleFiltroCategoria===k)?null:k;
       eleAtencaoExpandido=false; // troca de filtro reabre no recorte curto, senão "ver todas" de uma categoria vazaria pra outra
-      renderAtencaoEletrica(true);
+      // passF() agora também recorta por eleFiltroCategoria (ver comentário lá) — sem
+      // invalidar o cache de obrasOf() por município, o mapa continuaria pintando com a
+      // categoria anterior. render() já chama renderPanel()→setKPIs()→renderAtencaoEletrica(),
+      // então isto substitui o renderAtencaoEletrica(true) antigo (pedido do usuário,
+      // 24/09/2026: clicar no card também deve refletir no mapa, não só na listinha).
+      invalidateAggCache();
+      render();
     });
     card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); card.click(); } });
   });
@@ -2947,7 +2964,8 @@ document.addEventListener('keydown',e=>{
 });
 // Etapa C: genérico — qualquer chave de st.f que seja um Set com itens conta como
 // filtro ativo (não só as que já têm def em FILTER_DEFS).
-function hasActiveFilter(){ return !!st.f.q || Object.keys(st.f).some(k=>st.f[k] instanceof Set && st.f[k].size>0); }
+function hasActiveFilter(){ return !!st.f.q || Object.keys(st.f).some(k=>st.f[k] instanceof Set && st.f[k].size>0)
+  || (st.metric==='eletrica' && !!eleFiltroCategoria && eleFiltroCategoria!=='atencao'); }
 // Etapa C — sufixo "· N contrato(s) encontrado(s)" na linha de escopo do painel,
 // visível em TODOS os níveis quando há filtro ativo (o nível Estado/Distritos já
 // tinha o seu; aqui cobre distrito, município e seleção combinada). N sai de
