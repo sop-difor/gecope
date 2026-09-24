@@ -615,7 +615,7 @@ async function loadData(){
     return;
   }
   document.body.classList.remove('boot-loading');
-  fillFilters(); render(); refit();
+  fillFilters(); render(); refit(true);
 }
 
 /* ============================================================
@@ -794,7 +794,8 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
 
 const METRIC={obras:{label:'Nº de obras',fmt:v=>NUM.format(v)},
               valor:{label:'Valor total',fmt:v=>BRL.format(v)},
-              aditivo:{label:'Aditivos (R$)',fmt:v=>BRL.format(v)}};
+              aditivo:{label:'Aditivos (R$)',fmt:v=>BRL.format(v)},
+              eletrica:{label:'Obras em atenção elétrica',fmt:v=>NUM.format(v)}};
 let BASE=TOKENS.mapBase; // re-derivado na troca de tema (repaintTheme)
 const allIds=Object.keys(DB.municipios);
 function groupsList(){return DB.distritos;}
@@ -844,8 +845,12 @@ function obrasOf(id){
   if(hit===undefined){ hit=DB.municipios[id].obras.filter(passF); _obrasOfCache.set(id,hit); }
   return hit;
 }
-function aggIds(ids){let obras=0,valor=0,valorOriginal=0,par=0,adit=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;valorOriginal+=o.valor_original;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;}));return{obras,valor,valorOriginal,par,adit};}
-function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:a.obras;}
+// obra "em atenção elétrica": mesma régua de obrasComAtencaoEletrica() (passou do
+// primeiro marco de medição, 50%) — reaproveitada aqui pra métrica de mapa/painel
+// poder contar isso por município sem duplicar o critério.
+function obraEmAtencaoEletrica(o){const pct=medObraStats(o).pct;return pct!=null&&pct>=MARCOS_ELETRICA[0];}
+function aggIds(ids){let obras=0,valor=0,valorOriginal=0,par=0,adit=0,eletrica=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;valorOriginal+=o.valor_original;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;if(st.metric==='eletrica'&&obraEmAtencaoEletrica(o))eletrica++;}));return{obras,valor,valorOriginal,par,adit,eletrica};}
+function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:st.metric==='eletrica'?a.eletrica:a.obras;}
 // ---- recorte e período do modo Replanilhamentos (E2) ----
 // Mesma aritmética de `current_date - interval 'N months'` do Postgres, que o diagnóstico
 // SQL usa: o dia é limitado ao último dia do mês de destino (31/08 − 6 meses = 28/02). O
@@ -983,7 +988,14 @@ function rpFmtCurto(r){
 }
 
 // ---- mapa ----
-const map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:6,maxZoom:11});
+// zoomSnap/zoomDelta fracionários (pedido do usuário, 24/09/2026 — "aumentar um
+// pouco mais o zoom, mas sem deixar faltar parte na tela"): por padrão o Leaflet só
+// pula entre zooms INTEIROS, então fitBounds() é obrigado a "arredondar pra baixo"
+// sempre que o próximo nível inteiro estourasse o contêiner — sobrando uma margem
+// enorme mesmo com padding pequeno. Com passos de 0,25 o mapa preenche o espaço
+// disponível de verdade, continuando 100% dentro da área visível (fitBounds nunca
+// corta nada, só escolhe o zoom — a garantia de "sempre inteiro" não muda).
+const map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:6,maxZoom:11,zoomSnap:0.25,zoomDelta:0.25});
 L.control.zoom({position:'bottomright'}).addTo(map);
 let layer,stateShape,fullBounds=null;
 const HID={weight:0,opacity:0,fillOpacity:0};
@@ -1194,38 +1206,32 @@ function boundsOfIds(ids){
   layer.eachLayer(l=>{ if(set.has(l.feature.properties.id)){const lb=l.getBounds(); b=b?b.extend(lb):L.latLngBounds(lb.getSouthWest(),lb.getNorthEast());} });
   return b;
 }
-// a entrada animada (flyToBounds) roda uma única vez; os vários "ensureSize" de
-// segurança (fontes, resize, orientação) chamam fitFull() logo em seguida e, sem
-// essa guarda, cortariam a animação no meio com um fitBounds instantâneo.
-let _firstFit=true, _entranceDone=false;
-function fitFull(){
-  if(!fullBounds) return;
-  if(_firstFit){
-    _firstFit=false;
-    // Etapa D: a entrada já parte do nível 1 (11 distritos). Os polígonos de
-    // distrito entram com um fade curto logo no início do voo — a câmera se aproxima
-    // e eles "assentam" junto. Duração encurtada (2,8s → 1,5s) a pedido; o
-    // #mapWrap.in no CSS acompanha (mesma duração).
-    if(groupLayer){ enterGroupFade(); requestAnimationFrame(()=>requestAnimationFrame(revealGroupFade)); }
-    map.flyToBounds(fullBounds,{padding:[24,24],duration:1.5,easeLinearity:.12});
-    map.once('moveend',()=>{ _entranceDone=true; updateLabels(); });
-    return;
-  }
-  if(!_entranceDone) return;
-  // reenquadramentos depois da entrada (resize, orientação, entrar/sair da tela
-  // cheia) também animam — evita o "salto" instantâneo quando o viewport muda
-  map.flyToBounds(fullBounds,{padding:[24,24],duration:.9,easeLinearity:.2});
-  map.once('moveend',()=>{ updateLabels(); });
+// Pedido do usuário (24/09/2026): o mapa deve entrar já carregado, sem a entrada
+// animada de câmera que existia antes (flyToBounds afastado → aproximando, mais o
+// fade/scale de #mapWrap em CSS). fitFull/fitGroup/fitCity usam fitBounds direto;
+// `instant` (true nas chamadas de arranque/resize) some com o pequeno pan/zoom
+// embutido do próprio Leaflet, que senão apareceria como "salto" nesses casos.
+//
+// largura extra à esquerda quando o painel Controles está aberto: ele fica por cima
+// do mapa (position:absolute, não entra no grid de `main`), então sem compensar isso
+// aqui o Leaflet centraliza a área TODA do #map — inclusive a faixa coberta pelo
+// painel — e o mapa parece puxado pra direita (achado do usuário, Print 1). O Painel
+// lateral (aside) não precisa do mesmo tratamento: é uma coluna própria do grid, então
+// #map já nasce menor e fitBounds centraliza certo sozinho.
+function ctrlOverlayWidth(){
+  return (_ctrl && _ctrl.classList.contains('show')) ? _ctrl.getBoundingClientRect().width+28 : 0;
 }
-function fitGroup(){ const b=boundsOfIds(idsOfGroup(st.group)); if(b) map.fitBounds(b,{padding:[40,40],maxZoom:10}); }
-function fitCity(){ const b=boundsOfIds([st.city]); if(b) map.fitBounds(b,{padding:[60,60],maxZoom:11}); }
-// Etapa D — fade de entrada dos 11 distritos: opacidade via classe CSS no <path>
-// (multiplica sobre o estilo do Leaflet, sem brigar com groupStyle()). Roda uma
-// única vez, no primeiro fitFull(); ao terminar, as classes saem e o Leaflet
-// volta a mandar sozinho no estilo.
-function enterGroupFade(){ if(!groupLayer) return; groupLayer.eachLayer(l=>{ if(l._path) l._path.classList.add('grp-enter'); }); }
-function revealGroupFade(){ if(!groupLayer) return; groupLayer.eachLayer(l=>{ if(!l._path) return; l._path.classList.add('grp-enter-in');
-  setTimeout(()=>{ if(l._path) l._path.classList.remove('grp-enter','grp-enter-in'); },420); }); }
+function fitPad(base){ return {paddingTopLeft:[base+ctrlOverlayWidth(),base], paddingBottomRight:[base,base]}; }
+function fitFull(instant){
+  if(!fullBounds) return;
+  const o=fitPad(16); if(instant) o.animate=false;
+  map.fitBounds(fullBounds,o);
+  updateLabels();
+}
+function fitGroup(instant){ const b=boundsOfIds(idsOfGroup(st.group)); if(!b) return;
+  const o={...fitPad(40),maxZoom:10}; if(instant) o.animate=false; map.fitBounds(b,o); }
+function fitCity(instant){ const b=boundsOfIds([st.city]); if(!b) return;
+  const o={...fitPad(60),maxZoom:11}; if(instant) o.animate=false; map.fitBounds(b,o); }
 
 // navegação
 // Etapa D: o nível 0 saiu; "voltar ao topo" (troca de escopo, breadcrumb raiz,
@@ -1435,12 +1441,6 @@ function refreshMapCounts(){
   });
 }
 function updateLabels(){
-  // Nenhum rótulo do mapa aparece enquanto a animação de entrada (flyToBounds)
-  // ainda está rodando: durante o voo o declutter roda num zoom que ainda vai
-  // mudar e escondia parte dos nomes, deixando distritos "sem nome" à mostra.
-  // Só quando a apresentação termina (_entranceDone, marcado no moveend do
-  // primeiro fitFull) os rótulos entram — já no enquadramento final.
-  if(!_entranceDone){ setLayer(groupLbl,false); setLayer(cityLbl,false); return; }
   const s=applyLabelSizes();
   setLayer(groupLbl,st.level===1);
   setLayer(cityLbl,st.level>=2);
@@ -1596,20 +1596,39 @@ function obrasComAtencaoEletrica(){
 }
 let CUR_ELETRICA_ATENCAO=[];
 let eleAtencaoExpandido=false;
+// Bloco "Atenção elétrica": só faz sentido enquanto a métrica do mapa é Elétrica — o
+// resto do tempo fica fora do painel (pedido do usuário, 24/09/2026: antes ficava
+// sempre visível, competindo por espaço com os KPIs de Obras/Valor). Guarda a
+// visibilidade anterior pra forçar 1 reflow ao reaparecer (o cache de "sujo" abaixo
+// só acompanha mudança de DADO, não a troca de métrica — sem isso o corpo ficaria
+// vazio na primeira vez que o usuário troca pra Elétrica sem nenhum dado ter mudado).
+let _eleAtencaoVisivelAntes=false;
 // forceReflow: ignora o cache "sujo"/"limpo" e redesenha mesmo sem invalidateAggCache()
 // ter rodado — usado só pelo toggle "ver todas/ver menos" (dado não mudou, só a
 // quantidade exibida). Toda outra chamada (setKPIs a cada render) é barata: se nada
 // mudou desde o último cálculo (_atencaoEletricaDirty===false), não recalcula nem
 // reescreve o innerHTML — evita custo e perda de foco de teclado a cada hover no mapa.
 function renderAtencaoEletrica(forceReflow){
+  const wrap=document.getElementById('eleAtencaoWrap');
   const corpo=document.getElementById('eleAtencaoBody'); if(!corpo) return;
-  if(!forceReflow && !_atencaoEletricaDirty) return;
+  const visivel=st.metric==='eletrica';
+  if(wrap) wrap.hidden=!visivel;
+  if(!visivel){ _eleAtencaoVisivelAntes=false; return; }
+  const tornouVisivelAgora=!_eleAtencaoVisivelAntes;
+  _eleAtencaoVisivelAntes=true;
+  if(!forceReflow && !tornouVisivelAgora && !_atencaoEletricaDirty) return;
   _atencaoEletricaDirty=false;
   const titulo=document.getElementById('eleAtencaoTitulo');
   const itens=obrasComAtencaoEletrica();
   CUR_ELETRICA_ATENCAO=itens.map(it=>it.o);
   if(titulo) titulo.textContent=itens.length?`Atenção elétrica (${itens.length})`:'Atenção elétrica';
   if(!itens.length){ corpo.innerHTML='<div class="empty">Nenhuma obra acima de 50% de medição no momento.</div>'; return; }
+  const vistoriadas=itens.filter(it=>it.totalRelatorios>0).length;
+  const resumo=`<div class="ele-resumo">
+    <div class="ele-resumo-i"><span class="v">${NUM.format(itens.length)}</span><span class="l">em atenção</span></div>
+    <div class="ele-resumo-i ok"><span class="v">${NUM.format(vistoriadas)}</span><span class="l">vistoriadas</span></div>
+    <div class="ele-resumo-i warn"><span class="v">${NUM.format(itens.length-vistoriadas)}</span><span class="l">a vistoriar</span></div>
+  </div>`;
   const MOSTRAR=6;
   const mostrar=eleAtencaoExpandido?itens:itens.slice(0,MOSTRAR);
   const linha=(it,i)=>`<div class="ele-alert-row" role="button" tabindex="0" data-oid="${i}">
@@ -1618,7 +1637,7 @@ function renderAtencaoEletrica(forceReflow){
   </div>`;
   const verBtn=itens.length>MOSTRAR
     ?`<button type="button" class="ele-alert-ver" id="eleAtencaoVer">${eleAtencaoExpandido?'ver menos':'ver todas ('+itens.length+')'}</button>`:'';
-  corpo.innerHTML=mostrar.map(linha).join('')+verBtn;
+  corpo.innerHTML=resumo+mostrar.map(linha).join('')+verBtn;
   const verEl=document.getElementById('eleAtencaoVer');
   if(verEl) verEl.onclick=()=>{ eleAtencaoExpandido=!eleAtencaoExpandido; renderAtencaoEletrica(true); };
 }
@@ -2387,6 +2406,7 @@ function buildEletricaPane(o){
   const pct=med.pct;
   const pR=pct==null?0:Math.max(0,Math.min(100,pct));
   const marcoAtingido=[...MARCOS_ELETRICA].reverse().find(m=>pR>=m);
+  const rel=o.relatoriosEletrica||[];
   const progCard=`<div class="rs-card ele-prog">
     <div class="rs-lbl">${RS_ICO.chart} Medição da obra</div>
     <div class="rs-num big">${pct==null?'—':fmtPct1(pct)+'%'}</div>
@@ -2396,8 +2416,21 @@ function buildEletricaPane(o){
       ${MARCOS_ELETRICA.map(m=>`<span class="ele-tick${pR>=m?' on':''}" style="left:${m}%" title="${m}% de medição"></span>`).join('')}
     </div>
   </div>`;
+  // segundo cartão da fileira: a mesma leitura de "vistoriada/aguardando" que o painel
+  // lateral usa (renderAtencaoEletrica) — resume de relance a situação da obra, sem
+  // repetir os números de "Relatórios enviados" logo abaixo.
+  const statusInfo = pct==null||!marcoAtingido
+    ? {cls:'',txt:'Fora do radar da elétrica', sub:'abaixo do marco de atenção (50% de medição)'}
+    : rel.length
+      ? {cls:'ok',txt:'Vistoriada', sub:`${rel.length} relatório${rel.length===1?'':'s'} enviado${rel.length===1?'':'s'}`}
+      : {cls:'warn',txt:'Aguardando vistoria', sub:`passou de ${marcoAtingido}% sem relatório enviado`};
+  const statusCard=`<div class="rs-card ele-status">
+    <div class="rs-lbl">${RS_ICO.clock} Situação da vistoria</div>
+    <div class="ele-status-chip ${statusInfo.cls}">${statusInfo.txt}</div>
+    <div class="rs-card-sub">${statusInfo.sub}</div>
+  </div>`;
+  const topRow=`<div class="ele-top-row">${progCard}${statusCard}</div>`;
 
-  const rel=o.relatoriosEletrica||[];
   const lista=rel.length
     ? `<div class="elelist">${rel.map(r=>`<div class="elerow">
         <div class="elerow-main">
@@ -2430,13 +2463,13 @@ function buildEletricaPane(o){
       <div class="elefields">
         <label>Data da vistoria<input type="date" id="eleData" required value="${hoje}"></label>
         <label>Responsável<input type="text" id="eleResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
-        <label>Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
+        <label class="span2">Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
       </div>
       <div class="ele-erro" id="eleErro" hidden></div>
       <button type="submit" class="ele-btn" id="eleBtnEnviar" disabled>Enviar relatório</button>
     </form>`:'';
 
-  return progCard+`<div class="msec">Relatórios enviados (${rel.length})</div>`+lista+formulario;
+  return topRow+`<div class="msec">Relatórios enviados (${rel.length})</div>`+lista+formulario;
 }
 // upload multipart/related direto pra API do Google Drive v3, com o access_token de
 // curta duração devolvido por eletrica-drive-token (Fase 1 — ver comentário no topo
@@ -4039,7 +4072,10 @@ function fitCtrlHeight(){
   const top=_ctrl.getBoundingClientRect().top;
   _ctrl.style.maxHeight=Math.max(160,window.innerHeight-top-14)+'px';
 }
-function openCtrl(o){ _ctrl.classList.toggle('show',o); _ctrlT.style.display=o?'none':''; if(o) fitCtrlHeight(); }
+// abrir/fechar Controles muda a largura que fitPad() precisa compensar à esquerda
+// (ver fitFull/fitGroup/fitCity) — sem o refit() aqui, o mapa só recentraria no
+// próximo reenquadramento por outro motivo (navegar, redimensionar a janela).
+function openCtrl(o){ _ctrl.classList.toggle('show',o); _ctrlT.style.display=o?'none':''; if(o) fitCtrlHeight(); if(layer) refit(); }
 _ctrlT.onclick=()=>openCtrl(true);
 document.getElementById('ctrlClose').onclick=()=>openCtrl(false);
 window.addEventListener('resize',fitCtrlHeight);
@@ -4858,9 +4894,9 @@ fullBounds=layer.getBounds();
 // exibido (ver render()); permanece criado só como objeto inerte para repaintTheme.
 stateShape=L.geoJSON(ESTADO,{interactive:false,style:{fillColor:TOKENS.mapStateFill,color:`rgba(${TOKENS.ngRgb},.42)`,weight:1.5,fillOpacity:.96}});
 buildCityState(); rebuildGroupLabels(); buildGroupLayer();
-// posição inicial "afastada" — o refit()/fitFull() logo abaixo anima a
-// aproximação (efeito de entrada suave, tipo câmera chegando no mapa)
-map.fitBounds(fullBounds,{padding:[220,220],animate:false});
+// mapa já entra no enquadramento final, sem animação de câmera (pedido do usuário,
+// 24/09/2026) — fitFull(true) é instantâneo.
+fitFull(true);
 render();
 // Porta de sessão (plano de permissões por papel, Fase 2): resolve o token e
 // delega pra loadData() — que é quem de fato checa SESSION_TOKEN (mesmo guard
@@ -4875,22 +4911,12 @@ render();
 })();
 
 // mantém o mapa centralizado apesar de fontes, layout e barra de endereço (mobile)
-function refit(){ if(st.level>=3) fitCity(); else if(st.level===2) fitGroup(); else fitFull(); }
-function ensureSize(){
-  // enquanto a entrada animada (flyToBounds) está rodando, invalidateSize()
-  // reposiciona o mapa instantaneamente e corta a animação no meio — daí o
-  // "tapa" no final. Ignora os ensureSize() de segurança até ela terminar.
-  if(!_firstFit && !_entranceDone) return;
-  map.invalidateSize(false); refit();
-}
+function refit(instant){ if(st.level>=3) fitCity(instant); else if(st.level===2) fitGroup(instant); else fitFull(instant); }
+// segurança de layout (fontes ainda carregando, resize, orientação, barra de endereço
+// do celular somem/aparecem): sempre instantâneo — não é navegação do usuário, é só
+// reajuste, então uma animação aqui só chamaria atenção à toa.
+function ensureSize(){ map.invalidateSize(false); refit(true); }
 requestAnimationFrame(ensureSize);
-
-// revelação: o mapa parte oculto (opacity/scale) e some com o fitFull() acima —
-// dois requestAnimationFrame garantem que o navegador pinte o estado inicial
-// antes de iniciar a transição, senão o fade não roda.
-requestAnimationFrame(()=>requestAnimationFrame(()=>{
-  document.getElementById('mapWrap').classList.add('in');
-}));
 [80,200,400,700,1100,1700,2500].forEach(t=>setTimeout(ensureSize,t));
 ['load','resize','pageshow','orientationchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(ensureSize,60)));
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) ensureSize(); });
