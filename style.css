@@ -667,6 +667,52 @@
             color: rgba(255, 255, 255, 0.35);
         }
 
+        /* Tile de módulo sem acesso (ver setupLockedModuleCard em core/auth.js):
+           antes o tile sumia (display:none) pra quem não tinha o papel exigido,
+           abrindo "buracos" no grid da Início. Agora fica sempre visível, só
+           esmaecido/sem hover, com um cadeado no lugar do ícone do módulo e um
+           selo "Sem acesso" — sinaliza que o módulo existe mas está bloqueado,
+           em vez de fingir que ele não existe. */
+        .home-action-card.locked-module,
+        .home-list-row.locked-module {
+            cursor: not-allowed;
+            opacity: 0.6;
+            filter: grayscale(70%);
+        }
+        .home-action-card.locked-module:hover,
+        .home-list-row.locked-module:hover {
+            transform: none;
+            box-shadow: var(--shadow-card-elevated);
+        }
+        .locked-module-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--text-muted);
+            background: var(--sop-slate-50);
+            border: 1px solid var(--sop-slate-100);
+            padding: 3px 9px;
+            border-radius: 999px;
+        }
+        body.theme-dark .locked-module-badge {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .home-action-card.locked-module .home-action-text h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .home-list-row.locked-module .bi-chevron-right {
+            display: none;
+        }
+
         .btn-back-minimal {
             background: none;
             border: none;
