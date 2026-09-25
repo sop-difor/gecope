@@ -258,7 +258,9 @@ function setupLockedModuleCard(el, locked) {
         if (!el.querySelector('.locked-module-badge')) {
             const badge = document.createElement('span');
             badge.className = 'locked-module-badge';
-            badge.innerHTML = '<i class="bi bi-lock-fill"></i> Sem acesso';
+            badge.title = 'Sem acesso';
+            badge.setAttribute('aria-label', 'Sem acesso');
+            badge.innerHTML = '<i class="bi bi-lock-fill"></i>';
             const alvo = el.querySelector('.home-action-text h3') || el.querySelector('.home-list-row-title');
             if (alvo) alvo.appendChild(badge);
         }
