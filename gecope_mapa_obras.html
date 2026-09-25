@@ -168,8 +168,14 @@
          mapa-obras.js) — hidden por padrão pra não piscar na primeira pintura, antes
          do primeiro render() decidir a métrica ativa. -->
     <div class="statwrap" id="eleAtencaoWrap" hidden>
-      <div class="sec-h"><span id="eleAtencaoTitulo">Atenção, Elétrica!</span></div>
+      <div class="sec-h"><span id="eleAtencaoTitulo">Elétrica</span></div>
       <div id="eleAtencaoBody"></div>
+    </div>
+    <!-- Painel "Engenheiros Eletricistas" (grill de 25/09/2026) — mesma visibilidade
+         do bloco acima: só na métrica Elétrica (ver renderEleEngenheiros). -->
+    <div class="statwrap" id="eleEngWrap" hidden>
+      <div class="sec-h"><span>Engenheiros Eletricistas</span></div>
+      <div id="eleEngBody"></div>
     </div>
     <div class="statwrap">
       <div class="sec-h"><span>Situação das obras</span></div>
