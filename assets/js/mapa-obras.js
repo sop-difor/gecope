@@ -142,7 +142,9 @@ const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,val
 // eletrica_vistorias: metadados dos relatórios de vistoria elétrica (o arquivo em si
 // fica no Google Drive — ver supabase/functions/eletrica-drive-token). excluido_em
 // filtrado aqui (não é policy: soft delete, ver sql/create_eletrica_vistorias.sql).
-const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,drive_web_view_link,criado_em';
+// drive_file_id entrou pro botão de baixar do modal do engenheiro (pedido do usuário,
+// 25/09/2026) — drive_web_view_link sozinho só abre o visualizador do Drive, não baixa.
+const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,drive_web_view_link,drive_file_id,criado_em';
 const SB_ELETRICA_AGENDA='eletrica_vistorias_agendadas'; // agendamento de vistoria (obra+data+responsável), pedido do usuário 24/09/2026
 const ELETRICA_AGENDA_COLS='id,id_obra,data_planejada,responsavel_nome,criado_em';
 // referência estática dos códigos de situação da medição (STM) exibida na aba
@@ -1861,7 +1863,7 @@ function computarRosterEletrica(){
   const acha=nomeBruto=>{ const k=normTxt(nomeBruto); return (k&&porNome.has(k)) ? porNome.get(k) : naoIdent; };
   for(const cod in DB.municipios){
     for(const o of DB.municipios[cod].obras){
-      for(const r of (o.relatoriosEletrica||[])) acha(r.responsavel_nome).vistoriadas.push({o,data:r.data_vistoria});
+      for(const r of (o.relatoriosEletrica||[])) acha(r.responsavel_nome).vistoriadas.push({o,data:r.data_vistoria,r});
       const ag=o.agendamentoEletrica;
       if(ag && !(o.relatoriosEletrica&&o.relatoriosEletrica.length)) acha(ag.responsavel_nome).agendadas.push({o,data:ag.data_planejada});
     }
@@ -1971,7 +1973,7 @@ function abreModalEngenheiroEletrica(chave){
     </div></div>
     <div class="mbody dsh">${tiles}${distritosHtml}${secAgendadas}${secVistoriadas}${mesesChart}${anoChart}</div>`;
   mostraJanelaGenerica();
-  wireEngObraRows();
+  wireEngObraRows(chave);
   const mesCols=Object.keys(porMes).sort().map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), porMes[m]]);
   renderBarChart(document.getElementById('engChartMes'),mesCols,'vistoria','vistorias','Vistorias por mês');
   if(anos.length>=2){
@@ -2007,34 +2009,89 @@ function grupoDistritoEng(idPrefix,itens,ordGruposPorData){
     :(a,b)=>b.itens.length-a.itens.length||a.distrito.localeCompare(b.distrito,'pt-BR'));
   return grupos.map((g,i)=>{
     const id=`${idPrefix}${i}`;
-    const linhas=g.itens.map(x=>{
-      const idx=_engModalObrasRef.length; _engModalObrasRef.push(x.o);
-      return `<div class="eng-obra-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
-        +`<span class="eng-obra-data">${x.data?fmtDateBR(x.data):'sem data'}</span>`
-        +`<span class="eng-obra-nome">${escHtml(x.o.objeto||x.o.codigo_obra||x.o.contrato)}</span></div>`;
-    }).join('');
+    const linhas=linhasPorObra(g.itens,id);
     return `<div class="eng-grp"><button type="button" class="adToggle eng-grp-h" data-target="${id}" aria-expanded="false" aria-controls="${id}">`
       +`<span class="eng-grp-nome">${escHtml(g.distrito)}</span>`
       +`<span class="eng-grp-meta"><b>${NUM.format(g.itens.length)}</b> vistoria${g.itens.length===1?'':'s'} <span class="adToggle-car">▾</span></span>`
       +`</button><div id="${id}" class="elelist" hidden>${linhas}</div></div>`;
   }).join('');
 }
-// clique/teclado numa linha de obra do modal do engenheiro — reconstruído a cada
-// abreModalEngenheiroEletrica() (innerHTML novo, listeners velhos morrem junto, mesmo
-// padrão de wireEleEngenheiros).
-function wireEngObraRows(){
-  document.querySelectorAll('.modal .eng-obra-row[data-idx]').forEach(row=>{
-    row.addEventListener('click',()=>abreObraNaAbaEletrica(_engModalObrasRef[+row.dataset.idx]));
+// botão de baixar (pedido do usuário, 25/09/2026) — link direto do Drive, não o de
+// visualização; `data-href` (não `href`) porque é um <button>, não um <a>: o clique é
+// tratado à parte em wireEngObraRows() pra não também abrir a obra (stopPropagation).
+function botaoBaixarRelatorio(r){
+  const url=r&&driveDownloadUrl(r.drive_file_id);
+  return url?`<button type="button" class="eng-baixar" data-href="${escHtml(url)}" title="Baixar relatório" aria-label="Baixar relatório de ${fmtDateBR(r.data_vistoria)}">${RS_ICO.baixar}</button>`:'';
+}
+// Linhas de UM grupo de distrito (agendadas OU vistoriadas), já ordenado por data desc:
+// obras com mais de 1 vistoria (relatório) apareciam repetidas, uma linha idêntica por
+// data — poluía a janela (achado do usuário, 25/09/2026, com um caso de 3 vistorias na
+// mesma obra). Agrupa por OBRA preservando a ordem de primeira aparição — que, como a
+// lista de entrada já vem por data desc, é a mesma posição que a vistoria mais recente da
+// obra ocuparia sozinha — e colapsa: 1 vistoria continua a linha simples de sempre, com
+// clique abrindo a obra direto; 2+ viram um cabeçalho com o nome da obra atrás de um
+// toggle (recolhido por padrão, mesmo mecanismo dos distritos — pedido do usuário,
+// 25/09/2026) e, ao expandir, cada relatório com sua versão (mesmo V1/V2/… de
+// buildEletricaPane — versaoPorIdRelatorio), data e botão de baixar; clicar num
+// relatório é que abre a obra, já que o cabeçalho virou o toggle.
+// `idPrefix` (o id do próprio grupo de distrito) vira a base do id de cada acordeão de
+// obra — precisa ser único no modal inteiro, não só dentro do distrito.
+function linhasPorObra(itensOrdenados,idPrefix){
+  const porObra=new Map(); const ordem=[];
+  for(const it of itensOrdenados){
+    let grp=porObra.get(it.o);
+    if(!grp){ grp={o:it.o,itens:[]}; porObra.set(it.o,grp); ordem.push(grp); }
+    grp.itens.push(it);
+  }
+  return ordem.map((grp,j)=>{
+    const idx=_engModalObrasRef.length; _engModalObrasRef.push(grp.o);
+    const nome=escHtml(grp.o.objeto||grp.o.codigo_obra||grp.o.contrato);
+    if(grp.itens.length===1){
+      const it=grp.itens[0];
+      return `<div class="eng-obra-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
+        +`<span class="eng-obra-data">${it.data?fmtDateBR(it.data):'sem data'}</span>`
+        +`<span class="eng-obra-nome">${nome}</span>${botaoBaixarRelatorio(it.r)}</div>`;
+    }
+    const verId=`${idPrefix}-obra${j}`;
+    const verMap=versaoPorIdRelatorio(grp.o.relatoriosEletrica||[]);
+    const versoes=grp.itens.map(it=>{
+      const ver=it.r?verMap[it.r.id]:null;
+      const rotulo=`RELATÓRIO${ver?` · <span class="eng-ver-v">V${ver}</span>`:''} · ${it.data?fmtDateBR(it.data):'sem data'}`;
+      return `<div class="eng-ver-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
+        +`<span class="eng-ver-label">${rotulo}</span>${botaoBaixarRelatorio(it.r)}</div>`;
+    }).join('');
+    return `<div class="eng-obra-bloco"><button type="button" class="adToggle eng-obra-cab" data-target="${verId}" aria-expanded="false" aria-controls="${verId}">`
+      +`<span class="eng-obra-nome">${nome}</span>`
+      +`<span class="eng-obra-count">${NUM.format(grp.itens.length)} vistorias <span class="adToggle-car">▾</span></span></button>`
+      +`<div id="${verId}" class="eng-ver-lista" hidden>${versoes}</div></div>`;
+  }).join('');
+}
+// clique/teclado numa linha de obra ou de versão do modal do engenheiro — reconstruído a
+// cada abreModalEngenheiroEletrica() (innerHTML novo, listeners velhos morrem junto,
+// mesmo padrão de wireEleEngenheiros). `chave` é repassada pra abreObraNaAbaEletrica()
+// virar o voltarChave do openModal() — sem ela, quem clicasse numa vistoria ficava sem
+// jeito de voltar pro modal do engenheiro (achado do usuário, 25/09/2026).
+function wireEngObraRows(chave){
+  document.querySelectorAll('.modal .eng-obra-row[data-idx],.modal .eng-ver-row[data-idx]').forEach(row=>{
+    row.addEventListener('click',()=>abreObraNaAbaEletrica(_engModalObrasRef[+row.dataset.idx],chave));
     row.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); row.click(); } });
+  });
+  // botão de baixar mora dentro da linha (role="button"); precisa de stopPropagation
+  // senão o clique também "borbulha" e abre a obra por cima do download.
+  document.querySelectorAll('.modal .eng-baixar[data-href]').forEach(btn=>{
+    btn.addEventListener('click',e=>{ e.stopPropagation(); window.open(btn.dataset.href,'_blank','noopener'); });
   });
 }
 // abre a janela da obra a partir de uma linha do modal do engenheiro, já na aba Elétrica
 // (pedido do usuário, 25/09/2026) — mesmo openModal() do card de obra, só troca de aba
 // antes de mostrar: quem clicou veio de "vistorias agendadas"/"obras vistoriadas", onde a
 // Elétrica é sempre o contexto relevante (mesma ideia do atalho de "Comissão completa").
-function abreObraNaAbaEletrica(o){
+// voltarChave (chave do engenheiro) vira o botão "← Voltar" do cabeçalho do modal de
+// obra, em vez do "✕" de sempre — sem ele, não havia caminho de volta pro modal de
+// origem (achado do usuário, 25/09/2026).
+function abreObraNaAbaEletrica(o,voltarChave){
   if(!o) return;
-  openModal(o);
+  openModal(o,voltarChave);
   const t=document.querySelector('.modal .mtab[data-tab="eletrica"]'); if(t) t.click();
 }
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
@@ -2542,7 +2599,12 @@ const RS_ICO={
   chart:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16M8 14l3-3 3 2 4-5"/></svg>',
   voltar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
   lixeira:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/></svg>',
+  baixar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20h14"/></svg>',
 };
+// link de DOWNLOAD direto do Drive (uc?export=download), não o de visualização
+// (drive_web_view_link, que só abre o app do Drive) — pedido do usuário, 25/09/2026:
+// um botão simples de "baixar o relatório" no modal do engenheiro.
+function driveDownloadUrl(fileId){ return fileId?`https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`:null; }
 // medição NO NÍVEL DA OBRA: Σ do `total` LÍQUIDO das medições desta obra (já com as
 // glosas descontadas — não `valor_medido`, que é o bruto) ÷ valor da obra. Denominador =
 // `o.valor` (valor_atual da obra em contratos_edificacao — autoritativo; medicoes.valor_atual
@@ -2718,8 +2780,17 @@ function buildResumoPane(o,raw){
 // obra atualmente exibida no modal — guardada só para redesenhar o modal na troca
 // de tema ao vivo (os gráficos internos carregam cor de TOKENS no innerHTML).
 let _lastModalObra=null;
-function openModal(o){
-  _lastModalObra=o;
+// chave do engenheiro de origem (se veio de abreObraNaAbaEletrica), guardada junto pelo
+// mesmo motivo — sem isso, um retoque de tema com o modal de obra aberto reabriria sem o
+// botão "← Voltar", perdendo o caminho de volta pro modal do engenheiro (achado do
+// usuário, 25/09/2026: faltava um jeito de voltar depois de clicar numa vistoria).
+let _lastModalVoltarChave=null;
+// voltarChave: chave do engenheiro (ROSTER_ELETRICA_COMPUTADO) de quem abriu esta obra a
+// partir do seu modal (ver abreObraNaAbaEletrica) — troca o "✕" por "← Voltar" no
+// cabeçalho, mesmo padrão de abreModalFiscal(mat, voltarGid). undefined/null = fluxo
+// normal (obra aberta direto da lista/mapa), com "✕" de sempre.
+function openModal(o,voltarChave){
+  _lastModalObra=o; _lastModalVoltarChave=voltarChave||null;
   const raw=o.raw||{};
   const resumoHTML=buildResumoPane(o,raw);
   const fiscalizacaoHTML=buildFiscalizacaoPane(o);
@@ -2734,13 +2805,19 @@ function openModal(o){
   const locateBtn=munCod
     ? `<button type="button" class="m-locate" id="modalLocate" title="Fechar e ver ${munTxt} no mapa">${PIN_SVG}<span>Localizar no mapa</span></button>`
     : `<button type="button" class="m-locate" id="modalLocate" disabled title="Este contrato não tem município mapeável no Ceará">${PIN_SVG}<span>Localizar no mapa</span></button>`;
+  // com voltarChave, "✕" vira "← Voltar" pro modal do engenheiro (mesma troca que
+  // abreModalFiscal faz com voltarGid) — Esc/clique fora continuam funcionando igual,
+  // fecharOuVoltar() já clica em #modalVoltar quando ele existe.
+  const fecharBtn=voltarChave
+    ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para o engenheiro">${RS_ICO.voltar}<span>Voltar</span></button>`
+    : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
   document.getElementById('modal').innerHTML=
     `<div class="mtop" data-tab="resumo">
        <div class="mh"><div class="mh-titles">
            <div class="mt">DADOS DO CONTRATO Nº ${fmtContratoExt(raw.nr_contrato_ext)}</div>
            ${(o.nObras||1)>1?`<div class="mobra">${RS_ICO.dist}<span>Obra ${escHtml(o.codigo_obra||('#'+o.id_obra))} · uma das obras deste contrato</span></div>`:''}
            <div class="msub">${RS_ICO.chart}<span>Resumo executivo do contrato</span></div></div>
-         <div class="mh-actions">${locateBtn}<button class="mx" id="modalX" aria-label="Fechar">✕</button></div></div>
+         <div class="mh-actions">${locateBtn}${fecharBtn}</div></div>
        <div class="mtabs" role="tablist">
          <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneResumo" data-tab="resumo">Resumo</button>
          <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneAdValor" data-tab="aditivos-valor">Aditivos de valor</button>
@@ -2761,7 +2838,9 @@ function openModal(o){
        <div class="mupd">Atualizado em ${fmtDateTimeBR(raw.atualizado_em)}</div>
      </div>`;
   document.getElementById('modalBg').classList.add('show');
-  document.getElementById('modalX').onclick=closeModal;
+  const _mx=document.getElementById('modalX'); if(_mx) _mx.onclick=closeModal;
+  const _voltar=document.getElementById('modalVoltar');
+  if(_voltar) _voltar.onclick=()=>abreModalEngenheiroEletrica(voltarChave);
   const _loc=document.getElementById('modalLocate');
   if(_loc && munCod) _loc.onclick=()=>{ closeModal(); goCity(munCod); };
   const _vc=document.getElementById('mResumoVerComissao');
@@ -2790,6 +2869,16 @@ function buildFiscalizacaoPane(o){
   const list=`<div class="msec">Comissão de fiscalização (${com.length})</div>`
     +`<div class="mcomlist">${com.map(m=>`<div class="mcomrow"><span class="mcomtipo">${escHtml(m.tipo)}</span><span class="mcomnome">${escHtml(m.nome)}${matTag(m)}</span></div>`).join('')}</div>`;
   return top+list;
+}
+// mapa id do relatório -> número de versão (V1, V2, …), pela ordem de ENVIO (criado_em),
+// não pela ordem de exibição por data_vistoria — um relatório de vistoria retroativa não
+// pode "roubar" o número de um mais antigo. Compartilhada entre a aba Elétrica da obra
+// (buildEletricaPane) e o modal do engenheiro (grupoDistritoEng): o mesmo relatório tem
+// que levar o mesmo "V" nos dois lugares.
+function versaoPorIdRelatorio(rel){
+  const mapa={};
+  [...rel].sort((a,b)=>String(a.criado_em||'').localeCompare(String(b.criado_em||''))).forEach((r,idx)=>{ mapa[r.id]=idx+1; });
+  return mapa;
 }
 // Aba "Elétrica" (Fase 1, grill de 24/09/2026): progresso de medição da obra (mesmo
 // medObraStats do Resumo/Medições, nunca duplicado em SQL — única fonte de verdade,
@@ -2871,11 +2960,7 @@ function buildEletricaPane(o){
         </div>
       </div>`;
 
-  // versão do relatório (V1, V2, …) = ordem de ENVIO (criado_em), não a ordem de
-  // exibição da lista (que é por data_vistoria desc, ver fetchEletricaVistorias) —
-  // um relatório de vistoria retroativa não deve "roubar" o número de um mais antigo.
-  const versaoPorId={};
-  [...rel].sort((a,b)=>String(a.criado_em||'').localeCompare(String(b.criado_em||''))).forEach((r,idx)=>{ versaoPorId[r.id]=idx+1; });
+  const versaoPorId=versaoPorIdRelatorio(rel);
   const lista=rel.length
     ? `<div class="elelist">${rel.map(r=>`<div class="elerow" title="Enviado em ${fmtDateTimeBR(r.criado_em)}">
         <div class="elerow-line">
@@ -4751,7 +4836,7 @@ function repaintTheme(){
   if(!layer) return; // troca antes do init do mapa: o render() inicial já pinta no tema certo
   if(stateShape) stateShape.setStyle({fillColor:TOKENS.mapStateFill,color:`rgba(${TOKENS.ngRgb},.42)`});
   const _mbg=document.getElementById('modalBg');
-  if(_mbg&&_mbg.classList.contains('show')&&_lastModalObra) openModal(_lastModalObra);
+  if(_mbg&&_mbg.classList.contains('show')&&_lastModalObra) openModal(_lastModalObra,_lastModalVoltarChave);
   render();
 }
 function setTheme(dark){
