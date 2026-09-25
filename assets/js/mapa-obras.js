@@ -1041,6 +1041,14 @@ function rpFmtCurto(r){
 const map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:6,maxZoom:11,zoomSnap:0.25,zoomDelta:0.25});
 L.control.zoom({position:'bottomright'}).addTo(map);
 let layer,stateShape,fullBounds=null;
+// camada atualmente com o destaque de hover (município). bringToFront(), logo abaixo,
+// reordena o nó SVG por baixo do cursor — em bordas compartilhadas entre municípios
+// vizinhos isso pode disparar o mouseover do vizinho antes do mouseout do anterior
+// (bug conhecido do Leaflet com mouseover/mouseout + reordenação de DOM), deixando os
+// dois com o destaque ligado ao mesmo tempo — visualmente parecendo seleção múltipla
+// sem Ctrl. Guardar aqui e apagar o anterior à força no próximo mouseover fecha essa
+// janela: nunca mais de uma camada com o destaque, mesmo se o mouseout não chegar.
+let _hoverCityLayer=null;
 const HID={weight:0,opacity:0,fillOpacity:0};
 function zt(){const z=(map&&map.getZoom)?map.getZoom():NaN; return isFinite(z)?Math.max(0,Math.min(1,(z-6)/4)):0;}  // 0 no estado inteiro, 1 aproximado
 function gw(){return 1.0+0.9*zt();}                                 // espessura da divisa de bloco
@@ -1168,9 +1176,12 @@ function tipHtml(id){
   const v=mval(aggIds([id]));return `<b>${DB.municipios[id].nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`;
 }
 function onEach(f,l){
-  l.on('mouseover',()=>{ const id=f.properties.id; if(!visible(id)||noMatchCity(id))return; l.setStyle({weight:1.8,color:TOKENS.mapLine}); l.bringToFront();
-                         tip.setLatLng(l.getBounds().getCenter()).setContent(tipHtml(id)).addTo(map); });
-  l.on('mouseout',()=>{ layer.resetStyle(l); tip.remove(); });
+  l.on('mouseover',()=>{ const id=f.properties.id; if(!visible(id)||noMatchCity(id))return;
+    if(_hoverCityLayer && _hoverCityLayer!==l) layer.resetStyle(_hoverCityLayer);
+    _hoverCityLayer=l;
+    l.setStyle({weight:1.8,color:TOKENS.mapLine}); l.bringToFront();
+    tip.setLatLng(l.getBounds().getCenter()).setContent(tipHtml(id)).addTo(map); });
+  l.on('mouseout',()=>{ if(_hoverCityLayer===l) _hoverCityLayer=null; layer.resetStyle(l); tip.remove(); });
   l.on('click',e=>onClick(f.properties.id,e));
 }
 function onClick(id,e){
@@ -1200,6 +1211,8 @@ let groupLayer=null;
 // Aceito de propósito (efeito cosmético de até 150ms, autocorrige sozinho) em vez de
 // complicar o cache pra fechar uma janela tão estreita.
 let _levelMaxGroup=1, _groupValByGid=new Map();
+// mesma defesa de _hoverCityLayer (acima), agora pro nível de distrito/região.
+let _hoverGroupLayer=null;
 function groupStyle(f){
   // distrito/região na seleção combinada (Ctrl+clique): mesmo destaque cheio usado
   // pra município selecionado no nível 2 — consistência visual entre os dois níveis
@@ -1222,7 +1235,10 @@ function onGroup(f,l){
   // ano) — à toa se o painel lateral estiver recolhido e ninguém puder ver o resultado.
   // panelVisible() é compartilhada (perto de _mainEl/openAside, mais abaixo) em vez de
   // recriada a cada feature — buildGroupLayer() chama onGroup() ~11-14x por build.
-  l.on('mouseover',()=>{ if(inert()) return; l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; if(panelVisible()) renderPanel();
+  l.on('mouseover',()=>{ if(inert()) return;
+    if(_hoverGroupLayer && _hoverGroupLayer!==l) groupLayer.resetStyle(_hoverGroupLayer);
+    _hoverGroupLayer=l;
+    l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; if(panelVisible()) renderPanel();
     // com filtro ativo, _groupValByGid já tem esse valor (calculado em render() logo
     // antes do groupLayer.setStyle() que acabou de rodar) — não recalcula à toa aqui.
     if(modoReplan()){
@@ -1231,7 +1247,7 @@ function onGroup(f,l){
     }
     const v=hasActiveFilter()?(_groupValByGid.get(String(gid))||0):mval(aggIds(idsOfGroup(gid)));
     tip.setLatLng(l.getBounds().getCenter()).setContent(`<b>${f.properties.nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`).addTo(map); });
-  l.on('mouseout',()=>{ groupLayer.resetStyle(l); st.hoverGroup=null; if(panelVisible()) renderPanel(); tip.remove(); });
+  l.on('mouseout',()=>{ if(_hoverGroupLayer===l) _hoverGroupLayer=null; groupLayer.resetStyle(l); st.hoverGroup=null; if(panelVisible()) renderPanel(); tip.remove(); });
   // Ctrl/Cmd+clique num distrito/região soma à seleção combinada em vez de entrar nele
   l.on('click',e=>{ if(inert()) return;
     if(e.originalEvent&&(e.originalEvent.ctrlKey||e.originalEvent.metaKey)){ toggleSelection('group',gid); return; }
@@ -5234,6 +5250,22 @@ map.on('click',e=>{
   if(!st.sel) return;
   const t=e.originalEvent&&e.originalEvent.target;
   if(t&&t.closest&&t.closest('.leaflet-interactive')) return;
+  clearSelection();
+});
+// clicar fora do mapa inteiro (cabeçalho, painel lateral etc.) também deve limpar
+// a seleção combinada — o listener acima só cobre o espaço vazio DENTRO do mapa,
+// então antes desse listener um clique no cabeçalho ou no painel lateral não tinha
+// efeito nenhum na seleção (achado do usuário). Exceções: modal aberto (mesma regra
+// do Esc, linha ~3121 — interagir com o modal não deve mexer no mapa por baixo) e o
+// chip .chip-sel do painel, que já tem sua própria lógica pra tirar só UM item da
+// seleção (ver document.getElementById('body') acima) — sem essa exceção, o clique
+// nele dispararia toggleSelection() e, na mesma bolha, este listener apagaria a
+// seleção inteira logo em seguida.
+document.addEventListener('click',e=>{
+  if(!st.sel) return;
+  if(e.target.closest && e.target.closest('#mapWrap')) return;
+  if(e.target.closest && e.target.closest('.chip-sel')) return;
+  if(document.getElementById('modalBg').classList.contains('show')) return;
   clearSelection();
 });
 
