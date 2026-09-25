@@ -4807,7 +4807,20 @@
                                                                         </div>
                                                                     </div>
 
-
+                                                                    <!-- Aviso "módulo sem acesso" (ver setupLockedModuleCard em core/auth.js):
+                                                                         os tiles da Início ficam sempre visíveis pra todo mundo agora (senão
+                                                                         abrem "buracos" no grid pra quem não tem acesso a alguns módulos), então
+                                                                         o clique num tile bloqueado precisa de um aviso visível em vez de só
+                                                                         falhar em silêncio. position-fixed/top-level: precisa aparecer por cima
+                                                                         de qualquer pane ativo, não só da Início. -->
+                                                                    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1090">
+                                                                        <div id="toastModuloSemAcesso" class="toast align-items-center text-bg-dark border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4000">
+                                                                            <div class="d-flex">
+                                                                                <div class="toast-body"><i class="bi bi-lock-fill me-2"></i><span id="toastModuloSemAcessoTexto">Você não tem acesso a este módulo.</span></div>
+                                                                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
 
                                                                     <!-- Camada core: infraestrutura compartilhada por todos os módulos -->
                                                                     <script src="config.js"></script>

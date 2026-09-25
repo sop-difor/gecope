@@ -236,6 +236,68 @@ async function signOutUser() {
     applyRoleToUI('guest');
 }
 
+// Tile de módulo (.home-action-card/.home-list-row) sem acesso pro papel atual: em vez
+// de sumir (display:none, o que abria "buracos" no grid da Início), o tile continua
+// visível com aparência de bloqueado e o clique mostra um aviso em vez de abrir o
+// módulo. `locked` alterna entre os dois estados — chamada de novo a cada
+// applyRoleToUI() (troca de papel/autorização), então precisa ser idempotente nos
+// dois sentidos (travar de novo, ou destravar quem ganhou a autorização).
+function setupLockedModuleCard(el, locked) {
+    el.classList.toggle('locked-module', locked);
+    if (locked) {
+        el.setAttribute('aria-disabled', 'true');
+        // guarda o onclick ORIGINAL (o inline do HTML) só da primeira vez que este tile
+        // é travado — sem essa guarda, uma segunda chamada com locked=true sobrescreveria
+        // el._onclickOriginal com o próprio handler de aviso, e destravar depois reabriria
+        // o módulo pro aviso, não pro onclick de verdade.
+        if (!el.dataset.onclickOriginalSet) {
+            el._onclickOriginal = el.onclick;
+            el.dataset.onclickOriginalSet = '1';
+        }
+        el.onclick = e => { e.preventDefault(); avisarModuloSemAcesso(el); };
+        if (!el.querySelector('.locked-module-badge')) {
+            const badge = document.createElement('span');
+            badge.className = 'locked-module-badge';
+            badge.innerHTML = '<i class="bi bi-lock-fill"></i> Sem acesso';
+            const alvo = el.querySelector('.home-action-text h3') || el.querySelector('.home-list-row-title');
+            if (alvo) alvo.appendChild(badge);
+        }
+    } else {
+        el.removeAttribute('aria-disabled');
+        if (el.dataset.onclickOriginalSet) el.onclick = el._onclickOriginal || null;
+        const badge = el.querySelector('.locked-module-badge');
+        if (badge) badge.remove();
+    }
+}
+
+// nome de exibição do módulo pro texto do aviso — lido do próprio título visível do
+// tile (h3 do card grande, ou o title da linha), então nunca diverge do que a pessoa
+// está vendo. Clona antes de ler o texto pra não incluir o badge "Sem acesso" nele
+// mesmo (ele mora dentro do h3/title, ver setupLockedModuleCard acima).
+function nomeDoModuloTile(el) {
+    const alvo = el.querySelector('.home-action-text h3') || el.querySelector('.home-list-row-title');
+    if (!alvo) return 'este módulo';
+    const clone = alvo.cloneNode(true);
+    const badge = clone.querySelector('.locked-module-badge');
+    if (badge) badge.remove();
+    return clone.textContent.trim() || 'este módulo';
+}
+
+// aviso de clique num tile bloqueado — toast do Bootstrap (mesma lib já carregada pro
+// resto da Início); alert() só como rede de segurança se o toast não existir na
+// página (ex.: markup não carregado ainda).
+function avisarModuloSemAcesso(el) {
+    const nome = nomeDoModuloTile(el);
+    const toastEl = document.getElementById('toastModuloSemAcesso');
+    const textoEl = document.getElementById('toastModuloSemAcessoTexto');
+    if (toastEl && textoEl && window.bootstrap && bootstrap.Toast) {
+        textoEl.textContent = `Você não tem acesso ao módulo "${nome}". Fale com um administrador se precisar dele.`;
+        bootstrap.Toast.getOrCreateInstance(toastEl).show();
+    } else {
+        alert(`Você não tem acesso ao módulo "${nome}".`);
+    }
+}
+
 function applyRoleToUI(rawRole) {
     const role = (rawRole || 'guest').toLowerCase();
 
@@ -262,8 +324,12 @@ function applyRoleToUI(rawRole) {
     // -> um card/linha SEM data-roles continua sempre visível pra todos os papéis (não
     //    entra neste querySelectorAll); a restrição desses fica só em showPane()/cada função.
     //    Já um card/linha COM data-roles (ex.: Financeiro, Curva ABC) precisa respeitar o
-    //    atributo de verdade — do contrário fica visível pra quem não tem acesso, e o clique
-    //    morre silenciosamente em showPane() sem nenhum aviso (achado do rev-produto, Fase 1).
+    //    atributo de verdade.
+    // Tiles da Início (isCard) NUNCA mais somem por papel (pedido do usuário: sumir abria
+    // "buracos" no grid da Início pra quem não tinha acesso a alguns módulos) — ficam
+    // sempre visíveis e setupLockedModuleCard() cuida da aparência/clique de quem não tem
+    // acesso. Abas de #dashboardTabs (não são card) continuam escondidas de verdade: são
+    // uma barra de navegação linear, não um grid, então escondê-las não deixa buraco.
     document.querySelectorAll('[data-roles]').forEach(el => {
         const isCard = el.classList.contains('home-action-card') || el.classList.contains('home-list-row');
         const allowed = el.getAttribute('data-roles').split(',');
@@ -272,10 +338,11 @@ function applyRoleToUI(rawRole) {
         // (ex.: Fiscal com "financeiro" concedido individualmente vê o card).
         const autorizacaoExtra = el.getAttribute('data-autorizacao');
         const temExtra = autorizacaoExtra && typeof temAutorizacao === 'function' && temAutorizacao(autorizacaoExtra);
-        if (allowed.includes(role) || temExtra) {
-            el.style.setProperty('display', isCard ? 'flex' : 'block', 'important');
+        const liberado = allowed.includes(role) || temExtra;
+        if (isCard) {
+            setupLockedModuleCard(el, !liberado);
         } else {
-            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('display', liberado ? 'block' : 'none', 'important');
         }
     });
 

@@ -973,32 +973,30 @@
         box-shadow:0 1px 2px rgba(0,0,0,.22),0 6px 16px rgba(0,0,0,.16)}
   :root.theme-dark .ele-resumo-i:hover{border-color:rgba(var(--acc-rgb),.5);box-shadow:0 2px 5px rgba(0,0,0,.28),0 10px 24px rgba(0,0,0,.22)}
   @media (max-width:420px){.ele-resumo{grid-template-columns:1fr}}
-  /* Distrito Operacional → Município (pedido do usuário, 24/09/2026): cabeçalhos
-     leves só pra separar visualmente, sem virar outro componente colapsável. */
-  .ele-grupo-do+.ele-grupo-do{margin-top:10px}
-  .ele-grupo-do-h{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;color:var(--amber-text);
-        text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
-  .ele-grupo-mun-h{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim);
-        margin:6px 0 4px 2px}
-  /* "Atenção elétrica" (Fase 1) — mesma casca de .rrow, mas com acento lateral âmbar:
-     é a única lista da barra lateral que representa uma ação da equipe de campo, não
-     uma métrica de leitura, e o acento marca essa diferença sem inventar um
-     componente novo do zero. */
-  .ele-alert-row{cursor:pointer;border:1px solid var(--card-border);border-left:3px solid var(--amber-deep);
-        border-radius:11px;padding:10px 14px;margin-bottom:8px;
+  /* Painel "Engenheiros Eletricistas" (grill de 25/09/2026) — cartão com borda e
+     elevação no hover, sem acento lateral: é um diretório de pessoas, não um alerta
+     de obra. (A lista de obras por categoria que morava aqui — cards ⇒ linhas
+     agrupadas por Distrito/Município — foi removida a pedido do usuário em
+     25/09/2026: clicar num card agora só filtra o mapa/"Resultados da busca", que já
+     é o mecanismo genérico de qualquer filtro do app.) */
+  .eng-row{display:flex;align-items:center;gap:10px;cursor:pointer;border:1px solid var(--card-border);
+        border-radius:11px;padding:9px 12px;margin-bottom:8px;
         background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));transition:border-color .16s ease,box-shadow .16s ease}
-  .ele-alert-row:hover,.ele-alert-row:focus-visible{border-color:rgba(var(--amber-rgb),.5);box-shadow:0 0 0 1px rgba(var(--amber-rgb),.18);outline:none}
-  .ele-alert-main{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
-  .ele-alert-nome{color:var(--text-bright);font-weight:600}
-  .ele-alert-marco{font-family:'Space Grotesk',sans-serif;color:var(--amber-text);font-weight:700;font-size:12.5px}
-  .ele-alert-sub{margin-top:3px;font-size:11.5px;color:var(--text-dim)}
-  .ele-alert-ver{display:block;width:100%;text-align:center;margin-top:2px;padding:8px;cursor:pointer;
-        border:1px dashed var(--card-border);border-radius:10px;background:transparent;color:var(--text-dim);
-        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700}
-  .ele-alert-ver:hover{border-color:rgba(var(--amber-rgb),.4);color:var(--amber-text)}
-  /* chip de agendamento — só informativo aqui na lista; agendar/cancelar de verdade
-     vive dentro do modal da obra (aba Elétrica), ver .ele-agenda-info abaixo. */
-  .ele-agenda-chip{margin-top:5px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--ng-light)}
+  .eng-row:hover,.eng-row:focus-visible{border-color:rgba(var(--ng-rgb),.4);box-shadow:0 0 0 1px rgba(var(--ng-rgb),.14);outline:none}
+  /* "Não identificado" (responsavel_nome sem par no roster, Q6/Q12) — tracejado e
+     apagado, sinal de dado pra limpar, não mais um cartão de pessoa normal. */
+  .eng-row.unk{border-style:dashed;opacity:.85}
+  .eng-ic{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+        color:var(--ng);background:rgba(var(--ng-rgb),.13);border:1px solid rgba(var(--ng-rgb),.2)}
+  .eng-row.unk .eng-ic{color:var(--text-dim);background:rgba(var(--raise-rgb),.12);border-color:var(--card-border)}
+  .eng-ic svg{width:15px;height:15px;display:block}
+  .eng-nome{flex:1 1 auto;min-width:0;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;
+        color:var(--text-bright);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .eng-row.unk .eng-nome{color:var(--text-dim);font-style:italic;font-weight:600}
+  .eng-stats{flex:none;display:flex;gap:12px}
+  .eng-stat{font-family:Montserrat,sans-serif;font-size:10.5px;color:var(--text-dim);white-space:nowrap}
+  .eng-stat b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text-bright);margin-right:3px}
+  @media (max-width:420px){ .eng-stats{flex-direction:column;gap:2px;align-items:flex-end} }
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
   /* Barra VAZADA = média sobre menos de AMOSTRA_SOLIDA despachos (ver amostraFina no JS).
      Hachura no lugar do preenchimento sólido: mantém a cor (que continua significando
@@ -1270,6 +1268,9 @@
         background:rgba(var(--raise-rgb),.10);color:var(--text-bright)}
   .modal .ele-status-chip.ok{background:rgba(var(--ng-rgb),.15);color:var(--ng-deep)}
   .modal .ele-status-chip.warn{background:rgba(var(--amber-rgb),.15);color:var(--amber-text)}
+  /* mesmo azul de .ele-resumo-i.info (--acc:#5B9FDB), sem split por tema — aquele
+     também não separa, e já é a referência de "info" nos cards da Elétrica. */
+  .modal .ele-status-chip.info{background:rgba(60,135,201,.15);color:#5B9FDB}
   /* top:2px casa com o margin-top:2px próprio de .rs-bar — tick e barra começam no
      mesmo pixel dentro do wrapper */
   .modal .ele-tick{position:absolute;top:2px;width:2px;height:6px;background:rgba(var(--raise-rgb),.28);transform:translateX(-1px)}
@@ -1298,6 +1299,20 @@
   .modal .elerow-excluir svg{width:14px;height:14px}
   .modal .elerow-excluir:hover{color:var(--status-stop);background:rgba(var(--raise-rgb),.08)}
   .modal .elerow-obs{margin-top:4px;color:var(--text-data);line-height:1.4}
+  /* Modal do engenheiro (grill de 25/09/2026): distrito × obras (distintas, ver
+     abreModalEngenheiroEletrica) e a lista de obras vistoriadas/agendadas. */
+  .modal .eng-dist-lista{display:flex;flex-direction:column;gap:1px;margin-top:2px}
+  .modal .eng-dist-row{display:flex;justify-content:space-between;gap:10px;padding:6px 2px;font-size:12px;
+        border-bottom:1px solid rgba(var(--raise-rgb),.06)}
+  .modal .eng-dist-row:last-child{border-bottom:0}
+  .modal .eng-dist-row span{color:var(--text-dim);font-weight:600}
+  .modal .eng-dist-row b{font-family:'Space Grotesk',sans-serif;color:var(--text-bright);font-weight:700}
+  .modal .eng-obra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Montserrat,sans-serif;padding:8px 0}
+  .modal .eng-obra-row+.eng-obra-row{border-top:1px solid rgba(var(--raise-rgb),.06)}
+  .modal .eng-obra-data{flex:none;color:var(--text-bright);font-weight:700;font-size:12px}
+  .modal .eng-obra-nome{flex:1 1 auto;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        font-size:12.5px;color:var(--text-bright)}
+  .modal .eng-obra-dist{flex:none;font-size:10.5px;color:var(--text-dim)}
   .modal .ele-insert-btn{margin-top:14px}
   /* agendamento de vistoria (independente do relatório, ver .ele-agenda-info abaixo) —
      mesmo botão .ele-insert-btn/.ele-btn do "Inserir relatório". */
