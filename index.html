@@ -357,15 +357,15 @@
                         data-bs-target="#pane-home" data-bs-toggle="tab">Início</button></li>
                 <li class="nav-item" data-roles="admin" data-autorizacao="financeiro"><button class="nav-link"
                         data-bs-target="#pane-financeiro" data-bs-toggle="tab">Financeiro</button></li>
-                <li class="nav-item" data-roles="admin,gerente,fiscal,externo"><button class="nav-link"
+                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,eletrica"><button class="nav-link"
                         data-bs-target="#pane-curva-abc" data-bs-toggle="tab">Curva ABC</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo"><button class="nav-link"
                         data-bs-target="#pane-reuniao" data-bs-toggle="tab">Processos</button></li>
-                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
+                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest,eletrica"><button class="nav-link"
                         data-bs-target="#pane-orcamentos" data-bs-toggle="tab">Orçamentos</button></li>
-                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
+                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest,eletrica"><button class="nav-link"
                         data-bs-target="#pane-composicoes" data-bs-toggle="tab">Composições</button></li>
-                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
+                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest,eletrica"><button class="nav-link"
                         data-bs-target="#pane-tabelas" data-bs-toggle="tab">Tabelas</button></li>
                 <li class="nav-item" data-roles="admin"><button class="nav-link" data-bs-target="#pane-admin"
                         data-bs-toggle="tab">Administração</button></li>
@@ -426,7 +426,7 @@
                     <div class="home-quick-actions-grid">
                         <!-- Módulos mais usados (destaque) -->
                         <div class="home-featured-grid">
-                            <div class="home-action-card accent-green" data-pane="pane-reuniao" onclick="showPane('pane-reuniao')">
+                            <div class="home-action-card accent-green" data-pane="pane-reuniao" data-roles="admin,gerente,fiscal,externo" onclick="showPane('pane-reuniao')">
                                 <div class="home-featured-badge">Mais usado</div>
                                 <div class="home-action-icon bg-green"><i class="bi bi-file-earmark-text"></i></div>
                                 <div class="home-action-text">
@@ -448,7 +448,7 @@
                         <!-- Demais módulos -->
                         <div class="home-list-grid">
                             <!-- Administração -->
-                            <div class="home-list-row" data-pane="pane-admin" onclick="showPane('pane-admin')">
+                            <div class="home-list-row" data-pane="pane-admin" data-roles="admin" onclick="showPane('pane-admin')">
                                 <div class="home-action-icon bg-slate"><i class="bi bi-shield-lock"></i></div>
                                 <div class="home-list-row-title">Administração<span id="badge-alerta-whatsapp"
                                         class="badge-alerta-aba" style="display:none;" title=""><i
@@ -456,13 +456,13 @@
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Composições -->
-                            <div class="home-list-row" data-pane="pane-composicoes" onclick="showPane('pane-composicoes')">
+                            <div class="home-list-row" data-pane="pane-composicoes" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-composicoes')">
                                 <div class="home-action-icon bg-blue"><i class="bi bi-journal-text"></i></div>
                                 <div class="home-list-row-title">Composições</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Curva ABC -->
-                            <div class="home-list-row" data-pane="pane-curva-abc" data-roles="admin,gerente,fiscal,externo"
+                            <div class="home-list-row" data-pane="pane-curva-abc" data-roles="admin,gerente,fiscal,externo,eletrica"
                                 onclick="showPane('pane-curva-abc')">
                                 <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
                                 <div class="home-list-row-title">Curva ABC</div>
@@ -476,13 +476,13 @@
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Orçamentos -->
-                            <div class="home-list-row" data-pane="pane-orcamentos" onclick="showPane('pane-orcamentos')">
+                            <div class="home-list-row" data-pane="pane-orcamentos" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-orcamentos')">
                                 <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
                                 <div class="home-list-row-title">Orçamentos</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Tabelas -->
-                            <div class="home-list-row" data-pane="pane-tabelas" onclick="showPane('pane-tabelas')">
+                            <div class="home-list-row" data-pane="pane-tabelas" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-tabelas')">
                                 <div class="home-action-icon bg-slate"><i class="bi bi-search"></i></div>
                                 <div class="home-list-row-title">Tabelas</div>
                                 <i class="bi bi-chevron-right"></i>
@@ -507,7 +507,7 @@
                     </div>
 
                     <!-- Latest Activities Panel -->
-                    <div class="home-activities-panel" style="cursor: pointer;" onclick="showPane('pane-atividades')">
+                    <div class="home-activities-panel" data-roles="admin,gerente,fiscal,externo,guest" style="cursor: pointer;" onclick="showPane('pane-atividades')">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h3 class="m-0"><i class="bi bi-clock-history"></i>Atividades Realizadas</h3>
                             <span class="text-primary small fw-bold">Ver Tudo <i class="bi bi-chevron-right"></i></span>
