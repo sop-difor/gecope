@@ -1352,14 +1352,42 @@
   .modal .eng-grp-h .adToggle-car{font-size:9px;color:var(--text-dimmer)}
   .modal .eng-grp-h[aria-expanded="true"] .adToggle-car{color:var(--ng)}
   .modal .eng-grp .elelist{margin-top:6px}
-  .modal .eng-obra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Montserrat,sans-serif;
-        padding:8px 6px;margin:0 -6px;border-radius:8px;cursor:pointer;transition:background-color .12s}
-  .modal .eng-obra-row+.eng-obra-row{border-top:1px solid rgba(var(--raise-rgb),.06)}
+  .modal .eng-obra-row,.modal .eng-ver-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+        font-family:Montserrat,sans-serif;cursor:pointer;border-radius:8px;transition:background-color .12s;
+        padding:8px 6px;margin:0 -6px}
+  .modal .eng-obra-row+.eng-obra-row,.modal .eng-obra-row+.eng-obra-bloco,
+  .modal .eng-obra-bloco+.eng-obra-row,.modal .eng-obra-bloco+.eng-obra-bloco{border-top:1px solid rgba(var(--raise-rgb),.06)}
   .modal .eng-obra-row:hover,.modal .eng-obra-row:focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
   .modal .eng-obra-row:hover .eng-obra-nome,.modal .eng-obra-row:focus-visible .eng-obra-nome{color:var(--ng-light)}
   .modal .eng-obra-data{flex:none;color:var(--text-bright);font-weight:700;font-size:12px}
   .modal .eng-obra-nome{flex:1 1 auto;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
         font-size:12.5px;color:var(--text-bright);transition:color .12s}
+  /* obra com 2+ relatórios (achado do usuário, 25/09/2026: uma obra vistoriada 3x
+     aparecia 3x, uma linha idêntica por data) — o cabeçalho (.eng-obra-cab) é o nome
+     uma vez só, atrás de um toggle recolhido por padrão (mesmo .adToggle dos distritos,
+     ver .eng-grp-h acima — pedido do usuário, 25/09/2026); ao expandir, cada relatório
+     vem numa linha própria, recuada, com sua PRÓPRIA borda esquerda pra ficar claro que
+     pertence à obra de cima, não é uma obra irmã. */
+  .modal .adToggle.eng-obra-cab{margin:0 -6px;width:calc(100% + 12px);padding:8px 6px;border:0;background:transparent;
+        border-radius:8px;display:flex;align-items:center;gap:8px;text-align:left;font:inherit}
+  .modal .adToggle.eng-obra-cab:hover,.modal .adToggle.eng-obra-cab:focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
+  .modal .adToggle.eng-obra-cab:hover .eng-obra-nome,.modal .adToggle.eng-obra-cab:focus-visible .eng-obra-nome{color:var(--ng-light)}
+  .modal .eng-obra-count{flex:none;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);font-weight:600}
+  .modal .eng-obra-count .adToggle-car{font-size:9px;color:var(--text-dimmer)}
+  .modal .adToggle.eng-obra-cab[aria-expanded="true"] .adToggle-car{color:var(--ng)}
+  .modal .eng-ver-lista{margin:2px -6px 4px 18px;padding:2px 0 2px 10px;border-left:2px solid rgba(var(--raise-rgb),.1)}
+  .modal .eng-ver-row:hover,.modal .eng-ver-row:focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
+  .modal .eng-ver-label{flex:1 1 auto;min-width:100px;font-size:11.5px;color:var(--text-dim);font-weight:600;
+        letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .modal .eng-ver-v{color:var(--amber-text);font-weight:700}
+  /* botão de baixar (pedido do usuário, 25/09/2026): setinha simples, mesmo tamanho/
+     mecânica do "excluir relatório" da aba Elétrica (.elerow-excluir), cor neutra em
+     repouso e verde no hover — não é uma ação destrutiva, não pede o tom de aviso. */
+  .modal .eng-baixar{flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;
+        width:24px;height:24px;padding:0;border:0;background:transparent;color:var(--text-dim);
+        cursor:pointer;border-radius:6px;transition:.15s}
+  .modal .eng-baixar svg{width:13px;height:13px;display:block}
+  .modal .eng-baixar:hover{color:var(--ng-light);background:rgba(var(--ng-rgb),.12)}
   .modal .ele-insert-btn{margin-top:14px}
   /* agendamento de vistoria (independente do relatório, ver .ele-agenda-info abaixo) —
      mesmo botão .ele-insert-btn/.ele-btn do "Inserir relatório". */
