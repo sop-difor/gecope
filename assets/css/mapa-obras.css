@@ -879,8 +879,12 @@
   .sec-h{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);margin:26px 0 12px;display:flex;justify-content:space-between}
   /* "Contratos por ano de assinatura" — barras em HTML/flex (não mais SVG esticado):
      texto sem distorção, valor acima de cada barra, trilho de fundo, ano de pico
-     em destaque. Cores vêm dos tokens, então acompanha os dois temas. */
-  #yearChart .ychart{display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:14px}
+     em destaque. Cores vêm dos tokens, então acompanha os dois temas. Selector geral
+     (não mais preso a #yearChart): renderBarChart() também desenha em #engChartMes/
+     #engChartAno (modal do engenheiro) — preso a #yearChart, o flex nunca pegava lá e a
+     "vistorias mês a mês" caía pro layout de bloco padrão (número e mês empilhados sem
+     barra nenhuma, achado do usuário em 25/09/2026). */
+  .ychart{display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:14px}
   .ycol{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
   .ycol .yval{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;color:var(--text-dim);line-height:1;min-height:11px}
   .ycol .ytrack{flex:1;width:100%;max-width:32px;display:flex;align-items:flex-end;
@@ -1300,19 +1304,62 @@
   .modal .elerow-excluir:hover{color:var(--status-stop);background:rgba(var(--raise-rgb),.08)}
   .modal .elerow-obs{margin-top:4px;color:var(--text-data);line-height:1.4}
   /* Modal do engenheiro (grill de 25/09/2026): distrito × obras (distintas, ver
-     abreModalEngenheiroEletrica) e a lista de obras vistoriadas/agendadas. */
-  .modal .eng-dist-lista{display:flex;flex-direction:column;gap:1px;margin-top:2px}
-  .modal .eng-dist-row{display:flex;justify-content:space-between;gap:10px;padding:6px 2px;font-size:12px;
-        border-bottom:1px solid rgba(var(--raise-rgb),.06)}
-  .modal .eng-dist-row:last-child{border-bottom:0}
-  .modal .eng-dist-row span{color:var(--text-dim);font-weight:600}
-  .modal .eng-dist-row b{font-family:'Space Grotesk',sans-serif;color:var(--text-bright);font-weight:700}
-  .modal .eng-obra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Montserrat,sans-serif;padding:8px 0}
+     abreModalEngenheiroEletrica) e a lista de obras vistoriadas/agendadas.
+     "Por distrito operacional" é a MESMA rosca (donutMulti/donutLeg) de GECOPE ×
+     Fiscalização — só o wrapper é próprio, em linha (o modal tem 1180px de sobra,
+     bem diferente do aside estreito que obriga .gxf-donut a empilhar). Distrito não
+     tem cor semântica própria (não é "atraso"/"no prazo"): dist1..dist6 é uma escala
+     de tons do verde da marca (--ng/--ng-light/--ng-mid/--ng-deep + 2 opacidades),
+     não uma paleta categórica nova — mantém a identidade de cor única do app mesmo
+     com N fatias arbitrárias. Acima de 6 distritos (não deve acontecer na prática:
+     um só engenheiro raramente cobre mais que isso) os tons voltam a se repetir.
+     `.donut-leg` explicitamente sem width:100% (ao contrário do valor herdado da
+     rosca compartilhada) pra caber ao lado do anel em vez de forçar quebra de linha. */
+  .modal .eng-dist-donut{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:6px}
+  .modal .eng-dist-donut svg{flex:none}
+  .modal .eng-dist-donut .donut-leg{width:auto;flex:1 1 200px;min-width:160px}
+  .donut-seg.dist1{stroke:var(--ng)}
+  .donut-seg.dist2{stroke:var(--ng-light)}
+  .donut-seg.dist3{stroke:var(--ng-mid)}
+  .donut-seg.dist4{stroke:var(--ng-deep)}
+  .donut-seg.dist5{stroke:rgba(var(--ng-rgb),.55)}
+  .donut-seg.dist6{stroke:rgba(var(--ng-rgb),.32)}
+  .donut-dot.dist1{background:var(--ng)}
+  .donut-dot.dist2{background:var(--ng-light)}
+  .donut-dot.dist3{background:var(--ng-mid)}
+  .donut-dot.dist4{background:var(--ng-deep)}
+  .donut-dot.dist5{background:rgba(var(--ng-rgb),.55)}
+  .donut-dot.dist6{background:rgba(var(--ng-rgb),.32)}
+  /* Grupo por distrito (Vistorias agendadas/Obras vistoriadas): UMA linha clicável faz
+     as vezes do antigo par "cabeçalho estático + botão 'Ver N vistorias'" — a contagem
+     já mora na própria linha, então um segundo rótulo ao lado era peso morto (achado do
+     rev-design em 25/09/2026). Reaproveita .adToggle (wireAdToggles já liga qualquer
+     um dentro de .modal por data-target) só trocando a casca de pílula centrada por uma
+     barra de largura total, alinhada à esquerda — mesma lista, cabeçalho único. */
+  .modal .eng-grp{margin-top:8px}
+  .modal .eng-grp:first-child{margin-top:0}
+  /* .adToggle.eng-grp-h (não só .eng-grp-h): .adToggle já é a pílula genérica, definida
+     mais abaixo no arquivo — com a mesma especificidade (2 classes), quem vier depois no
+     arquivo venceria a cascata. Somar as 2 classes no seletor (3 classes) garante que
+     esta casca vence sem depender de onde cada regra mora no arquivo. */
+  .modal .adToggle.eng-grp-h{margin:0;width:100%;padding:10px 14px;border-radius:10px;
+        display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+  .modal .adToggle.eng-grp-h:hover,.modal .adToggle.eng-grp-h:focus-visible{background:rgba(var(--ng-rgb),.07);color:inherit}
+  .modal .adToggle.eng-grp-h[aria-expanded="true"]{border-color:rgba(var(--ng-rgb),.35);background:rgba(var(--ng-rgb),.06)}
+  .modal .eng-grp-nome{font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;color:var(--text-bright)}
+  .modal .eng-grp-meta{flex:none;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--text-dim)}
+  .modal .eng-grp-meta b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text-bright)}
+  .modal .eng-grp-h .adToggle-car{font-size:9px;color:var(--text-dimmer)}
+  .modal .eng-grp-h[aria-expanded="true"] .adToggle-car{color:var(--ng)}
+  .modal .eng-grp .elelist{margin-top:6px}
+  .modal .eng-obra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Montserrat,sans-serif;
+        padding:8px 6px;margin:0 -6px;border-radius:8px;cursor:pointer;transition:background-color .12s}
   .modal .eng-obra-row+.eng-obra-row{border-top:1px solid rgba(var(--raise-rgb),.06)}
+  .modal .eng-obra-row:hover,.modal .eng-obra-row:focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
+  .modal .eng-obra-row:hover .eng-obra-nome,.modal .eng-obra-row:focus-visible .eng-obra-nome{color:var(--ng-light)}
   .modal .eng-obra-data{flex:none;color:var(--text-bright);font-weight:700;font-size:12px}
   .modal .eng-obra-nome{flex:1 1 auto;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-        font-size:12.5px;color:var(--text-bright)}
-  .modal .eng-obra-dist{flex:none;font-size:10.5px;color:var(--text-dim)}
+        font-size:12.5px;color:var(--text-bright);transition:color .12s}
   .modal .ele-insert-btn{margin-top:14px}
   /* agendamento de vistoria (independente do relatório, ver .ele-agenda-info abaixo) —
      mesmo botão .ele-insert-btn/.ele-btn do "Inserir relatório". */
