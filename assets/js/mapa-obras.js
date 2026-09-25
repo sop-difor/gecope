@@ -1930,19 +1930,30 @@ function abreModalEngenheiroEletrica(chave){
   // com 2 relatórios do mesmo engenheiro não pode contar 2x no mesmo distrito (Q7).
   const porDistrito=new Map();
   for(const o of todasObras){ const d=distritoDaObra(o); if(!porDistrito.has(d)) porDistrito.set(d,0); porDistrito.set(d,porDistrito.get(d)+1); }
+  // rosca com legenda (mesmo donutMulti/donutLeg de GECOPE × Fiscalização — ver ali) em
+  // vez da barra por linha de antes: com só 2-6 distritos por engenheiro, a proporção de
+  // cada um sobre o total salta mais aos olhos numa rosca só do que numa pilha de barras
+  // (achado do usuário, 25/09/2026 — pediu "outro gráfico" aqui). Distrito não é um
+  // estado com cor própria (como atraso/no prazo), então a cor vem de uma escala de tons
+  // do próprio verde da marca (dist1..dist6, ver CSS) — nunca inventando hues novos só
+  // pra categoria.
   const distritosHtml=porDistrito.size
     ?`<div class="statwrap"><div class="sec-h"><span>Por distrito operacional</span></div>`
-      +`<div class="eng-dist-lista">${[...porDistrito.entries()].sort((a,b)=>b[1]-a[1]).map(([nome,n])=>
-        `<div class="eng-dist-row"><span>${escHtml(nome)}</span><b>${NUM.format(n)}</b></div>`).join('')}</div></div>`
+      +`<div class="eng-dist-donut">${(()=>{
+          const segs=[...porDistrito.entries()].sort((a,b)=>b[1]-a[1])
+            .map(([nome,n],i)=>({label:nome,n,cls:'dist'+(i%6+1)}));
+          return donutMulti(segs,104)+donutLeg(segs);
+        })()}</div></div>`
     :'';
-  const listaObras=(arr,vazio)=>arr.length
-    ?`<div class="elelist">${arr.slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||''))).map(x=>
-        `<div class="eng-obra-row"><span class="eng-obra-data">${x.data?fmtDateBR(x.data):'sem data'}</span>`
-        +`<span class="eng-obra-nome">${escHtml(x.o.objeto||x.o.codigo_obra||x.o.contrato)}</span>`
-        +`<span class="eng-obra-dist">${escHtml(distritoDaObra(x.o))}</span></div>`).join('')}</div>`
-    :`<div class="empty">${vazio}</div>`;
-  const secAgendadas=`<div class="statwrap"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${listaObras(e.agendadas,'Nenhuma vistoria agendada no momento.')}</div>`;
-  const secVistoriadas=`<div class="statwrap"><div class="sec-h"><span>Obras vistoriadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${listaObras(e.vistoriadas,'Nenhuma vistoria registrada.')}</div>`;
+  // ambas as listas agora vêm agrupadas por distrito, cada grupo atrás de um toggle
+  // (mesmo .gproc/.adToggle de grupoProcs — clicar no distrito abre a lista daquele
+  // distrito, pedido do usuário, 25/09/2026). _engModalObrasRef é zerado aqui e
+  // realimentado por grupoDistritoEng: as linhas levam só um índice nesse array (não o
+  // objeto obra inteiro) pra não inflar o innerHTML, e abreObraNaAbaEletrica() usa esse
+  // índice pra abrir a obra certa direto na aba Elétrica.
+  _engModalObrasRef=[];
+  const secAgendadas=`<div class="statwrap"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${e.agendadas.length?grupoDistritoEng('engAg',e.agendadas,true):'<div class="empty">Nenhuma vistoria agendada no momento.</div>'}</div>`;
+  const secVistoriadas=`<div class="statwrap"><div class="sec-h"><span>Obras vistoriadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
   // gráficos: mês a mês sempre reaproveita renderBarChart (Q7); ano a ano só aparece
   // com ≥2 anos distintos, pra não desenhar um gráfico de barra única.
   const porMes={}, porAno={};
@@ -1960,12 +1971,71 @@ function abreModalEngenheiroEletrica(chave){
     </div></div>
     <div class="mbody dsh">${tiles}${distritosHtml}${secAgendadas}${secVistoriadas}${mesesChart}${anoChart}</div>`;
   mostraJanelaGenerica();
+  wireEngObraRows();
   const mesCols=Object.keys(porMes).sort().map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), porMes[m]]);
   renderBarChart(document.getElementById('engChartMes'),mesCols,'vistoria','vistorias','Vistorias por mês');
   if(anos.length>=2){
     const anoCols=anos.sort().map(a=>[a,'’'+a.slice(2),porAno[a]]);
     renderBarChart(document.getElementById('engChartAno'),anoCols,'vistoria','vistorias','Vistorias por ano');
   }
+}
+// obras referenciadas pelas linhas do modal do engenheiro (índice → obra), realimentado
+// a cada abreModalEngenheiroEletrica(); as linhas levam só o índice no data-idx.
+let _engModalObrasRef=[];
+// Agrupa itens (agendadas OU vistoriadas) por distrito operacional; cada grupo vira UMA
+// linha clicável (.eng-grp-h, um <button> só — nome + contagem + seta, sem um rótulo
+// "Ver N vistorias" redundante ao lado, achado do rev-design em 25/09/2026) que abre a
+// lista daquele distrito. Reaproveita a mecânica de wireAdToggles() (classe .adToggle +
+// data-target + .adToggle-car) — só a casca visual é própria deste modal.
+// ordGruposPorData ordena os GRUPOS pela
+// vistoria mais recente de cada um — usado em "Vistorias agendadas"; sem ela, os grupos
+// vêm por volume (mais obras primeiro, como o card "Por distrito operacional" acima),
+// que é a leitura que "Obras vistoriadas" pediu, sem exigir recência entre distritos.
+// Dentro de cada grupo, os itens vêm sempre da vistoria mais recente para a mais antiga.
+function grupoDistritoEng(idPrefix,itens,ordGruposPorData){
+  const porDist=new Map();
+  for(const it of itens){
+    const d=distritoDaObra(it.o);
+    if(!porDist.has(d)) porDist.set(d,[]);
+    porDist.get(d).push(it);
+  }
+  const grupos=[...porDist.entries()].map(([distrito,arr])=>({
+    distrito, itens:arr.slice().sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')))
+  }));
+  grupos.sort(ordGruposPorData
+    ?(a,b)=>String(b.itens[0]?.data||'').localeCompare(String(a.itens[0]?.data||''))
+    :(a,b)=>b.itens.length-a.itens.length||a.distrito.localeCompare(b.distrito,'pt-BR'));
+  return grupos.map((g,i)=>{
+    const id=`${idPrefix}${i}`;
+    const linhas=g.itens.map(x=>{
+      const idx=_engModalObrasRef.length; _engModalObrasRef.push(x.o);
+      return `<div class="eng-obra-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
+        +`<span class="eng-obra-data">${x.data?fmtDateBR(x.data):'sem data'}</span>`
+        +`<span class="eng-obra-nome">${escHtml(x.o.objeto||x.o.codigo_obra||x.o.contrato)}</span></div>`;
+    }).join('');
+    return `<div class="eng-grp"><button type="button" class="adToggle eng-grp-h" data-target="${id}" aria-expanded="false" aria-controls="${id}">`
+      +`<span class="eng-grp-nome">${escHtml(g.distrito)}</span>`
+      +`<span class="eng-grp-meta"><b>${NUM.format(g.itens.length)}</b> vistoria${g.itens.length===1?'':'s'} <span class="adToggle-car">▾</span></span>`
+      +`</button><div id="${id}" class="elelist" hidden>${linhas}</div></div>`;
+  }).join('');
+}
+// clique/teclado numa linha de obra do modal do engenheiro — reconstruído a cada
+// abreModalEngenheiroEletrica() (innerHTML novo, listeners velhos morrem junto, mesmo
+// padrão de wireEleEngenheiros).
+function wireEngObraRows(){
+  document.querySelectorAll('.modal .eng-obra-row[data-idx]').forEach(row=>{
+    row.addEventListener('click',()=>abreObraNaAbaEletrica(_engModalObrasRef[+row.dataset.idx]));
+    row.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); row.click(); } });
+  });
+}
+// abre a janela da obra a partir de uma linha do modal do engenheiro, já na aba Elétrica
+// (pedido do usuário, 25/09/2026) — mesmo openModal() do card de obra, só troca de aba
+// antes de mostrar: quem clicou veio de "vistorias agendadas"/"obras vistoriadas", onde a
+// Elétrica é sempre o contexto relevante (mesma ideia do atalho de "Comissão completa").
+function abreObraNaAbaEletrica(o){
+  if(!o) return;
+  openModal(o);
+  const t=document.querySelector('.modal .mtab[data-tab="eletrica"]'); if(t) t.click();
 }
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
 // ({k,nome,sub,v}). Compartilhadas entre renderPanel() e o popover de navegação
