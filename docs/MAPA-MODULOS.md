@@ -25,6 +25,7 @@
 | Notificações ou envio de WhatsApp | `whatsapp.js` e `server/whatsapp-proxy/` |
 | Mapa de obras e geografia | `gecope_mapa_obras.html` e `assets/js/mapa-obras.js` |
 | Desempenho dos fiscais nos replanilhamentos | `assets/js/mapa-obras.js` (modo Replanilhamentos) e `sql/create_vw_painel_desempenho_fiscais.sql`. Desde a E7, a quebra por distrito/fiscal de `modules/processos/processos.js` (`abrirBreakdownFiscal`) também lê distrito/fiscal dessa mesma view (fonte única) — restrita a admin/gerente; some do clique pro papel fiscal (`.fiscal-no-breakdown`, `core/auth.js`). Decisões e revisões em `docs/painel-fiscais/`. |
+| Cronograma de visitas dos engenheiros eletricistas (botão "Cronograma" da métrica Elétrica) | `assets/js/mapa-obras.js` (`abreCronogramaEletrica`, bloco "Cronograma de visitas") e `assets/css/mapa-obras.css` (`.crono-*`). Lê `eletrica_vistorias` e `eletrica_vistorias_agendadas` inteiras a cada abertura; decisões no comentário do bloco. |
 | Cronograma de analistas, tarefas ou rotinas | `cronograma.html` |
 | Perguntas em linguagem natural | `assistente.html` e `supabase/functions/gecope-assistant/` |
 | Métricas, feedback ou falhas do assistente | `assistente-painel.html` e `supabase/functions/gecope-assistant-painel/` |
@@ -63,7 +64,7 @@
 
 - `index.html`: aplicação principal. Contém a estrutura dos painéis e modais e carrega `config.js`, `database.js`, `utils.js`, `core/*`, `shared/*`, `relatorio.js`, `whatsapp.js` e os módulos de negócio.
 - `cronograma.html`: tela independente de cronograma; usa `config.js`, `database.js` e lógica inline para analistas, tarefas e rotinas.
-- `gecope_mapa_obras.html`: tela independente de mapa; usa Leaflet, `assets/js/mapa-obras.js`, dados GeoJSON em `assets/geo/`, `config.js` e `database.js`.
+- `gecope_mapa_obras.html`: tela independente de mapa; usa Leaflet, `assets/js/mapa-obras.js`, dados GeoJSON em `assets/geo/`, `config.js` e `database.js`. Na métrica Elétrica ainda tem o painel de engenheiros e o modal de cronograma de visitas (mês a mês, só leitura; agendar/cancelar/anexar relatório continuam na aba Elétrica da obra).
 - `assistente.html`: interface do Assistente de Dados; usa a sessão do GECOPE e chama a Edge Function do assistente.
 - `assistente-painel.html`: painel de uso e feedback do assistente; chama a Edge Function de métricas.
 
