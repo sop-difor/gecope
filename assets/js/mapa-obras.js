@@ -1882,6 +1882,7 @@ function renderEleEngenheiros(forceReflow){
   const corpo=document.getElementById('eleEngBody'); if(!corpo) return;
   const visivel=st.metric==='eletrica';
   if(wrap) wrap.hidden=!visivel;
+  const cronoWrap=document.getElementById('eleCronoWrap'); if(cronoWrap) cronoWrap.hidden=!visivel;
   if(!visivel) return;
   if(!forceReflow && !_rosterEletricaDirty) return;
   _rosterEletricaDirty=false;
@@ -2093,6 +2094,291 @@ function abreObraNaAbaEletrica(o,voltarChave){
   if(!o) return;
   openModal(o,voltarChave);
   const t=document.querySelector('.modal .mtab[data-tab="eletrica"]'); if(t) t.click();
+}
+// ---- Cronograma de visitas dos engenheiros eletricistas (grill de 28/09/2026) ----
+// Modal (mesmo #modalBg/#modal do resto) com as visitas do MÊS, agrupadas por dia. Só
+// leitura: agendar/cancelar/anexar relatório continuam na aba Elétrica da obra.
+// Decisões do grill:
+//  - Busca as DUAS tabelas de vistoria inteiras toda vez que abre (sem o cache de sessão,
+//    pra refletir um agendamento recém-feito) e sem filtrar por obra ativa: um mês passado
+//    precisa mostrar visitas de obras hoje concluídas. Obras que a carteira carregada não
+//    tem vêm de contratos_edificacao só pelos ids das visitas (em lotes, a URL não cabe
+//    tudo) — só nome/município/status, sem medição, então essas linhas NÃO abrem o modal da
+//    obra (mostram o status real da obra no lugar).
+//  - 3 status: vistoriada (relatório), agendada e "sem relatório" (agendada com data
+//    anterior a hoje e sem relatório depois dela — não afirma que a visita não houve, só
+//    que ninguém enviou o relatório).
+//  - Diferença CONSCIENTE dos cards do painel lateral: lá o agendamento some assim que a
+//    obra tem qualquer relatório (categoriaEletricaObra); aqui uma reinspeção agendada
+//    para DEPOIS do último relatório aparece. Os contadores do painel não mudam.
+//  - Só o agendamento ativo mais recente por obra (fetchEletricaAgendamentos), como no
+//    resto do mapa; cancelados/excluídos (excluido_em) nunca entram.
+//  - Engenheiro = o texto digitado (responsavel_nome); o filtro casa por normTxt com o
+//    roster, igual ao painel de engenheiros, e o resto vira "Não identificado".
+const CRONO_CHAVE_VOLTAR='__cronograma__';
+const CRONO_NAOIDENT='__naoidentificado__';
+const CRONO_STATUS={
+  vistoriada:{rot:'Vistoriada',rotPl:'Vistoriadas',cls:'ok',ic:'<circle cx="12" cy="12" r="9"/><path d="M8.3 12.4l2.4 2.4L16 9.3"/>'},
+  agendada:{rot:'Agendada',rotPl:'Agendadas',cls:'info',ic:'<rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M8 3.2v4M16 3.2v4M3.5 10h17"/>'},
+  semrelatorio:{rot:'Sem relatório',rotPl:'Sem relatório',cls:'warn',ic:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>'},
+};
+const CRONO_DOW=['dom','seg','ter','qua','qui','sex','sáb'];
+// mes: 0-11. engs: null (todos marcados) | Set de nomeNorm/CRONO_NAOIDENT marcados (Set vazio =
+// nenhum marcado, a agenda fica vazia). status: '' | chave de CRONO_STATUS.
+let _cronoEstado={ano:null,mes:null,engs:null,status:''};
+let _cronoEngLista=[];   // engenheiros oferecidos na lista de caixas: [{chave,nome}]
+let _cronoItens=[];
+let _cronoCarregado=false;
+let _cronoObrasRef=[];   // índice → obra carregada (as linhas levam só o data-idx)
+let _cronoSeq=0;         // descarta resposta de uma abertura já superada por outra
+function hojeISOLocal(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function chaveEngCronograma(nomeBruto){
+  const k=normTxt(nomeBruto);
+  return (k&&(ENGENHEIROS_ELETRICA||[]).some(e=>e.nomeNorm===k))?k:CRONO_NAOIDENT;
+}
+// Lista plana de visitas {tipo,data,resp,r,id,o,clicavel}. `o` é a obra carregada, a obra
+// "reduzida" (mapRow de contratos_edificacao, sem medição) ou null se o id não existe lá.
+async function carregarVisitasCronograma(){
+  const [vist,agend]=await Promise.all([fetchEletricaVistorias(),fetchEletricaAgendamentos()]);
+  const noMapa=new Map();
+  for(const cod in DB.municipios) for(const o of DB.municipios[cod].obras) noMapa.set(o.id_obra,o);
+  const ids=[...new Set([...Object.keys(vist),...Object.keys(agend)].map(Number))];
+  const faltam=ids.filter(id=>!noMapa.has(id));
+  const lotes=[]; for(let i=0;i<faltam.length;i+=80) lotes.push(faltam.slice(i,i+80));
+  const linhas=await Promise.all(lotes.map(l=>
+    fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter:inListFilter('id_obra',l,false)})
+      .catch(e=>{ console.warn('cronograma: obras fora da carteira indisponíveis:',e.message); return []; })));
+  const reduzidas=new Map();
+  for(const r of linhas.flat()) reduzidas.set(r.id_obra,mapRow(r));
+  const hoje=hojeISOLocal();
+  const itens=[];
+  for(const id of ids){
+    const rel=vist[id]||[];   // mais recente primeiro
+    const carregada=noMapa.get(id)||null;
+    const base={id,o:carregada||reduzidas.get(id)||null,clicavel:!!carregada};
+    for(const r of rel) itens.push({...base,tipo:'vistoriada',data:r.data_vistoria,resp:r.responsavel_nome,r});
+    const ag=agend[id];
+    if(ag && (!rel.length || String(ag.data_planejada||'')>String(rel[0].data_vistoria||'')))
+      itens.push({...base,tipo:String(ag.data_planejada||'')<hoje?'semrelatorio':'agendada',data:ag.data_planejada,resp:ag.responsavel_nome,r:null});
+  }
+  return itens;
+}
+function abreCronogramaEletrica(opts){
+  const seq=++_cronoSeq;
+  if(!(opts&&opts.preservar)||_cronoEstado.ano==null){
+    const h=new Date(); _cronoEstado={ano:h.getFullYear(),mes:h.getMonth(),engs:null,status:''};
+  }
+  _cronoItens=[]; _cronoCarregado=false;
+  const seta=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
+      <div class="mh-titles"><div class="mt">Cronograma de visitas</div></div>
+      <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
+    </div></div>
+    <div class="mbody crono">
+      <div class="crono-side">
+        <div class="crono-nav">
+          <div class="crono-titulo" id="cronoMes" aria-live="polite"></div>
+          <button type="button" class="crono-hoje" id="cronoHoje">Hoje</button>
+          <button type="button" class="crono-nav-btn" id="cronoPrev" aria-label="Mês anterior">${seta('M15 5l-7 7 7 7')}</button>
+          <button type="button" class="crono-nav-btn" id="cronoNext" aria-label="Próximo mês">${seta('M9 5l7 7-7 7')}</button>
+        </div>
+        <div id="cronoCal"></div>
+        <div class="crono-chips" id="cronoChips"></div>
+        <div id="cronoFiltros"></div>
+      </div>
+      <div class="crono-agenda" id="cronoAgenda"><div class="empty">Carregando…</div></div>
+    </div>`;
+  mostraJanelaGenerica();
+  document.getElementById('cronoPrev').onclick=()=>mudaMesCronograma(-1);
+  document.getElementById('cronoNext').onclick=()=>mudaMesCronograma(1);
+  document.getElementById('cronoHoje').onclick=()=>{
+    const h=new Date(); _cronoEstado.ano=h.getFullYear(); _cronoEstado.mes=h.getMonth(); renderCorpoCronograma();
+  };
+  renderCorpoCronograma();
+  (async()=>{
+    try{
+      if(ENGENHEIROS_ELETRICA===null) await garantirRosterEletrica();
+      const itens=await carregarVisitasCronograma();
+      if(seq!==_cronoSeq) return;
+      _cronoItens=itens; _cronoCarregado=true;
+      montaFiltrosCronograma();
+      renderCorpoCronograma();
+    }catch(e){
+      if(seq!==_cronoSeq) return;
+      console.warn('cronograma:',e);
+      const c=document.getElementById('cronoAgenda');
+      if(c) c.innerHTML='<div class="crono-vazio">Não foi possível carregar o cronograma. Feche a janela e abra de novo.</div>';
+    }
+  })();
+}
+function mudaMesCronograma(delta){
+  let m=_cronoEstado.mes+delta, a=_cronoEstado.ano;
+  if(m<0){ m=11; a--; } else if(m>11){ m=0; a++; }
+  _cronoEstado.mes=m; _cronoEstado.ano=a;
+  renderCorpoCronograma();
+}
+// Lista de caixas de seleção (TODOS + um por engenheiro), no lugar do <select>. Montada uma vez
+// por abertura; renderCorpoCronograma só atualiza marcações e contagens (sincronizaFiltroEngCronograma),
+// pra não tirar o foco do teclado a cada clique. "Não identificado" só aparece se algum
+// responsavel_nome do cronograma não casa com o cadastro.
+function montaFiltrosCronograma(){
+  const host=document.getElementById('cronoFiltros'); if(!host) return;
+  const lista=(ENGENHEIROS_ELETRICA||[]).map(e=>({chave:e.nomeNorm,nome:e.nome}));
+  if(_cronoItens.some(it=>chaveEngCronograma(it.resp)===CRONO_NAOIDENT)) lista.push({chave:CRONO_NAOIDENT,nome:'Não identificado'});
+  _cronoEngLista=lista;
+  if(!lista.length){ host.innerHTML=''; return; }
+  const caixa=(k,nome,cls)=>`<label class="crono-eng${cls?' '+cls:''}"><input type="checkbox" data-eng="${escHtml(k)}">`
+    +`<span class="crono-eng-box" aria-hidden="true"><svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 12.5l4.2 4.2L18.5 7.8"/></svg>`
+    +`<svg class="dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M6.5 12h11"/></svg></span>`
+    +`<span class="crono-eng-nome">${escHtml(nome)}</span><span class="crono-eng-n"></span></label>`;
+  host.innerHTML=`<div class="crono-engs" role="group" aria-label="Filtrar por engenheiro">`
+    +caixa('__todos__','Todos','todos')
+    +`<div class="crono-engs-lista">${lista.map(e=>caixa(e.chave,e.nome)).join('')}</div></div>`;
+  host.querySelectorAll('input[data-eng]').forEach(inp=>inp.addEventListener('change',()=>{
+    const k=inp.dataset.eng, todas=lista.map(e=>e.chave);
+    if(k==='__todos__') _cronoEstado.engs=inp.checked?null:new Set();
+    else{
+      const atual=_cronoEstado.engs===null?new Set(todas):new Set(_cronoEstado.engs);
+      if(inp.checked) atual.add(k); else atual.delete(k);
+      _cronoEstado.engs=(atual.size===todas.length)?null:atual;
+    }
+    renderCorpoCronograma();
+  }));
+}
+// marcações + contagem do mês por engenheiro (respeita o status escolhido) — `porEng`: chave → n.
+function sincronizaFiltroEngCronograma(porEng,total){
+  const host=document.getElementById('cronoFiltros'); if(!host) return;
+  const engs=_cronoEstado.engs;
+  host.querySelectorAll('input[data-eng]').forEach(inp=>{
+    const k=inp.dataset.eng, lab=inp.closest('label'), n=lab.querySelector('.crono-eng-n');
+    if(k==='__todos__'){
+      inp.checked=engs===null||engs.size===_cronoEngLista.length;
+      inp.indeterminate=engs!==null&&engs.size>0&&engs.size<_cronoEngLista.length;
+      n.textContent=_cronoCarregado?NUM.format(total):'';
+    }else{
+      inp.checked=engs===null||engs.has(k);
+      n.textContent=_cronoCarregado?NUM.format(porEng[k]||0):'';
+    }
+  });
+}
+function cronoGlifo(k){
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CRONO_STATUS[k].ic}</svg>`;
+}
+function linhaVisitaCronograma(it){
+  const cfg=CRONO_STATUS[it.tipo];
+  const o=it.o;
+  const nome=o?(o.objeto&&o.objeto!=='—'?o.objeto:(o.codigo_obra||o.contrato)):`Obra #${it.id}`;
+  const distrito=o?distritoDaObra(o):'Sem distrito';
+  const resp=it.resp?escHtml(it.resp):'Sem responsável';
+  // obra que a carteira carregada não tem: mostra o status REAL dela (Concluída,
+  // Encerrada…) e não abre o modal — ver o comentário do bloco acima.
+  const chipObra=(o&&!it.clicavel)?`<span class="crono-obra-st" title="Obra fora da carteira carregada — troque para Histórico completo para abrir">${escHtml(o.statusObra)}</span>`:'';
+  const conteudo=`<span class="crono-gl ${cfg.cls}">${cronoGlifo(it.tipo)}</span>`
+    +`<span class="crono-info"><span class="crono-obra" title="${escHtml(nome)}">${escHtml(nome)}</span><span class="crono-resp">${resp}</span></span>`
+    +`<span class="crono-dir"><span class="crono-st ${cfg.cls}">${cfg.rot}</span><span class="crono-dist">${escHtml(distrito)}</span>${chipObra}</span>`
+    // slot de largura fixa (mesmo vazio): sem ele, a coluna de status andava conforme a
+    // linha tivesse ou não o botão de baixar.
+    +`<span class="crono-fim">${botaoBaixarRelatorio(it.r)}</span>`;
+  if(!it.clicavel) return `<div class="crono-row nc">${conteudo}</div>`;
+  const idx=_cronoObrasRef.length; _cronoObrasRef.push(o);
+  return `<div class="crono-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">${conteudo}</div>`;
+}
+// Tudo o que depende do mês/filtros é redesenhado aqui, menos o <select> de engenheiro
+// (montaFiltrosCronograma) — refazê-lo a cada troca tiraria o foco do teclado.
+// Os botões de status contam o mês SÓ com o filtro de engenheiro (senão, com um status
+// escolhido, os outros dois mostrariam 0); o calendário e a agenda seguem os dois filtros.
+function renderCorpoCronograma(){
+  const titulo=document.getElementById('cronoMes');
+  const cal=document.getElementById('cronoCal');
+  const chips=document.getElementById('cronoChips');
+  const agenda=document.getElementById('cronoAgenda');
+  if(!titulo||!cal||!chips||!agenda) return;
+  const {ano,mes,engs,status}=_cronoEstado;
+  titulo.innerHTML=`<span class="crono-mes">${MESES_NOME[mes]}</span><span class="crono-ano">${ano}</span>`;
+  const prefixo=`${ano}-${String(mes+1).padStart(2,'0')}`;
+  const engOk=it=>engs===null||engs.has(chaveEngCronograma(it.resp));
+  const doMes=_cronoCarregado?_cronoItens.filter(it=>String(it.data||'').slice(0,7)===prefixo):[];
+  const doMesEng=doMes.filter(engOk);
+  const visiveis=doMesEng.filter(it=>!status||it.tipo===status)
+    .sort((a,b)=>String(a.data).localeCompare(String(b.data))
+      || normTxt(a.resp).localeCompare(normTxt(b.resp)) || String(a.o?.objeto||a.id).localeCompare(String(b.o?.objeto||b.id),'pt-BR'));
+  const porEng={}, doMesStatus=doMes.filter(it=>!status||it.tipo===status);
+  for(const it of doMesStatus){ const k=chaveEngCronograma(it.resp); porEng[k]=(porEng[k]||0)+1; }
+  sincronizaFiltroEngCronograma(porEng,doMesStatus.length);
+  const filtrado=engs!==null||!!status;
+  const hoje=hojeISOLocal();
+  // calendário do mês (domingo primeiro): pontos por visita (até 3), dia clicável só se tem visita
+  const porDia={};
+  for(const it of visiveis){ const d=+String(it.data).slice(8,10); (porDia[d]=porDia[d]||[]).push(it); }
+  const vazios=new Date(ano,mes,1).getDay(), nDias=new Date(ano,mes+1,0).getDate();
+  let celulas='<span class="crono-d vazio"></span>'.repeat(vazios);
+  for(let d=1;d<=nDias;d++){
+    const iso=`${prefixo}-${String(d).padStart(2,'0')}`, its=porDia[d]||[];
+    const cls=`crono-d${iso===hoje?' hoje':''}${its.length?' tem':''}`;
+    const interno=`<span class="n">${d}</span><span class="pts">${its.slice(0,3).map(it=>`<i class="${CRONO_STATUS[it.tipo].cls}"></i>`).join('')}</span>`;
+    celulas+=its.length
+      ?`<button type="button" class="${cls}" data-dia="${iso}" aria-label="${d} de ${MESES_NOME[mes]}: ${its.length} visita${its.length===1?'':'s'}">${interno}</button>`
+      :`<span class="${cls}">${interno}</span>`;
+  }
+  cal.innerHTML=`<div class="crono-dow">${CRONO_DOW.map(x=>`<span>${x}</span>`).join('')}</div><div class="crono-grid">${celulas}</div>`;
+  chips.innerHTML=Object.entries(CRONO_STATUS).map(([k,s])=>
+    `<button type="button" class="crono-chip ${s.cls}" data-status="${k}" aria-pressed="${status===k}"><span class="crono-chip-ic">${cronoGlifo(k)}</span>`
+    +`<span class="crono-chip-rot">${s.rotPl}</span><span class="crono-chip-n">${_cronoCarregado?NUM.format(doMesEng.filter(it=>it.tipo===k).length):'–'}</span></button>`).join('');
+  // agenda: um bloco por dia com visita (dia grande à esquerda, visitas à direita)
+  _cronoObrasRef=[];
+  agenda.scrollTop=0;
+  if(!_cronoCarregado){ agenda.innerHTML='<div class="empty">Carregando…</div>'; }
+  else if(!visiveis.length){
+    agenda.innerHTML=`<div class="crono-vazio">Nenhuma visita em ${MESES_NOME[mes].toLowerCase()} de ${ano}${filtrado?' com os filtros escolhidos':''}.`
+      +`${filtrado?'<button type="button" class="crono-limpar" id="cronoLimpar">Limpar filtros</button>':''}</div>`;
+  }else{
+    const dias=new Map();
+    for(const it of visiveis){ if(!dias.has(it.data)) dias.set(it.data,[]); dias.get(it.data).push(it); }
+    agenda.innerHTML=[...dias.entries()].map(([data,arr])=>{
+      const dia=+data.slice(8,10);
+      const sem=CRONO_DOW[new Date(ano,mes,dia).getDay()];
+      return `<section class="crono-dia" id="cronoDia-${data}"><div class="crono-dia-data"><span class="num">${dia}</span><span class="sem">${sem}</span>`
+        +`${data===hoje?'<span class="crono-hoje-tag">hoje</span>':''}</div>`
+        +`<div class="crono-dia-itens">${arr.map(linhaVisitaCronograma).join('')}</div></section>`;
+    }).join('');
+  }
+  wireCorpoCronograma();
+}
+// Liga cliques do que renderCorpoCronograma acabou de redesenhar. Linha de visita → obra na
+// aba Elétrica, com "← Voltar" pro cronograma (mês e filtros ficam em _cronoEstado). O
+// botão de baixar mora dentro da linha, então precisa de stopPropagation (mesmo padrão de
+// wireEngObraRows).
+function wireCorpoCronograma(){
+  const modal=document.getElementById('modal');
+  modal.querySelectorAll('#cronoChips .crono-chip').forEach(b=>b.addEventListener('click',()=>{
+    _cronoEstado.status=(_cronoEstado.status===b.dataset.status)?'':b.dataset.status;
+    renderCorpoCronograma();
+  }));
+  modal.querySelectorAll('#cronoCal .crono-d[data-dia]').forEach(b=>b.addEventListener('click',()=>{
+    const agenda=document.getElementById('cronoAgenda'), alvo=document.getElementById('cronoDia-'+b.dataset.dia);
+    if(!agenda||!alvo) return;
+    agenda.scrollTo({top:alvo.offsetTop-4,behavior:'smooth'});
+    alvo.classList.remove('flash'); void alvo.offsetWidth; alvo.classList.add('flash');
+  }));
+  const limpar=document.getElementById('cronoLimpar');
+  if(limpar) limpar.onclick=()=>{
+    _cronoEstado.engs=null; _cronoEstado.status='';
+    renderCorpoCronograma();
+  };
+  modal.querySelectorAll('#cronoAgenda .crono-row[data-idx]').forEach(row=>{
+    row.addEventListener('click',()=>abreObraNaAbaEletrica(_cronoObrasRef[+row.dataset.idx],CRONO_CHAVE_VOLTAR));
+    row.addEventListener('keydown',ev=>{ if(ev.target===row&&(ev.key==='Enter'||ev.key===' ')){ ev.preventDefault(); row.click(); } });
+  });
+  modal.querySelectorAll('#cronoAgenda .eng-baixar[data-href]').forEach(btn=>{
+    btn.addEventListener('click',e=>{ e.stopPropagation(); window.open(btn.dataset.href,'_blank','noopener'); });
+  });
+}
+{
+  const btn=document.getElementById('btnCronogramaEle');
+  if(btn) btn.addEventListener('click',()=>abreCronogramaEletrica());
 }
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
 // ({k,nome,sub,v}). Compartilhadas entre renderPanel() e o popover de navegação
@@ -2809,7 +3095,7 @@ function openModal(o,voltarChave){
   // abreModalFiscal faz com voltarGid) — Esc/clique fora continuam funcionando igual,
   // fecharOuVoltar() já clica em #modalVoltar quando ele existe.
   const fecharBtn=voltarChave
-    ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para o engenheiro">${RS_ICO.voltar}<span>Voltar</span></button>`
+    ? `<button type="button" class="m-locate" id="modalVoltar" title="${voltarChave===CRONO_CHAVE_VOLTAR?'Voltar para o cronograma':'Voltar para o engenheiro'}">${RS_ICO.voltar}<span>Voltar</span></button>`
     : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
   document.getElementById('modal').innerHTML=
     `<div class="mtop" data-tab="resumo">
@@ -2840,7 +3126,7 @@ function openModal(o,voltarChave){
   document.getElementById('modalBg').classList.add('show');
   const _mx=document.getElementById('modalX'); if(_mx) _mx.onclick=closeModal;
   const _voltar=document.getElementById('modalVoltar');
-  if(_voltar) _voltar.onclick=()=>abreModalEngenheiroEletrica(voltarChave);
+  if(_voltar) _voltar.onclick=()=>voltarChave===CRONO_CHAVE_VOLTAR?abreCronogramaEletrica({preservar:true}):abreModalEngenheiroEletrica(voltarChave);
   const _loc=document.getElementById('modalLocate');
   if(_loc && munCod) _loc.onclick=()=>{ closeModal(); goCity(munCod); };
   const _vc=document.getElementById('mResumoVerComissao');

@@ -1388,6 +1388,136 @@
         cursor:pointer;border-radius:6px;transition:.15s}
   .modal .eng-baixar svg{width:13px;height:13px;display:block}
   .modal .eng-baixar:hover{color:var(--ng-light);background:rgba(var(--ng-rgb),.12)}
+  /* Cronograma de visitas (grill de 28/09/2026): botão no painel lateral + modal do mês.
+     Azul = mesmo #5B9FDB de .ele-resumo-i.info (agendada), sem split por tema. */
+  .ele-crono-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:40px;cursor:pointer;
+        border:1px solid rgba(60,135,201,.35);background:rgba(60,135,201,.12);color:#5B9FDB;border-radius:11px;
+        font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.2px;margin-bottom:6px;transition:.15s}
+  .ele-crono-btn:hover,.ele-crono-btn:focus-visible{border-color:rgba(60,135,201,.6);background:rgba(60,135,201,.2);outline:none}
+  .ele-crono-btn svg{width:16px;height:16px;display:block;flex:none}
+  /* Janela do cronograma: mini-calendário + botões de status + engenheiro à esquerda,
+     agenda por dia à direita (a agenda rola por dentro, o lado esquerdo fica sempre à vista).
+     Cada status tem cor E ícone (check/calendário/relógio) — cor sozinha não basta.
+     --c/--c-rgb/--c-text: cor de destaque, seu rgb e a versão legível como TEXTO; azul
+     escurece no tema claro (#5B9FDB sobre branco não passa em contraste). */
+  .modal{--crono-info:#2E6DA4;--crono-info-rgb:60,135,201}
+  :root.theme-dark .modal{--crono-info:#5B9FDB}
+  .modal .crono-chip.ok,.modal .crono-gl.ok,.modal .crono-st.ok,.modal .crono-d i.ok{--c:var(--ng);--c-rgb:var(--ng-rgb);--c-text:var(--ng-light)}
+  .modal .crono-chip.info,.modal .crono-gl.info,.modal .crono-st.info,.modal .crono-d i.info{--c:var(--crono-info);--c-rgb:var(--crono-info-rgb);--c-text:var(--crono-info)}
+  .modal .crono-chip.warn,.modal .crono-gl.warn,.modal .crono-st.warn,.modal .crono-d i.warn{--c:var(--amber);--c-rgb:var(--amber-rgb);--c-text:var(--amber-text)}
+  .modal:has(.mbody.crono){width:min(1560px,96vw);min-height:min(88vh,1000px)}
+  .modal .mbody.crono{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:36px;align-items:start}
+  @media (max-width:760px){ .modal .mbody.crono{grid-template-columns:minmax(0,1fr);gap:20px} }
+  .modal .crono-side{display:flex;flex-direction:column;gap:20px}
+  .modal .crono-nav{display:flex;align-items:center;gap:6px}
+  .modal .crono-titulo{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:7px;font-family:Montserrat,sans-serif}
+  .modal .crono-mes{font-size:20px;font-weight:700;color:var(--text-bright)}
+  .modal .crono-ano{font-size:13px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-nav-btn{flex:none;width:32px;height:32px;display:grid;place-items:center;padding:0;cursor:pointer;
+        border:1px solid var(--card-border);background:transparent;color:var(--text-bright);border-radius:8px;transition:.15s}
+  .modal .crono-nav-btn svg{width:15px;height:15px;display:block}
+  .modal .crono-hoje{flex:none;height:32px;padding:0 10px;border:0;background:transparent;cursor:pointer;
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--crono-info);border-radius:8px}
+  .modal .crono-nav-btn:hover,.modal .crono-hoje:hover{background:rgba(var(--crono-info-rgb),.12);border-color:rgba(var(--crono-info-rgb),.45)}
+  .modal .crono-nav-btn:focus-visible,.modal .crono-hoje:focus-visible,.modal .crono-chip:focus-visible,
+  .modal .crono-d.tem:focus-visible,.modal .crono-limpar:focus-visible{outline:2px solid var(--crono-info);outline-offset:2px}
+  .modal .crono-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
+  .modal .crono-dow span{text-align:center;font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .modal .crono-d{height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+        border:1px solid transparent;border-radius:9px;background:transparent;padding:0;margin:0;
+        font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;color:var(--text-dim)}
+  .modal .crono-d.vazio{visibility:hidden}
+  .modal .crono-d.tem{cursor:pointer;color:var(--text-bright);font-weight:700;background:rgba(var(--raise-rgb),.06);transition:background-color .12s,border-color .12s}
+  .modal .crono-d.tem:hover{background:rgba(var(--ng-rgb),.12);border-color:rgba(var(--ng-rgb),.35)}
+  .modal .crono-d.hoje{border-color:var(--crono-info);color:var(--crono-info);font-weight:700}
+  .modal .crono-d .pts{display:flex;gap:3px;height:5px}
+  .modal .crono-d .pts i{width:5px;height:5px;border-radius:50%;background:var(--c)}
+  .modal .crono-chips{display:flex;flex-direction:column;gap:6px}
+  .modal .crono-chip{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px 8px 8px;cursor:pointer;text-align:left;
+        border:1px solid var(--card-border);background:transparent;border-radius:11px;font-family:Montserrat,sans-serif;
+        transition:border-color .15s,background-color .15s}
+  .modal .crono-chip:hover{border-color:rgba(var(--c-rgb),.5)}
+  .modal .crono-chip[aria-pressed="true"]{border-color:var(--c);background:rgba(var(--c-rgb),.12)}
+  .modal .crono-chip-ic{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+        background:rgba(var(--c-rgb),.15);color:var(--c-text)}
+  .modal .crono-chip-ic svg{width:14px;height:14px;display:block}
+  .modal .crono-chip-rot{flex:1 1 auto;font-size:12.5px;font-weight:600;color:var(--text-bright)}
+  .modal .crono-chip-n{flex:none;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest)}
+  /* Filtro de engenheiro: TODOS + um por pessoa, cada um com caixa de seleção e a contagem do
+     mês à direita. O <input> nativo fica no label (invisível, mas focável e lido por leitor de
+     tela); a caixa desenhada segue o estado dele (:checked / :indeterminate). */
+  .modal .crono-engs{border:1px solid var(--card-border);border-radius:12px;padding:4px;display:flex;flex-direction:column}
+  .modal .crono-engs-lista{max-height:236px;overflow:auto;display:flex;flex-direction:column}
+  .modal .crono-eng{position:relative;display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:8px;cursor:pointer;
+        font-family:Montserrat,sans-serif;transition:background-color .12s}
+  .modal .crono-eng:hover{background:rgba(var(--ng-rgb),.08)}
+  .modal .crono-eng.todos{margin-bottom:3px;padding-bottom:11px;border-radius:8px 8px 0 0;border-bottom:1px solid rgba(var(--raise-rgb),.1)}
+  .modal .crono-eng input{position:absolute;left:10px;top:50%;width:18px;height:18px;margin:-9px 0 0;opacity:0;cursor:pointer}
+  .modal .crono-eng-box{flex:none;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;
+        border:1.5px solid rgba(var(--raise-rgb),.4);background:transparent;color:var(--bg-modal);transition:background-color .12s,border-color .12s}
+  .modal .crono-eng-box svg{width:13px;height:13px;display:none}
+  .modal .crono-eng:hover .crono-eng-box{border-color:var(--ng)}
+  .modal .crono-eng input:checked+.crono-eng-box,.modal .crono-eng input:indeterminate+.crono-eng-box{background:var(--ng);border-color:var(--ng)}
+  .modal .crono-eng input:checked+.crono-eng-box .ck{display:block}
+  .modal .crono-eng input:indeterminate+.crono-eng-box .ck{display:none}
+  .modal .crono-eng input:indeterminate+.crono-eng-box .dash{display:block}
+  .modal .crono-eng input:focus-visible+.crono-eng-box{outline:2px solid var(--crono-info);outline-offset:2px}
+  .modal .crono-eng-nome{flex:1 1 auto;min-width:0;font-size:11.5px;font-weight:600;letter-spacing:.2px;line-height:1.3;
+        text-transform:uppercase;color:var(--text-bright)}
+  .modal .crono-eng.todos .crono-eng-nome{font-weight:700;letter-spacing:.4px}
+  .modal .crono-eng-n{flex:none;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-agenda{position:relative;max-height:calc(94vh - 200px);overflow:auto;padding-right:8px}
+  @media (max-width:760px){ .modal .crono-agenda{max-height:56vh} }
+  .modal .crono-dia{display:grid;grid-template-columns:64px minmax(0,1fr);gap:16px;padding:14px 0;
+        border-top:1px solid rgba(var(--raise-rgb),.1)}
+  .modal .crono-dia:first-child{border-top:0;padding-top:0}
+  .modal .crono-dia-data{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
+  .modal .crono-dia-data .num{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1;color:var(--text-brightest)}
+  .modal .crono-dia-data .sem{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-hoje-tag{display:inline-flex;align-items:center;gap:5px;font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;color:var(--crono-info)}
+  .modal .crono-hoje-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--crono-info)}
+  @media (prefers-reduced-motion:no-preference){
+    .modal .crono-dia.flash{animation:cronoFlash 1.2s ease-out}
+    @keyframes cronoFlash{from{background:rgba(var(--crono-info-rgb),.16)}to{background:transparent}}
+  }
+  .modal .crono-dia-itens{display:flex;flex-direction:column}
+  .modal .crono-row{display:flex;align-items:center;gap:14px;padding:9px 8px;margin:0 -8px;border-radius:9px;
+        font-family:Montserrat,sans-serif;transition:background-color .12s}
+  .modal .crono-row+.crono-row{border-top:1px solid rgba(var(--raise-rgb),.06)}
+  .modal .crono-row:not(.nc){cursor:pointer}
+  .modal .crono-row:not(.nc):hover,.modal .crono-row:not(.nc):focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
+  .modal .crono-row.nc{cursor:default}
+  .modal .crono-gl{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+        background:rgba(var(--c-rgb),.14);color:var(--c-text)}
+  .modal .crono-gl svg{width:16px;height:16px;display:block}
+  .modal .crono-info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .modal .crono-obra{font-size:13px;font-weight:400;line-height:1.35;color:var(--text-bright);display:-webkit-box;-webkit-box-orient:vertical;
+        -webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;text-align:justify;text-justify:inter-word;transition:color .12s}
+  .modal .crono-row:not(.nc):hover .crono-obra{color:var(--ng-light)}
+  .modal .crono-resp{font-size:11.5px;font-weight:600;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .modal .crono-dir{flex:0 0 112px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+  .modal .crono-fim{flex:0 0 28px;display:flex;align-items:center;justify-content:flex-end}
+  .modal .crono-st{font-size:11.5px;font-weight:700;color:var(--c-text)}
+  .modal .crono-dist{font-size:11px;color:var(--text-dim)}
+  .modal .crono-obra-st{flex:0 1 auto;align-self:flex-start;margin-top:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;font-weight:600;color:var(--text-dim);border:1px dashed var(--card-border);
+        border-radius:999px;padding:2px 8px;white-space:nowrap}
+  .modal .crono-vazio{padding:44px 12px;text-align:center;font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-dim);
+        display:flex;flex-direction:column;align-items:center;gap:12px}
+  .modal .crono-limpar{border:1px solid rgba(var(--crono-info-rgb),.45);background:transparent;color:var(--crono-info);
+        border-radius:8px;padding:7px 14px;cursor:pointer;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700}
+  .modal .crono-limpar:hover{background:rgba(var(--crono-info-rgb),.12)}
+  /* celular: o dia vira cabeçalho da seção e o status desce para baixo do nome da obra —
+     lado a lado, a coluna do dia e o status deixavam o nome com ~4 letras */
+  @media (max-width:560px){
+    .modal .crono-dia{grid-template-columns:minmax(0,1fr);gap:4px}
+    .modal .crono-dia-data{flex-direction:row;align-items:baseline;gap:8px}
+    .modal .crono-dia-data .num{font-size:24px}
+    .modal .crono-row{flex-wrap:wrap;row-gap:2px}
+    .modal .crono-info{flex:1 1 0}
+    .modal .crono-dir{flex:0 0 100%;order:5;flex-direction:row;align-items:baseline;gap:8px;text-align:left;padding-left:42px}
+    .modal .crono-fim{flex:none}
+  }
   .modal .ele-insert-btn{margin-top:14px}
   /* agendamento de vistoria (independente do relatório, ver .ele-agenda-info abaixo) —
      mesmo botão .ele-insert-btn/.ele-btn do "Inserir relatório". */
