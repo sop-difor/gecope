@@ -1924,15 +1924,19 @@ function distritoDaObra(o){
 function abreModalEngenheiroEletrica(chave){
   const e=ROSTER_ELETRICA_COMPUTADO.find(x=>x.chave===chave); if(!e) return;
   const todasObras=new Set([...e.vistoriadas,...e.agendadas].map(x=>x.o));
-  const tiles=`<div class="dsh-tiles">`
-    +tile(NUM.format(e.vistoriadas.length),'Vistorias realizadas','histórico completo')
-    +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','ativas, ainda sem relatório')
-    +tile(NUM.format(todasObras.size),'Obras','distintas, vistoriadas + agendadas')
-    +`</div>`;
   // por distrito — OBRAS distintas (vistoriadas ∪ agendadas), não eventos: uma obra
   // com 2 relatórios do mesmo engenheiro não pode contar 2x no mesmo distrito (Q7).
   const porDistrito=new Map();
   for(const o of todasObras){ const d=distritoDaObra(o); if(!porDistrito.has(d)) porDistrito.set(d,0); porDistrito.set(d,porDistrito.get(d)+1); }
+  // topo no mesmo padrão herói+gráfico das janelas de fiscal/distrito (dsh-topo, ver
+  // CSS): "vistorias realizadas" vira o número que a janela existe para dizer, a rosca
+  // por distrito senta ao lado em vez de empilhada — antes os 3 ladrilhos competiam
+  // em pé de igualdade com a rosca, sem nenhum ponto de entrada óbvio (rev-design,
+  // 28/09/2026, pedido do usuário por algo "mais profissional"). Sem distrito (roster
+  // sem nenhuma obra ainda) o herói fica sozinho, sem grade vazia ao lado.
+  const hero=`<div class="dsh-hero"><div class="rs-lbl">${RS_ICO.chart} Vistorias realizadas</div>`
+    +`<div class="dsh-big">${NUM.format(e.vistoriadas.length)}<span class="dsh-un">${e.vistoriadas.length===1?'vistoria':'vistorias'}</span></div>`
+    +`<div class="dsh-sub">${escHtml(`${NUM.format(e.agendadas.length)} agendada${e.agendadas.length===1?'':'s'} · ${NUM.format(todasObras.size)} obra${todasObras.size===1?'':'s'} atendida${todasObras.size===1?'':'s'}`)}</div></div>`;
   // rosca com legenda (mesmo donutMulti/donutLeg de GECOPE × Fiscalização — ver ali) em
   // vez da barra por linha de antes: com só 2-6 distritos por engenheiro, a proporção de
   // cada um sobre o total salta mais aos olhos numa rosca só do que numa pilha de barras
@@ -1940,14 +1944,24 @@ function abreModalEngenheiroEletrica(chave){
   // estado com cor própria (como atraso/no prazo), então a cor vem de uma escala de tons
   // do próprio verde da marca (dist1..dist6, ver CSS) — nunca inventando hues novos só
   // pra categoria.
-  const distritosHtml=porDistrito.size
-    ?`<div class="statwrap"><div class="sec-h"><span>Por distrito operacional</span></div>`
+  const distritoPlot=porDistrito.size
+    ?`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.dist} Por distrito operacional</div>`
       +`<div class="eng-dist-donut">${(()=>{
           const segs=[...porDistrito.entries()].sort((a,b)=>b[1]-a[1])
             .map(([nome,n],i)=>({label:nome,n,cls:'dist'+(i%6+1)}));
           return donutMulti(segs,104)+donutLeg(segs);
         })()}</div></div>`
     :'';
+  const topo=distritoPlot?`<div class="dsh-topo">${hero}${distritoPlot}</div>`:hero;
+  // ladrilhos de apoio: "Vistorias agendadas" mira direto na seção (mesmo mecanismo de
+  // scrollTo dos ladrilhos do fiscal — a seção já fica sempre visível, só rola até ela);
+  // "Obras atendidas" e "Distritos" somam vistoriadas+agendadas, sem seção única
+  // correspondente, então ficam informativos.
+  const tiles=`<div class="dsh-tiles">`
+    +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','ativas, ainda sem relatório',{scrollTo:'secEngAgendadas'})
+    +tile(NUM.format(todasObras.size),'Obras atendidas','distintas, vistoriadas + agendadas')
+    +tile(NUM.format(porDistrito.size),'Distritos','operacionais cobertos')
+    +`</div>`;
   // ambas as listas agora vêm agrupadas por distrito, cada grupo atrás de um toggle
   // (mesmo .gproc/.adToggle de grupoProcs — clicar no distrito abre a lista daquele
   // distrito, pedido do usuário, 25/09/2026). _engModalObrasRef é zerado aqui e
@@ -1955,24 +1969,26 @@ function abreModalEngenheiroEletrica(chave){
   // objeto obra inteiro) pra não inflar o innerHTML, e abreObraNaAbaEletrica() usa esse
   // índice pra abrir a obra certa direto na aba Elétrica.
   _engModalObrasRef=[];
-  const secAgendadas=`<div class="statwrap"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${e.agendadas.length?grupoDistritoEng('engAg',e.agendadas,true):'<div class="empty">Nenhuma vistoria agendada no momento.</div>'}</div>`;
-  const secVistoriadas=`<div class="statwrap"><div class="sec-h"><span>Obras vistoriadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
+  const secAgendadas=`<div class="statwrap" id="secEngAgendadas"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${e.agendadas.length?grupoDistritoEng('engAg',e.agendadas,true):'<div class="empty">Nenhuma vistoria agendada no momento.</div>'}</div>`;
+  const secVistoriadas=`<div class="statwrap" id="secEngVistoriadas"><div class="sec-h"><span>Obras vistoriadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
   // gráficos: mês a mês sempre reaproveita renderBarChart (Q7); ano a ano só aparece
-  // com ≥2 anos distintos, pra não desenhar um gráfico de barra única.
+  // com ≥2 anos distintos, pra não desenhar um gráfico de barra única. Sobem pra logo
+  // depois dos ladrilhos (antes ficavam no fim, depois das duas listas longas) — junto
+  // do resto do "de relance" da janela, com as listas de detalhe por último.
   const porMes={}, porAno={};
   for(const {data} of e.vistoriadas){
     const m=String(data||'').slice(0,7); if(m.length===7) porMes[m]=(porMes[m]||0)+1;
     const a=String(data||'').slice(0,4); if(a.length===4) porAno[a]=(porAno[a]||0)+1;
   }
   const anos=Object.keys(porAno);
-  const mesesChart=`<div class="statwrap"><div class="sec-h"><span>Vistorias mês a mês</span></div><div id="engChartMes"></div></div>`;
-  const anoChart=anos.length>=2?`<div class="statwrap"><div class="sec-h"><span>Vistorias ano a ano</span></div><div id="engChartAno"></div></div>`:'';
+  const mesesChart=`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.chart} Vistorias mês a mês</div><div id="engChartMes"></div></div>`;
+  const anoChart=anos.length>=2?`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.chart} Vistorias ano a ano</div><div id="engChartAno"></div></div>`:'';
   const sub=e.email?`<div class="msub">${RS_ICO.pessoa}<span>${escHtml(e.email)}</span></div>`:'';
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(e.nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
     </div></div>
-    <div class="mbody dsh">${tiles}${distritosHtml}${secAgendadas}${secVistoriadas}${mesesChart}${anoChart}</div>`;
+    <div class="mbody dsh">${topo}${tiles}${mesesChart}${anoChart}${secAgendadas}${secVistoriadas}</div>`;
   mostraJanelaGenerica();
   wireEngObraRows(chave);
   const mesCols=Object.keys(porMes).sort().map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), porMes[m]]);
@@ -2029,12 +2045,16 @@ function botaoBaixarRelatorio(r){
 // data — poluía a janela (achado do usuário, 25/09/2026, com um caso de 3 vistorias na
 // mesma obra). Agrupa por OBRA preservando a ordem de primeira aparição — que, como a
 // lista de entrada já vem por data desc, é a mesma posição que a vistoria mais recente da
-// obra ocuparia sozinha — e colapsa: 1 vistoria continua a linha simples de sempre, com
-// clique abrindo a obra direto; 2+ viram um cabeçalho com o nome da obra atrás de um
-// toggle (recolhido por padrão, mesmo mecanismo dos distritos — pedido do usuário,
-// 25/09/2026) e, ao expandir, cada relatório com sua versão (mesmo V1/V2/… de
-// buildEletricaPane — versaoPorIdRelatorio), data e botão de baixar; clicar num
-// relatório é que abre a obra, já que o cabeçalho virou o toggle.
+// obra ocuparia sozinha. TODA obra vira o mesmo cabeçalho-acordeão (mesmo com 1 vistoria
+// só — achado do usuário, 28/09/2026: a linha direta com data, sem essa casca, era um
+// segundo estilo competindo com o cabeçalho das obras com 2+; agora as duas seguem o
+// estilo único do cabeçalho: quantas vistorias + município na meta, objeto completo
+// embaixo) atrás de um toggle (recolhido por padrão, mesmo mecanismo dos distritos —
+// pedido do usuário, 25/09/2026); ao expandir, cada relatório com sua versão (mesmo
+// V1/V2/… de buildEletricaPane — versaoPorIdRelatorio, que numera pelo HISTÓRICO DA OBRA
+// inteiro, não só pelas vistorias deste engenheiro — por isso vale mostrar mesmo com só 1
+// aqui), data e botão de baixar; clicar num relatório é que abre a obra, já que o
+// cabeçalho virou o toggle.
 // `idPrefix` (o id do próprio grupo de distrito) vira a base do id de cada acordeão de
 // obra — precisa ser único no modal inteiro, não só dentro do distrito.
 function linhasPorObra(itensOrdenados,idPrefix){
@@ -2047,12 +2067,8 @@ function linhasPorObra(itensOrdenados,idPrefix){
   return ordem.map((grp,j)=>{
     const idx=_engModalObrasRef.length; _engModalObrasRef.push(grp.o);
     const nome=escHtml(grp.o.objeto||grp.o.codigo_obra||grp.o.contrato);
-    if(grp.itens.length===1){
-      const it=grp.itens[0];
-      return `<div class="eng-obra-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
-        +`<span class="eng-obra-data">${it.data?fmtDateBR(it.data):'sem data'}</span>`
-        +`<span class="eng-obra-nome">${nome}</span>${botaoBaixarRelatorio(it.r)}</div>`;
-    }
+    const mun=grp.o.municipioTxt?escHtml(grp.o.municipioTxt):'';
+    const n=grp.itens.length;
     const verId=`${idPrefix}-obra${j}`;
     const verMap=versaoPorIdRelatorio(grp.o.relatoriosEletrica||[]);
     const versoes=grp.itens.map(it=>{
@@ -2062,18 +2078,18 @@ function linhasPorObra(itensOrdenados,idPrefix){
         +`<span class="eng-ver-label">${rotulo}</span>${botaoBaixarRelatorio(it.r)}</div>`;
     }).join('');
     return `<div class="eng-obra-bloco"><button type="button" class="adToggle eng-obra-cab" data-target="${verId}" aria-expanded="false" aria-controls="${verId}">`
-      +`<span class="eng-obra-nome">${nome}</span>`
-      +`<span class="eng-obra-count">${NUM.format(grp.itens.length)} vistorias <span class="adToggle-car">▾</span></span></button>`
+      +`<div class="eng-obra-meta"><span class="eng-obra-count">${NUM.format(n)} vistoria${n===1?'':'s'}${mun?` · ${mun}`:''}</span><span class="adToggle-car">▾</span></div>`
+      +`<div class="eng-obra-nome">${nome}</div></button>`
       +`<div id="${verId}" class="eng-ver-lista" hidden>${versoes}</div></div>`;
   }).join('');
 }
-// clique/teclado numa linha de obra ou de versão do modal do engenheiro — reconstruído a
+// clique/teclado numa linha de relatório dentro do acordeão de uma obra — reconstruído a
 // cada abreModalEngenheiroEletrica() (innerHTML novo, listeners velhos morrem junto,
 // mesmo padrão de wireEleEngenheiros). `chave` é repassada pra abreObraNaAbaEletrica()
 // virar o voltarChave do openModal() — sem ela, quem clicasse numa vistoria ficava sem
 // jeito de voltar pro modal do engenheiro (achado do usuário, 25/09/2026).
 function wireEngObraRows(chave){
-  document.querySelectorAll('.modal .eng-obra-row[data-idx],.modal .eng-ver-row[data-idx]').forEach(row=>{
+  document.querySelectorAll('.modal .eng-ver-row[data-idx]').forEach(row=>{
     row.addEventListener('click',()=>abreObraNaAbaEletrica(_engModalObrasRef[+row.dataset.idx],chave));
     row.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); row.click(); } });
   });
