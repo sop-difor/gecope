@@ -1388,6 +1388,16 @@
         cursor:pointer;border-radius:6px;transition:.15s}
   .modal .eng-baixar svg{width:13px;height:13px;display:block}
   .modal .eng-baixar:hover{color:var(--ng-light);background:rgba(var(--ng-rgb),.12)}
+  /* toast "Baixando relatório…" (pedido do usuário, 28/09/2026): o download passa pela
+     Edge Function + Drive antes de começar, e o :active/opacity do botão sozinho passava
+     despercebido dentro do modal. z-index acima do .ele-dialog-bg (2100, o mais alto do
+     módulo Elétrica) pra aparecer mesmo com o formulário de novo relatório aberto por cima. */
+  .ele-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2200;
+        background:var(--bg-modal);color:var(--text-base);border:1px solid var(--card-border);
+        border-radius:10px;padding:10px 16px;font:600 12.5px Montserrat,sans-serif;
+        box-shadow:0 8px 24px rgba(0,0,0,.28);max-width:min(320px,calc(100vw - 32px));
+        text-align:center}
+  .ele-toast-erro{border-color:rgba(220,80,80,.4);color:#e07a7a}
   /* Cronograma de visitas (grill de 28/09/2026): botão no painel lateral + modal do mês.
      Azul = mesmo #5B9FDB de .ele-resumo-i.info (agendada), sem split por tema. */
   .ele-crono-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:40px;cursor:pointer;

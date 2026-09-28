@@ -43,6 +43,29 @@ function contentDisposition(nome: string) {
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nome)}`;
 }
 
+// Access token do Google guardado no escopo do módulo: instâncias "quentes" da function
+// reaproveitam o token (~1h de vida) em vez de trocar o refresh token a cada clique —
+// era uma ida e volta inteira ao Google só pra baixar um arquivo. Margem de 60s.
+let tokenCache: { valor: string; expiraEm: number } | null = null;
+
+async function obterAccessToken(): Promise<string> {
+  if (tokenCache && tokenCache.expiraEm > Date.now() + 60_000) return tokenCache.valor;
+  const resp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: Deno.env.get("GOOGLE_CLIENT_ID")!,
+      client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!,
+      refresh_token: Deno.env.get("GOOGLE_REFRESH_TOKEN")!,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!resp.ok) throw new Error(`Google OAuth respondeu ${resp.status}: ${await resp.text()}`);
+  const json = await resp.json();
+  tokenCache = { valor: json.access_token, expiraEm: Date.now() + (json.expires_in ?? 3600) * 1000 };
+  return json.access_token;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") {
@@ -61,11 +84,6 @@ Deno.serve(async (req: Request) => {
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   );
 
-  const { data: { user }, error: erroAuth } = await supabase.auth.getUser(token);
-  if (erroAuth || !user) {
-    return jsonResponse({ ok: false, erro: "Sua sessão do GECOPE expirou. Entre novamente." }, 401);
-  }
-
   let body: { id_relatorio?: number };
   try {
     body = await req.json();
@@ -77,12 +95,20 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: false, erro: "id_relatorio inválido." }, 400);
   }
 
-  const { data: rel, error: erroRel } = await supabase
-    .from("eletrica_vistorias")
-    .select("drive_file_id, arquivo_nome_original, arquivo_mime")
-    .eq("id", idRelatorio)
-    .is("excluido_em", null)
-    .maybeSingle();
+  // Valida a sessão e busca o relatório ao mesmo tempo (eram 2 idas e voltas em série).
+  // Sessão inválida => a consulta com RLS também não devolve nada, e o 401 tem prioridade.
+  const [{ data: { user }, error: erroAuth }, { data: rel, error: erroRel }] = await Promise.all([
+    supabase.auth.getUser(token),
+    supabase
+      .from("eletrica_vistorias")
+      .select("drive_file_id, arquivo_nome_original, arquivo_mime")
+      .eq("id", idRelatorio)
+      .is("excluido_em", null)
+      .maybeSingle(),
+  ]);
+  if (erroAuth || !user) {
+    return jsonResponse({ ok: false, erro: "Sua sessão do GECOPE expirou. Entre novamente." }, 401);
+  }
   if (erroRel) {
     console.error("Erro consultando eletrica_vistorias:", erroRel);
     return jsonResponse({ ok: false, erro: "Não consegui localizar o relatório agora. Tente novamente." }, 500);
@@ -93,18 +119,7 @@ Deno.serve(async (req: Request) => {
 
   let accessToken: string;
   try {
-    const resp = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: Deno.env.get("GOOGLE_CLIENT_ID")!,
-        client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!,
-        refresh_token: Deno.env.get("GOOGLE_REFRESH_TOKEN")!,
-        grant_type: "refresh_token",
-      }),
-    });
-    if (!resp.ok) throw new Error(`Google OAuth respondeu ${resp.status}: ${await resp.text()}`);
-    accessToken = (await resp.json()).access_token;
+    accessToken = await obterAccessToken();
   } catch (erro) {
     console.error("Erro renovando token do Google:", erro);
     return jsonResponse(

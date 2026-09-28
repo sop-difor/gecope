@@ -2909,6 +2909,22 @@ async function baixarRelatorioEletrica(idRelatorio){
   a.href=url; a.download=nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),10000);
 }
+// toast simples ("Baixando relatório…"/erro) fixo no rodapé — o delay do Drive (troca de
+// token + leitura do arquivo) não é instantâneo, e só o cursor de espera passava batido
+// dentro de um modal. Um elemento só, reaproveitado por cima de tudo (inclusive o modal,
+// que tem seu próprio z-index) — não precisa recriar a cada clique.
+function toastEletrica(msg,tipo){
+  let el=document.getElementById('eleToast');
+  if(!el){
+    el=document.createElement('div'); el.id='eleToast'; el.className='ele-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent=msg; el.className='ele-toast'+(tipo?` ele-toast-${tipo}`:'');
+  el.hidden=false;
+  clearTimeout(el._t);
+  if(tipo==='erro') el._t=setTimeout(()=>{ el.hidden=true; },4000);
+}
+function esconderToastEletrica(){ const el=document.getElementById('eleToast'); if(el) el.hidden=true; }
 // liga todo elemento [data-rel-id] dentro de `raiz`; desabilita durante o download e avisa
 // em caso de erro. stopPropagation: o botão mora dentro de linhas clicáveis.
 function wireBaixarRelatorio(raiz){
@@ -2917,8 +2933,9 @@ function wireBaixarRelatorio(raiz){
       e.preventDefault(); e.stopPropagation();
       if(el.dataset.baixando) return;
       el.dataset.baixando='1'; el.style.opacity='.5';
-      try{ await baixarRelatorioEletrica(el.dataset.relId); }
-      catch(err){ window.alert(err.message||'Não consegui baixar o relatório agora.'); }
+      toastEletrica('Baixando relatório…');
+      try{ await baixarRelatorioEletrica(el.dataset.relId); esconderToastEletrica(); }
+      catch(err){ toastEletrica(err.message||'Não consegui baixar o relatório agora.','erro'); }
       finally{ delete el.dataset.baixando; el.style.opacity=''; }
     });
   });
