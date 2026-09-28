@@ -142,9 +142,9 @@ const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,val
 // eletrica_vistorias: metadados dos relatórios de vistoria elétrica (o arquivo em si
 // fica no Google Drive — ver supabase/functions/eletrica-drive-token). excluido_em
 // filtrado aqui (não é policy: soft delete, ver sql/create_eletrica_vistorias.sql).
-// drive_file_id entrou pro botão de baixar do modal do engenheiro (pedido do usuário,
-// 25/09/2026) — drive_web_view_link sozinho só abre o visualizador do Drive, não baixa.
-const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,drive_web_view_link,drive_file_id,criado_em';
+// Sem drive_file_id nem link do Drive: o Drive é privado (403 pra quem não é dono), então
+// o download passa pela Edge Function eletrica-drive-download, que recebe só o `id`.
+const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,criado_em';
 const SB_ELETRICA_AGENDA='eletrica_vistorias_agendadas'; // agendamento de vistoria (obra+data+responsável), pedido do usuário 24/09/2026
 const ELETRICA_AGENDA_COLS='id,id_obra,data_planejada,responsavel_nome,criado_em';
 // referência estática dos códigos de situação da medição (STM) exibida na aba
@@ -2017,12 +2017,12 @@ function grupoDistritoEng(idPrefix,itens,ordGruposPorData){
       +`</button><div id="${id}" class="elelist" hidden>${linhas}</div></div>`;
   }).join('');
 }
-// botão de baixar (pedido do usuário, 25/09/2026) — link direto do Drive, não o de
-// visualização; `data-href` (não `href`) porque é um <button>, não um <a>: o clique é
-// tratado à parte em wireEngObraRows() pra não também abrir a obra (stopPropagation).
+// botão de baixar (pedido do usuário, 25/09/2026) — baixa pelo GECOPE (Edge Function
+// eletrica-drive-download), não por link do Drive (privado, dava 403). `data-rel-id` (não
+// `href`) porque é um <button>: o clique é tratado à parte em wireBaixarRelatorio() pra
+// não também abrir a obra (stopPropagation).
 function botaoBaixarRelatorio(r){
-  const url=r&&driveDownloadUrl(r.drive_file_id);
-  return url?`<button type="button" class="eng-baixar" data-href="${escHtml(url)}" title="Baixar relatório" aria-label="Baixar relatório de ${fmtDateBR(r.data_vistoria)}">${RS_ICO.baixar}</button>`:'';
+  return r&&r.id?`<button type="button" class="eng-baixar" data-rel-id="${r.id}" title="Baixar relatório" aria-label="Baixar relatório de ${fmtDateBR(r.data_vistoria)}">${RS_ICO.baixar}</button>`:'';
 }
 // Linhas de UM grupo de distrito (agendadas OU vistoriadas), já ordenado por data desc:
 // obras com mais de 1 vistoria (relatório) apareciam repetidas, uma linha idêntica por
@@ -2079,9 +2079,7 @@ function wireEngObraRows(chave){
   });
   // botão de baixar mora dentro da linha (role="button"); precisa de stopPropagation
   // senão o clique também "borbulha" e abre a obra por cima do download.
-  document.querySelectorAll('.modal .eng-baixar[data-href]').forEach(btn=>{
-    btn.addEventListener('click',e=>{ e.stopPropagation(); window.open(btn.dataset.href,'_blank','noopener'); });
-  });
+  wireBaixarRelatorio(document.querySelector('.modal')||document);
 }
 // abre a janela da obra a partir de uma linha do modal do engenheiro, já na aba Elétrica
 // (pedido do usuário, 25/09/2026) — mesmo openModal() do card de obra, só troca de aba
@@ -2372,9 +2370,7 @@ function wireCorpoCronograma(){
     row.addEventListener('click',()=>abreObraNaAbaEletrica(_cronoObrasRef[+row.dataset.idx],CRONO_CHAVE_VOLTAR));
     row.addEventListener('keydown',ev=>{ if(ev.target===row&&(ev.key==='Enter'||ev.key===' ')){ ev.preventDefault(); row.click(); } });
   });
-  modal.querySelectorAll('#cronoAgenda .eng-baixar[data-href]').forEach(btn=>{
-    btn.addEventListener('click',e=>{ e.stopPropagation(); window.open(btn.dataset.href,'_blank','noopener'); });
-  });
+  wireBaixarRelatorio(modal.querySelector('#cronoAgenda')||modal);
 }
 {
   const btn=document.getElementById('btnCronogramaEle');
@@ -2887,10 +2883,46 @@ const RS_ICO={
   lixeira:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/></svg>',
   baixar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20h14"/></svg>',
 };
-// link de DOWNLOAD direto do Drive (uc?export=download), não o de visualização
-// (drive_web_view_link, que só abre o app do Drive) — pedido do usuário, 25/09/2026:
-// um botão simples de "baixar o relatório" no modal do engenheiro.
-function driveDownloadUrl(fileId){ return fileId?`https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`:null; }
+// Baixa o relatório pelo GECOPE: a Edge Function eletrica-drive-download confere a sessão
+// e a RLS e devolve o arquivo lido do Drive privado da conta do setor. O link direto do
+// Drive (uc?export=download) dava 403 pra quem não é dono do arquivo. Vira blob e clica
+// num <a download> temporário — precisa ser fetch (não link) pra mandar o Authorization.
+async function baixarRelatorioEletrica(idRelatorio){
+  const {data:sessao}=await window.sbClient.auth.getSession();
+  const token=sessao&&sessao.session?sessao.session.access_token:null;
+  if(!token) throw new Error('Sua sessão do GECOPE expirou. Entre novamente.');
+  const resp=await fetch(`${SB_URL}/functions/v1/eletrica-drive-download`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,apikey:SB_KEY},
+    body:JSON.stringify({id_relatorio:Number(idRelatorio)}),
+  });
+  if(!resp.ok){
+    const j=await resp.json().catch(()=>({}));
+    throw new Error(j.erro||'Não consegui baixar o relatório agora. Tente novamente.');
+  }
+  const cd=resp.headers.get('Content-Disposition')||'';
+  const m=/filename\*=UTF-8''([^;]+)/i.exec(cd)||/filename="([^"]+)"/i.exec(cd);
+  let nome='relatorio';
+  if(m){ try{ nome=decodeURIComponent(m[1]); }catch(_){ nome=m[1]; } }
+  const url=URL.createObjectURL(await resp.blob());
+  const a=document.createElement('a');
+  a.href=url; a.download=nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+// liga todo elemento [data-rel-id] dentro de `raiz`; desabilita durante o download e avisa
+// em caso de erro. stopPropagation: o botão mora dentro de linhas clicáveis.
+function wireBaixarRelatorio(raiz){
+  raiz.querySelectorAll('[data-rel-id]').forEach(el=>{
+    el.addEventListener('click',async e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(el.dataset.baixando) return;
+      el.dataset.baixando='1'; el.style.opacity='.5';
+      try{ await baixarRelatorioEletrica(el.dataset.relId); }
+      catch(err){ window.alert(err.message||'Não consegui baixar o relatório agora.'); }
+      finally{ delete el.dataset.baixando; el.style.opacity=''; }
+    });
+  });
+}
 // medição NO NÍVEL DA OBRA: Σ do `total` LÍQUIDO das medições desta obra (já com as
 // glosas descontadas — não `valor_medido`, que é o bruto) ÷ valor da obra. Denominador =
 // `o.valor` (valor_atual da obra em contratos_edificacao — autoritativo; medicoes.valor_atual
@@ -3253,9 +3285,7 @@ function buildEletricaPane(o){
           <span class="elerow-ver">V${versaoPorId[r.id]}</span>
           <span class="elerow-data">${fmtDateBR(r.data_vistoria)}</span>
           <span class="elerow-resp">${escHtml(r.responsavel_nome)}</span>
-          ${r.drive_web_view_link
-            ?`<a class="elerow-link" href="${escHtml(r.drive_web_view_link)}" target="_blank" rel="noopener">${escHtml(r.arquivo_nome_original||'Abrir relatório')}</a>`
-            :`<span class="elerow-link off">${escHtml(r.arquivo_nome_original||'Arquivo')}</span>`}
+          <a class="elerow-link" href="#" data-rel-id="${r.id}" title="Baixar relatório">${escHtml(r.arquivo_nome_original||'Baixar relatório')}</a>
           ${podeEnviar?`<button type="button" class="elerow-excluir" data-id="${r.id}" title="Excluir relatório" aria-label="Excluir relatório de ${fmtDateBR(r.data_vistoria)}">${RS_ICO.lixeira}</button>`:''}
         </div>
         ${r.observacao?`<div class="elerow-obs">${escHtml(r.observacao)}</div>`:''}
@@ -3319,6 +3349,7 @@ const ELE_TAMANHO_MAX=20*1024*1024; // 20MB — mesmo teto validado em eletrica-
 // antigos morrem com o innerHTML velho — mesmo padrão de wireModalTabs/openModal.
 function wireEletricaPane(o){
   const pane=document.getElementById('mPaneEletrica'); if(!pane) return;
+  wireBaixarRelatorio(pane);
   // botão "Excluir" de cada relatório: soft delete (mesma UPDATE+excluido_em de
   // sql/create_eletrica_vistorias.sql) — não depende do formulário existir, mas só
   // é renderizado junto com ele (mesma trava PAPEIS_ELETRICA_ESCRITA).
