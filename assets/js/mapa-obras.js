@@ -146,7 +146,7 @@ const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,val
 // filtrado aqui (não é policy: soft delete, ver sql/create_eletrica_vistorias.sql).
 // Sem drive_file_id nem link do Drive: o Drive é privado (403 pra quem não é dono), então
 // o download passa pela Edge Function eletrica-drive-download, que recebe só o `id`.
-const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,observacao,arquivo_nome_original,criado_em';
+const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,nup_processo,observacao,arquivo_nome_original,criado_em';
 const SB_ELETRICA_AGENDA='eletrica_vistorias_agendadas'; // agendamento de vistoria (obra+data+responsável), pedido do usuário 24/09/2026
 const ELETRICA_AGENDA_COLS='id,id_obra,data_planejada,responsavel_nome,criado_em';
 // referência estática dos códigos de situação da medição (STM) exibida na aba
@@ -860,17 +860,23 @@ function grpById(g){return groupsList().find(x=>String(x.id)===String(g));}
 // valor, Prazo…) usam o mesmo caminho — a diferença está só em como fillFilters()
 // monta a lista de opções. A busca livre `q` continua um caso à parte.
 function passF(o){const f=st.f;
-  // cards do resumo "Elétrica" (eleFiltroCategoria, ver mais abaixo): mesma fonte
-  // (categoriaEletricaObra) que renderAtencaoEletrica() usa pra contar cada card,
-  // aplicada aqui pra que o clique no card recorte também o que o mapa pinta/soma — não só a
-  // listinha do painel. Só entra em jogo na métrica Elétrica. 'obras' já filtra pelo
-  // universo-base (status Em Execução/Paralisada — Q5 do grill de 25/09/2026: o card
-  // "Obras" é clicável como os outros 3, mesmo comportamento de filtrar o mapa).
+  // cards do resumo "Elétrica" (eleFiltroCategoria, ver mais abaixo) — clicar recorta
+  // também o que o mapa pinta/soma, não só o número do card. Só entra em jogo na
+  // métrica Elétrica. 'obras'/'avistoriar' usam categoriaEletricaObra e continuam
+  // restritos à carteira ativa (Q5 do grill de 25/09/2026). 'agendadas'/'vistoriadas'
+  // usam a MESMA regra sem restrição de contarEletricaAgendadasVistoriadas() (pedido do
+  // usuário, 29/09/2026) — sem isso o clique no card mostraria menos obras do que o
+  // número exibido.
   if(st.metric==='eletrica' && eleFiltroCategoria){
-    const c=categoriaEletricaObra(o);
-    if(!c.ativo) return false; // as 4 categorias do painel só existem na carteira ativa da elétrica
-    const catAlvo={vistoriadas:'vistoriada',avistoriar:'avistoriar',agendadas:'agendada'}[eleFiltroCategoria];
-    if(catAlvo && c.categoria!==catAlvo) return false;
+    if(eleFiltroCategoria==='agendadas'){
+      if((o.relatoriosEletrica&&o.relatoriosEletrica.length) || !o.agendamentoEletrica) return false;
+    } else if(eleFiltroCategoria==='vistoriadas'){
+      if(!(o.relatoriosEletrica&&o.relatoriosEletrica.length)) return false;
+    } else {
+      const c=categoriaEletricaObra(o);
+      if(!c.ativo) return false; // 'obras'/'avistoriar' só existem na carteira ativa da elétrica
+      if(eleFiltroCategoria==='avistoriar' && c.categoria!=='avistoriar') return false;
+    }
   }
   for(let i=0;i<FILTER_DEFS.length;i++){
     const d=FILTER_DEFS[i], set=f[d.key];
@@ -1775,6 +1781,25 @@ function obrasComAtencaoEletrica(){
   arr.sort((a,b)=>(a.totalRelatorios>0)-(b.totalRelatorios>0) || (b.pct??-1)-(a.pct??-1));
   return arr;
 }
+// Cards "Agendadas"/"Vistoriadas" do resumo: SEM restrição de carteira ativa nem de
+// limiar de medição (pedido do usuário, 29/09/2026 — antes usavam categoriaEletricaObra,
+// que só conta essas 2 categorias dentro da carteira ativa e, para 'agendada', só acima
+// de LIMIAR_ELETRICA%; isso fazia o card divergir da soma do painel "Engenheiros
+// Eletricistas", que já contava sem essas restrições, ver computarRosterEletrica()).
+// Mesma regra em ambos os lugares agora: agendada = tem agendamento ativo e nenhum
+// relatório; vistoriada = tem pelo menos 1 relatório — qualquer obra da base, dentro ou
+// fora da carteira ativa. 'obras' e 'a vistoriar' continuam restritos à carteira ativa
+// (categoriaEletricaObra, sem mudança).
+function contarEletricaAgendadasVistoriadas(){
+  let agendadas=0, vistoriadas=0;
+  for(const cod in DB.municipios){
+    for(const o of DB.municipios[cod].obras){
+      if(o.relatoriosEletrica&&o.relatoriosEletrica.length){ vistoriadas++; continue; }
+      if(o.agendamentoEletrica) agendadas++;
+    }
+  }
+  return {agendadas, vistoriadas};
+}
 // filtro por card do resumo (null | 'obras' | 'vistoriadas' | 'avistoriar' |
 // 'agendadas') — clicar de novo no card já ativo limpa o filtro. 'obras' é o
 // universo inteiro (mesmo efeito de null), mas precisa de valor próprio pra o card
@@ -1817,9 +1842,8 @@ function renderAtencaoEletrica(forceReflow){
   const itens=obrasComAtencaoEletrica();
   if(titulo) titulo.textContent=itens.length?`Elétrica (${itens.length})`:'Elétrica';
   if(!itens.length){ corpo.innerHTML='<div class="empty">Nenhuma obra em execução ou paralisada no momento.</div>'; return; }
-  const vistoriadas=itens.filter(it=>it.categoria==='vistoriada').length;
-  const agendadas=itens.filter(it=>it.categoria==='agendada').length;
   const avistoriar=itens.filter(it=>it.categoria==='avistoriar').length;
+  const {agendadas, vistoriadas}=contarEletricaAgendadasVistoriadas();
   // cada card filtra o mapa/"Resultados da busca" pra só aquela categoria (via
   // eleFiltroCategoria em passF()/hasActiveFilter()) — clicar no card já ativo limpa
   // o filtro (mesmo padrão de toggle de outros chips no app). Só os 4 cards moram
@@ -1830,17 +1854,17 @@ function renderAtencaoEletrica(forceReflow){
   // do botão "i" (mostraRpTip/kpi-info, mesmo mecanismo do modo Replanilhamentos).
   const cardDef=[
     {k:'obras',v:itens.length,l:'obras',cls:'',ic:ICONS_ELE_RESUMO.obras,
-      tip:'Obras em execução ou paralisadas — a carteira ativa da elétrica. Base dos outros 3 cards ao lado.'},
+      tip:'Quantidade de obras com status Em Execução e Paralisadas.'},
     {k:'avistoriar',v:avistoriar,l:'a vistoriar',cls:'warn',ic:ICONS_ELE_RESUMO.avistoriar,
-      tip:`Medição igual ou maior que ${LIMIAR_ELETRICA}%, sem relatório de vistoria enviado e sem vistoria agendada.`},
+      tip:`Quantidade de obras com, no mínimo, ${LIMIAR_ELETRICA}% de medição realizada.`},
     {k:'agendadas',v:agendadas,l:'agendadas',cls:'info',ic:ICONS_ELE_RESUMO.agendadas,
-      tip:`Medição igual ou maior que ${LIMIAR_ELETRICA}%, sem relatório enviado, com vistoria já agendada.`},
+      tip:'Quantidade de vistorias agendadas atualmente pelos engenheiros.'},
     {k:'vistoriadas',v:vistoriadas,l:'vistoriadas',cls:'ok',ic:ICONS_ELE_RESUMO.vistoriadas,
-      tip:'Tem pelo menos 1 relatório de vistoria enviado — por histórico completo, não exige a medição atual estar acima do limiar.'},
+      tip:'Quantidade de obras vistoriadas pelos engenheiros.'},
   ];
   corpo.innerHTML=`<div class="ele-resumo">${cardDef.map(c=>
     `<div class="ele-resumo-i${c.cls?' '+c.cls:''}${eleFiltroCategoria===c.k?' on':''}" role="button" tabindex="0" data-filtro="${c.k}">`
-    +`<div class="eri-txt"><span class="l">${c.l}<button type="button" class="kpi-info" data-tip="${escHtml(c.tip)}" aria-label="O que é ${escHtml(c.l)}?">i</button></span><span class="v">${NUM.format(c.v)}</span></div>`
+    +`<div class="eri-txt"><span class="l">${c.l}<button type="button" class="kpi-info" data-tip="${escHtml(c.tip)}" aria-label="O que é ${escHtml(c.l)}?">${RS_ICO.info}</button></span><span class="v">${NUM.format(c.v)}</span></div>`
     +`<span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${c.ic}</svg></span>`
     +`</div>`).join('')}</div>`;
   wireEleResumoFiltro();
@@ -1931,7 +1955,7 @@ function renderEleEngenheiros(forceReflow){
       <span class="eng-ic${corCls}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${RS_ICO.pessoa}</svg></span>
       <div class="eng-nome">${escHtml(nomeExibido)}</div>
       <div class="eng-stats">
-        <span class="eng-stat"><b>${NUM.format(e.vistoriadas.length)}</b> vistoriada${e.vistoriadas.length===1?'':'s'}</span>
+        <span class="eng-stat"><b>${NUM.format(e.vistoriadas.length)}</b> vistoria${e.vistoriadas.length===1?'':'s'}</span>
         <span class="eng-stat"><b>${NUM.format(e.agendadas.length)}</b> agendada${e.agendadas.length===1?'':'s'}</span>
         <span class="eng-stat eng-stat-warn"><b>${NUM.format(e.faltam.length)}</b> a vistoriar</span>
       </div>
@@ -2051,7 +2075,7 @@ function abreModalEngenheiroEletrica(chave){
   // (acordeão de versões de relatório, que não existe aqui).
   const secFaltam=`<div class="statwrap" id="secEngFaltam"><div class="sec-h"><span>A vistoriar</span><span>${NUM.format(e.faltam.length)}</span></div>${e.faltam.length?grupoDistritoFaltam(e.faltam):'<div class="empty">Nenhuma obra pendente de vistoria no momento.</div>'}</div>`;
   const secAgendadas=`<div class="statwrap" id="secEngAgendadas"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${e.agendadas.length?grupoDistritoEng('engAg',e.agendadas,true):'<div class="empty">Nenhuma vistoria agendada no momento.</div>'}</div>`;
-  const secVistoriadas=`<div class="statwrap" id="secEngVistoriadas"><div class="sec-h"><span>Obras vistoriadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
+  const secVistoriadas=`<div class="statwrap" id="secEngVistoriadas"><div class="sec-h"><span>Vistorias realizadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
   // gráficos: mês a mês sempre reaproveita renderBarChart (Q7); ano a ano só aparece
   // com ≥2 anos distintos, pra não desenhar um gráfico de barra única. Sobem pra logo
   // depois dos ladrilhos (antes ficavam no fim, depois das duas listas longas) — junto
@@ -2090,7 +2114,7 @@ let _engModalObrasRef=[];
 // ordGruposPorData ordena os GRUPOS pela
 // vistoria mais recente de cada um — usado em "Vistorias agendadas"; sem ela, os grupos
 // vêm por volume (mais obras primeiro, como o card "Por distrito operacional" acima),
-// que é a leitura que "Obras vistoriadas" pediu, sem exigir recência entre distritos.
+// que é a leitura que "Vistorias realizadas" pediu, sem exigir recência entre distritos.
 // Dentro de cada grupo, os itens vêm sempre da vistoria mais recente para a mais antiga.
 function grupoDistritoEng(idPrefix,itens,ordGruposPorData){
   const porDist=new Map();
@@ -2189,9 +2213,10 @@ function linhasPorObra(itensOrdenados,idPrefix){
     const verMap=versaoPorIdRelatorio(grp.o.relatoriosEletrica||[]);
     const versoes=grp.itens.map(it=>{
       const ver=it.r?verMap[it.r.id]:null;
-      const rotulo=`RELATÓRIO${ver?` · <span class="eng-ver-v">V${ver}</span>`:''} · ${it.data?fmtDateBR(it.data):'sem data'}`;
+      const nup=it.r&&it.r.nup_processo;
+      const rotulo=`RELATÓRIO${ver?` · <span class="eng-ver-v">V${ver}</span>`:''} · ${it.data?fmtDateBR(it.data):'sem data'}${nup?` - NUP ${escHtml(nup)}`:''}`;
       return `<div class="eng-ver-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
-        +`<span class="eng-ver-label">${rotulo}</span>${botaoBaixarRelatorio(it.r)}</div>`;
+        +`<span class="eng-ver-label">${rotulo}</span>${botaoBaixarRelatorio(it.r)}${botaoAbrirSuite(nup)}</div>`;
     }).join('');
     return `<div class="eng-obra-bloco"><button type="button" class="adToggle eng-obra-cab" data-target="${verId}" aria-expanded="false" aria-controls="${verId}">`
       +`<div class="eng-obra-meta"><span class="eng-obra-count">${NUM.format(n)} vistoria${n===1?'':'s'}${mun?` · ${mun}`:''}</span><span class="adToggle-car">▾</span></div>`
@@ -2212,10 +2237,11 @@ function wireEngObraRows(chave){
   // botão de baixar mora dentro da linha (role="button"); precisa de stopPropagation
   // senão o clique também "borbulha" e abre a obra por cima do download.
   wireBaixarRelatorio(document.querySelector('.modal')||document);
+  wireAbrirSuite(document.querySelector('.modal')||document);
 }
 // abre a janela da obra a partir de uma linha do modal do engenheiro, já na aba Elétrica
 // (pedido do usuário, 25/09/2026) — mesmo openModal() do card de obra, só troca de aba
-// antes de mostrar: quem clicou veio de "vistorias agendadas"/"obras vistoriadas", onde a
+// antes de mostrar: quem clicou veio de "vistorias agendadas"/"vistorias realizadas", onde a
 // Elétrica é sempre o contexto relevante (mesma ideia do atalho de "Comissão completa").
 // voltarChave (chave do engenheiro) vira o botão "← Voltar" do cabeçalho do modal de
 // obra, em vez do "✕" de sempre — sem ele, não havia caminho de volta pro modal de
@@ -3014,6 +3040,8 @@ const RS_ICO={
   voltar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
   lixeira:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/></svg>',
   baixar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20h14"/></svg>',
+  info:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.6" r=".9" fill="currentColor" stroke="none"/></svg>',
+  suite:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/><path d="M14 4h6v6"/><path d="M20 4 11 13"/></svg>',
 };
 // Baixa o relatório pelo GECOPE: a Edge Function eletrica-drive-download confere a sessão
 // e a RLS e devolve o arquivo lido do Drive privado da conta do setor. O link direto do
@@ -3057,6 +3085,14 @@ function toastEletrica(msg,tipo){
   if(tipo==='erro') el._t=setTimeout(()=>{ el.hidden=true; },4000);
 }
 function esconderToastEletrica(){ const el=document.getElementById('eleToast'); if(el) el.hidden=true; }
+// ".ele-suite-btn" (botaoAbrirSuite) é um <a target="_blank"> comum — só precisa de
+// stopPropagation porque mora dentro de linhas clicáveis (.eng-ver-row); a navegação
+// em si o navegador já faz sozinho.
+function wireAbrirSuite(raiz){
+  raiz.querySelectorAll('.ele-suite-btn').forEach(el=>{
+    el.addEventListener('click',e=>e.stopPropagation());
+  });
+}
 // liga todo elemento [data-rel-id] dentro de `raiz`; desabilita durante o download e avisa
 // em caso de erro. stopPropagation: o botão mora dentro de linhas clicáveis.
 function wireBaixarRelatorio(raiz){
@@ -3435,6 +3471,7 @@ function buildEletricaPane(o){
           <span class="elerow-data">${fmtDateBR(r.data_vistoria)}</span>
           <span class="elerow-resp">${escHtml(r.responsavel_nome)}</span>
           <a class="elerow-link" href="#" data-rel-id="${r.id}" title="Baixar relatório">${escHtml(r.arquivo_nome_original||'Baixar relatório')}</a>
+          ${r.nup_processo?`<span class="elerow-nup" title="Processo SUITE">NUP ${escHtml(r.nup_processo)}</span>${botaoAbrirSuite(r.nup_processo)}`:''}
           ${podeEnviar?`<button type="button" class="elerow-excluir" data-id="${r.id}" title="Excluir relatório" aria-label="Excluir relatório de ${fmtDateBR(r.data_vistoria)}">${RS_ICO.lixeira}</button>`:''}
         </div>
         ${r.observacao?`<div class="elerow-obs">${escHtml(r.observacao)}</div>`:''}
@@ -3460,6 +3497,7 @@ function buildEletricaPane(o){
         <div class="elefields">
           <label>Data da vistoria<input type="date" id="eleData" required value="${hoje}"></label>
           <label>Responsável<input type="text" id="eleResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
+          <label class="span2">NUP do processo (SUITE)<input type="text" id="eleNup" required maxlength="20" placeholder="00000.000000/0000-00" inputmode="numeric"></label>
           <label class="span2">Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
         </div>
         <div class="ele-erro" id="eleErro" hidden></div>
@@ -3493,12 +3531,36 @@ async function uploadParaDrive(accessToken,folderId,arquivo,nomeArquivo){
 const ELE_TIPOS_ACEITOS={'application/pdf':1,'application/msword':1,
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document':1};
 const ELE_TAMANHO_MAX=20*1024*1024; // 20MB — mesmo teto validado em eletrica-drive-token
+// NUP do processo SUITE (pedido do usuário, 29/09/2026): a partir de agora todo
+// relatório de vistoria exige o número do processo aberto no SUITE, pra obrigar o
+// engenheiro a abrir o processo lá e encaminhar ao fiscal responsável. Mesma máscara
+// de utils.js:mascaraProcesso — cópia local (não import) porque gecope_mapa_obras.html
+// não carrega utils.js (arquivo pesado, só usado pelo index.html — ver
+// docs/MAPA-MODULOS.md), mesmo padrão já usado em cronograma.html.
+function mascaraNup(val){
+  val=String(val||'').replace(/\D/g,'');
+  val=val.replace(/^(\d{5})(\d)/,'$1.$2');
+  val=val.replace(/^(\d{5})\.(\d{6})(\d)/,'$1.$2/$3');
+  val=val.replace(/^(\d{5})\.(\d{6})\/(\d{4})(\d)/,'$1.$2/$3-$4');
+  if(val.length>20) val=val.substring(0,20);
+  return val;
+}
+const NUP_REGEX=/^\d{5}\.\d{6}\/\d{4}-\d{2}$/;
+// mesmo link "Abrir no SUITE" de modules/processos/processos.js:3418 (NUP só com
+// dígitos na URL, senão o SUITE devolve 404) — ícone-botão reaproveitado tanto na aba
+// Elétrica da obra (buildEletricaPane) quanto no modal do engenheiro (linhasPorObra).
+function botaoAbrirSuite(nup){
+  if(!nup) return '';
+  const limpo=String(nup).replace(/\D/g,'');
+  return `<a class="ele-suite-btn" href="https://suite.ce.gov.br/consultar-processo/${limpo}" target="_blank" rel="noopener noreferrer" title="Abrir processo ${escHtml(nup)} no SUITE" aria-label="Abrir processo ${escHtml(nup)} no SUITE">${RS_ICO.suite}</a>`;
+}
 // liga a dropzone e o submit do formulário de novo relatório. Chamada de novo a cada
 // re-render da aba (sucesso de envio redesenha só #mPaneEletrica), então os listeners
 // antigos morrem com o innerHTML velho — mesmo padrão de wireModalTabs/openModal.
 function wireEletricaPane(o){
   const pane=document.getElementById('mPaneEletrica'); if(!pane) return;
   wireBaixarRelatorio(pane);
+  wireAbrirSuite(pane);
   // botão "Excluir" de cada relatório: soft delete (mesma UPDATE+excluido_em de
   // sql/create_eletrica_vistorias.sql) — não depende do formulário existir, mas só
   // é renderizado junto com ele (mesma trava PAPEIS_ELETRICA_ESCRITA).
@@ -3581,6 +3643,8 @@ function wireEletricaPane(o){
   const drop=form.querySelector('#eleDrop'), input=form.querySelector('#eleFile');
   const btn=form.querySelector('#eleBtnEnviar'), elErro=form.querySelector('#eleErro');
   const elNome=form.querySelector('#eleArquivoNome');
+  const elNup=form.querySelector('#eleNup');
+  elNup.addEventListener('input',()=>{ elNup.value=mascaraNup(elNup.value); });
   let arquivo=null;
 
   function setErro(msg){ elErro.textContent=msg||''; elErro.hidden=!msg; }
@@ -3608,9 +3672,16 @@ function wireEletricaPane(o){
     const dataVistoria=form.querySelector('#eleData').value;
     const responsavel=form.querySelector('#eleResp').value.trim();
     const observacao=form.querySelector('#eleObs').value.trim();
+    const nupProcesso=elNup.value.trim();
     if(!arquivo){ setErro('Selecione um arquivo.'); return; }
     if(!dataVistoria){ setErro('Informe a data da vistoria.'); return; }
     if(!responsavel){ setErro('Informe o responsável.'); return; }
+    // exige o NUP do processo aberto no SUITE (pedido do usuário, 29/09/2026): o
+    // relatório tem que ser encaminhado por lá ao fiscal responsável, não só
+    // anexado aqui. Validado ANTES do upload pro Drive — sem isso um NUP inválido só
+    // apareceria depois de já ter gasto o upload inteiro.
+    if(!nupProcesso){ setErro('Informe o número NUP do processo aberto no SUITE.'); return; }
+    if(!NUP_REGEX.test(nupProcesso)){ setErro('NUP incompleto. Use o formato 00000.000000/0000-00.'); return; }
     setErro('');
     btn.disabled=true; const txtOriginal=btn.textContent; btn.textContent='Enviando…';
     let drive, tokenJson;
@@ -3632,7 +3703,7 @@ function wireEletricaPane(o){
       drive=await uploadParaDrive(tokenJson.accessToken,tokenJson.folderId,arquivo,nomeNoDrive);
 
       const {error:erroInsert}=await window.sbClient.from('eletrica_vistorias').insert({
-        id_obra:o.id_obra, data_vistoria:dataVistoria, responsavel_nome:responsavel, observacao:observacao||null,
+        id_obra:o.id_obra, data_vistoria:dataVistoria, responsavel_nome:responsavel, nup_processo:nupProcesso, observacao:observacao||null,
         arquivo_nome_original:arquivo.name, arquivo_mime:arquivo.type, arquivo_tamanho_bytes:arquivo.size,
         drive_file_id:drive.id, drive_folder_id:tokenJson.folderId, drive_web_view_link:drive.webViewLink||null,
         criado_por_email:emailUsuario||'',
@@ -4666,7 +4737,7 @@ function renderPanelReplan(scope,body){
   // denominador que antes ia no subtítulo) mora na janelinha do botão "i" — ver rpTip.
   // `sub` fica para o que é DADO e não explicação (atrasados × no prazo, média suprimida).
   const kpi=(rot,val,tip,sub)=>`<div class="kpi kpi-rp"><div class="k">${escHtml(rot)}`
-    +`<button type="button" class="kpi-info" data-tip="${escHtml(tip)}" aria-label="O que é ${escHtml(rot)}?">i</button></div>`
+    +`<button type="button" class="kpi-info" data-tip="${escHtml(tip)}" aria-label="O que é ${escHtml(rot)}?">${RS_ICO.info}</button></div>`
     +`<div class="v">${escHtml(val)}</div>`+(sub?`<div class="ks">${sub}</div>`:'')+`</div>`;
   // Anomalias de carga são da BASE INTEIRA — não do recorte —, daí ficarem à parte e o
   // rótulo dizer isso. O subtítulo diz de qual contagem cada uma fica de fora: as duas
