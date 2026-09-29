@@ -1685,7 +1685,7 @@ const MESES_NOME=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
 // nítido em qualquer largura, e cada coluna ganha o valor acima da barra, um trilho
 // de fundo e destaque quando é o pico. Altura mínima de 6% pra colunas baixas não
 // sumirem.
-function renderBarChart(host,cols,unidadeSingular,unidadePlural,ariaLabel){
+function renderBarChart(host,cols,unidadeSingular,unidadePlural,ariaLabel,opts){
   if(!cols.length){ host.innerHTML=`<div class="empty" style="padding:2px 0">Sem ${unidadePlural} neste recorte.</div>`; return; }
   const max=Math.max(...cols.map(c=>c[2]));
   const html=cols.map(([,label,n])=>{
@@ -1697,6 +1697,30 @@ function renderBarChart(host,cols,unidadeSingular,unidadePlural,ariaLabel){
       +`<div class="ylab">${label}</div></div>`;
   }).join('');
   host.innerHTML=`<div class="ychart" role="img" aria-label="${ariaLabel}">${html}</div>`;
+  if(opts&&opts.media&&cols.length>1) desenhaLinhaMedia(host.querySelector('.ychart'),cols,max,unidadePlural);
+}
+// linha de média (pedido do usuário, 29/09/2026): só nos gráficos "mês a mês" de
+// vistorias (renderYearChart/modal do engenheiro) — deixa claro se um mês ficou acima
+// ou abaixo do ritmo médio, o que nenhum dos KPIs isolados mostra. Cols já vem sem os
+// meses zerados (só entram meses com pelo menos 1 vistoria), então a média é sobre os
+// meses efetivamente mostrados, coerente com o que a barra de cada mês representa.
+// Posicionamento em px via getBoundingClientRect(), não % em CSS: as alturas do
+// .ychart são todas fixas (só a LARGURA das colunas é responsiva a resize), então medir
+// 1x no render basta — sem precisar recalcular em resize.
+function desenhaLinhaMedia(chartEl,cols,max,unidadePlural){
+  const track=chartEl&&chartEl.querySelector('.ytrack'); if(!track||!max) return;
+  const media=cols.reduce((s,c)=>s+c[2],0)/cols.length;
+  const pct=Math.min(100,media/max*100);
+  const chartRect=chartEl.getBoundingClientRect();
+  const trackRect=track.getBoundingClientRect();
+  const top=(trackRect.bottom-pct/100*trackRect.height)-chartRect.top;
+  const linha=document.createElement('div');
+  linha.className='ymedia';
+  linha.style.top=`${top.toFixed(1)}px`;
+  const mediaFmt=media.toLocaleString('pt-BR',{maximumFractionDigits:1});
+  linha.title=`Média: ${mediaFmt} ${unidadePlural}/mês`;
+  linha.innerHTML=`<span class="ymedia-lbl">méd. ${mediaFmt}</span>`;
+  chartEl.appendChild(linha);
 }
 // contagem de contratos por ano de assinatura no recorte atual — dá noção de
 // safra/tendência que nenhum KPI isolado mostra. Na métrica Elétrica vira "Vistorias
@@ -1714,7 +1738,7 @@ function renderYearChart(ids){
     })));
     const meses=Object.keys(counts).sort();
     const cols=meses.map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), counts[m]]);
-    renderBarChart(host,cols,'vistoria','vistorias','Vistorias realizadas por mês');
+    renderBarChart(host,cols,'vistoria','vistorias','Vistorias realizadas por mês',{media:true});
     return;
   }
   if(titulo) titulo.textContent='Contratos por ano de assinatura';
@@ -2172,7 +2196,7 @@ function abreModalEngenheiroEletrica(chave){
   mostraJanelaGenerica();
   wireEngObraRows(chave);
   const mesCols=Object.keys(porMes).sort().map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), porMes[m]]);
-  renderBarChart(document.getElementById('engChartMes'),mesCols,'vistoria','vistorias','Vistorias por mês');
+  renderBarChart(document.getElementById('engChartMes'),mesCols,'vistoria','vistorias','Vistorias por mês',{media:true});
   if(anos.length>=2){
     const anoCols=anos.sort().map(a=>[a,'’'+a.slice(2),porAno[a]]);
     renderBarChart(document.getElementById('engChartAno'),anoCols,'vistoria','vistorias','Vistorias por ano');

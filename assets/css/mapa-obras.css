@@ -926,7 +926,7 @@
      #engChartAno (modal do engenheiro) — preso a #yearChart, o flex nunca pegava lá e a
      "vistorias mês a mês" caía pro layout de bloco padrão (número e mês empilhados sem
      barra nenhuma, achado do usuário em 25/09/2026). */
-  .ychart{display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:14px}
+  .ychart{position:relative;display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:14px}
   .ycol{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
   .ycol .yval{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;color:var(--text-dim);line-height:1;min-height:11px}
   .ycol .ytrack{flex:1;width:100%;max-width:32px;display:flex;align-items:flex-end;
@@ -936,6 +936,16 @@
   .ycol.peak .yval{color:var(--ng)}
   .ycol:hover .ybar{filter:brightness(1.08)}
   .ycol:hover .yval{color:var(--text-brightest)}
+  /* linha de média (desenhaLinhaMedia, pedido do usuário, 29/09/2026): --status-exec já
+     é o azul neutro do app (status "em execução") — distinto do verde das barras e do
+     âmbar de alerta, sem inventar cor nova só pra essa referência. pointer-events:none
+     pra não atrapalhar o hover/title de cada .ycol por baixo. */
+  .ymedia{position:absolute;left:0;right:2px;height:0;border-top:1.5px dashed var(--status-exec);pointer-events:none;z-index:1}
+  /* sem background própria (evitaria adivinhar a cor do card por trás — .ychart aparece
+     tanto no painel principal quanto dentro do modal, cada um com seu fundo): o texto
+     pequeno e o azul de --status-exec já se distinguem das barras verdes por baixo. */
+  .ymedia-lbl{position:absolute;right:0;top:-13px;font-family:'Space Grotesk',sans-serif;font-size:8.5px;font-weight:700;
+        color:var(--status-exec);white-space:nowrap}
 
   /* skeleton: placeholder neutro nos KPIs/gráficos enquanto a 1ª carga de dados ainda
      não chegou — troca o "tudo em branco até aparecer de repente" por um sinal de que
@@ -1472,7 +1482,12 @@
      da obra vira o rótulo — texto longo demais pra 1 linha com reticências (mesmo motivo
      de .eng-obra-nome), então quebra em até 2 linhas; município desce como subtítulo. */
   .modal .eng-ver-row-obra{flex-direction:column;align-items:stretch;gap:1px}
+  /* mesmo peso/tamanho de .eng-obra-nome (objeto das obras vistoriadas/agendadas) — sem
+     isso herdava font-weight:600/letter-spacing de .eng-ver-label (pensado pro rótulo
+     "RELATÓRIO · V1 · data", não pro objeto da obra) e destoava das outras listas do
+     modal (achado do usuário, 29/09/2026: "A vistoriar" aparecia em negrito sozinho). */
   .modal .eng-ver-row-obra .eng-ver-label{white-space:normal;text-overflow:clip;color:var(--text-bright);
+        font-size:12.5px;line-height:1.4;font-weight:400;letter-spacing:normal;
         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .modal .eng-ver-sub{font-size:10.5px;color:var(--text-dim);font-weight:600}
   /* botão de baixar (pedido do usuário, 25/09/2026): setinha simples, mesmo tamanho/
