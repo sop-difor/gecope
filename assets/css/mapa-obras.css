@@ -1402,28 +1402,32 @@
      hero+plot de .dsh-topo que a janela do fiscal usa) — só o miolo (.eng-dist-donut)
      é próprio, em linha, porque o par cabe lado a lado no .dsh-plot sem forçar quebra
      (ao contrário do aside estreito que obriga .gxf-donut a empilhar). Distrito não
-     tem cor semântica própria (não é "atraso"/"no prazo"): dist1..dist6 é uma escala
-     de tons do verde da marca (--ng/--ng-light/--ng-mid/--ng-deep + 2 opacidades),
-     não uma paleta categórica nova — mantém a identidade de cor única do app mesmo
-     com N fatias arbitrárias. Acima de 6 distritos (não deve acontecer na prática:
+     tem cor semântica própria (não é "atraso"/"no prazo"): dist1..dist6 é uma paleta
+     categórica própria (--dist1..6, definida abaixo). Acima de 6 distritos (não deve acontecer na prática:
      um só engenheiro raramente cobre mais que isso) os tons voltam a se repetir.
      `.donut-leg` explicitamente sem width:100% (ao contrário do valor herdado da
      rosca compartilhada) pra caber ao lado do anel em vez de forçar quebra de linha. */
   .modal .eng-dist-donut{display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:6px}
   .modal .eng-dist-donut svg{flex:none}
   .modal .eng-dist-donut .donut-leg{width:auto;flex:1 1 200px;min-width:160px}
-  .donut-seg.dist1{stroke:var(--ng)}
-  .donut-seg.dist2{stroke:var(--ng-light)}
-  .donut-seg.dist3{stroke:var(--ng-mid)}
-  .donut-seg.dist4{stroke:var(--ng-deep)}
-  .donut-seg.dist5{stroke:rgba(var(--ng-rgb),.55)}
-  .donut-seg.dist6{stroke:rgba(var(--ng-rgb),.32)}
-  .donut-dot.dist1{background:var(--ng)}
-  .donut-dot.dist2{background:var(--ng-light)}
-  .donut-dot.dist3{background:var(--ng-mid)}
-  .donut-dot.dist4{background:var(--ng-deep)}
-  .donut-dot.dist5{background:rgba(var(--ng-rgb),.55)}
-  .donut-dot.dist6{background:rgba(var(--ng-rgb),.32)}
+  /* Paleta categórica de distrito (29/09/2026): tons do mesmo verde ficavam parecidos
+     demais na rosca. Agora 6 matizes distintos (verde da marca, azul, âmbar, violeta,
+     coral, ardósia), com luminância parecida entre si pra nenhum gritar mais que outro;
+     variantes mais escuras no tema claro pra manter contraste com o fundo. */
+  :root{--dist1:#66C2A0;--dist2:#6FA8DC;--dist3:#F6B255;--dist4:#B39DDB;--dist5:#E9806E;--dist6:#94A3B8}
+  :root:not(.theme-dark){--dist1:#0C8A5C;--dist2:#2F6FB5;--dist3:#C0791A;--dist4:#7A5BB5;--dist5:#C4503C;--dist6:#5B6B7A}
+  .donut-seg.dist1{stroke:var(--dist1)}
+  .donut-seg.dist2{stroke:var(--dist2)}
+  .donut-seg.dist3{stroke:var(--dist3)}
+  .donut-seg.dist4{stroke:var(--dist4)}
+  .donut-seg.dist5{stroke:var(--dist5)}
+  .donut-seg.dist6{stroke:var(--dist6)}
+  .donut-dot.dist1{background:var(--dist1)}
+  .donut-dot.dist2{background:var(--dist2)}
+  .donut-dot.dist3{background:var(--dist3)}
+  .donut-dot.dist4{background:var(--dist4)}
+  .donut-dot.dist5{background:var(--dist5)}
+  .donut-dot.dist6{background:var(--dist6)}
   /* Grupo por distrito (Vistorias agendadas/Obras vistoriadas): UMA linha clicável faz
      as vezes do antigo par "cabeçalho estático + botão 'Ver N vistorias'" — a contagem
      já mora na própria linha, então um segundo rótulo ao lado era peso morto (achado do
@@ -1997,7 +2001,7 @@
   .modal .dsh-tile-clic:hover{border-color:rgba(var(--ng-rgb),.4)}
   .modal .dsh-tile-clic:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
   .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text-brightest);line-height:1.1}
-  .modal .dsh-tl{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.5px;
+  .modal .dsh-tl{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.5px;
         text-transform:uppercase;color:var(--text-label)}
   .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
 
