@@ -23,6 +23,8 @@ function readTokens(){ return {
   nomatchFill:_tok('--nomatch-fill'), nomatchBorder:_tok('--nomatch-border'),
   // Modo Replanilhamentos — área com amostra pequena demais para entrar na escala.
   amostraFill:_tok('--amostra-fill'), amostraOpacity:parseFloat(_tok('--amostra-opacity'))||0.40,
+  // Cores por engenheiro eletricista (distritos operacionais) — ver ENGENHEIRO_DISTRITOS.
+  engLarissa:_tok('--eng-larissa'), engErasmo:_tok('--eng-erasmo'), engFilipe:_tok('--eng-filipe'), engBreno:_tok('--eng-breno'),
 }; }
 // TOKENS continua const (referência estável usada em todo o arquivo); na troca de
 // tema o conteúdo é reescrito no lugar com Object.assign, não trocado o objeto.
@@ -1260,6 +1262,16 @@ function groupStyle(f){
   if(f&&st.sel&&st.sel.kind==='group'&&st.sel.ids.has(String(f.properties.gid))) return {fillColor:TOKENS.ng,color:TOKENS.mapLine,weight:gw()+1.2,fillOpacity:.68,opacity:1};
   if(f&&modoReplan()) return {...rpPreenche(_rpGrp.get(String(f.properties.gid)),_rpMaxGrp),color:TOKENS.mapGroupBorder,weight:gw(),opacity:.9};
   if(f&&noMatchGroup(f.properties.gid)) return NOMATCH_STYLE(); // Etapa C: filtro ativo, distrito sem contratos
+  // Elétrica com um card do resumo ativo (eleFiltroCategoria): pinta cada distrito com
+  // a cor do engenheiro responsável em vez do verde único/coroplético — só a partir do
+  // clique no card (pedido do usuário, 29/09/2026); entrando na métrica sem filtro, o
+  // mapa continua mostrando a carteira inteira em verde, como sempre foi. Distrito sem
+  // nenhuma obra na categoria já caiu no noMatchGroup() acima (cinza), então aqui
+  // engenheiroPorDistritoId() sempre tem par pros 11 distritos cadastrados.
+  if(f && st.metric==='eletrica' && eleFiltroCategoria){
+    const eng=engenheiroPorDistritoId(f.properties.gid);
+    if(eng) return {fillColor:TOKENS[ENG_COR_TOKEN[eng.cor]], color:TOKENS.mapGroupBorder, weight:gw(), fillOpacity:.62, opacity:.95};
+  }
   // sem busca/filtro ativos: cor uniforme, como sempre foi — a própria divisão em
   // distritos/regiões já é a informação. Com filtro ativo, escala a opacidade pela
   // intensidade — mesma fórmula de styleFeature no nível 2 (floor + span·t, por tema),
@@ -1287,6 +1299,15 @@ function onGroup(f,l){
       return;
     }
     const v=hasActiveFilter()?(_groupValByGid.get(String(gid))||0):mval(aggIds(idsOfGroup(gid)));
+    // Elétrica com card ativo: o distrito está pintado pela cor do engenheiro (ver
+    // groupStyle) — o tooltip identifica quem é, e a RM Fortaleza ganha uma nota
+    // porque o polígono é 1 só mas a capital conta pra outro engenheiro (Erasmo).
+    if(st.metric==='eletrica' && eleFiltroCategoria){
+      const eng=engenheiroPorDistritoId(gid);
+      const nota=String(gid)==='0'?'<span class="tip-sub">Fortaleza (capital) conta para Erasmo Pacheco</span>':'';
+      tip.setLatLng(l.getBounds().getCenter()).setContent(`<b>${f.properties.nome}</b><br>${eng?escHtml(eng.curto):'Sem engenheiro atribuído'} · ${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}${nota}`).addTo(map);
+      return;
+    }
     tip.setLatLng(l.getBounds().getCenter()).setContent(`<b>${f.properties.nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`).addTo(map); });
   l.on('mouseout',()=>{ if(_hoverGroupLayer===l) _hoverGroupLayer=null; groupLayer.resetStyle(l); st.hoverGroup=null; if(panelVisible()) renderPanel(); tip.remove(); });
   // Ctrl/Cmd+clique num distrito/região soma à seleção combinada em vez de entrar nele
@@ -1857,15 +1878,24 @@ function wireEleResumoFiltro(){
 // vistoria agendada — mesma régua "agendamento só conta enquanto não há relatório" do
 // funil principal (ver categoriaEletricaObra) — e independe da % atual da obra (Q11).
 function computarRosterEletrica(){
-  const porNome=new Map(); // nomeNorm -> {chave,nome,email,vistoriadas:[],agendadas:[]}
-  for(const e of (ENGENHEIROS_ELETRICA||[])) porNome.set(e.nomeNorm,{chave:e.nomeNorm,nome:e.nome,email:e.email,vistoriadas:[],agendadas:[]});
-  const naoIdent={chave:'__naoidentificado__',nome:'Não identificado',email:'',vistoriadas:[],agendadas:[]};
+  const porNome=new Map(); // nomeNorm -> {chave,nome,email,vistoriadas:[],agendadas:[],faltam:[]}
+  for(const e of (ENGENHEIROS_ELETRICA||[])) porNome.set(e.nomeNorm,{chave:e.nomeNorm,nome:e.nome,email:e.email,vistoriadas:[],agendadas:[],faltam:[]});
+  const naoIdent={chave:'__naoidentificado__',nome:'Não identificado',email:'',vistoriadas:[],agendadas:[],faltam:[]};
   const acha=nomeBruto=>{ const k=normTxt(nomeBruto); return (k&&porNome.has(k)) ? porNome.get(k) : naoIdent; };
   for(const cod in DB.municipios){
     for(const o of DB.municipios[cod].obras){
       for(const r of (o.relatoriosEletrica||[])) acha(r.responsavel_nome).vistoriadas.push({o,data:r.data_vistoria,r});
       const ag=o.agendamentoEletrica;
       if(ag && !(o.relatoriosEletrica&&o.relatoriosEletrica.length)) acha(ag.responsavel_nome).agendadas.push({o,data:ag.data_planejada});
+      // "a vistoriar" (categoria='avistoriar', mesma regra do card do resumo): a obra
+      // ainda não tem relatório nem agendamento, então não tem responsavel_nome pra
+      // casar — o único jeito de atribuir a um engenheiro é pelo distrito operacional
+      // do município (pedido do usuário, 29/09/2026), via engenheiroDaObra().
+      if(categoriaEletricaObra(o).categoria==='avistoriar'){
+        const eng=engenheiroDaObra(o);
+        const alvo=eng&&porNome.get(eng.nomeNorm);
+        if(alvo) alvo.faltam.push({o});
+      }
     }
   }
   const lista=[...porNome.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
@@ -1890,14 +1920,23 @@ function renderEleEngenheiros(forceReflow){
   const lista=computarRosterEletrica();
   ROSTER_ELETRICA_COMPUTADO=lista;
   if(!lista.length){ corpo.innerHTML='<div class="empty">Nenhum engenheiro cadastrado com o papel Elétrica.</div>'; return; }
-  const linha=e=>`<div class="eng-row${e.chave==='__naoidentificado__'?' unk':''}" role="button" tabindex="0" data-eng="${escHtml(e.chave)}">
-      <span class="eng-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${RS_ICO.pessoa}</svg></span>
-      <div class="eng-nome">${escHtml(e.nome)}</div>
+  // nome curto + cor do distrito (ENGENHEIRO_DISTRITOS, pedido do usuário 29/09/2026):
+  // casado pela mesma chave normalizada do roster (e.chave===nomeNorm) — "Não
+  // identificado" não tem atribuição, fica sem cor/nome curto (mostra o nome bruto).
+  const linha=e=>{
+    const atrib=ENGENHEIRO_DISTRITOS.find(a=>a.nomeNorm===e.chave);
+    const corCls=atrib?` cor-${atrib.cor}`:'';
+    const nomeExibido=atrib?atrib.curto:e.nome;
+    return `<div class="eng-row${e.chave==='__naoidentificado__'?' unk':''}" role="button" tabindex="0" data-eng="${escHtml(e.chave)}">
+      <span class="eng-ic${corCls}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${RS_ICO.pessoa}</svg></span>
+      <div class="eng-nome">${escHtml(nomeExibido)}</div>
       <div class="eng-stats">
         <span class="eng-stat"><b>${NUM.format(e.vistoriadas.length)}</b> vistoriada${e.vistoriadas.length===1?'':'s'}</span>
         <span class="eng-stat"><b>${NUM.format(e.agendadas.length)}</b> agendada${e.agendadas.length===1?'':'s'}</span>
+        <span class="eng-stat eng-stat-warn"><b>${NUM.format(e.faltam.length)}</b> a vistoriar</span>
       </div>
     </div>`;
+  };
   corpo.innerHTML=lista.map(linha).join('');
   wireEleEngenheiros();
 }
@@ -1917,6 +1956,40 @@ function distritoDaObra(o){
   const gid=(cod!=null&&DB.municipios[cod])?DB.municipios[cod].do:null;
   const g=grpById(gid);
   return g?g.nome.replace(/^D\.O\.\s*/,''):'Sem distrito';
+}
+// Distritos operacionais atribuídos a cada engenheiro eletricista (pedido do usuário,
+// 29/09/2026) — mapeamento fixo por nome normalizado, a mesma chave que casa
+// responsavel_nome com o roster (fetchEletricaEngenheiros/ENGENHEIROS_ELETRICA). RM
+// Fortaleza (distrito id 0) é a única exceção: o polígono é um só no GeoJSON, mas o
+// município de Fortaleza (capital) conta pra Erasmo enquanto o resto da RM Fortaleza
+// conta pra Larissa — só existe no nível de OBRA (engenheiroDaObra), o polígono inteiro
+// no mapa usa a cor da Larissa (é o distrito nominal dela). `cor` é a chave do token CSS
+// (--eng-<cor>, ver ENG_COR_TOKEN) e da classe do ícone no painel (.eng-ic.cor-<cor>).
+const ENGENHEIRO_DISTRITOS=[
+  {nomeNorm:normTxt('LARISSA SILVA BORGES'), curto:'Larissa Borges', cor:'larissa', distritos:[5,1,0]},
+  {nomeNorm:normTxt('ERASMO DE SOUSA PACHECO JUNIOR'), curto:'Erasmo Pacheco', cor:'erasmo', distritos:[3,7], capitalRmFortaleza:true},
+  {nomeNorm:normTxt('FILIPE RIBEIRO MACEDO'), curto:'Filipe Macedo', cor:'filipe', distritos:[9,10,8]},
+  {nomeNorm:normTxt('FRANCISCO BRENO BARBOSA FREITAS'), curto:'Breno Barbosa', cor:'breno', distritos:[2,6,4]},
+];
+const ENG_COR_TOKEN={larissa:'engLarissa', erasmo:'engErasmo', filipe:'engFilipe', breno:'engBreno'};
+// engenheiro responsável pelo DISTRITO (id de DISTRITOS/GeoJSON) — usado pra pintar o
+// mapa por engenheiro (groupStyle) e pro tooltip do distrito (onGroup). RM Fortaleza
+// (id 0) sempre devolve Larissa aqui — a exceção da capital só entra por OBRA, ver
+// engenheiroDaObra().
+function engenheiroPorDistritoId(gid){
+  if(gid==null) return null;
+  return ENGENHEIRO_DISTRITOS.find(e=>e.distritos.includes(Number(gid)))||null;
+}
+// engenheiro responsável por UMA obra — mesma resolução município→distrito de
+// distritoDaObra(), mas devolvendo a atribuição em vez do nome. Único caso especial:
+// dentro da RM Fortaleza, o município de Fortaleza (capital) é do Erasmo; os outros 12
+// municípios da RM seguem a regra normal do distrito (Larissa).
+function engenheiroDaObra(o){
+  const cod=NAMEIDX[normTxt(o.municipioTxt)];
+  const gid=(cod!=null&&DB.municipios[cod])?DB.municipios[cod].do:null;
+  if(gid==null) return null;
+  if(String(gid)==='0' && normTxt(o.municipioTxt)===normTxt('FORTALEZA')) return ENGENHEIRO_DISTRITOS.find(e=>e.capitalRmFortaleza)||null;
+  return engenheiroPorDistritoId(gid);
 }
 // modal de detalhe de 1 engenheiro — mesmo #modalBg/#modal genérico e mesma casca de
 // cabeçalho (mtop/mh) que abreModalFiscal usa; sem "voltar" (sempre aberto direto do
@@ -1953,22 +2026,30 @@ function abreModalEngenheiroEletrica(chave){
         })()}</div></div>`
     :'';
   const topo=distritoPlot?`<div class="dsh-topo">${hero}${distritoPlot}</div>`:hero;
-  // ladrilhos de apoio: "Vistorias agendadas" mira direto na seção (mesmo mecanismo de
-  // scrollTo dos ladrilhos do fiscal — a seção já fica sempre visível, só rola até ela);
-  // "Obras atendidas" e "Distritos" somam vistoriadas+agendadas, sem seção única
-  // correspondente, então ficam informativos.
+  // ladrilhos de apoio: "A vistoriar"/"Vistorias agendadas" miram direto na seção (mesmo
+  // mecanismo de scrollTo dos ladrilhos do fiscal — a seção já fica sempre visível, só
+  // rola até ela); "Obras atendidas" e "Distritos" somam vistoriadas+agendadas, sem seção
+  // única correspondente, então ficam informativos. "A vistoriar" (e.faltam,
+  // computarRosterEletrica) fica de fora dessa soma — são obras sem nenhuma vistoria
+  // ainda, não "atendidas".
   const tiles=`<div class="dsh-tiles">`
+    +tile(NUM.format(e.faltam.length),'A vistoriar','sem relatório nem agendamento',{scrollTo:'secEngFaltam'})
     +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','ativas, ainda sem relatório',{scrollTo:'secEngAgendadas'})
     +tile(NUM.format(todasObras.size),'Obras atendidas','distintas, vistoriadas + agendadas')
     +tile(NUM.format(porDistrito.size),'Distritos','operacionais cobertos')
     +`</div>`;
-  // ambas as listas agora vêm agrupadas por distrito, cada grupo atrás de um toggle
-  // (mesmo .gproc/.adToggle de grupoProcs — clicar no distrito abre a lista daquele
-  // distrito, pedido do usuário, 25/09/2026). _engModalObrasRef é zerado aqui e
-  // realimentado por grupoDistritoEng: as linhas levam só um índice nesse array (não o
+  // as 3 listas vêm agrupadas por distrito, cada grupo atrás de um toggle (mesmo
+  // .gproc/.adToggle de grupoProcs — clicar no distrito abre a lista daquele distrito,
+  // pedido do usuário, 25/09/2026). _engModalObrasRef é zerado aqui e realimentado por
+  // grupoDistritoEng/grupoDistritoFaltam: as linhas levam só um índice nesse array (não o
   // objeto obra inteiro) pra não inflar o innerHTML, e abreObraNaAbaEletrica() usa esse
   // índice pra abrir a obra certa direto na aba Elétrica.
   _engModalObrasRef=[];
+  // "a vistoriar" (e.faltam) não tem responsavel_nome pra casar (é atribuído por
+  // distrito, ver engenheiroDaObra) e não tem relatório/data — por isso usa
+  // grupoDistritoFaltam (linha simples por obra) em vez de grupoDistritoEng
+  // (acordeão de versões de relatório, que não existe aqui).
+  const secFaltam=`<div class="statwrap" id="secEngFaltam"><div class="sec-h"><span>A vistoriar</span><span>${NUM.format(e.faltam.length)}</span></div>${e.faltam.length?grupoDistritoFaltam(e.faltam):'<div class="empty">Nenhuma obra pendente de vistoria no momento.</div>'}</div>`;
   const secAgendadas=`<div class="statwrap" id="secEngAgendadas"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${e.agendadas.length?grupoDistritoEng('engAg',e.agendadas,true):'<div class="empty">Nenhuma vistoria agendada no momento.</div>'}</div>`;
   const secVistoriadas=`<div class="statwrap" id="secEngVistoriadas"><div class="sec-h"><span>Obras vistoriadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
   // gráficos: mês a mês sempre reaproveita renderBarChart (Q7); ano a ano só aparece
@@ -1988,7 +2069,7 @@ function abreModalEngenheiroEletrica(chave){
       <div class="mh-titles"><div class="mt">${escHtml(e.nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
     </div></div>
-    <div class="mbody dsh">${topo}${tiles}${mesesChart}${anoChart}${secAgendadas}${secVistoriadas}</div>`;
+    <div class="mbody dsh">${topo}${tiles}${mesesChart}${anoChart}${secFaltam}${secAgendadas}${secVistoriadas}</div>`;
   mostraJanelaGenerica();
   wireEngObraRows(chave);
   const mesCols=Object.keys(porMes).sort().map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), porMes[m]]);
@@ -2031,6 +2112,41 @@ function grupoDistritoEng(idPrefix,itens,ordGruposPorData){
       +`<span class="eng-grp-nome">${escHtml(g.distrito)}</span>`
       +`<span class="eng-grp-meta"><b>${NUM.format(g.itens.length)}</b> vistoria${g.itens.length===1?'':'s'} <span class="adToggle-car">▾</span></span>`
       +`</button><div id="${id}" class="elelist" hidden>${linhas}</div></div>`;
+  }).join('');
+}
+// versão de grupoDistritoEng() pra "a vistoriar" (e.faltam, computarRosterEletrica):
+// obras sem nenhum relatório nem agendamento, então sem `data`/`r` pra ordenar ou pra
+// gerar o acordeão de versões de linhasPorObra() — 1 linha por obra já basta, sem
+// aninhar outro nível de toggle dentro do distrito.
+function grupoDistritoFaltam(itens){
+  const porDist=new Map();
+  for(const it of itens){
+    const d=distritoDaObra(it.o);
+    if(!porDist.has(d)) porDist.set(d,[]);
+    porDist.get(d).push(it);
+  }
+  const grupos=[...porDist.entries()].map(([distrito,arr])=>({distrito,itens:arr}));
+  grupos.sort((a,b)=>b.itens.length-a.itens.length||a.distrito.localeCompare(b.distrito,'pt-BR'));
+  return grupos.map((g,i)=>{
+    const id=`engFa${i}`;
+    return `<div class="eng-grp"><button type="button" class="adToggle eng-grp-h" data-target="${id}" aria-expanded="false" aria-controls="${id}">`
+      +`<span class="eng-grp-nome">${escHtml(g.distrito)}</span>`
+      +`<span class="eng-grp-meta"><b>${NUM.format(g.itens.length)}</b> obra${g.itens.length===1?'':'s'} <span class="adToggle-car">▾</span></span>`
+      +`</button><div id="${id}" class="elelist" hidden>${linhasFaltamPorObra(g.itens)}</div></div>`;
+  }).join('');
+}
+// linha de 1 obra "a vistoriar" — mesmo .eng-ver-row de linhasPorObra() (clicável, mesma
+// wireEngObraRows() por delegação de data-idx), mas sem o rótulo "RELATÓRIO · data" (não
+// existe relatório ainda): objeto + município, com quebra em até 2 linhas (mesmo
+// -webkit-line-clamp de .eng-obra-nome — objeto de obra pública é longo, não cabe numa
+// linha só com reticências no meio do texto).
+function linhasFaltamPorObra(itens){
+  return itens.map(it=>{
+    const idx=_engModalObrasRef.length; _engModalObrasRef.push(it.o);
+    const nome=escHtml(it.o.objeto||it.o.codigo_obra||it.o.contrato);
+    const mun=it.o.municipioTxt?escHtml(it.o.municipioTxt):'';
+    return `<div class="eng-ver-row eng-ver-row-obra" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
+      +`<span class="eng-ver-label">${nome}</span>${mun?`<span class="eng-ver-sub">${mun}</span>`:''}</div>`;
   }).join('');
 }
 // botão de baixar (pedido do usuário, 25/09/2026) — baixa pelo GECOPE (Edge Function
