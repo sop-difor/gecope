@@ -2131,8 +2131,8 @@ function abreModalEngenheiroEletrica(chave){
   // cada um sobre o total salta mais aos olhos numa rosca só do que numa pilha de barras
   // (achado do usuário, 25/09/2026 — pediu "outro gráfico" aqui). Distrito não é um
   // estado com cor própria (como atraso/no prazo), então a cor vem de uma escala de tons
-  // do próprio verde da marca (dist1..dist6, ver CSS) — nunca inventando hues novos só
-  // pra categoria.
+  // de 6 cores bem distintas (dist1..dist6, ver CSS) — tons do mesmo verde ficavam
+  // parecidos demais na rosca (pedido do usuário, 29/09/2026).
   const distritoPlot=porDistrito.size
     ?`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.dist} Por distrito operacional</div>`
       +`<div class="eng-dist-donut">${(()=>{
@@ -2149,11 +2149,11 @@ function abreModalEngenheiroEletrica(chave){
   // computarRosterEletrica) fica de fora dessa soma — são obras sem nenhuma vistoria
   // ainda, não "atendidas".
   const tiles=`<div class="dsh-tiles">`
-    +tile(NUM.format(e.faltam.length),'A vistoriar','sem relatório nem agendamento',{scrollTo:'secEngFaltam'})
-    +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','data futura, ainda sem relatório',{scrollTo:'secEngAgendadas'})
-    +tile(NUM.format(e.pendentes.length),'Pendentes','data passou, sem confirmação',{scrollTo:'secEngPendentes'})
-    +tile(NUM.format(todasObras.size),'Obras atendidas','distintas, vistoriadas + agendadas + pendentes')
-    +tile(NUM.format(porDistrito.size),'Distritos','operacionais cobertos')
+    +tile(NUM.format(e.faltam.length),'A vistoriar','sem relatório nem agendamento',{tip:'Sem relatórios, nem agendamento e com medição maior ou igual a 75%.',scrollTo:'secEngFaltam'})
+    +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','data futura, ainda sem relatório',{tip:'Quantidade de vistorias agendadas.',scrollTo:'secEngAgendadas'})
+    +tile(NUM.format(e.pendentes.length),'Pendentes','data passou, sem confirmação',{tip:'Quantidade de vistorias que foram agendadas, mas o engenheiro não confirmou a realização da vistoria.',scrollTo:'secEngPendentes'})
+    +tile(NUM.format(todasObras.size),'Obras atendidas','distintas, vistoriadas + agendadas + pendentes',{tip:'Obras distintas + vistoriadas + agendadas.'})
+    +tile(NUM.format(porDistrito.size),'Distritos','operacionais cobertos',{tip:'Quantidade de Distritos Operacionais atendidos.'})
     +`</div>`;
   // as 3 listas vêm agrupadas por distrito, cada grupo atrás de um toggle (mesmo
   // .gproc/.adToggle de grupoProcs — clicar no distrito abre a lista daquele distrito,
@@ -3901,7 +3901,8 @@ function wireModalTabs(){
 // de delegação de evento nem de limpar listener velho.
 function wireAdToggles(){
   document.querySelectorAll('.modal .adToggle, .modal .dsh-tile[data-target]').forEach(btn=>{
-    btn.onclick=()=>{
+    btn.onclick=ev=>{
+      if(ev&&ev.target.closest&&ev.target.closest('.kpi-info')) return;
       const el=document.getElementById(btn.dataset.target); if(!el) return;
       const willOpen=el.hidden;
       el.hidden=!willOpen; btn.setAttribute('aria-expanded',String(willOpen));
@@ -3914,7 +3915,8 @@ function wireAdToggles(){
   // Ladrilho que só aponta pra uma seção JÁ visível (ex.: "Fiscais no período" → os
   // cartões de Fiscalização, que nunca ficam escondidos) — sem esconder/mostrar, só rola.
   document.querySelectorAll('.modal .dsh-tile[data-scrollto]').forEach(btn=>{
-    btn.onclick=()=>{
+    btn.onclick=ev=>{
+      if(ev&&ev.target.closest&&ev.target.closest('.kpi-info')) return;
       const el=document.getElementById(btn.dataset.scrollto); if(!el) return;
       el.scrollIntoView({behavior:'smooth',block:'start'});
     };
@@ -3962,7 +3964,7 @@ document.getElementById('modal').addEventListener('keydown',e=>{
   const fc=e.target.closest('.fcard');
   if(fc){ e.preventDefault(); abreModalFiscal(fc.dataset.mat,document.getElementById('modal').dataset.rpDistrito); return; }
   const tl=e.target.closest('.dsh-tile[role="button"]');
-  if(tl){ e.preventDefault(); tl.click(); }
+  if(tl && !e.target.closest('.kpi-info')){ e.preventDefault(); tl.click(); }
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharOuVoltar(); });
 // Esc limpa a seleção combinada (Ctrl+clique) — mas só quando não há nada "mais
@@ -4372,7 +4374,10 @@ function tile(valor,label,sub,opts){
       ? ` role="button" tabindex="0" data-scrollto="${escHtml(opts.scrollTo)}"`
       : '';
   return `<div class="dsh-tile${attrs?' dsh-tile-clic':''}"${attrs}><div class="dsh-tv">${escHtml(valor)}</div>`
-    +`<div class="dsh-tl">${escHtml(label)}</div>`+(sub?`<div class="dsh-ts">${escHtml(sub)}</div>`:'')+`</div>`;
+    +(opts.tip
+      // subtítulo num tooltip (!) igual ao dos cards da tela inicial (kpi-info/mostraRpTip)
+      ? `<div class="dsh-tl">${escHtml(label)}<button type="button" class="kpi-info" data-tip="${escHtml(opts.tip)}" aria-label="O que é ${escHtml(label)}?">${RS_ICO.info}</button></div>`
+      : `<div class="dsh-tl">${escHtml(label)}</div>`+(sub?`<div class="dsh-ts">${escHtml(sub)}</div>`:''))+`</div>`;
 }
 // Barra empilhada da fila de hoje. Mesmo tri-estado do donut GECOPE × Fiscalização, e
 // pela mesma razão: processo SEM data de compromisso não é "no prazo", é um terceiro
