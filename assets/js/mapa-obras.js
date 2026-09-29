@@ -148,7 +148,9 @@ const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,val
 // o download passa pela Edge Function eletrica-drive-download, que recebe só o `id`.
 const ELETRICA_COLS='id,id_obra,data_vistoria,responsavel_nome,nup_processo,observacao,arquivo_nome_original,criado_em';
 const SB_ELETRICA_AGENDA='eletrica_vistorias_agendadas'; // agendamento de vistoria (obra+data+responsável), pedido do usuário 24/09/2026
-const ELETRICA_AGENDA_COLS='id,id_obra,data_planejada,responsavel_nome,criado_em';
+// realizada_em (sql/add_realizada_eletrica_vistorias_agendadas.sql, 29/09/2026): confirmação do
+// engenheiro de que a vistoria aconteceu, independente de relatório — ver statusAgendamentoEletrica().
+const ELETRICA_AGENDA_COLS='id,id_obra,data_planejada,responsavel_nome,realizada_em,criado_em';
 // referência estática dos códigos de situação da medição (STM) exibida na aba
 // Medições — só rótulos, não vem do banco (o modelo do usuário traz esta lista).
 const STM_LEGENDA=[
@@ -863,15 +865,19 @@ function passF(o){const f=st.f;
   // cards do resumo "Elétrica" (eleFiltroCategoria, ver mais abaixo) — clicar recorta
   // também o que o mapa pinta/soma, não só o número do card. Só entra em jogo na
   // métrica Elétrica. 'obras'/'avistoriar' usam categoriaEletricaObra e continuam
-  // restritos à carteira ativa (Q5 do grill de 25/09/2026). 'agendadas'/'vistoriadas'
-  // usam a MESMA regra sem restrição de contarEletricaAgendadasVistoriadas() (pedido do
-  // usuário, 29/09/2026) — sem isso o clique no card mostraria menos obras do que o
-  // número exibido.
+  // restritos à carteira ativa (Q5 do grill de 25/09/2026). 'agendadas'/'pendentes'/
+  // 'vistoriadas' usam a MESMA regra sem restrição de contarEletricaAgendadasVistoriadas()
+  // (statusAgendamentoEletrica, pedido do usuário, 29/09/2026) — sem isso o clique no
+  // card mostraria menos obras do que o número exibido.
   if(st.metric==='eletrica' && eleFiltroCategoria){
-    if(eleFiltroCategoria==='agendadas'){
-      if((o.relatoriosEletrica&&o.relatoriosEletrica.length) || !o.agendamentoEletrica) return false;
-    } else if(eleFiltroCategoria==='vistoriadas'){
-      if(!(o.relatoriosEletrica&&o.relatoriosEletrica.length)) return false;
+    if(eleFiltroCategoria==='agendadas'||eleFiltroCategoria==='pendentes'||eleFiltroCategoria==='vistoriadas'){
+      const temRel=o.relatoriosEletrica&&o.relatoriosEletrica.length;
+      if(eleFiltroCategoria==='vistoriadas'){
+        if(!(temRel || statusAgendamentoEletrica(o.agendamentoEletrica)==='vistoriada')) return false;
+      } else {
+        if(temRel) return false;
+        if(statusAgendamentoEletrica(o.agendamentoEletrica)!==(eleFiltroCategoria==='agendadas'?'agendada':'pendente')) return false;
+      }
     } else {
       const c=categoriaEletricaObra(o);
       if(!c.ativo) return false; // 'obras'/'avistoriar' só existem na carteira ativa da elétrica
@@ -1735,19 +1741,45 @@ function setKPIs(){
   renderAtencaoEletrica();
   renderEleEngenheiros();
 }
+// data de hoje em ISO local (YYYY-MM-DD) — usada por toda comparação de data_planejada
+// da Elétrica (funil, cards, cronograma). Movida pra cá (antes só existia dentro do
+// bloco do Cronograma) porque agora statusAgendamentoEletrica()/categoriaEletricaObra()
+// também precisam dela; function declaration, então a ordem no arquivo não importa.
+function hojeISOLocal(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// status de UM agendamento ativo (sem relatório ainda) — fonte ÚNICA da regra "data
+// passou sem confirmação = Pendente", usada por categoriaEletricaObra,
+// contarEletricaAgendadasVistoriadas, computarRosterEletrica e o Cronograma
+// (carregarVisitasCronograma), pra nunca haver 2 lugares comparando a mesma data de
+// jeitos diferentes (pedido do usuário, 29/09/2026 — "quero que esses status fiquem
+// alinhados"). 'vistoriada': o engenheiro confirmou (realizada_em preenchido),
+// relatório ou não — quem chama decide se funde isso com rel.length>0 ou mostra à
+// parte. 'pendente': data_planejada já passou e ninguém confirmou. 'agendada': data
+// ainda não chegou.
+function statusAgendamentoEletrica(ag,hoje){
+  if(!ag) return null;
+  if(ag.realizada_em) return 'vistoriada';
+  return String(ag.data_planejada||'')<(hoje||hojeISOLocal()) ? 'pendente' : 'agendada';
+}
 // universo-base + categoria do funil "Elétrica" de UMA obra (rodada de 25/09/2026,
 // grill) — fonte única usada tanto pelo painel (obrasComAtencaoEletrica, abaixo)
 // quanto pelo filtro dos cards (passF()), pra nunca haver 2 critérios calculando a
 // mesma coisa de dois jeitos (mesmo espírito de medObraStats, comentário lá em cima).
 // `ativo`: STATUS, não % — toda obra Em Execução ou Paralisada (statusBucket
 // 'exec'/'stop') — é o universo do card "Obras" e o N do título; fora dele não há
-// categoria nenhuma (Q1 do grill: os 4 cards falam só da carteira ativa). Dentro do
+// categoria nenhuma (Q1 do grill: os cards falam só da carteira ativa). Dentro do
 // universo, cada obra cai em NO MÁXIMO 1 categoria de um funil mutuamente exclusivo
 // (Q2): já tem relatório enviado → 'vistoriada' (por HISTÓRICO — Q3, não exige
 // LIMIAR_ELETRICA% atual, senão uma obra vistoriada "sumiria" do card se a medição
-// mudasse depois); senão, medição ≥LIMIAR_ELETRICA% → 'agendada' (tem agendamento
-// ativo) ou 'avistoriar' (não tem); abaixo do limiar (ou sem ficha de medição) →
-// null — só conta para "Obras", não aparece nos outros 3 cards.
+// mudasse depois); senão, medição ≥LIMIAR_ELETRICA% → conforme o agendamento
+// (statusAgendamentoEletrica: 'agendada'/'pendente'/'vistoriada' já confirmada sem
+// relatório) ou 'avistoriar' (sem agendamento); abaixo do limiar (ou sem ficha de
+// medição) → null — só conta para "Obras", não aparece nos outros cards (grill de
+// 29/09/2026, situações 1-4: Agendada/Pendente/Vistoriada, esta última com ou sem
+// relatório — ver buildEletricaPane pro rótulo "Realizada" que distingue as duas na
+// aba da obra).
 function categoriaEletricaObra(o){
   const sb=statusBucket(o.statusObra);
   const ativo=sb==='exec'||sb==='stop';
@@ -1760,7 +1792,7 @@ function categoriaEletricaObra(o){
   const agendamento=rel.length?null:(o.agendamentoEletrica||null);
   let categoria=null;
   if(rel.length) categoria='vistoriada';
-  else if(pct!=null && pct>=LIMIAR_ELETRICA) categoria=agendamento?'agendada':'avistoriar';
+  else if(pct!=null && pct>=LIMIAR_ELETRICA) categoria=agendamento?statusAgendamentoEletrica(agendamento):'avistoriar';
   return {ativo, categoria, pct, rel, agendamento};
 }
 // Painel "Elétrica": olha TODA a carteira carregada, não o recorte de filtro do
@@ -1781,40 +1813,49 @@ function obrasComAtencaoEletrica(){
   arr.sort((a,b)=>(a.totalRelatorios>0)-(b.totalRelatorios>0) || (b.pct??-1)-(a.pct??-1));
   return arr;
 }
-// Cards "Agendadas"/"Vistoriadas" do resumo: SEM restrição de carteira ativa nem de
-// limiar de medição (pedido do usuário, 29/09/2026 — antes usavam categoriaEletricaObra,
-// que só conta essas 2 categorias dentro da carteira ativa e, para 'agendada', só acima
-// de LIMIAR_ELETRICA%; isso fazia o card divergir da soma do painel "Engenheiros
-// Eletricistas", que já contava sem essas restrições, ver computarRosterEletrica()).
-// Mesma regra em ambos os lugares agora: agendada = tem agendamento ativo e nenhum
-// relatório; vistoriada = tem pelo menos 1 relatório — qualquer obra da base, dentro ou
-// fora da carteira ativa. 'obras' e 'a vistoriar' continuam restritos à carteira ativa
-// (categoriaEletricaObra, sem mudança).
+// Cards "Agendadas"/"Pendentes"/"Vistoriadas" do resumo: SEM restrição de carteira
+// ativa nem de limiar de medição (pedido do usuário, 29/09/2026 — antes usavam
+// categoriaEletricaObra, que só conta dentro da carteira ativa e, pra 'agendada', só
+// acima de LIMIAR_ELETRICA%; isso fazia o card divergir da soma do painel
+// "Engenheiros Eletricistas", que já contava sem essas restrições, ver
+// computarRosterEletrica()). Mesma regra statusAgendamentoEletrica() usada em ambos os
+// lugares agora — qualquer obra da base, dentro ou fora da carteira ativa. 'obras' e
+// 'a vistoriar' continuam restritos à carteira ativa (categoriaEletricaObra, sem
+// mudança). 'vistoriadas' funde as situações 3 e 4 do grill de 29/09/2026 (confirmada
+// sem relatório + relatório enviado) — o mesmo card cobre as duas, o detalhe de qual
+// das duas fica na aba Elétrica da obra (buildEletricaPane) e no Cronograma/janela do
+// engenheiro, que distinguem "Realizada" de "Vistoriada" linha a linha.
 function contarEletricaAgendadasVistoriadas(){
-  let agendadas=0, vistoriadas=0;
+  let agendadas=0, pendentes=0, vistoriadas=0;
+  const hoje=hojeISOLocal();
   for(const cod in DB.municipios){
     for(const o of DB.municipios[cod].obras){
       if(o.relatoriosEletrica&&o.relatoriosEletrica.length){ vistoriadas++; continue; }
-      if(o.agendamentoEletrica) agendadas++;
+      const st=statusAgendamentoEletrica(o.agendamentoEletrica,hoje);
+      if(st==='vistoriada') vistoriadas++;
+      else if(st==='pendente') pendentes++;
+      else if(st==='agendada') agendadas++;
     }
   }
-  return {agendadas, vistoriadas};
+  return {agendadas, pendentes, vistoriadas};
 }
 // filtro por card do resumo (null | 'obras' | 'vistoriadas' | 'avistoriar' |
-// 'agendadas') — clicar de novo no card já ativo limpa o filtro. 'obras' é o
-// universo inteiro (mesmo efeito de null), mas precisa de valor próprio pra o card
-// saber que está "ativo" quando clicado. Chamava-se 'atencao' antes da rodada de
-// 25/09/2026, quando o card também se chamava "Em Atenção".
+// 'agendadas' | 'pendentes') — clicar de novo no card já ativo limpa o filtro.
+// 'obras' é o universo inteiro (mesmo efeito de null), mas precisa de valor próprio
+// pra o card saber que está "ativo" quando clicado. Chamava-se 'atencao' antes da
+// rodada de 25/09/2026, quando o card também se chamava "Em Atenção".
 let eleFiltroCategoria=null;
-// Ícones dos 4 cards do resumo "Elétrica" (mesma linguagem visual dos ícones de .kpi —
+// Ícones dos cards do resumo "Elétrica" (mesma linguagem visual dos ícones de .kpi —
 // stroke 1.8, viewBox 24×24). Só o miolo do <svg>, a moldura fica no template. 'obras'
 // reaproveita o mesmo desenho de RS_ICO.obj (prédio) — é o mesmo conceito ("obra"), só
-// em cartão menor.
+// em cartão menor. 'pendentes' (grill de 29/09/2026): relógio com "!", pra não repetir
+// nem o círculo de "vistoriadas" nem o olho de "avistoriar".
 const ICONS_ELE_RESUMO={
   obras:'<path d="M3 21h18M6 21V7l6-4 6 4v14M10 21v-4h4v4"/><path d="M9 10h.01M15 10h.01M9 13.5h.01M15 13.5h.01"/>',
   vistoriadas:'<circle cx="12" cy="12" r="9"/><path d="M8.3 12.4l2.4 2.4L16 9.3"/>',
   avistoriar:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
   agendadas:'<rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M8 3.2v4M16 3.2v4M3.5 10h17"/>',
+  pendentes:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
 };
 // Bloco "Atenção elétrica": só faz sentido enquanto a métrica do mapa é Elétrica — o
 // resto do tempo fica fora do painel (pedido do usuário, 24/09/2026: antes ficava
@@ -1841,39 +1882,52 @@ function renderAtencaoEletrica(forceReflow){
   const titulo=document.getElementById('eleAtencaoTitulo');
   const itens=obrasComAtencaoEletrica();
   if(titulo) titulo.textContent=itens.length?`Elétrica (${itens.length})`:'Elétrica';
-  if(!itens.length){ corpo.innerHTML='<div class="empty">Nenhuma obra em execução ou paralisada no momento.</div>'; return; }
-  const avistoriar=itens.filter(it=>it.categoria==='avistoriar').length;
-  const {agendadas, vistoriadas}=contarEletricaAgendadasVistoriadas();
+  const avistoriar=itens.length?itens.filter(it=>it.categoria==='avistoriar').length:0;
+  const {agendadas, pendentes, vistoriadas}=contarEletricaAgendadasVistoriadas();
   // cada card filtra o mapa/"Resultados da busca" pra só aquela categoria (via
   // eleFiltroCategoria em passF()/hasActiveFilter()) — clicar no card já ativo limpa
-  // o filtro (mesmo padrão de toggle de outros chips no app). Só os 4 cards moram
-  // aqui: a lista de obras em si NÃO é mais desenhada neste painel (pedido do
-  // usuário, 25/09/2026 — virava uma parede de ~280 itens); quem quer ver as obras
-  // filtradas já tem "Resultados da busca" (ver renderPanel(), hasActiveFilter()),
-  // o mesmo mecanismo genérico que qualquer outro filtro do app já usa. `tip`: texto
-  // do botão "i" (mostraRpTip/kpi-info, mesmo mecanismo do modo Replanilhamentos).
+  // o filtro (mesmo padrão de toggle de outros chips no app). A lista de obras em si
+  // NÃO é mais desenhada neste painel (pedido do usuário, 25/09/2026 — virava uma
+  // parede de ~280 itens); quem quer ver as obras filtradas já tem "Resultados da
+  // busca" (ver renderPanel(), hasActiveFilter()), o mesmo mecanismo genérico que
+  // qualquer outro filtro do app já usa. `tip`: texto do botão "i" (mostraRpTip/
+  // kpi-info, mesmo mecanismo do modo Replanilhamentos).
   const cardDef=[
     {k:'obras',v:itens.length,l:'obras',cls:'',ic:ICONS_ELE_RESUMO.obras,
       tip:'Quantidade de obras com status Em Execução e Paralisadas.'},
     {k:'avistoriar',v:avistoriar,l:'a vistoriar',cls:'warn',ic:ICONS_ELE_RESUMO.avistoriar,
       tip:`Quantidade de obras com, no mínimo, ${LIMIAR_ELETRICA}% de medição realizada.`},
     {k:'agendadas',v:agendadas,l:'agendadas',cls:'info',ic:ICONS_ELE_RESUMO.agendadas,
-      tip:'Quantidade de vistorias agendadas atualmente pelos engenheiros.'},
+      tip:'Quantidade de vistorias agendadas para uma data futura.'},
+    {k:'pendentes',v:pendentes,l:'pendentes',cls:'danger',ic:ICONS_ELE_RESUMO.pendentes,
+      tip:'Quantidade de vistorias cuja data agendada já passou, sem confirmação do engenheiro.'},
     {k:'vistoriadas',v:vistoriadas,l:'vistoriadas',cls:'ok',ic:ICONS_ELE_RESUMO.vistoriadas,
-      tip:'Quantidade de obras vistoriadas pelos engenheiros.'},
+      tip:'Quantidade de obras com vistoria confirmada pelo engenheiro (com ou sem relatório enviado).'},
   ];
-  corpo.innerHTML=`<div class="ele-resumo">${cardDef.map(c=>
+  // "Cronograma" mora na MESMA grade dos cards, nas mesmas dimensões (pedido do
+  // usuário, 29/09/2026: 5 cards de status deixavam um buraco numa grade de 2
+  // colunas — o botão vira o 6º ladrilho, 2 colunas × 3 linhas, sem sobra). Não é
+  // filtro (sem data-filtro, sem estado "on") — só navega pro modal do Cronograma,
+  // por isso fica fora do cardDef/wireEleResumoFiltro.
+  const cronoTile=`<button type="button" class="ele-resumo-i crono" id="btnCronogramaEle" title="Ver as visitas agendadas e realizadas pelos engenheiros, mês a mês">
+    <div class="eri-txt"><span class="l">Cronograma</span></div>
+    <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M8 3.2v4M16 3.2v4M3.5 10h17"/></svg></span>
+  </button>`;
+  const cards=cardDef.map(c=>
     `<div class="ele-resumo-i${c.cls?' '+c.cls:''}${eleFiltroCategoria===c.k?' on':''}" role="button" tabindex="0" data-filtro="${c.k}">`
     +`<div class="eri-txt"><span class="l">${c.l}<button type="button" class="kpi-info" data-tip="${escHtml(c.tip)}" aria-label="O que é ${escHtml(c.l)}?">${RS_ICO.info}</button></span><span class="v">${NUM.format(c.v)}</span></div>`
     +`<span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${c.ic}</svg></span>`
-    +`</div>`).join('')}</div>`;
+    +`</div>`).join('');
+  corpo.innerHTML=`<div class="ele-resumo">${cards}${cronoTile}</div>`
+    +(itens.length?'':'<div class="empty">Nenhuma obra em execução ou paralisada no momento.</div>');
   wireEleResumoFiltro();
 }
-// liga o clique/teclado dos 4 cards do resumo (filtro de categoria) — chamada de
-// novo a cada reflow (innerHTML reconstruído, listeners velhos morrem junto).
+// liga o clique/teclado dos cards do resumo (filtro de categoria) + o ladrilho
+// "Cronograma" (navegação simples, sem filtro) — chamada de novo a cada reflow
+// (innerHTML reconstruído, listeners velhos morrem junto).
 function wireEleResumoFiltro(){
   const corpo=document.getElementById('eleAtencaoBody'); if(!corpo) return;
-  corpo.querySelectorAll('.ele-resumo-i').forEach(card=>{
+  corpo.querySelectorAll('.ele-resumo-i[data-filtro]').forEach(card=>{
     card.addEventListener('click',e=>{
       // o botão "i" (kpi-info) tem seu próprio comportamento (mostraRpTip, por hover/
       // foco) — sem este corte, o clique nele borbulharia pro card e alternaria o
@@ -1891,6 +1945,8 @@ function wireEleResumoFiltro(){
     });
     card.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&!e.target.closest('.kpi-info')){ e.preventDefault(); card.click(); } });
   });
+  const btnCrono=corpo.querySelector('#btnCronogramaEle');
+  if(btnCrono) btnCrono.addEventListener('click',()=>abreCronogramaEletrica());
 }
 // ---- Painel "Engenheiros Eletricistas" (Q6/Q7 do grill de 25/09/2026) ----
 // contagens do roster: olha TODA a obra carregada (não só a carteira ativa dos 4
@@ -1901,16 +1957,26 @@ function wireEleResumoFiltro(){
 // Um relatório = 1 vistoria (evento, pode repetir por obra); 1 agendamento ATIVO = 1
 // vistoria agendada — mesma régua "agendamento só conta enquanto não há relatório" do
 // funil principal (ver categoriaEletricaObra) — e independe da % atual da obra (Q11).
+// vistoriadas: relatório OU confirmação sem relatório (situações 3+4 do grill de
+// 29/09/2026, "Realizadas" — item leva `r:null` quando não há relatório, ver
+// linhasPorObra() pro rótulo condicional). agendadas: só data futura. pendentes: data
+// já passou, sem confirmação — bloco próprio na janela (Q5 do grill).
 function computarRosterEletrica(){
-  const porNome=new Map(); // nomeNorm -> {chave,nome,email,vistoriadas:[],agendadas:[],faltam:[]}
-  for(const e of (ENGENHEIROS_ELETRICA||[])) porNome.set(e.nomeNorm,{chave:e.nomeNorm,nome:e.nome,email:e.email,vistoriadas:[],agendadas:[],faltam:[]});
-  const naoIdent={chave:'__naoidentificado__',nome:'Não identificado',email:'',vistoriadas:[],agendadas:[],faltam:[]};
+  const porNome=new Map(); // nomeNorm -> {chave,nome,email,vistoriadas:[],agendadas:[],pendentes:[],faltam:[]}
+  for(const e of (ENGENHEIROS_ELETRICA||[])) porNome.set(e.nomeNorm,{chave:e.nomeNorm,nome:e.nome,email:e.email,vistoriadas:[],agendadas:[],pendentes:[],faltam:[]});
+  const naoIdent={chave:'__naoidentificado__',nome:'Não identificado',email:'',vistoriadas:[],agendadas:[],pendentes:[],faltam:[]};
   const acha=nomeBruto=>{ const k=normTxt(nomeBruto); return (k&&porNome.has(k)) ? porNome.get(k) : naoIdent; };
+  const hoje=hojeISOLocal();
   for(const cod in DB.municipios){
     for(const o of DB.municipios[cod].obras){
       for(const r of (o.relatoriosEletrica||[])) acha(r.responsavel_nome).vistoriadas.push({o,data:r.data_vistoria,r});
       const ag=o.agendamentoEletrica;
-      if(ag && !(o.relatoriosEletrica&&o.relatoriosEletrica.length)) acha(ag.responsavel_nome).agendadas.push({o,data:ag.data_planejada});
+      if(ag && !(o.relatoriosEletrica&&o.relatoriosEletrica.length)){
+        const alvo=acha(ag.responsavel_nome), st=statusAgendamentoEletrica(ag,hoje);
+        if(st==='vistoriada') alvo.vistoriadas.push({o,data:ag.data_planejada,r:null});
+        else if(st==='pendente') alvo.pendentes.push({o,data:ag.data_planejada});
+        else alvo.agendadas.push({o,data:ag.data_planejada});
+      }
       // "a vistoriar" (categoria='avistoriar', mesma regra do card do resumo): a obra
       // ainda não tem relatório nem agendamento, então não tem responsavel_nome pra
       // casar — o único jeito de atribuir a um engenheiro é pelo distrito operacional
@@ -1923,7 +1989,7 @@ function computarRosterEletrica(){
     }
   }
   const lista=[...porNome.values()].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
-  if(naoIdent.vistoriadas.length||naoIdent.agendadas.length) lista.push(naoIdent);
+  if(naoIdent.vistoriadas.length||naoIdent.agendadas.length||naoIdent.pendentes.length) lista.push(naoIdent);
   return lista;
 }
 // mesmo padrão de visibilidade/dirty-check de renderAtencaoEletrica() (painel
@@ -1936,7 +2002,8 @@ function renderEleEngenheiros(forceReflow){
   const corpo=document.getElementById('eleEngBody'); if(!corpo) return;
   const visivel=st.metric==='eletrica';
   if(wrap) wrap.hidden=!visivel;
-  const cronoWrap=document.getElementById('eleCronoWrap'); if(cronoWrap) cronoWrap.hidden=!visivel;
+  // o ladrilho "Cronograma" agora mora dentro de #eleAtencaoBody (renderAtencaoEletrica),
+  // não mais num #eleCronoWrap próprio — sem visibilidade separada pra controlar aqui.
   if(!visivel) return;
   if(!forceReflow && !_rosterEletricaDirty) return;
   _rosterEletricaDirty=false;
@@ -1957,6 +2024,7 @@ function renderEleEngenheiros(forceReflow){
       <div class="eng-stats">
         <span class="eng-stat"><b>${NUM.format(e.vistoriadas.length)}</b> vistoria${e.vistoriadas.length===1?'':'s'}</span>
         <span class="eng-stat"><b>${NUM.format(e.agendadas.length)}</b> agendada${e.agendadas.length===1?'':'s'}</span>
+        <span class="eng-stat eng-stat-danger"><b>${NUM.format(e.pendentes.length)}</b> pendente${e.pendentes.length===1?'':'s'}</span>
         <span class="eng-stat eng-stat-warn"><b>${NUM.format(e.faltam.length)}</b> a vistoriar</span>
       </div>
     </div>`;
@@ -2020,7 +2088,7 @@ function engenheiroDaObra(o){
 // painel lateral, nunca por cima de outra janela).
 function abreModalEngenheiroEletrica(chave){
   const e=ROSTER_ELETRICA_COMPUTADO.find(x=>x.chave===chave); if(!e) return;
-  const todasObras=new Set([...e.vistoriadas,...e.agendadas].map(x=>x.o));
+  const todasObras=new Set([...e.vistoriadas,...e.agendadas,...e.pendentes].map(x=>x.o));
   // por distrito — OBRAS distintas (vistoriadas ∪ agendadas), não eventos: uma obra
   // com 2 relatórios do mesmo engenheiro não pode contar 2x no mesmo distrito (Q7).
   const porDistrito=new Map();
@@ -2033,7 +2101,7 @@ function abreModalEngenheiroEletrica(chave){
   // sem nenhuma obra ainda) o herói fica sozinho, sem grade vazia ao lado.
   const hero=`<div class="dsh-hero"><div class="rs-lbl">${RS_ICO.chart} Vistorias realizadas</div>`
     +`<div class="dsh-big">${NUM.format(e.vistoriadas.length)}<span class="dsh-un">${e.vistoriadas.length===1?'vistoria':'vistorias'}</span></div>`
-    +`<div class="dsh-sub">${escHtml(`${NUM.format(e.agendadas.length)} agendada${e.agendadas.length===1?'':'s'} · ${NUM.format(todasObras.size)} obra${todasObras.size===1?'':'s'} atendida${todasObras.size===1?'':'s'}`)}</div></div>`;
+    +`<div class="dsh-sub">${escHtml(`${NUM.format(e.agendadas.length)} agendada${e.agendadas.length===1?'':'s'} · ${NUM.format(e.pendentes.length)} pendente${e.pendentes.length===1?'':'s'} · ${NUM.format(todasObras.size)} obra${todasObras.size===1?'':'s'} atendida${todasObras.size===1?'':'s'}`)}</div></div>`;
   // rosca com legenda (mesmo donutMulti/donutLeg de GECOPE × Fiscalização — ver ali) em
   // vez da barra por linha de antes: com só 2-6 distritos por engenheiro, a proporção de
   // cada um sobre o total salta mais aos olhos numa rosca só do que numa pilha de barras
@@ -2058,8 +2126,9 @@ function abreModalEngenheiroEletrica(chave){
   // ainda, não "atendidas".
   const tiles=`<div class="dsh-tiles">`
     +tile(NUM.format(e.faltam.length),'A vistoriar','sem relatório nem agendamento',{scrollTo:'secEngFaltam'})
-    +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','ativas, ainda sem relatório',{scrollTo:'secEngAgendadas'})
-    +tile(NUM.format(todasObras.size),'Obras atendidas','distintas, vistoriadas + agendadas')
+    +tile(NUM.format(e.agendadas.length),'Vistorias agendadas','data futura, ainda sem relatório',{scrollTo:'secEngAgendadas'})
+    +tile(NUM.format(e.pendentes.length),'Pendentes','data passou, sem confirmação',{scrollTo:'secEngPendentes'})
+    +tile(NUM.format(todasObras.size),'Obras atendidas','distintas, vistoriadas + agendadas + pendentes')
     +tile(NUM.format(porDistrito.size),'Distritos','operacionais cobertos')
     +`</div>`;
   // as 3 listas vêm agrupadas por distrito, cada grupo atrás de um toggle (mesmo
@@ -2075,6 +2144,12 @@ function abreModalEngenheiroEletrica(chave){
   // (acordeão de versões de relatório, que não existe aqui).
   const secFaltam=`<div class="statwrap" id="secEngFaltam"><div class="sec-h"><span>A vistoriar</span><span>${NUM.format(e.faltam.length)}</span></div>${e.faltam.length?grupoDistritoFaltam(e.faltam):'<div class="empty">Nenhuma obra pendente de vistoria no momento.</div>'}</div>`;
   const secAgendadas=`<div class="statwrap" id="secEngAgendadas"><div class="sec-h"><span>Vistorias agendadas</span><span>${NUM.format(e.agendadas.length)}</span></div>${e.agendadas.length?grupoDistritoEng('engAg',e.agendadas,true):'<div class="empty">Nenhuma vistoria agendada no momento.</div>'}</div>`;
+  // "Pendentes" (grill de 29/09/2026, situação 2): data planejada já passou, sem
+  // confirmação do engenheiro — bloco próprio, separado de "Agendadas" (data futura).
+  const secPendentes=`<div class="statwrap" id="secEngPendentes"><div class="sec-h"><span>Pendentes</span><span>${NUM.format(e.pendentes.length)}</span></div>${e.pendentes.length?grupoDistritoEng('engPe',e.pendentes,true):'<div class="empty">Nenhuma vistoria pendente de confirmação no momento.</div>'}</div>`;
+  // "Vistorias realizadas": funde as situações 3 e 4 (confirmada sem relatório +
+  // relatório enviado) — o mesmo bloco cobre as duas, linhasPorObra() diferencia o
+  // rótulo de cada linha conforme tem ou não relatório (r:null nas confirmadas).
   const secVistoriadas=`<div class="statwrap" id="secEngVistoriadas"><div class="sec-h"><span>Vistorias realizadas</span><span>${NUM.format(e.vistoriadas.length)}</span></div>${e.vistoriadas.length?grupoDistritoEng('engVi',e.vistoriadas,false):'<div class="empty">Nenhuma vistoria registrada.</div>'}</div>`;
   // gráficos: mês a mês sempre reaproveita renderBarChart (Q7); ano a ano só aparece
   // com ≥2 anos distintos, pra não desenhar um gráfico de barra única. Sobem pra logo
@@ -2093,7 +2168,7 @@ function abreModalEngenheiroEletrica(chave){
       <div class="mh-titles"><div class="mt">${escHtml(e.nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
     </div></div>
-    <div class="mbody dsh">${topo}${tiles}${mesesChart}${anoChart}${secFaltam}${secAgendadas}${secVistoriadas}</div>`;
+    <div class="mbody dsh">${topo}${tiles}${mesesChart}${anoChart}${secFaltam}${secAgendadas}${secPendentes}${secVistoriadas}</div>`;
   mostraJanelaGenerica();
   wireEngObraRows(chave);
   const mesCols=Object.keys(porMes).sort().map(m=>[m, MESES_ABREV[+m.slice(5,7)-1]+'/'+m.slice(2,4), porMes[m]]);
@@ -2214,7 +2289,14 @@ function linhasPorObra(itensOrdenados,idPrefix){
     const versoes=grp.itens.map(it=>{
       const ver=it.r?verMap[it.r.id]:null;
       const nup=it.r&&it.r.nup_processo;
-      const rotulo=`RELATÓRIO${ver?` · <span class="eng-ver-v">V${ver}</span>`:''} · ${it.data?fmtDateBR(it.data):'sem data'}${nup?` - NUP ${escHtml(nup)}`:''}`;
+      // it.r só existe pra vistoria com relatório de fato enviado — sem ele, o item é
+      // agendamento (agendada/pendente) OU confirmação sem relatório (situação 3 do
+      // grill de 29/09/2026, dentro de "Vistorias realizadas"); "RELATÓRIO" ficaria
+      // enganoso nos três casos, então usa "VISTORIA" (sem versão/NUP/botão de baixar,
+      // que só fazem sentido quando existe o arquivo).
+      const rotulo=it.r
+        ?`RELATÓRIO${ver?` · <span class="eng-ver-v">V${ver}</span>`:''} · ${it.data?fmtDateBR(it.data):'sem data'}${nup?` - NUP ${escHtml(nup)}`:''}`
+        :`VISTORIA · ${it.data?fmtDateBR(it.data):'sem data'}`;
       return `<div class="eng-ver-row" role="button" tabindex="0" data-idx="${idx}" aria-label="Ver dados do contrato, aba Elétrica">`
         +`<span class="eng-ver-label">${rotulo}</span>${botaoBaixarRelatorio(it.r)}${botaoAbrirSuite(nup)}</div>`;
     }).join('');
@@ -2251,7 +2333,7 @@ function abreObraNaAbaEletrica(o,voltarChave){
   openModal(o,voltarChave);
   const t=document.querySelector('.modal .mtab[data-tab="eletrica"]'); if(t) t.click();
 }
-// ---- Cronograma de visitas dos engenheiros eletricistas (grill de 28/09/2026) ----
+// ---- Cronograma de vistorias dos engenheiros eletricistas (grill de 28/09/2026) ----
 // Modal (mesmo #modalBg/#modal do resto) com as visitas do MÊS, agrupadas por dia. Só
 // leitura: agendar/cancelar/anexar relatório continuam na aba Elétrica da obra.
 // Decisões do grill:
@@ -2261,9 +2343,12 @@ function abreObraNaAbaEletrica(o,voltarChave){
 //    tem vêm de contratos_edificacao só pelos ids das visitas (em lotes, a URL não cabe
 //    tudo) — só nome/município/status, sem medição, então essas linhas NÃO abrem o modal da
 //    obra (mostram o status real da obra no lugar).
-//  - 3 status: vistoriada (relatório), agendada e "sem relatório" (agendada com data
-//    anterior a hoje e sem relatório depois dela — não afirma que a visita não houve, só
-//    que ninguém enviou o relatório).
+//  - 4 status (grill de 29/09/2026, situações 1-4): 'agendada' (data futura); 'pendente'
+//    (data já passou e o engenheiro ainda não confirmou a realização — não afirma que a
+//    visita não houve, só que ninguém confirmou); 'realizada' (o engenheiro confirmou
+//    que a visita aconteceu, ainda sem relatório); 'vistoriada' (relatório enviado). A
+//    confirmação (realizada_em) é feita na aba Elétrica da obra — este modal continua só
+//    leitura. Fonte única da regra: statusAgendamentoEletrica().
 //  - Diferença CONSCIENTE dos cards do painel lateral: lá o agendamento some assim que a
 //    obra tem qualquer relatório (categoriaEletricaObra); aqui uma reinspeção agendada
 //    para DEPOIS do último relatório aparece. Os contadores do painel não mudam.
@@ -2274,9 +2359,10 @@ function abreObraNaAbaEletrica(o,voltarChave){
 const CRONO_CHAVE_VOLTAR='__cronograma__';
 const CRONO_NAOIDENT='__naoidentificado__';
 const CRONO_STATUS={
-  vistoriada:{rot:'Vistoriada',rotPl:'Vistoriadas',cls:'ok',ic:'<circle cx="12" cy="12" r="9"/><path d="M8.3 12.4l2.4 2.4L16 9.3"/>'},
   agendada:{rot:'Agendada',rotPl:'Agendadas',cls:'info',ic:'<rect x="3.5" y="5" width="17" height="15" rx="2.2"/><path d="M8 3.2v4M16 3.2v4M3.5 10h17"/>'},
-  semrelatorio:{rot:'Sem relatório',rotPl:'Sem relatório',cls:'warn',ic:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>'},
+  pendente:{rot:'Pendente',rotPl:'Pendentes',cls:'danger',ic:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>'},
+  realizada:{rot:'Realizada',rotPl:'Realizadas',cls:'teal',ic:'<circle cx="12" cy="12" r="9"/><path d="M8.3 12.4l2.4 2.4L16 9.3"/>'},
+  vistoriada:{rot:'Vistoriada',rotPl:'Vistoriadas',cls:'ok',ic:'<circle cx="12" cy="12" r="9"/><path d="M8.3 12.4l2.4 2.4L16 9.3"/>'},
 };
 const CRONO_DOW=['dom','seg','ter','qua','qui','sex','sáb'];
 // mes: 0-11. engs: null (todos marcados) | Set de nomeNorm/CRONO_NAOIDENT marcados (Set vazio =
@@ -2287,10 +2373,7 @@ let _cronoItens=[];
 let _cronoCarregado=false;
 let _cronoObrasRef=[];   // índice → obra carregada (as linhas levam só o data-idx)
 let _cronoSeq=0;         // descarta resposta de uma abertura já superada por outra
-function hojeISOLocal(){
-  const d=new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+// hojeISOLocal() agora mora perto de categoriaEletricaObra (é usada por lá também).
 function chaveEngCronograma(nomeBruto){
   const k=normTxt(nomeBruto);
   return (k&&(ENGENHEIROS_ELETRICA||[]).some(e=>e.nomeNorm===k))?k:CRONO_NAOIDENT;
@@ -2317,8 +2400,13 @@ async function carregarVisitasCronograma(){
     const base={id,o:carregada||reduzidas.get(id)||null,clicavel:!!carregada};
     for(const r of rel) itens.push({...base,tipo:'vistoriada',data:r.data_vistoria,resp:r.responsavel_nome,r});
     const ag=agend[id];
-    if(ag && (!rel.length || String(ag.data_planejada||'')>String(rel[0].data_vistoria||'')))
-      itens.push({...base,tipo:String(ag.data_planejada||'')<hoje?'semrelatorio':'agendada',data:ag.data_planejada,resp:ag.responsavel_nome,r:null});
+    if(ag && (!rel.length || String(ag.data_planejada||'')>String(rel[0].data_vistoria||''))){
+      // 'vistoriada' de statusAgendamentoEletrica (confirmada) vira 'realizada' aqui —
+      // rótulo próprio pra não se confundir com a linha que TEM relatório (acima), já
+      // que esta não ganha botão de baixar (r:null).
+      const st=statusAgendamentoEletrica(ag,hoje);
+      itens.push({...base,tipo:st==='vistoriada'?'realizada':st,data:ag.data_planejada,resp:ag.responsavel_nome,r:null});
+    }
   }
   return itens;
 }
@@ -2330,7 +2418,7 @@ function abreCronogramaEletrica(opts){
   _cronoItens=[]; _cronoCarregado=false;
   const seta=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
-      <div class="mh-titles"><div class="mt">Cronograma de visitas</div></div>
+      <div class="mh-titles"><div class="mt">Cronograma de Vistorias</div></div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
     </div></div>
     <div class="mbody crono">
@@ -2530,10 +2618,8 @@ function wireCorpoCronograma(){
   });
   wireBaixarRelatorio(modal.querySelector('#cronoAgenda')||modal);
 }
-{
-  const btn=document.getElementById('btnCronogramaEle');
-  if(btn) btn.addEventListener('click',()=>abreCronogramaEletrica());
-}
+// btnCronogramaEle é religado a cada renderAtencaoEletrica() (wireEleResumoFiltro) —
+// virou um ladrilho da própria grade de cards, não mais um botão estático no HTML.
 // entries pra ranking/popover de irmãos — mesma forma que rankRows() consome
 // ({k,nome,sub,v}). Compartilhadas entre renderPanel() e o popover de navegação
 // lateral da trilha (Fase 8): uma lista, uma ordenação, um lugar só calculando.
@@ -3411,15 +3497,23 @@ function buildEletricaPane(o){
   // 25/09/2026). Sem isso o modal podia dizer "aguardando vistoria" numa obra que o
   // painel nem lista em "A Vistoriar" por ainda não ter passado de 75%.
   const cat=categoriaEletricaObra(o);
+  // categoria 'vistoriada' cobre 2 situações (3 e 4 do grill de 29/09/2026): relatório
+  // enviado (rel.length>0) OU só confirmada pelo engenheiro, sem relatório ainda — a
+  // segunda usa o rótulo "Realizada" pra não sugerir que existe um arquivo pra baixar
+  // (o botão de baixar só aparece de fato na lista de relatórios, mais abaixo).
   const statusInfo = !cat.ativo
     ? {cls:'',txt:'Fora da carteira ativa', sub:'obra não está em execução nem paralisada'}
     : cat.categoria==='vistoriada'
-      ? {cls:'ok',txt:'Vistoriada', sub:`${rel.length} relatório${rel.length===1?'':'s'} enviado${rel.length===1?'':'s'}`}
+      ? (rel.length
+          ? {cls:'ok',txt:'Vistoriada', sub:`${rel.length} relatório${rel.length===1?'':'s'} enviado${rel.length===1?'':'s'}`}
+          : {cls:'teal',txt:'Realizada', sub:'vistoria confirmada pelo engenheiro, ainda sem relatório enviado'})
       : cat.categoria==='agendada'
         ? {cls:'info',txt:'Vistoria agendada', sub:`medição ${fmtPct1(pct)}% · aguardando a data agendada`}
-        : cat.categoria==='avistoriar'
-          ? {cls:'warn',txt:'Aguardando vistoria', sub:`passou de ${LIMIAR_ELETRICA}% sem relatório enviado`}
-          : {cls:'',txt:'Fora do radar da elétrica', sub:`abaixo do limiar de atenção (${LIMIAR_ELETRICA}% de medição)`};
+        : cat.categoria==='pendente'
+          ? {cls:'danger',txt:'Pendente', sub:'a data agendada passou e a vistoria ainda não foi confirmada'}
+          : cat.categoria==='avistoriar'
+            ? {cls:'warn',txt:'Aguardando vistoria', sub:`passou de ${LIMIAR_ELETRICA}% sem relatório enviado`}
+            : {cls:'',txt:'Fora do radar da elétrica', sub:`abaixo do limiar de atenção (${LIMIAR_ELETRICA}% de medição)`};
   const statusCard=`<div class="rs-card ele-status">
     <div class="rs-lbl">${RS_ICO.clock} Situação da vistoria</div>
     <div class="ele-status-chip ${statusInfo.cls}">${statusInfo.txt}</div>
@@ -3440,11 +3534,24 @@ function buildEletricaPane(o){
   // usuário escolhe agendar OU inserir um relatório, sem UI própria na lista.
   // Cancelamento é soft-delete (UPDATE excluido_em), nunca DELETE físico.
   const agenda=o.agendamentoEletrica;
+  // Confirmação de realização (grill de 29/09/2026, realizada_em — sql/
+  // add_realizada_eletrica_vistorias_agendadas.sql): só aparece depois que a data
+  // planejada passou (Q6 do grill — antes disso a visita ainda nem devia ter
+  // acontecido). Checkbox porque é reversível (o engenheiro pode desmarcar por
+  // engano), não um botão de ação única como "Cancelar agendamento".
+  const agendaVenceu=agenda && String(agenda.data_planejada||'')<hoje;
+  // cor da caixa segue o mesmo status do chip acima (statusInfo) — pendente em
+  // vermelho, realizada em teal, agendada (data futura) no azul de sempre.
+  const agendaStatus=agenda?statusAgendamentoEletrica(agenda,hoje):null;
+  const agendaCls=agendaStatus==='pendente'?'danger':agendaStatus==='vistoriada'?'teal':'info';
   const agendaSecao=!podeEnviar?'':agenda
     ?`<div class="msec">Agendamento de vistoria</div>
-      <div class="ele-agenda-info">
-        <span>Agendada p/ <b>${fmtDateBR(agenda.data_planejada)}</b> · ${escHtml(agenda.responsavel_nome)}</span>
-        <button type="button" class="ele-agenda-cancelar-btn" id="eleAgendaCancelarBtn">Cancelar agendamento</button>
+      <div class="ele-agenda-info ${agendaCls}">
+        <span>Agendada para <b>${fmtDateBR(agenda.data_planejada)}</b> · ${escHtml(agenda.responsavel_nome)}${agenda.realizada_em?' · <span class="ele-agenda-ok">vistoria confirmada</span>':''}</span>
+        <div class="ele-agenda-acoes">
+          ${agendaVenceu?`<label class="ele-agenda-check"><input type="checkbox" id="eleAgendaRealizada"${agenda.realizada_em?' checked':''}><span>Vistoria realizada</span></label>`:''}
+          <button type="button" class="ele-agenda-cancelar-btn" id="eleAgendaCancelarBtn">Cancelar agendamento</button>
+        </div>
       </div>`
     :`<div class="msec">Agendamento de vistoria</div>
       <button type="button" class="ele-btn ele-insert-btn" id="eleAbrirAgenda">Agendar vistoria</button>
@@ -3587,6 +3694,26 @@ function wireEletricaPane(o){
     const{error}=await window.sbClient.from(SB_ELETRICA_AGENDA).update({excluido_em:new Date().toISOString()}).eq('id',o.agendamentoEletrica.id);
     if(error){ window.alert('Não consegui cancelar o agendamento agora. Tente novamente.'); btnCancelarAgenda.disabled=false; return; }
     o.agendamentoEletrica=null;
+    pane.innerHTML=buildEletricaPane(o);
+    wireEletricaPane(o);
+    invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros();
+  });
+  // Checkbox "Vistoria realizada": grava/limpa realizada_em (sql/
+  // add_realizada_eletrica_vistorias_agendadas.sql) — só existe depois que a data
+  // planejada já passou (ver agendaVenceu em buildEletricaPane). Reversível: desmarcar
+  // volta a obra pra "Pendente".
+  const chkRealizada=pane.querySelector('#eleAgendaRealizada');
+  if(chkRealizada) chkRealizada.addEventListener('change',async()=>{
+    if(!o.agendamentoEletrica) return;
+    const marcar=chkRealizada.checked;
+    chkRealizada.disabled=true;
+    const{error}=await window.sbClient.from(SB_ELETRICA_AGENDA)
+      .update({realizada_em:marcar?new Date().toISOString():null}).eq('id',o.agendamentoEletrica.id);
+    if(error){
+      window.alert(`Não consegui ${marcar?'confirmar':'desfazer a confirmação d'}a vistoria agora. Tente novamente.`);
+      chkRealizada.checked=!marcar; chkRealizada.disabled=false; return;
+    }
+    o.agendamentoEletrica={...o.agendamentoEletrica, realizada_em:marcar?new Date().toISOString():null};
     pane.innerHTML=buildEletricaPane(o);
     wireEletricaPane(o);
     invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros();
