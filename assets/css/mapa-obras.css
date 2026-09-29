@@ -7,6 +7,16 @@
   --amber:#F6B255; --amber-text:#F6C98A; --amber-text-2:#FFC98A; --amber-deep:#B4531A; --amber-rgb:246,178,85;
   --status-exec:#3C87C9; --status-ok:#189E6E; --status-wait:#FAB219;
   --status-stop:#D03B3B; --status-stop-deep:#7A1F1F; --status-stop-text:#FFC9C0; --status-stop-rgb:208,59,59;
+  /* "Pendente"/"Realizada" da Elétrica (Cronograma de Vistorias e painéis do engenheiro,
+     grill de 29/09/2026): --danger é o MESMO vermelho de --status-stop (obra Paralisada)
+     — reaproveitado de propósito, não uma cor nova, pra "vistoria vencida sem confirmação"
+     ler como o mesmo tipo de alerta que já existe no app — só com token próprio pra não
+     acoplar a leitura de vistoria à de status de obra. --teal é o único par novo: fica
+     entre --ng (Vistoriada) e o azul de "Agendada", pra marcar "confirmada, falta só o
+     relatório" sem reaproveitar nem o verde de "concluído" nem o azul de "ainda não
+     chegou a data". */
+  --danger:#D03B3B; --danger-deep:#7A1F1F; --danger-text:#FFC9C0; --danger-rgb:208,59,59;
+  --teal:#4FBFB0; --teal-deep:#1F7A6C; --teal-text:#8FE0D3; --teal-rgb:79,191,176;
 
   /* mapa (paleta própria, deliberadamente distinta da de status acima —
      ver STATUS_STATES em mapa-obras.js — para não confundir os dois canais de cor) */
@@ -101,6 +111,9 @@
 
     --status-exec:#2F7DB8; --status-ok:#12805A; --status-wait:#B0730C;
     --status-stop:#C5372F; --status-stop-deep:#8A241C; --status-stop-text:#A62B22; --status-stop-rgb:197,55,47;
+
+    --danger:#C5372F; --danger-deep:#8A241C; --danger-text:#8A241C; --danger-rgb:197,55,47;
+    --teal:#178074; --teal-deep:#0F5C52; --teal-text:#0F5C52; --teal-rgb:23,128,116;
 
     /* fundos — quase branco; a hierarquia vem de sombra + espaço, não de degraus de cinza */
     --bg-base:#F4F6F5; --bg-base-rgb:244,246,245;
@@ -440,7 +453,11 @@
      lista de status e um dos dois com o donut) era o conteúdo mais apertado do painel. */
   /* linha explícita: sem ela a linha implícita é `auto` e cresce com o conteúdo do
      painel lateral (que tem rolagem própria), esticando o mapa para além da janela. */
-  main{display:grid;grid-template-columns:1fr 600px;grid-template-rows:minmax(0,1fr);
+  /* 600px→660px (pedido do usuário, 29/09/2026): a 4ª estatística "pendentes" em
+     .eng-stats (grill do mesmo dia) apertou demais o nome do engenheiro em
+     .eng-nome, cortando "Erasmo Pacheco"/"Breno Barbosa" em telas comuns — só o
+     suficiente pra sobrar espaço pro nome, sem exagerar na largura do painel. */
+  main{display:grid;grid-template-columns:1fr 660px;grid-template-rows:minmax(0,1fr);
        flex:1;min-height:0;transition:grid-template-columns .35s ease}
   main.aside-collapsed{grid-template-columns:1fr 0}
   main.aside-collapsed aside{padding:0;border-left:0;overflow:hidden}
@@ -981,6 +998,14 @@
         background:linear-gradient(var(--acc),var(--acc-deep))}
   .ele-resumo-i.ok{--acc:var(--ng);--acc-deep:var(--ng-deep);--acc-rgb:var(--ng-rgb)}
   .ele-resumo-i.info{--acc:#5B9FDB;--acc-deep:#2E6DA4;--acc-rgb:60,135,201}
+  /* "pendentes" (grill de 29/09/2026): vistoria vencida sem confirmação — mesmo
+     vermelho de --status-stop (obra Paralisada), token --danger próprio (ver :root). */
+  .ele-resumo-i.danger{--acc:var(--danger);--acc-deep:var(--danger-deep);--acc-rgb:var(--danger-rgb)}
+  /* ladrilho "Cronograma" (mesma grade dos cards de status, grill de 29/09/2026): é
+     navegação, não filtro — acento no verde da marca (--ng) pra não parecer mais um
+     status. <button> nativo, então reseta a aparência padrão do elemento. */
+  .ele-resumo-i.crono{--acc:var(--ng);--acc-deep:var(--ng-deep);--acc-rgb:var(--ng-rgb);
+        appearance:none;-webkit-appearance:none;font:inherit;text-align:left;width:100%;color:inherit}
   .eri-txt{display:flex;flex-direction:column;gap:6px;min-width:0}
   .ele-resumo-i .l{display:inline-flex;align-items:center;gap:7px;font-family:Montserrat,sans-serif;
         font-size:10px;font-weight:700;color:var(--text-label);text-transform:uppercase;letter-spacing:.4px}
@@ -988,6 +1013,8 @@
         line-height:1;text-shadow:0 0 16px rgba(var(--acc-rgb),.18)}
   .ele-resumo-i.ok .v{color:var(--ng-light)}
   .ele-resumo-i.warn .v{color:var(--amber-text)}
+  .ele-resumo-i.danger .v{color:var(--danger-text)}
+  .ele-resumo-i.crono .l{font-size:13px;text-transform:none;letter-spacing:0;color:var(--text-bright);font-weight:700}
   .ele-resumo-i .ic{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;
         color:var(--acc);background:rgba(var(--acc-rgb),.15);border:1px solid rgba(var(--acc-rgb),.22)}
   .ele-resumo-i .ic svg{width:18px;height:18px;display:block}
@@ -1035,6 +1062,9 @@
   /* "a vistoriar" (pendências por distrito) — mesmo âmbar do card "A vistoriar" do
      resumo (.ele-resumo-i.warn .v), pra ligar visualmente os dois números. */
   .eng-stat-warn b{color:var(--amber-text)}
+  /* "pendentes" (vistoria vencida sem confirmação) — mesmo vermelho do card "Pendentes"
+     do resumo (.ele-resumo-i.danger .v). */
+  .eng-stat-danger b{color:var(--danger-text)}
   @media (max-width:420px){ .eng-stats{flex-direction:column;gap:2px;align-items:flex-end} }
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
   /* Barra VAZADA = média sobre menos de AMOSTRA_SOLIDA despachos (ver amostraFina no JS).
@@ -1310,6 +1340,10 @@
   /* mesmo azul de .ele-resumo-i.info (--acc:#5B9FDB), sem split por tema — aquele
      também não separa, e já é a referência de "info" nos cards da Elétrica. */
   .modal .ele-status-chip.info{background:rgba(60,135,201,.15);color:#5B9FDB}
+  /* "Pendente" (mesmo --danger do card "Pendentes" do resumo) e "Realizada" (--teal,
+     entre o verde de Vistoriada e o azul de Agendada) — grill de 29/09/2026. */
+  .modal .ele-status-chip.danger{background:rgba(var(--danger-rgb),.15);color:var(--danger-text)}
+  .modal .ele-status-chip.teal{background:rgba(var(--teal-rgb),.15);color:var(--teal-deep)}
   /* top:2px casa com o margin-top:2px próprio de .rs-bar — tick e barra começam no
      mesmo pixel dentro do wrapper */
   .modal .ele-tick{position:absolute;top:2px;width:2px;height:6px;background:rgba(var(--raise-rgb),.28);transform:translateX(-1px)}
@@ -1459,13 +1493,8 @@
         box-shadow:0 8px 24px rgba(0,0,0,.28);max-width:min(320px,calc(100vw - 32px));
         text-align:center}
   .ele-toast-erro{border-color:rgba(220,80,80,.4);color:#e07a7a}
-  /* Cronograma de visitas (grill de 28/09/2026): botão no painel lateral + modal do mês.
-     Azul = mesmo #5B9FDB de .ele-resumo-i.info (agendada), sem split por tema. */
-  .ele-crono-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:40px;cursor:pointer;
-        border:1px solid rgba(60,135,201,.35);background:rgba(60,135,201,.12);color:#5B9FDB;border-radius:11px;
-        font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.2px;margin-bottom:6px;transition:.15s}
-  .ele-crono-btn:hover,.ele-crono-btn:focus-visible{border-color:rgba(60,135,201,.6);background:rgba(60,135,201,.2);outline:none}
-  .ele-crono-btn svg{width:16px;height:16px;display:block;flex:none}
+  /* Cronograma de vistorias (grill de 28/09/2026, ladrilho movido pra dentro de
+     .ele-resumo em 29/09/2026 — ver .ele-resumo-i.crono acima): modal do mês abaixo. */
   /* Janela do cronograma: mini-calendário + botões de status + engenheiro à esquerda,
      agenda por dia à direita (a agenda rola por dentro, o lado esquerdo fica sempre à vista).
      Cada status tem cor E ícone (check/calendário/relógio) — cor sozinha não basta.
@@ -1476,6 +1505,10 @@
   .modal .crono-chip.ok,.modal .crono-gl.ok,.modal .crono-st.ok,.modal .crono-d i.ok{--c:var(--ng);--c-rgb:var(--ng-rgb);--c-text:var(--ng-light)}
   .modal .crono-chip.info,.modal .crono-gl.info,.modal .crono-st.info,.modal .crono-d i.info{--c:var(--crono-info);--c-rgb:var(--crono-info-rgb);--c-text:var(--crono-info)}
   .modal .crono-chip.warn,.modal .crono-gl.warn,.modal .crono-st.warn,.modal .crono-d i.warn{--c:var(--amber);--c-rgb:var(--amber-rgb);--c-text:var(--amber-text)}
+  /* 'pendente' (data vencida sem confirmação) e 'realizada' (confirmada, sem
+     relatório) — grill de 29/09/2026, situações 2 e 3. */
+  .modal .crono-chip.danger,.modal .crono-gl.danger,.modal .crono-st.danger,.modal .crono-d i.danger{--c:var(--danger);--c-rgb:var(--danger-rgb);--c-text:var(--danger-text)}
+  .modal .crono-chip.teal,.modal .crono-gl.teal,.modal .crono-st.teal,.modal .crono-d i.teal{--c:var(--teal);--c-rgb:var(--teal-rgb);--c-text:var(--teal-text)}
   .modal:has(.mbody.crono){width:min(1560px,96vw);min-height:min(88vh,1000px)}
   .modal .mbody.crono{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:36px;align-items:start}
   @media (max-width:760px){ .modal .mbody.crono{grid-template-columns:minmax(0,1fr);gap:20px} }
@@ -1553,13 +1586,19 @@
     @keyframes cronoFlash{from{background:rgba(var(--crono-info-rgb),.16)}to{background:transparent}}
   }
   .modal .crono-dia-itens{display:flex;flex-direction:column}
-  .modal .crono-row{display:flex;align-items:center;gap:14px;padding:9px 8px;margin:0 -8px;border-radius:9px;
+  /* align-items:flex-start (não center) — o status precisa começar na mesma linha do
+     TÍTULO da obra, não centralizado contra o bloco inteiro (2 linhas de descrição +
+     responsável vs. 2 linhas de status + distrito quase nunca têm a mesma altura, o
+     que desalinhava as duas primeiras linhas — pedido do usuário, 29/09/2026). Ícone e
+     botão de baixar recentralizam por conta própria (align-self) pra não ficarem
+     "grudados" no topo da linha. */
+  .modal .crono-row{display:flex;align-items:flex-start;gap:14px;padding:9px 8px;margin:0 -8px;border-radius:9px;
         font-family:Montserrat,sans-serif;transition:background-color .12s}
   .modal .crono-row+.crono-row{border-top:1px solid rgba(var(--raise-rgb),.06)}
   .modal .crono-row:not(.nc){cursor:pointer}
   .modal .crono-row:not(.nc):hover,.modal .crono-row:not(.nc):focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
   .modal .crono-row.nc{cursor:default}
-  .modal .crono-gl{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  .modal .crono-gl{align-self:center;flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
         background:rgba(var(--c-rgb),.14);color:var(--c-text)}
   .modal .crono-gl svg{width:16px;height:16px;display:block}
   .modal .crono-info{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -1567,8 +1606,9 @@
         -webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;text-align:justify;text-justify:inter-word;transition:color .12s}
   .modal .crono-row:not(.nc):hover .crono-obra{color:var(--ng-light)}
   .modal .crono-resp{font-size:11.5px;font-weight:600;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .modal .crono-dir{flex:0 0 112px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
-  .modal .crono-fim{flex:0 0 28px;display:flex;align-items:center;justify-content:flex-end}
+  /* centralizado (não mais à esquerda) — coluna de largura fixa, pedido do usuário. */
+  .modal .crono-dir{flex:0 0 112px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+  .modal .crono-fim{align-self:center;flex:0 0 28px;display:flex;align-items:center;justify-content:flex-end}
   .modal .crono-st{font-size:11.5px;font-weight:700;color:var(--c-text)}
   .modal .crono-dist{font-size:11px;color:var(--text-dim)}
   .modal .crono-obra-st{flex:0 1 auto;align-self:flex-start;margin-top:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;font-weight:600;color:var(--text-dim);border:1px dashed var(--card-border);
@@ -1593,12 +1633,26 @@
   /* agendamento de vistoria (independente do relatório, ver .ele-agenda-info abaixo) —
      mesmo botão .ele-insert-btn/.ele-btn do "Inserir relatório". */
   .modal .ele-agenda-info{margin-top:10px;display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;
-        padding:10px 14px;border:1px solid rgba(var(--amber-rgb),.3);border-radius:11px;background:rgba(var(--amber-rgb),.06);
+        padding:10px 14px;border:1px solid rgba(var(--c-rgb),.3);border-radius:11px;background:rgba(var(--c-rgb),.06);
         font-family:Montserrat,sans-serif;font-size:12.5px;color:var(--text-bright)}
+  /* cor conforme o status do agendamento (agendaCls em buildEletricaPane) — mesma
+     paleta danger/teal/info dos chips da Elétrica e do Cronograma. */
+  .modal .ele-agenda-info.info{--c-rgb:60,135,201}
+  .modal .ele-agenda-info.danger{--c-rgb:var(--danger-rgb)}
+  .modal .ele-agenda-info.teal{--c-rgb:var(--teal-rgb)}
   .modal .ele-agenda-cancelar-btn{border:0;background:transparent;padding:0;color:var(--text-dim);
         font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;text-decoration:underline;cursor:pointer}
   .modal .ele-agenda-cancelar-btn:hover{color:var(--status-stop)}
   .modal .ele-agenda-cancelar-btn:disabled{opacity:.5;cursor:not-allowed}
+  /* confirmação "Vistoria realizada" (grill de 29/09/2026) + "Cancelar agendamento",
+     lado a lado — mesmo peso visual, mas a confirmação é reversível (checkbox) e o
+     cancelamento é uma ação única (link sublinhado), por isso tratamentos distintos. */
+  .modal .ele-agenda-acoes{display:flex;align-items:center;gap:14px;margin-left:auto}
+  .modal .ele-agenda-check{display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--text-bright)}
+  .modal .ele-agenda-check input{width:15px;height:15px;accent-color:var(--teal);cursor:pointer}
+  .modal .ele-agenda-check:has(input:checked){color:var(--teal-deep)}
+  .modal .ele-agenda-ok{color:var(--teal-deep);font-weight:700}
   /* diálogo de "novo relatório"/"agendar vistoria" — camada própria por cima do
      .modal (z-index acima de 2000, ver .modal-bg), pedido do usuário (24/09/2026):
      antes o formulário ficava sempre aberto na aba. position:fixed cobre a viewport
