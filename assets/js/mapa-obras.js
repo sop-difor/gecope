@@ -32,21 +32,29 @@ const TOKENS=readTokens();
 document.body.classList.add('boot-loading'); // pulso nos KPIs/gráficos até a 1ª carga de dados terminar (sucesso ou erro)
 
 let GEO, ESTADO, GRP, MUN, DISTRITOS, NAMEIDX;
-try{
-  const _fetchJson=u=>fetch(u).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status+' em '+u); return r.json(); });
-  const [_muni,_estado,_blocos,_ref]=await Promise.all([
-    _fetchJson('assets/geo/ce-municipios.json'),
-    _fetchJson('assets/geo/ce-estado.json'),
-    _fetchJson('assets/geo/ce-blocos.json'),
-    _fetchJson('assets/geo/ce-referencia.json'),
-  ]);
-  GEO=_muni; ESTADO=_estado; GRP=_blocos;
-  MUN=_ref.MUN; DISTRITOS=_ref.DISTRITOS; NAMEIDX=_ref.NAMEIDX;
-}catch(e){
-  console.error('Falha ao carregar dados geográficos:',e);
-  showDataError('Não foi possível carregar os dados geográficos do mapa. Verifique a conexão e recarregue a página.');
-  throw e;
-}
+// Estado da barra de status — declarado AQUI, antes de qualquer chamada possível a
+// setStatus()/showDataError() (que grava nestas duas variáveis). Quando ficavam junto de
+// setStatus (mais abaixo), uma falha no GeoJSON chamava setStatus dentro da zona morta
+// temporal do `let` e lançava ReferenceError: o overlay de erro nunca aparecia.
+let _lastStatus=null; // últimos args — replay na troca de tema (o dot lê TOKENS.ng/amber inline)
+let _statusObras=null; // último status do modo Obras, para a volta de Replanilhamentos (ver setStatus)
+// O botão "Tentar novamente" precisa funcionar já na falha do GeoJSON, que acontece antes
+// de o resto do arquivo ser avaliado.
+{ const _retry=document.getElementById('dataErrorRetry'); if(_retry) _retry.onclick=()=>location.reload(); }
+// ARRANQUE EM PARALELO. Antes: GeoJSON → (montar camadas) → token da sessão → contratos →
+// demais tabelas, tudo em série. O GeoJSON (~450KB) e a cadeia token → dados não dependem
+// um do outro: os dois downloads começam agora, no mesmo instante, e o `await` do geo só
+// acontece adiante (logo antes de DB precisar de MUN/DISTRITOS). O prefetch dos dados é
+// disparado junto (ver _prefetchDados) e loadData() apenas o consome.
+const _fetchJson=u=>fetch(u).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status+' em '+u); return r.json(); });
+const _geoP=Promise.all([
+  _fetchJson('assets/geo/ce-municipios.json'),
+  _fetchJson('assets/geo/ce-estado.json'),
+  _fetchJson('assets/geo/ce-blocos.json'),
+  _fetchJson('assets/geo/ce-referencia.json'),
+]);
+_geoP.catch(()=>{}); // o erro real é tratado no await, mais adiante — evita só o "unhandled rejection" no intervalo
+const _tokenP=obterTokenSessao();
 /* ============================================================
    CONEXÃO COM O SUPABASE
    URL/chave vêm de config.js (window.SUPABASE_URL/KEY), a mesma
@@ -66,13 +74,30 @@ const SB_URL=window.SUPABASE_URL;
 // window.sbClient vem de database.js (mesmo cliente do resto do GECOPE, com
 // storage guard e refresh automático). null se não houver sessão ativa.
 let SESSION_TOKEN=null;
+let SESSION_UID=null; // id do usuário da sessão — chave do cache de sessionStorage (não vazar dados entre contas)
 async function obterTokenSessao(){
   try{
     for(let i=0;i<20 && !window.sbClient;i++){ await new Promise(r=>setTimeout(r,100)); }
     if(!window.sbClient) return null;
     const {data}=await window.sbClient.auth.getSession();
+    SESSION_UID=data?.session?.user?.id ?? SESSION_UID;
     return data?.session?.access_token ?? null;
   }catch{ return null; }
+}
+// Token VIGENTE para cada rodada de requisições. SESSION_TOKEN é só o retrato do arranque:
+// o JWT do Supabase vence em ~1h e o supabase-js o renova por baixo (autoRefreshToken), então
+// quem já está com o painel aberto há um tempo (apresentação, aba esquecida) e troca de modo
+// ou reabre o Cronograma mandaria um Bearer vencido e tomaria 401. getSession() lê da memória
+// e só vai à rede se o token estiver perto de vencer — barato de chamar a cada fetchTable.
+async function tokenVigente(){
+  try{
+    if(window.sbClient){
+      const {data}=await window.sbClient.auth.getSession();
+      const t=data?.session?.access_token;
+      if(t){ SESSION_TOKEN=t; return t; }
+    }
+  }catch{ /* cai no último token conhecido */ }
+  return SESSION_TOKEN;
 }
 // Papel do usuário logado (E1) — decide se o modo Replanilhamentos é OFERECIDO. Não é
 // controle de acesso: o gate real é a view no banco, que devolve 0 linhas para quem não
@@ -230,6 +255,39 @@ let _edTip=null, _edTipAlvo=null;
 // O módulo opera exclusivamente por Distrito Operacional — os dados de "Região"
 // (ce-referencia.json:REGIOES, ce-blocos.json:reg) continuam no disco, mas não
 // são mais lidos pelo app.
+// ---- PREFETCH DOS DADOS + espera do GeoJSON ----
+// Constantes usadas pelo caminho de rede ficam AQUI, antes do `await`: o prefetch roda em
+// paralelo e pode retomar enquanto o corpo principal ainda está suspenso no await abaixo —
+// qualquer `const` declarado depois desta linha estaria na zona morta temporal para ele.
+// Timeout por requisição: sem ele, um fetch pendurado (rede móvel, gateway) deixava o painel
+// em "Carregando…" para sempre — nem o erro nem o "Tentar novamente" apareciam.
+const FETCH_TIMEOUT_MS=25000;
+// cache (sessionStorage) para não refazer o fetch inteiro a cada F5. As bases de origem
+// mudam no máximo 1x por dia (carga manual/mensal — ver docs/auditoria-egress-2026-09.md,
+// item 9), então 5min era bem mais curto do que precisava. 1h ainda mostra "Base atualizada
+// em" no cabeçalho (a defasagem fica visível); mutações locais (agendar/cancelar vistoria,
+// relatórios) limpam a entrada via invalidateSessionCache().
+const CACHE_TTL_MS=60*60*1000;
+// {scope,promise} da 1ª carga, iniciada assim que o token chega — ou null. Consumida (e zerada)
+// por loadData(). Sem token, resolve null e o gate de loadData() mostra o aviso de login.
+let _prefetchDados=null;
+{ const escopo='ativa'; // = st.dataScope inicial (o alternador de escopo não está mais na tela)
+  const promise=(async()=>{
+    const tk=await _tokenP; if(!tk) return null;
+    SESSION_TOKEN=tk;
+    return fetchDadosBrutos(escopo);
+  })();
+  promise.catch(()=>{}); // o erro é tratado no await de loadData()
+  _prefetchDados={scope:escopo,promise}; }
+try{
+  const [_muni,_estado,_blocos,_ref]=await _geoP;
+  GEO=_muni; ESTADO=_estado; GRP=_blocos;
+  MUN=_ref.MUN; DISTRITOS=_ref.DISTRITOS; NAMEIDX=_ref.NAMEIDX;
+}catch(e){
+  console.error('Falha ao carregar dados geográficos:',e);
+  showDataError('Não foi possível carregar os dados geográficos do mapa. Verifique a conexão e recarregue a página.');
+  throw e;
+}
 const DB={distritos:DISTRITOS, municipios:{}};
 for(const cod in MUN){ DB.municipios[cod]={nome:MUN[cod].nome, do:MUN[cod].do, obras:[], processos:[]}; }
 
@@ -321,6 +379,9 @@ function mapRow(r){
     // buckets de filtro (Etapa C) — distrito e medição são preenchidos no loadData,
     // onde o código do município e o.ficha já são conhecidos.
     distrito:null, medicaoBucket:'semficha',
+    // statusBucket() faz normalize + 3 regex; aggIds()/statusBreakdown() rodam por obra a cada
+    // hover/zoom, então o balde é calculado UMA vez aqui, não a cada agregação.
+    stBucket:statusBucket(r.status_obra||'—'),
     faixaValorBucket:faixaValorBucket(valor),
     prazoExecBucket:prazoDateBucket(r.data_inicio_real,r.data_fim_previsto),
     vigenciaBucket:prazoDateBucket(r.data_inicio_real,r.data_fim_vigencia_contrato),
@@ -330,24 +391,43 @@ function mapRow(r){
 // `Prefer: count=exact` (o servidor devolve em Content-Range: "0-999/N") — a partir
 // daí as páginas restantes são conhecidas de antemão e disparadas todas em paralelo
 // (Promise.all), em vez de um `while` sequencial esperando página a página.
-async function fetchTable(tbl,{select='*',filter=''}={}){
-  const qs=`select=${encodeURIComponent(select)}${filter?'&'+filter:''}`;
+// Timeout por requisição: sem ele, um fetch pendurado (rede móvel, gateway) deixava o painel
+// em "Carregando…" para sempre — nem o erro nem o "Tentar novamente" apareciam.
+// (FETCH_TIMEOUT_MS é declarada junto do prefetch, antes do await do GeoJSON)
+function fetchComTimeout(url,opts,rotulo){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),FETCH_TIMEOUT_MS);
+  return fetch(url,{...opts,signal:ctl.signal})
+    .catch(e=>{ throw e&&e.name==='AbortError' ? new Error('tempo esgotado ao consultar '+rotulo) : e; })
+    .finally(()=>clearTimeout(t));
+}
+// `order`: PAGINAÇÃO SEM ORDER BY não é estável — o Postgres pode devolver as linhas em ordens
+// diferentes entre as páginas (mais ainda com páginas em paralelo e uma carga do SIGSOP
+// gravando no meio), duplicando uma linha e perdendo outra em silêncio. Quando a chamada não
+// informa uma chave, ordena por TODAS as colunas do select (a ordem fica determinística no
+// conteúdo, e duas linhas idênticas em todas as colunas lidas são intercambiáveis).
+async function fetchTable(tbl,{select='*',filter='',order=null}={}){
+  const ord=order || (select!=='*' ? select.split(',').map(c=>c.trim()+'.asc').join(',') : '');
+  const qs=`select=${encodeURIComponent(select)}${filter?'&'+filter:''}${ord?'&order='+ord:''}`;
   // apikey continua sendo a chave anônima (exigida pelo PostgREST em toda chamada,
   // mesmo autenticada) — quem identifica o usuário pro RLS é o Authorization,
-  // que agora é o token da sessão logada, não mais a chave anônima.
-  const headers={apikey:SB_KEY, Authorization:'Bearer '+(SESSION_TOKEN||SB_KEY)};
+  // que é o token VIGENTE da sessão logada (ver tokenVigente), não mais a chave anônima.
+  const headers={apikey:SB_KEY, Authorization:'Bearer '+((await tokenVigente())||SB_KEY)};
   const PAGE=1000;
-  const first=await fetch(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`0-${PAGE-1}`, Prefer:'count=exact'}});
+  const first=await fetchComTimeout(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`0-${PAGE-1}`, Prefer:'count=exact'}},tbl);
   if(!first.ok) throw new Error('HTTP '+first.status+' em '+tbl+' — verifique URL/chave/RLS');
   const firstChunk=await first.json();
   const range=first.headers.get('content-range'); // "0-999/3577"
   const total=range && range.includes('/') ? parseInt(range.split('/')[1],10) : NaN;
   if(!isFinite(total)){ console.warn('Content-Range ausente/inválido em '+tbl+' — assumindo que a 1ª página já é a tabela inteira ('+firstChunk.length+' linhas). Se a tabela tiver mais que isso, os dados vêm truncados.'); return firstChunk; }
   if(firstChunk.length>=total) return firstChunk;
+  // O passo é o tamanho da 1ª página REAL, não PAGE: se o servidor tiver `max-rows` menor que
+  // 1000, a 1ª página volta curta e saltar de 1000 em 1000 pularia as linhas do meio.
+  const step=firstChunk.length;
+  if(!step) return firstChunk;
   const pageReqs=[];
-  for(let from=PAGE; from<total; from+=PAGE){
-    const to=Math.min(from+PAGE-1,total-1);
-    pageReqs.push(fetch(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`${from}-${to}`}})
+  for(let from=step; from<total; from+=step){
+    const to=Math.min(from+step-1,total-1);
+    pageReqs.push(fetchComTimeout(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`${from}-${to}`}},tbl)
       .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status+' em '+tbl); return r.json(); }));
   }
   const rest=await Promise.all(pageReqs);
@@ -364,6 +444,19 @@ function inListFilter(col,values,quote){
   const list=quote ? values.map(v=>`"${String(v).replace(/"/g,'\\"')}"`).join(',') : values.join(',');
   return `${col}=in.(${list})`;
 }
+// fetchTable com escopo `col in (values)` FATIADO. O supabase/PostgREST manda o `in.(...)` na
+// URL (GET): com centenas de valores a URL passa do limite do gateway (414/400) e a aba inteira
+// falhava de uma vez. Fatias pequenas correm em paralelo e são concatenadas. `values`
+// undefined = sem escopo (tabela inteira, histórico completo); lista vazia = nada a buscar.
+async function fetchTableIn(tbl,opts,col,values,quote){
+  if(!values) return fetchTable(tbl,opts);
+  if(!values.length) return [];
+  const CH=quote?100:200, fatias=[];
+  for(let i=0;i<values.length;i+=CH) fatias.push(values.slice(i,i+CH));
+  const partes=await Promise.all(fatias.map(f=>fetchTable(tbl,
+    {...opts, filter:[inListFilter(col,f,quote),opts.filter].filter(Boolean).join('&')})));
+  return partes.flat();
+}
 // id_obra -> comissão de fiscalização completa, ordenada pelo rank de EXIBIÇÃO de
 // classifyComissao (Fiscal > Presidente > 1º..4º Membro > Membro > Suplente). Quem é
 // o fiscal RESPONSÁVEL é decidido à parte por pickFiscal().
@@ -371,8 +464,7 @@ function inListFilter(col,values,quote){
 // lista de ids cabe numa query — no histórico completo os ~350 ids estourariam a URL,
 // então busca a tabela de comissão inteira, só com as colunas usadas).
 async function fetchFiscais(idFilter){
-  const filter=inListFilter('id_obra',idFilter,false);
-  const rows=await fetchTable(SB_COMISSAO,{select:COMISSAO_COLS,filter}); const m={};
+  const rows=await fetchTableIn(SB_COMISSAO,{select:COMISSAO_COLS},'id_obra',idFilter,false); const m={};
   const datasPorObra={};
   for(const r of rows){
     const data=String(r.atualizado_em||'').slice(0,10);
@@ -407,8 +499,7 @@ function advScopeNote(o,msg){ return (o.nObras||1)>1 ? `<div class="adv-scope-no
 // Mesma lógica de escopo que fetchFiscais: na carteira ativa filtra pelos contratos já
 // carregados (cabe numa URL); no histórico completo busca a tabela inteira (~580 linhas).
 async function fetchAditivos(nrFilter){
-  const filter=inListFilter('nr_contrato_sop',nrFilter,true);
-  const rows=await fetchTable(SB_ADITIVOS,{select:ADITIVOS_COLS,filter}); const m={};
+  const rows=await fetchTableIn(SB_ADITIVOS,{select:ADITIVOS_COLS},'nr_contrato_sop',nrFilter,true); const m={};
   for(const r of rows){ const k=r.nr_contrato_sop; if(!k) continue; (m[k]=m[k]||[]).push(r); }
   for(const k in m) m[k].sort((a,b)=>
     adPubDate(b).localeCompare(adPubDate(a))
@@ -418,16 +509,14 @@ async function fetchAditivos(nrFilter){
 // nr_contrato_sop -> ficha do contrato (só os 2 totais de medição já calculados
 // upstream pelo SIGSOP — total_medido/percentual_total_medido, ver aba Medições do modal).
 async function fetchFichas(nrFilter){
-  const filter=inListFilter('nr_contrato_sop',nrFilter,true);
-  const rows=await fetchTable(SB_FICHA,{select:FICHA_COLS,filter}); const m={};
+  const rows=await fetchTableIn(SB_FICHA,{select:FICHA_COLS},'nr_contrato_sop',nrFilter,true); const m={};
   for(const r of rows){ if(r.nr_contrato_sop) m[r.nr_contrato_sop]=r; }
   return m;
 }
 // id_obra -> lista de medições (para a curva "Evolução da medição" do Resumo).
 // Ordena por nr_medicao (as medições são sequenciais); periodo é só rótulo do eixo.
 async function fetchMedicoes(idFilter){
-  const filter=inListFilter('id_obra',idFilter,false);
-  const rows=await fetchTable(SB_MEDICOES,{select:MEDICOES_COLS,filter}); const m={};
+  const rows=await fetchTableIn(SB_MEDICOES,{select:MEDICOES_COLS},'id_obra',idFilter,false); const m={};
   for(const r of rows){ const k=r.id_obra; if(k==null) continue; (m[k]=m[k]||[]).push(r); }
   for(const k in m) m[k].sort((a,b)=>(num(a.nr_medicao)-num(b.nr_medicao)) || String(a.periodo||'').localeCompare(String(b.periodo||'')));
   return m;
@@ -435,9 +524,7 @@ async function fetchMedicoes(idFilter){
 // id_obra -> relatórios de vistoria elétrica (mais recente primeiro). Mesmo padrão de
 // escopo de fetchFiscais/fetchMedicoes (idFilter só na carteira ativa).
 async function fetchEletricaVistorias(idFilter){
-  const filtroObra=inListFilter('id_obra',idFilter,false);
-  const filter=(filtroObra?filtroObra+'&':'')+'excluido_em=is.null';
-  const rows=await fetchTable(SB_ELETRICA,{select:ELETRICA_COLS,filter}); const m={};
+  const rows=await fetchTableIn(SB_ELETRICA,{select:ELETRICA_COLS,filter:'excluido_em=is.null',order:'id.asc'},'id_obra',idFilter,false); const m={};
   for(const r of rows){ const k=r.id_obra; if(k==null) continue; (m[k]=m[k]||[]).push(r); }
   for(const k in m) m[k].sort((a,b)=>String(b.data_vistoria||'').localeCompare(String(a.data_vistoria||'')));
   return m;
@@ -446,9 +533,7 @@ async function fetchEletricaVistorias(idFilter){
 // Só 1 por obra é exibido mesmo que existisse mais de um ativo no banco (a UI evita
 // criar 2, ver sql/create_eletrica_vistorias_agendadas.sql) — pega o mais recente.
 async function fetchEletricaAgendamentos(idFilter){
-  const filtroObra=inListFilter('id_obra',idFilter,false);
-  const filter=(filtroObra?filtroObra+'&':'')+'excluido_em=is.null';
-  const rows=await fetchTable(SB_ELETRICA_AGENDA,{select:ELETRICA_AGENDA_COLS,filter}); const m={};
+  const rows=await fetchTableIn(SB_ELETRICA_AGENDA,{select:ELETRICA_AGENDA_COLS,filter:'excluido_em=is.null',order:'id.asc'},'id_obra',idFilter,false); const m={};
   for(const r of rows){ const k=r.id_obra; if(k==null) continue; if(!m[k]||r.criado_em>m[k].criado_em) m[k]=r; }
   return m;
 }
@@ -460,7 +545,7 @@ async function fetchEletricaAgendamentos(idFilter){
 // nomeNorm: normTxt() do nome — casamento com responsavel_nome (texto livre, digitado
 // à mão) é feito por essa chave normalizada, nunca pelo texto bruto.
 async function fetchEletricaEngenheiros(){
-  const rows=await fetchTable('app_users',{select:'nome,sobrenome,full_name,email',filter:'role=eq.eletrica&order=nome.asc'});
+  const rows=await fetchTable('app_users',{select:'nome,sobrenome,full_name,email',filter:'role=eq.eletrica',order:'nome.asc,email.asc'});
   return rows.map(u=>{
     const nome=(`${u.nome||''} ${u.sobrenome||''}`.trim())||u.full_name||u.email||'—';
     return {nome, email:u.email||'', nomeNorm:normTxt(nome)};
@@ -481,15 +566,12 @@ async function garantirRosterEletrica(){
 // não o horário em que o navegador buscou os dados — "Base atualizada em" precisa refletir
 // quando a BASE mudou de fato, não quando a página foi recarregada (antes usava
 // `new Date()`, então mostrava "agora" mesmo em bases paradas há dias).
-let _lastStatus=null; // últimos args — replay na troca de tema (o dot lê TOKENS.ng/amber inline)
-// Último status do modo Obras, para a volta de Replanilhamentos. Capturado AQUI, a cada
-// chamada, e não uma única vez na entrada do modo: uma loadData() (#btnScope, que fica
-// escondido dentro do modo novo, ou uma carga já em andamento) pode terminar com o modo
-// aberto, então um retrato congelado faria a volta para Obras exibir a contagem de
-// contratos do escopo anterior.
-// Declarado junto de _lastStatus de propósito — setStatus é chamada já na falha de carga
-// do GeoJSON, antes de boa parte do arquivo ser avaliada.
-let _statusObras=null;
+// _lastStatus e _statusObras são declarados no topo do arquivo (setStatus já é chamada na falha
+// de carga do GeoJSON, antes desta linha ser avaliada — ver o comentário lá).
+// _statusObras = último status do modo Obras, para a volta de Replanilhamentos. Capturado a
+// cada chamada, e não uma única vez na entrada do modo: uma loadData() (ou uma carga já em
+// andamento) pode terminar com o modo aberto, então um retrato congelado faria a volta para
+// Obras exibir a contagem de contratos do escopo anterior.
 // `replan` marca que o texto veio do modo Replanilhamentos.
 function setStatus(txt,ok,lastSync,replan){
   _lastStatus={txt,ok,lastSync,replan:!!replan};
@@ -521,8 +603,7 @@ function showDataError(msg,titulo){
     el.hidden=false;
   }
 }
-const _dataErrorRetryBtn=document.getElementById('dataErrorRetry');
-if(_dataErrorRetryBtn) _dataErrorRetryBtn.onclick=()=>location.reload();
+// (o onclick do "Tentar novamente" é ligado no topo do arquivo, para valer já na falha do GeoJSON)
 
 // Achado do rev-produto (Fase 2): "Não foi possível carregar os dados" +
 // "Tentar novamente" é enganoso pra quem simplesmente não está logado —
@@ -542,7 +623,7 @@ function showLoginRequired(msg){
 // apresentação — refazia as 5 consultas inteiras. 1h ainda mostra "Base atualizada em"
 // no cabeçalho (então a defasagem fica visível) e o botão "Atualizar dados" ao lado do
 // alternador de escopo força uma recarga a qualquer momento, ignorando o cache.
-const CACHE_TTL_MS=60*60*1000;
+// (CACHE_TTL_MS é declarada junto do prefetch, antes do await do GeoJSON)
 // Etapa B: o formato do cache ganhou `medic` (v3 — curva de medição do Resumo) e,
 // depois, mais colunas em cada linha de `medic` (v4 — nr_protocolo/total/status pra
 // a tabela mensal da aba Medições). v5: cada linha de `adit` ganhou data_publicacao.
@@ -556,7 +637,10 @@ const CACHE_TTL_MS=60*60*1000;
 // v12: novo campo `agend` (agendamento de vistoria por obra, continuação da Fase 1).
 // O bump de versão garante que um objeto de formato antigo nunca seja reidratado como
 // se fosse completo.
-function cacheKey(scope){ return 'gecope_mapa_cache_v12_'+scope; }
+// v13: chave por USUÁRIO (antes era só por escopo: quem entrava com outra conta na mesma aba
+// reaproveitava, por até 1h, os dados da conta anterior) e o cache deixa de guardar respostas
+// parciais (ver fetchDadosBrutos).
+function cacheKey(scope){ return 'gecope_mapa_cache_v13_'+(SESSION_UID||'anon')+'_'+scope; }
 function readCache(scope){
   try{
     const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
@@ -565,9 +649,50 @@ function readCache(scope){
     return obj;
   }catch{ return null; }
 }
-function writeCache(scope,rows,fisc,adit,ficha,medic,vist,agend){
-  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows,fisc,adit,ficha,medic,vist,agend})); }
+function writeCache(scope,d){
+  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows:d.rows,fisc:d.fisc,adit:d.adit,ficha:d.ficha,medic:d.medic,vist:d.vist,agend:d.agend})); }
   catch(e){ /* quota/privacidade — cache é só um bônus de velocidade, ignora e segue sem ele */ }
+}
+
+// Camada de REDE de loadData(), sem tocar em DOM nem em DB — por isso pode ser disparada antes
+// de o GeoJSON chegar (ver _prefetchDados). Devolve {rows,fisc,adit,ficha,medic,vist,agend,parcial}.
+// `parcial`: alguma tabela AUXILIAR falhou e entrou vazia. O painel abre mesmo assim (as obras
+// vêm de contratos_edificacao), mas esse resultado NÃO vai para o sessionStorage: antes o `{}`
+// da falha transitória era gravado com TTL de 1h, e todo F5 seguinte mostrava obras sem
+// medição/fiscal/vistoria, sem erro visível.
+async function fetchDadosBrutos(scope){
+  const cached=readCache(scope);
+  if(cached) return {rows:cached.rows, fisc:cached.fisc, adit:cached.adit||{}, ficha:cached.ficha||{}, medic:cached.medic||{}, vist:cached.vist||{}, agend:cached.agend||{}, parcial:false};
+  let parcial=false;
+  const tol=(nome,p)=>p.catch(e=>{ parcial=true; console.warn(nome+' indisponível:',e.message); return {}; });
+  let rows, ids, nrs; // ids/nrs undefined = sem escopo (histórico: tabelas inteiras)
+  let rowsP;
+  if(scope==='ativa'){
+    // carteira ativa: filtra no servidor (só ~348 linhas) e busca comissão/aditivos/ficha/
+    // medições/vistorias/agendamentos só desses contratos — evita baixar as tabelas inteiras
+    // quando 90% delas são de obras já encerradas, fora da carteira ativa.
+    const filter=`status_obra=in.(${ACTIVE_STATUSES.map(s=>`"${s}"`).join(',')})`;
+    rows=await fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter,order:'id_obra.asc'});
+    ids=[...new Set(rows.map(r=>r.id_obra).filter(v=>v!=null))];
+    nrs=[...new Set(rows.map(r=>r.nr_contrato_sop).filter(Boolean))];
+  } else {
+    // histórico completo: os ids/números não cabem numa query in.(...), então busca as
+    // tabelas inteiras (só com as colunas usadas), contratos junto, em paralelo.
+    rowsP=fetchTable(SB_TABLE,{select:CONTRATOS_COLS,order:'id_obra.asc'});
+    rowsP.catch(()=>{}); // o erro é relançado no await abaixo; aqui só evita o aviso de rejeição não tratada
+  }
+  const [fisc,adit,ficha,medic,vist,agend]=await Promise.all([
+    tol('comissao_fiscalizacao',fetchFiscais(ids)),
+    tol('aditivos_contrato',fetchAditivos(nrs)),
+    tol('ficha_contrato',fetchFichas(nrs)),
+    tol('medicoes',fetchMedicoes(ids)),
+    tol('eletrica_vistorias',fetchEletricaVistorias(ids)),
+    tol('eletrica_vistorias_agendadas',fetchEletricaAgendamentos(ids)),
+  ]);
+  if(rowsP) rows=await rowsP;
+  const dados={rows,fisc,adit,ficha,medic,vist,agend,parcial};
+  if(!parcial) writeCache(scope,dados);
+  return dados;
 }
 
 async function loadData(){
@@ -583,43 +708,13 @@ async function loadData(){
   invalidateAggCache(); // sem isso, um hover no mapa durante o fetch devolveria contagens da era de filtro anterior
   try{
     const scope=st.dataScope;
-    const cached=readCache(scope);
-    let rows, fisc, adit, ficha, medic, vist, agend;
-    if(cached){
-      rows=cached.rows; fisc=cached.fisc; adit=cached.adit||{}; ficha=cached.ficha||{}; medic=cached.medic||{}; vist=cached.vist||{}; agend=cached.agend||{};
-    } else if(scope==='ativa'){
-      // carteira ativa: filtra no servidor (só ~348 linhas) e, com os ids/números já em
-      // mãos, busca comissão/aditivos/ficha/medições/vistorias elétricas/agendamentos só
-      // desses contratos — evita baixar as tabelas inteiras quando 90% delas são de obras
-      // já encerradas, fora da carteira ativa.
-      const filter=`status_obra=in.(${ACTIVE_STATUSES.map(s=>`"${s}"`).join(',')})`;
-      rows=await fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter});
-      const ids=[...new Set(rows.map(r=>r.id_obra).filter(v=>v!=null))];
-      const nrs=[...new Set(rows.map(r=>r.nr_contrato_sop).filter(Boolean))];
-      [fisc,adit,ficha,medic,vist,agend]=await Promise.all([
-        fetchFiscais(ids).catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
-        fetchAditivos(nrs).catch(e=>{ console.warn('aditivos_contrato indisponível:',e.message); return {}; }),
-        fetchFichas(nrs).catch(e=>{ console.warn('ficha_contrato indisponível:',e.message); return {}; }),
-        fetchMedicoes(ids).catch(e=>{ console.warn('medicoes indisponível:',e.message); return {}; }),
-        fetchEletricaVistorias(ids).catch(e=>{ console.warn('eletrica_vistorias indisponível:',e.message); return {}; }),
-        fetchEletricaAgendamentos(ids).catch(e=>{ console.warn('eletrica_vistorias_agendadas indisponível:',e.message); return {}; }),
-      ]);
-      writeCache(scope,rows,fisc,adit,ficha,medic,vist,agend);
-    } else {
-      // histórico completo: os ids/números não cabem numa query in.(...), então busca
-      // as tabelas inteiras (só com as colunas usadas) em paralelo.
-      const [rowsR,fiscR,aditR,fichaR,medicR,vistR,agendR]=await Promise.all([
-        fetchTable(SB_TABLE,{select:CONTRATOS_COLS}),
-        fetchFiscais().catch(e=>{ console.warn('comissao_fiscalizacao indisponível:',e.message); return {}; }),
-        fetchAditivos().catch(e=>{ console.warn('aditivos_contrato indisponível:',e.message); return {}; }),
-        fetchFichas().catch(e=>{ console.warn('ficha_contrato indisponível:',e.message); return {}; }),
-        fetchMedicoes().catch(e=>{ console.warn('medicoes indisponível:',e.message); return {}; }),
-        fetchEletricaVistorias().catch(e=>{ console.warn('eletrica_vistorias indisponível:',e.message); return {}; }),
-        fetchEletricaAgendamentos().catch(e=>{ console.warn('eletrica_vistorias_agendadas indisponível:',e.message); return {}; }),
-      ]);
-      rows=rowsR; fisc=fiscR; adit=aditR; ficha=fichaR; medic=medicR; vist=vistR; agend=agendR;
-      writeCache(scope,rows,fisc,adit,ficha,medic,vist,agend);
-    }
+    // A 1ª carga consome o prefetch que o arranque já disparou (em paralelo ao GeoJSON);
+    // qualquer outra (mudança de escopo, recarga) busca na hora.
+    let dados=null;
+    if(_prefetchDados && _prefetchDados.scope===scope){ const p=_prefetchDados.promise; _prefetchDados=null; dados=await p; }
+    _prefetchDados=null;
+    if(!dados) dados=await fetchDadosBrutos(scope);
+    const {rows,fisc,adit,ficha,medic,vist,agend,parcial}=dados;
     // 1 contrato : N obras — conta quantas obras de cada contrato estão CARREGADAS
     // (na carteira ativa é só as ativas; no histórico completo é todas). Só usado como
     // sinal "tem mais de uma obra" (multiObra), não como número exibido ao usuário.
@@ -655,7 +750,7 @@ async function loadData(){
     // (YYYY-MM-DD...), que ordena lexicograficamente igual a cronologicamente.
     let lastSync=null;
     for(const r of rows){ if(r.atualizado_em && (!lastSync || r.atualizado_em>lastSync)) lastSync=r.atualizado_em; }
-    setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}`, true, lastSync);
+    setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}${parcial?' · ⚠ alguns dados auxiliares indisponíveis (fiscal/medição/vistoria) — recarregue para tentar de novo':''}`, true, lastSync);
     // #btnScope fica escondido no modo Replanilhamentos (body.modo-rp, CSS), mas uma
     // carga em andamento pode terminar já dentro do modo: o setStatus acima já atualizou
     // o retrato de Obras (_statusObras) para a volta, e aqui a linha de status volta a
@@ -759,7 +854,7 @@ let _procLastSync=null;
 async function loadProcessos(){
   if(_procCarregado) return {ok:true};
   if(!SESSION_TOKEN) return {ok:false,erro:'sem sessão'};
-  const rows=await fetchTable(SB_PROCESSOS,{select:PROCESSOS_COLS});
+  const rows=await fetchTable(SB_PROCESSOS,{select:PROCESSOS_COLS,order:'id.asc'});
   PROCESSOS=rows.map(mapProcesso);
   for(const p of PROCESSOS){ if(p.ultimaAtualizacao && (!_procLastSync || p.ultimaAtualizacao>_procLastSync)) _procLastSync=p.ultimaAtualizacao; }
   for(const c in DB.municipios) DB.municipios[c].processos=[];
@@ -947,7 +1042,7 @@ function obrasOf(id){
 // distinguir "a vistoriar" de "agendada" por município, então continua sendo só o
 // corte de %, igual era antes da rodada de 25/09/2026 (só o valor do limiar mudou).
 function obraEmAtencaoEletrica(o){const pct=medObraStats(o).pct;return pct!=null&&pct>=LIMIAR_ELETRICA;}
-function aggIds(ids){let obras=0,valor=0,valorOriginal=0,par=0,adit=0,eletrica=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;valorOriginal+=o.valor_original;adit+=o.aditivo;if(statusBucket(o.statusObra)==='stop')par++;if(st.metric==='eletrica'&&obraEmAtencaoEletrica(o))eletrica++;}));return{obras,valor,valorOriginal,par,adit,eletrica};}
+function aggIds(ids){let obras=0,valor=0,valorOriginal=0,par=0,adit=0,eletrica=0;ids.forEach(id=>obrasOf(id).forEach(o=>{obras++;valor+=o.valor;valorOriginal+=o.valor_original;adit+=o.aditivo;if(o.stBucket==='stop')par++;if(st.metric==='eletrica'&&obraEmAtencaoEletrica(o))eletrica++;}));return{obras,valor,valorOriginal,par,adit,eletrica};}
 function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit:st.metric==='eletrica'?a.eletrica:a.obras;}
 // ---- recorte e período do modo Replanilhamentos (E2) ----
 // Mesma aritmética de `current_date - interval 'N months'` do Postgres, que o diagnóstico
@@ -1508,25 +1603,32 @@ function setLayer(l,on){ if(!l)return; if(on&&!map.hasLayer(l))l.addTo(map); els
 function declutter(items,fs,H,pad,filt,prioFn){
   const placed=[];
   const prio=prioFn||(it=>it.prio||0);
-  const sorted=[...items].sort((a,b)=>prio(b)-prio(a));
+  // prioridade calculada UMA vez por item (antes rodava dentro do comparador do sort:
+  // O(n log n) chamadas, cada uma agregando as obras do distrito/município).
+  const pr=new Map(); for(const it of items) pr.set(it,prio(it));
+  const sorted=[...items].sort((a,b)=>pr.get(b)-pr.get(a));
+  // Três fases em vez de escrever-e-ler por rótulo. Intercalar `style.display=''` com
+  // getBoundingClientRect() força um layout síncrono por rótulo (~184 no nível 2) a cada
+  // zoomend/moveend. Agora: (1) escreve tudo, (2) mede tudo com um único layout, (3) decide
+  // as colisões só com contas e escreve o resultado. O resultado visual é o mesmo.
+  // Caixa de colisão vem do tamanho REAL do texto renderizado (getBoundingClientRect do
+  // wrapper .lbl), não de "nº de caracteres × fator estimado": a estimativa por caractere é
+  // sempre uma média e subestima rótulos longos (ex. "Serra da Ibiapaba"/"Sertão de Sobral"),
+  // que colidiam de verdade sem o algoritmo perceber. Precisa estar visível pra medir.
+  const vis=[];
   for(const it of sorted){
     const el=it.mk.getElement(); if(!el)continue;
     if(filt&&!filt(it)){el.style.display='none';continue;}
-    // caixa de colisão vem do tamanho REAL do texto renderizado (getBoundingClientRect
-    // do wrapper .lbl), não de "nº de caracteres × fator estimado". A estimativa por
-    // caractere é sempre uma média — apertar o fator o bastante pra caber rótulos
-    // curtos deixa rótulos longos (ex. "Serra da Ibiapaba"/"Sertão de Sobral", ambos
-    // ~17 caracteres) subestimados o bastante pra colidir de verdade sem o algoritmo
-    // perceber (achado do usuário). Precisa estar visível pra medir — por isso troca
-    // pra '' antes de ler o rect, e só volta pra 'none' se realmente colidir.
     el.style.display='';
-    const inner=el.querySelector('.lbl');
-    const p=map.latLngToContainerPoint(it.ll);
-    let w=it.nome.length*fs+pad, h=H; // fallback, só usado se .lbl não for encontrado
-    if(inner){ const r=inner.getBoundingClientRect(); w=r.width+pad; h=r.height+2; }
-    const bx={x1:p.x-w/2,y1:p.y-h/2,x2:p.x+w/2,y2:p.y+h/2};
+    vis.push({it,el,inner:el.querySelector('.lbl')});
+  }
+  for(const v of vis){ v.rect=v.inner?v.inner.getBoundingClientRect():null; v.p=map.latLngToContainerPoint(v.it.ll); }
+  for(const v of vis){
+    let w=v.it.nome.length*fs+pad, h=H; // fallback, só usado se .lbl não for encontrado
+    if(v.rect){ w=v.rect.width+pad; h=v.rect.height+2; }
+    const bx={x1:v.p.x-w/2,y1:v.p.y-h/2,x2:v.p.x+w/2,y2:v.p.y+h/2};
     let hit=false; for(const q of placed){if(bx.x1<q.x2&&bx.x2>q.x1&&bx.y1<q.y2&&bx.y2>q.y1){hit=true;break;}}
-    el.style.display=hit?'none':''; if(!hit)placed.push(bx);
+    if(hit) v.el.style.display='none'; else placed.push(bx);
   }
 }
 // tamanhos base dos rótulos do mapa (nome do distrito/município + contador de
@@ -1630,7 +1732,7 @@ function toggleSelection(kind,id){
 function clearSelection(){ if(st.sel){ st.sel=null; render(); } }
 function statusBreakdown(ids){
   const c={exec:0,ok:0,wait:0,stop:0}; let total=0;
-  ids.forEach(id=>obrasOf(id).forEach(o=>{ c[statusBucket(o.statusObra)]++; total++; }));
+  ids.forEach(id=>obrasOf(id).forEach(o=>{ c[o.stBucket]++; total++; }));
   return {c,total};
 }
 function renderStatusChart(ids){
@@ -1805,7 +1907,7 @@ function statusAgendamentoEletrica(ag,hoje){
 // relatório — ver buildEletricaPane pro rótulo "Realizada" que distingue as duas na
 // aba da obra).
 function categoriaEletricaObra(o){
-  const sb=statusBucket(o.statusObra);
+  const sb=o.stBucket;
   const ativo=sb==='exec'||sb==='stop';
   if(!ativo) return {ativo:false, categoria:null, pct:null, rel:[], agendamento:null};
   const pct=medObraStats(o).pct;
@@ -2412,7 +2514,7 @@ async function carregarVisitasCronograma(){
   const faltam=ids.filter(id=>!noMapa.has(id));
   const lotes=[]; for(let i=0;i<faltam.length;i+=80) lotes.push(faltam.slice(i,i+80));
   const linhas=await Promise.all(lotes.map(l=>
-    fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter:inListFilter('id_obra',l,false)})
+    fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter:inListFilter('id_obra',l,false),order:'id_obra.asc'})
       .catch(e=>{ console.warn('cronograma: obras fora da carteira indisponíveis:',e.message); return []; })));
   const reduzidas=new Map();
   for(const r of linhas.flat()) reduzidas.set(r.id_obra,mapRow(r));
@@ -6262,7 +6364,7 @@ render();
 // delega pra loadData() — que é quem de fato checa SESSION_TOKEN (mesmo guard
 // vale tanto pra esta chamada inicial quanto pro clique em #btnScope).
 (async()=>{
-  SESSION_TOKEN=await obterTokenSessao();
+  SESSION_TOKEN=await _tokenP; // já resolvido (o arranque o disparou lá no topo)
   loadData();   // sem sessão, mostra o aviso de login (showLoginRequired); com falha real, showDataError
   // Roster da Elétrica também em paralelo — pequeno, independente da carga de obras,
   // não vale atrasar o painel esperando por ele (mesmo espírito do papel, abaixo).
@@ -6278,12 +6380,23 @@ function refit(instant){ if(st.level>=3) fitCity(instant); else if(st.level===2)
 // segurança de layout (fontes ainda carregando, resize, orientação, barra de endereço
 // do celular somem/aparecem): sempre instantâneo — não é navegação do usuário, é só
 // reajuste, então uma animação aqui só chamaria atenção à toa.
-function ensureSize(){ map.invalidateSize(false); refit(true); }
+// Só reenquadra quando o tamanho do contêiner MUDOU (ou na 1ª vez). Antes, cada um dos ~15
+// gatilhos de arranque (7 timeouts + rAF + load + resize + fonts + ResizeObserver) reenquadrava
+// incondicionalmente: cada refit dispara moveend → updateLabels (o declutter inteiro) e desfazia
+// o zoom/pan que o usuário fizesse nos primeiros 2,5s.
+let _ensureSz='';
+function ensureSize(){
+  map.invalidateSize(false);
+  const z=map.getSize(), k=z.x+'x'+z.y;
+  if(k===_ensureSz) return;
+  _ensureSz=k; refit(true);
+}
 requestAnimationFrame(ensureSize);
-[80,200,400,700,1100,1700,2500].forEach(t=>setTimeout(ensureSize,t));
+[200,900].forEach(t=>setTimeout(ensureSize,t)); // rede de segurança p/ layout tardio; o ResizeObserver cobre o resto
 ['load','resize','pageshow','orientationchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(ensureSize,60)));
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) ensureSize(); });
-if(document.fonts && document.fonts.ready) document.fonts.ready.then(ensureSize);
+// fonte web muda a largura dos rótulos (não o tamanho do mapa): re-decide as colisões, sem reenquadrar
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ ensureSize(); updateLabels(); });
 if(window.ResizeObserver){ let t; new ResizeObserver(()=>{ clearTimeout(t); t=setTimeout(ensureSize,50); }).observe(document.getElementById('map')); }
 
 }catch(e){

@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GECOPE · Mapa de Obras Fiscalizadas — Ceará</title>
+<!-- Conexão com o Supabase e os 4 GeoJSONs começam já no parse do HTML, em vez de só quando
+     mapa-obras.js (defer) executa — o script pode ainda esperar o Leaflet/supabase-js chegarem. -->
+<link rel="preconnect" href="https://qexdnxqmiaarzwwwrcor.supabase.co" crossorigin>
+<link rel="preload" as="fetch" href="assets/geo/ce-municipios.json" crossorigin>
+<link rel="preload" as="fetch" href="assets/geo/ce-estado.json" crossorigin>
+<link rel="preload" as="fetch" href="assets/geo/ce-blocos.json" crossorigin>
+<link rel="preload" as="fetch" href="assets/geo/ce-referencia.json" crossorigin>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/mapa-obras.css">
@@ -218,7 +225,7 @@
 <script src="config.js"></script>
 <!-- Plano de permissões por papel (Fase 2): esta página exige sessão do GECOPE
      agora — precisa do mesmo cliente Supabase autenticado do resto do app. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
 <script src="database.js"></script>
 <script src="assets/js/mapa-obras.js" defer></script>
 </body>
