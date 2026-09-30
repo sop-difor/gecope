@@ -59,6 +59,30 @@ function isSetorRiscoDiligencia(sigla) {
     return SETORES_RISCO_DILIGENCIA.some(setor => s.startsWith(setor));
 }
 
+// Consulta `.in()` FATIADA. O supabase-js manda a lista na URL (GET): com milhares de códigos/ids
+// a URL estoura o limite do gateway (414/400) — e, mesmo quando cabe, o PostgREST devolve no
+// máximo `max-rows` (1000) linhas SEM avisar, truncando o resultado em silêncio. Fatias pequenas
+// resolvem as duas coisas; correm em paralelo, no máximo `concorrencia` por vez (o navegador
+// já limita conexões por host, e fila demais só atrasa a primeira resposta).
+// `consulta(fatia)` devolve a promessa do builder do supabase-js; o resultado é a concatenação
+// de todos os `data`. Qualquer fatia com erro faz a chamada inteira falhar (quem chama decide).
+async function consultaEmFatias(valores, tamanho, consulta, concorrencia = 4) {
+    const fatias = [];
+    for (let i = 0; i < valores.length; i += tamanho) fatias.push(valores.slice(i, i + tamanho));
+    const saida = new Array(fatias.length);
+    let proximo = 0;
+    const trabalhador = async () => {
+        while (proximo < fatias.length) {
+            const idx = proximo++;
+            const { data, error } = await consulta(fatias[idx]);
+            if (error) throw error;
+            saida[idx] = data || [];
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(concorrencia, fatias.length) }, trabalhador));
+    return saida.flat();
+}
+
 // Busca, em lote, o comentário mais recente de justificativa do alerta de retorno
 // para cada processo de window.allData, e anexa em d.alertaRetornoUltimo.
 async function carregarAlertasRetornoComentarios() {
@@ -75,13 +99,13 @@ async function carregarAlertasRetornoComentarios() {
             .map(d => String(d.id));
         if (!ids.length) return;
 
-        const { data, error } = await sbClient
+        // Fatiado (ver consultaEmFatias): as fatias têm processos distintos, então a ordem
+        // created_at desc dentro de cada uma basta para pegar o comentário mais recente.
+        const data = await consultaEmFatias(ids, 150, fatia => sbClient
             .from('alerta_retorno_comentarios')
             .select('processo_id, sigla, comentario')
-            .in('processo_id', ids)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
+            .in('processo_id', fatia)
+            .order('created_at', { ascending: false }));
 
         const ultimoPorProcesso = {};
         (data || []).forEach(reg => {
@@ -621,18 +645,20 @@ async function buscarObraPorCodigo(codigo) {
 async function sincronizarFiscaisDosProcessos() {
     const codigos = [...new Set(window.allData.map(row => row.codigoObra).filter(Boolean))];
     if (!codigos.length) return;
-    const { data: obras, error: errObras } = await sbClient
+    // Fatiado (ver consultaEmFatias). Antes eram dois `.in()` com TODOS os códigos/ids de uma vez:
+    // acima de alguns milhares a URL estourava, o erro era engolido por um `return` silencioso e o
+    // fiscal ficava com o valor antigo; e o PostgREST truncava em 1000 linhas sem avisar.
+    const obras = await consultaEmFatias(codigos, 150, fatia => sbClient
         .from('contratos_edificacao')
         .select('id_obra, codigo_obra')
-        .in('codigo_obra', codigos);
-    if (errObras || !obras || !obras.length) return;
+        .in('codigo_obra', fatia));
+    if (!obras.length) return;
 
     const idsObra = obras.map(obra => obra.id_obra).filter(id => id != null);
-    const { data: comissao, error: errComissao } = await sbClient
+    const comissao = await consultaEmFatias(idsObra, 100, fatia => sbClient
         .from('comissao_fiscalizacao')
         .select('id_obra, nome_completo, nome_referencia, tipo, matricula, atualizado_em')
-        .in('id_obra', idsObra);
-    if (errComissao || !comissao) return;
+        .in('id_obra', fatia));
 
     const porObra = new Map();
     obras.forEach(obra => porObra.set(obra.codigo_obra, []));
@@ -977,9 +1003,8 @@ async function atualizarPainelAposEdicaoLocal() {
     await carregarDadosFinanceiro();
     populateAllTabFilters();
     renderLastUpdate();
+    // updateDashboard() já cobre updateHome() (atividades) e updateFinanceiro().
     updateDashboard();
-    updateFinanceiro();
-    if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
     iniciarVarreduraRiscoDiligencia();
 }
 
@@ -1039,6 +1064,18 @@ async function removerProcessoLocal(id) {
 // usava neste arquivo. — 22/09/2026
 let _carregarDadosPromise = null;
 
+// Resolve depois do DOMContentLoaded — que só ocorre depois de as bibliotecas `defer` do
+// index.html (Plotly, jsPDF, html2pdf, docx, pdf-lib, SheetJS, ExcelJS, SweetAlert, DOMPurify:
+// alguns MB) baixarem e executarem — e depois de os demais handlers de DOMContentLoaded
+// (wireEvents, RBAC, máscaras) rodarem. A carga dos processos dispara ANTES disso, no fim deste
+// arquivo, e só a montagem de interface espera por esta promessa: a rede não precisa esperar
+// por bibliotecas de PDF/Excel para começar. — 30/09/2026
+const _interfacePronta = (document.readyState === 'loading'
+    ? new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true }))
+    : Promise.resolve()
+).then(() => new Promise(r => setTimeout(r, 0)));
+function aguardarInterfacePronta() { return _interfacePronta; }
+
 async function carregarDadosSupabase() {
     if (_carregarDadosPromise) return _carregarDadosPromise;
     _carregarDadosPromise = _carregarDadosSupabaseInterno()
@@ -1049,6 +1086,39 @@ async function carregarDadosSupabase() {
 async function _carregarDadosSupabaseInterno() {
     const loader = document.getElementById("load-error");
     if (loader) loader.style.display = "none";
+
+    // Identificação do fiscal logado (só papel 'fiscal'): consulta minúscula e independente da
+    // varredura de `processos`, então roda EM PARALELO a ela em vez de depois (era mais uma ida e
+    // volta em série no caminho até a Início). O resultado só é lido depois do `await` abaixo.
+    const identificacaoFiscalP = (async () => {
+        const userRole = (sessionStorage.getItem('sop_role') || 'guest').toString().trim().toLowerCase();
+        const userEmail = sessionStorage.getItem('sop_user');
+        const isFiscal = userRole === 'fiscal';
+
+        if (isFiscal && userEmail) {
+            try {
+                let fiscalName = null;
+                const { data: userData, error: userError } = await sbClient
+                    .from('app_users')
+                    .select('nome, sobrenome')
+                    .eq('email', userEmail)
+                    .single();
+
+                if (!userError && userData && userData.nome) {
+                    fiscalName = (userData.nome + (userData.sobrenome ? ' ' + userData.sobrenome : '')).trim().toUpperCase();
+                }
+
+                if (!fiscalName) {
+                    const namePart = userEmail.split('@')[0];
+                    fiscalName = namePart.replace(/\./g, ' ').toUpperCase();
+                }
+
+                sessionStorage.setItem('sop_fiscal_name', fiscalName);
+            } catch (e) {
+                console.error('Erro ao identificar nome do fiscal:', e);
+            }
+        }
+    })();
 
     let data = null;
     try {
@@ -1078,25 +1148,53 @@ async function _carregarDadosSupabaseInterno() {
         // toda volta devolveria o MESMO conjunto não vazio e a aba travaria acumulando memória.
         // 200 blocos = 200 mil processos, muito acima de qualquer cenário real desta tabela.
         const MAX_BLOCOS = 200;
-        const acumulado = [];
-        for (let inicio = 0, volta = 0; ; volta++) {
-            if (volta >= MAX_BLOCOS) {
+        const buscarBloco = async (inicio, fim, contar) => {
+            const opts = contar ? { count: 'exact' } : undefined;
+            const { data: bloco, error, count } = await sbClient
+                .from('processos')
+                .select('*', opts)
+                .order('created_at', { ascending: false })
+                .order('id', { ascending: false })
+                .range(inicio, fim);
+            if (error) throw new Error(`Tabela "processos" não acessível: ${error.message}`);
+            if (!Array.isArray(bloco)) throw new Error('Tipo de dados inválido: esperado array');
+            return { bloco, count };
+        };
+
+        // 1ª página + contagem total (`count: 'exact'`, Content-Range). Com o total em mãos, as
+        // páginas restantes são conhecidas de antemão e vão TODAS em paralelo — antes era um laço
+        // que esperava página a página (ceil(N/1000)+1 idas e voltas em série, a última só para
+        // descobrir que a tabela tinha acabado), e esse tempo era somado ao da Início.
+        // A ordenação (created_at desc, id desc) é total, então páginas em paralelo são
+        // consistentes entre si. O passo é `bloco.length`, e não TAMANHO_BLOCO: se o `max-rows`
+        // do servidor for menor que 1000, a 1ª página volta curta e saltar de 1000 em 1000
+        // ressuscitaria a truncagem silenciosa. — 22/09/2026 (passo) e 30/09/2026 (paralelo)
+        const primeiro = await buscarBloco(0, TAMANHO_BLOCO - 1, true);
+        const acumulado = [...primeiro.bloco];
+        const passo = primeiro.bloco.length;
+        if (passo > 0 && typeof primeiro.count === 'number' && primeiro.count > passo) {
+            const total = primeiro.count;
+            if (Math.ceil(total / passo) > MAX_BLOCOS) {
                 throw new Error('Carga de processos interrompida: limite de blocos atingido. '
                     + 'A paginação não está avançando — avise o administrador do sistema.');
             }
-            const { data: bloco, error } = await sbClient
-                .from('processos')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .order('id', { ascending: false })
-                .range(inicio, inicio + TAMANHO_BLOCO - 1);
-
-            if (error) throw new Error(`Tabela "processos" não acessível: ${error.message}`);
-            if (!Array.isArray(bloco)) throw new Error('Tipo de dados inválido: esperado array');
-
-            acumulado.push(...bloco);
-            if (bloco.length === 0) break;
-            inicio += bloco.length;
+            const pedidos = [];
+            for (let inicio = passo; inicio < total; inicio += passo) {
+                pedidos.push(buscarBloco(inicio, inicio + passo - 1, false));
+            }
+            (await Promise.all(pedidos)).forEach(r => acumulado.push(...r.bloco));
+        } else if (passo > 0 && typeof primeiro.count !== 'number') {
+            // Sem contagem (cabeçalho ausente): volta ao laço sequencial de sempre.
+            for (let inicio = passo, volta = 1; ; volta++) {
+                if (volta >= MAX_BLOCOS) {
+                    throw new Error('Carga de processos interrompida: limite de blocos atingido. '
+                        + 'A paginação não está avançando — avise o administrador do sistema.');
+                }
+                const { bloco } = await buscarBloco(inicio, inicio + TAMANHO_BLOCO - 1, false);
+                acumulado.push(...bloco);
+                if (bloco.length === 0) break;
+                inicio += bloco.length;
+            }
         }
 
         data = acumulado.filter(d => d.status !== 'EXCLUÍDO' && d.status !== 'EXCLUIDO');
@@ -1111,33 +1209,7 @@ async function _carregarDadosSupabaseInterno() {
         return;
     }
 
-    const userRole = (sessionStorage.getItem('sop_role') || 'guest').toString().trim().toLowerCase();
-    const userEmail = sessionStorage.getItem('sop_user');
-    const isFiscal = userRole === 'fiscal';
-
-    if (isFiscal && userEmail) {
-        try {
-            let fiscalName = null;
-            const { data: userData, error: userError } = await sbClient
-                .from('app_users')
-                .select('nome, sobrenome')
-                .eq('email', userEmail)
-                .single();
-
-            if (!userError && userData && userData.nome) {
-                fiscalName = (userData.nome + (userData.sobrenome ? ' ' + userData.sobrenome : '')).trim().toUpperCase();
-            }
-
-            if (!fiscalName) {
-                const namePart = userEmail.split('@')[0];
-                fiscalName = namePart.replace(/\./g, ' ').toUpperCase();
-            }
-
-            sessionStorage.setItem('sop_fiscal_name', fiscalName);
-        } catch (e) {
-            console.error('Erro ao identificar nome do fiscal:', e);
-        }
-    }
+    await identificacaoFiscalP;
 
     if (!Array.isArray(data)) return;
 
@@ -1162,19 +1234,27 @@ async function _carregarDadosSupabaseInterno() {
         return obj;
     });
 
-    try {
-        await sincronizarFiscaisDosProcessos();
-    } catch (e) {
-        console.warn('[Fiscal] Não foi possível sincronizar comissões vigentes:', e);
-    }
+    // Os números da Início (Em Andamento / Em Análise / Aprovados no mês) só dependem de
+    // status e dataAprovacao, que já estão em window.allData. Pintá-los AGORA, antes do "rabo" da
+    // carga (sincronia de fiscais, comentários de alerta, metas automáticas e a montagem dos
+    // painéis), tira esse tempo todo do caminho do que o usuário vê primeiro ao entrar.
+    if (typeof updateHomeStats === 'function') updateHomeStats();
 
-    // window.allData já foi atualizado acima; não é necessário reatribuir
-    /* window.allData já foi atualizado acima */
+    // Sincronia de fiscais e comentários do alerta de retorno são consultas independentes (um
+    // grava d.fiscal, o outro d.alertaRetornoUltimo) — rodavam uma depois da outra. Ambas
+    // precisam terminar ANTES de qualquer polling do SUITE, para que aplicarAlertaPreDiligencia
+    // já saiba se a situação atual já foi comentada ou não.
+    await Promise.all([
+        sincronizarFiscaisDosProcessos().catch(e => {
+            console.warn('[Fiscal] Não foi possível sincronizar comissões vigentes:', e);
+        }),
+        carregarAlertasRetornoComentarios()
+    ]);
 
-    // Carrega o último comentário de justificativa do alerta de retorno de cada processo,
-    // ANTES de qualquer polling do SUITE, para que aplicarAlertaPreDiligencia já saiba
-    // se a situação atual já foi comentada ou não.
-    await carregarAlertasRetornoComentarios();
+    // Daqui em diante é montagem de interface (Plotly, filtros, tabelas): precisa esperar o
+    // DOMContentLoaded, que só ocorre depois das bibliotecas `defer` do index.html. A parte de
+    // REDE acima já não espera por elas (ver o disparo antecipado no fim deste arquivo).
+    await aguardarInterfacePronta();
 
     try {
         // Auto-estabelecer metas para processos em 'ANÁLISE FISCAL' sem meta
@@ -1284,14 +1364,15 @@ async function _carregarDadosSupabaseInterno() {
 
         populateAllTabFilters();
         renderLastUpdate();
-        updateDashboard();
+        // updateDashboard() já chama updateHome() (que dispara carregarAtividadesResumoHome) e
+        // updateFinanceiro(). Chamar as duas de novo logo depois redesenhava duas vezes todos os
+        // gráficos Plotly do Financeiro e repetia a consulta de atividades. — 30/09/2026
         // Não chamar clearFinanceiro() aqui: isso forçava "Todos" nos filtros do
         // Financeiro em toda recarga de dados (inclusive após criar/editar/excluir
         // qualquer processo em outra aba), descartando a seleção manual do usuário.
         // populateAllTabFilters() já popula/preserva os filtros; clearFinanceiro()
         // continua disponível só no botão explícito "Limpar filtros".
-        updateFinanceiro();
-        if (typeof carregarAtividadesResumoHome === 'function') carregarAtividadesResumoHome();
+        updateDashboard();
         iniciarVarreduraRiscoDiligencia();
     } catch (e) {
         console.error('Erro ao atualizar UI:', e);
@@ -3789,6 +3870,12 @@ if (typeof verificarAdminSalvo === 'function') verificarAdminSalvo();
         toggleLanding(false);
     }
     applyRoleToUI(savedRole);
+
+    // Aba recarregada JÁ logada: começa a buscar os processos agora, em vez de esperar o
+    // DOMContentLoaded (ver _interfacePronta). Aba nova (guest) continua carregando só depois do
+    // login (core/auth.js) — mesma regra de egress de antes (docs/auditoria-egress-2026-09.md,
+    // item 2). O guarda _carregarDadosPromise impede varredura dupla.
+    if (savedRole !== 'guest') carregarDadosSupabase();
 })();
 
 // Expose helper to global (for onclick from HTML)

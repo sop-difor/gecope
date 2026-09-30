@@ -288,4 +288,53 @@
     window.formatCurrencyValue = formatCurrencyValue;
     window.debounce = debounce;
 
+    // Carregamento SOB DEMANDA das bibliotecas pesadas de exportação/importação. Antes eram
+    // todas `<script defer>` no index.html (jsPDF, autotable, html2pdf, docx, pdf-lib, SheetJS,
+    // ExcelJS: alguns MB) e o DOMContentLoaded — que libera a montagem da interface — só
+    // ocorria depois de baixarem e executarem TODAS, mesmo para quem nunca exporta nada.
+    // Agora cada uma é buscada na primeira vez que a função que a usa é chamada; chamadas
+    // simultâneas compartilham a mesma promessa e, se falhar, a próxima tentativa refaz.
+    // (html2pdf e pdf-lib saíram do index.html: nenhum código do app as usava.) — 30/09/2026
+    var BIBLIOTECAS = {
+        jspdf: {
+            global: 'jspdf',
+            urls: [
+                'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                // o autotable se registra no jsPDF: precisa vir DEPOIS
+                'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js'
+            ]
+        },
+        docx: { global: 'docx', urls: ['https://unpkg.com/docx@7.1.0/build/index.js'] },
+        xlsx: { global: 'XLSX', urls: ['https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'] },
+        exceljs: { global: 'ExcelJS', urls: ['https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'] }
+    };
+    var _bibliotecasEmVoo = {};
+
+    function carregarScriptExterno(url) {
+        return new Promise(function (resolve, reject) {
+            var s = document.createElement('script');
+            s.src = url;
+            s.onload = function () { resolve(); };
+            s.onerror = function () { s.remove(); reject(new Error('Falha ao baixar ' + url)); };
+            document.head.appendChild(s);
+        });
+    }
+
+    function carregarBiblioteca(nome) {
+        var def = BIBLIOTECAS[nome];
+        if (!def) return Promise.reject(new Error('Biblioteca desconhecida: ' + nome));
+        if (window[def.global]) return Promise.resolve(window[def.global]);
+        if (_bibliotecasEmVoo[nome]) return _bibliotecasEmVoo[nome];
+        var p = def.urls.reduce(function (cadeia, url) {
+            return cadeia.then(function () { return carregarScriptExterno(url); });
+        }, Promise.resolve()).then(function () {
+            if (!window[def.global]) throw new Error('Biblioteca ' + nome + ' não inicializou.');
+            return window[def.global];
+        });
+        _bibliotecasEmVoo[nome] = p;
+        p.catch(function () { delete _bibliotecasEmVoo[nome]; });
+        return p;
+    }
+    window.carregarBiblioteca = carregarBiblioteca;
+
 })(window);

@@ -211,7 +211,9 @@ async function signInWithEmail(email, password, opts = {}) {
         // Esconde landing
         toggleLanding(false);
 
-        setTimeout(() => carregarDadosSupabase(), 500);
+        // Sem o setTimeout de 500ms que havia aqui: signInWithPassword já resolveu e a sessão está
+        // gravada; o atraso só empurrava a Início para depois.
+        carregarDadosSupabase();
         return true;
     } catch (err) {
         console.error('[ERRO] Exceção em signInWithEmail:', err);

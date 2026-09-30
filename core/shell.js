@@ -79,6 +79,12 @@ function updateHome() {
     }
 
     // 3. Update Statistics
+    updateHomeStats();
+}
+
+// Só os três contadores da Início — separados de updateHome() para poderem ser pintados assim
+// que window.allData chega, sem refazer saudação, data e a consulta de atividades.
+function updateHomeStats() {
     const rows = window.allData || [];
 
     // Em Andamento (não aprovado, não cancelado, etc)
@@ -275,9 +281,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // fecha) — sem essa checagem, toda ABA NOVA baixava a tabela inteira aqui E DE NOVO
     // no login (auth.js), porque as duas rodavam sem saber uma da outra. Egress,
     // 18/09/2026 — ver docs/auditoria-egress-2026-09.md, item 2.
-    if ((sessionStorage.getItem('sop_role') || 'guest') !== 'guest') {
-        carregarDadosSupabase();
-    }
+    // 30/09/2026: o disparo saiu daqui. Este handler só roda depois de TODAS as bibliotecas `defer`
+    // (alguns MB de PDF/Excel/gráficos) terminarem, e a Início ficava com os números zerados esse
+    // tempo todo. Agora processos.js dispara a carga assim que carrega (aba já logada) e só a
+    // montagem de interface espera este evento — ver _interfacePronta em processos.js.
 
     // carregarListaFiscais() NÃO fica aqui: auth.js já chama a mesma função no próprio
     // DOMContentLoaded dele, de forma incondicional (roda em toda carga de página, aba

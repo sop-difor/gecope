@@ -98,7 +98,18 @@ async function carregarAtividades() {
     }
 }
 
-async function carregarAtividadesResumoHome() {
+// Chamada de vários lugares ao mesmo tempo (applyRoleToUI, updateHome, recarga de processos):
+// enquanto uma consulta está em voo, quem chega junto reaproveita a mesma promessa em vez de
+// disparar N consultas idênticas a app_atividades. Só sobrepostas — quem chama DEPOIS de ela
+// terminar (ex.: após registrar uma atividade nova) faz uma consulta nova e vê o dado fresco.
+let _atividadesHomeEmVoo = null;
+function carregarAtividadesResumoHome() {
+    if (_atividadesHomeEmVoo) return _atividadesHomeEmVoo;
+    _atividadesHomeEmVoo = _carregarAtividadesResumoHome().finally(() => { _atividadesHomeEmVoo = null; });
+    return _atividadesHomeEmVoo;
+}
+
+async function _carregarAtividadesResumoHome() {
     const listEl = document.getElementById('home-activities-list');
     if (!listEl) return;
 
