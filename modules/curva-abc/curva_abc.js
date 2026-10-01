@@ -1,6 +1,6 @@
 /* Curva ABC — análise de relevância dos itens de aditivo por valor.
    Adaptado de curva_abc.html para rodar como aba dentro do GECOPE.
-   Usa o XLSX já carregado globalmente pelo index.html (cdn.sheetjs.com). */
+   Usa o XLSX (cdn.sheetjs.com), baixado sob demanda por window.carregarBiblioteca('xlsx'). */
 (function () {
   "use strict";
 
@@ -91,24 +91,25 @@
   /* ---------- leitura do arquivo ---------- */
   function lerArquivo(file) {
     limpaErro();
-    if (typeof XLSX === "undefined") {
-      erro("<b>Biblioteca de planilhas ainda não carregou.</b> Aguarde um instante e tente novamente.");
-      return;
-    }
     state.fileName = file.name;
     state.arquivoOriginal = file;
-    var fr = new FileReader();
-    fr.onload = function (e) {
-      try {
-        var wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: false });
-        var ws = wb.Sheets[wb.SheetNames[0]];
-        var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
-        processarAoa(aoa);
-      } catch (ex) {
-        erro("<b>Não consegui ler este arquivo.</b> Verifique se é uma planilha .xlsx, .xls ou .csv válida. (" + esc(ex.message) + ")");
-      }
-    };
-    fr.readAsArrayBuffer(file);
+    /* SheetJS é baixado sob demanda (primeiro arquivo lido) */
+    window.carregarBiblioteca("xlsx").then(function () {
+      var fr = new FileReader();
+      fr.onload = function (e) {
+        try {
+          var wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: false });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
+          processarAoa(aoa);
+        } catch (ex) {
+          erro("<b>Não consegui ler este arquivo.</b> Verifique se é uma planilha .xlsx, .xls ou .csv válida. (" + esc(ex.message) + ")");
+        }
+      };
+      fr.readAsArrayBuffer(file);
+    }, function () {
+      erro("<b>Biblioteca de planilhas não carregou.</b> Verifique a conexão e tente novamente.");
+    });
   }
 
   function acharLinhaCabecalho(aoa) {
@@ -524,7 +525,11 @@
     return m;
   }
   function baixarXlsx() {
-    if (typeof XLSX === "undefined") { cvAlerta("Aguarde um instante", "Biblioteca de exportação ainda não carregou. Tente novamente em alguns segundos.", "info"); return; }
+    window.carregarBiblioteca("xlsx").then(gerarXlsx, function () {
+      cvAlerta("Biblioteca indisponível", "Não foi possível carregar a biblioteca de exportação. Verifique a conexão e tente novamente.", "info");
+    });
+  }
+  function gerarXlsx() {
     var ws = XLSX.utils.aoa_to_sheet(matriz());
     ws["!cols"] = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 70 }, { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 9 }, { wch: 10 }, { wch: 7 }];
     var ref = XLSX.utils.decode_range(ws["!ref"]);
