@@ -102,10 +102,26 @@ async function carregarAtividades() {
 // enquanto uma consulta está em voo, quem chega junto reaproveita a mesma promessa em vez de
 // disparar N consultas idênticas a app_atividades. Só sobrepostas — quem chama DEPOIS de ela
 // terminar (ex.: após registrar uma atividade nova) faz uma consulta nova e vê o dado fresco.
+// `{ fresco: true }`: quem acabou de gravar uma atividade e chega com uma consulta em voo (lida
+// ANTES da gravação) não pode receber esse resultado — marca como "suja" e, quando a em voo
+// terminar, uma nova consulta roda uma vez; a promessa devolvida só resolve depois dela. — 01/10/2026
 let _atividadesHomeEmVoo = null;
-function carregarAtividadesResumoHome() {
-    if (_atividadesHomeEmVoo) return _atividadesHomeEmVoo;
-    _atividadesHomeEmVoo = _carregarAtividadesResumoHome().finally(() => { _atividadesHomeEmVoo = null; });
+let _atividadesHomeSuja = false;
+function carregarAtividadesResumoHome({ fresco = false } = {}) {
+    if (_atividadesHomeEmVoo) {
+        if (fresco) _atividadesHomeSuja = true;
+        return _atividadesHomeEmVoo;
+    }
+    _atividadesHomeEmVoo = (async () => {
+        try {
+            do {
+                _atividadesHomeSuja = false;
+                await _carregarAtividadesResumoHome();
+            } while (_atividadesHomeSuja);
+        } finally {
+            _atividadesHomeEmVoo = null;
+        }
+    })();
     return _atividadesHomeEmVoo;
 }
 

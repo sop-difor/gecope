@@ -749,4 +749,9 @@ async function atualizarSelectVersao() {
         selectVersao.disabled = false;
     }
 }
-document.addEventListener('DOMContentLoaded', atualizarSelectVersao);
+// Roda no boot só com sessão restaurada; quem faz login dispara em seguida (evento abaixo), pois
+// antes do login o RLS pode devolver vazio e o seletor ficava preso no fallback. — 01/10/2026
+document.addEventListener('DOMContentLoaded', () => {
+    if (sessionStorage.getItem('sop_user')) atualizarSelectVersao();
+});
+window.addEventListener('gecope:login', () => atualizarSelectVersao());
