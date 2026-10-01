@@ -163,6 +163,11 @@ async function signInWithEmail(email, password, opts = {}) {
         sessionStorage.setItem('sop_user', email);
         sessionStorage.setItem('sop_role', role);
 
+        // A lista de fiscais (app_users) só é consultada com sessão ativa: no boot de visitante
+        // ela voltava vazia pelo RLS e nunca era refeita após o login. — 01/10/2026
+        if (typeof garantirFiscaisCarregados === 'function') garantirFiscaisCarregados();
+        window.dispatchEvent(new Event('gecope:login'));
+
         // Busca nome completo de forma robusta
         let finalName = '';
         if (profile.data) {
@@ -877,7 +882,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // chamada duplicada foi removida; showPane() é o único caminho que abre essa aba.)
 
     // Inicialização
-    if (typeof carregarListaFiscais === 'function') carregarListaFiscais();
+    // Só com sessão restaurada (aba recarregada já logada); visitante não consulta app_users
+    // e quem faz login dispara a carga no próprio login (acima).
+    if (sessionStorage.getItem('sop_user') && typeof garantirFiscaisCarregados === 'function') garantirFiscaisCarregados();
 
     // Garantir que o modal de cadastro esteja no final do body para evitar problemas de visibilidade
     try {

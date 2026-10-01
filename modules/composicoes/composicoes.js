@@ -1776,6 +1776,7 @@ async function gerarPDF_Profissional(rawInput) {
     });
 
     try {
+        await window.carregarBiblioteca('jspdf');
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
         const verdeSOP = [0, 143, 61];

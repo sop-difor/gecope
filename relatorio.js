@@ -316,7 +316,9 @@
                     `;
                                 }
 
-                                function gerarDOCX_Profissional(dados) {
+                                async function gerarDOCX_Profissional(dados) {
+                                    try { await window.carregarBiblioteca('docx'); }
+                                    catch (e) { console.error(e); alert('Não foi possível carregar a biblioteca de exportação DOCX. Verifique a conexão e tente novamente.'); return; }
                                     const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, HeadingLevel, TextRun, AlignmentType, VerticalAlign, BorderStyle } = window.docx;
 
                                     const formatarNumero = (v, d = 2) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -537,16 +539,13 @@
                                         return;
                                     }
 
-                                    // Verificar se ExcelJS está disponível
-                                    if (typeof ExcelJS === 'undefined') {
-                                        alert(" Biblioteca ExcelJS não carregada ainda. Aguarde e tente novamente.");
-                                        return;
-                                    }
-
                                     const btn = document.getElementById('btn-reuniao-export');
                                     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Gerando...'; }
 
                                     try {
+                                        // ExcelJS é baixado sob demanda (primeira exportação)
+                                        await window.carregarBiblioteca('exceljs');
+
                                         const now = new Date();
                                         const dateExport = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR');
                                         const userName = sessionStorage.getItem('sop_user_name') || 'Não identificado';
@@ -835,15 +834,11 @@
                                         return;
                                     }
 
-                                    if (typeof jspdf === 'undefined') {
-                                        alert("Biblioteca jsPDF não carregada ainda.");
-                                        return;
-                                    }
-
                                     const btn = document.getElementById('btn-reuniao-pdf');
                                     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...'; }
 
                                     try {
+                                        await window.carregarBiblioteca('jspdf');
                                         const { jsPDF } = window.jspdf;
                                         const doc = new jsPDF('l', 'mm', 'a4'); // Paisagem
 

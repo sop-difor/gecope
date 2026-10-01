@@ -481,14 +481,17 @@ async function carregarDadosFinanceiro() {
     }
 }
 
-function exportarFinanceiroExcel() {
+async function exportarFinanceiroExcel() {
     const rows = window.finDrilldownRows || [];
     if (rows.length === 0) {
         alert("Nenhum dado visível para exportar.");
         return;
     }
-    if (typeof XLSX === 'undefined') {
-        alert("Biblioteca de exportação não carregada ainda. Aguarde e tente novamente.");
+    try {
+        await window.carregarBiblioteca('xlsx');
+    } catch (e) {
+        console.error(e);
+        alert("Não foi possível carregar a biblioteca de exportação. Verifique a conexão e tente novamente.");
         return;
     }
 

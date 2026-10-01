@@ -66,7 +66,11 @@ function isSetorRiscoDiligencia(sigla) {
 // já limita conexões por host, e fila demais só atrasa a primeira resposta).
 // `consulta(fatia)` devolve a promessa do builder do supabase-js; o resultado é a concatenação
 // de todos os `data`. Qualquer fatia com erro faz a chamada inteira falhar (quem chama decide).
-async function consultaEmFatias(valores, tamanho, consulta, concorrencia = 4) {
+// Cada fatia é paginada por `.range()` até vir uma página incompleta: uma fatia cujo resultado
+// passe do `max-rows` do PostgREST (1000) não é mais cortada em silêncio. A consulta precisa
+// ter ordem determinística para a paginação ser estável. — 01/10/2026
+async function consultaEmFatias(valores, tamanho, consulta, concorrencia = 6) {
+    const PAGINA = 1000;
     const fatias = [];
     for (let i = 0; i < valores.length; i += tamanho) fatias.push(valores.slice(i, i + tamanho));
     const saida = new Array(fatias.length);
@@ -74,9 +78,14 @@ async function consultaEmFatias(valores, tamanho, consulta, concorrencia = 4) {
     const trabalhador = async () => {
         while (proximo < fatias.length) {
             const idx = proximo++;
-            const { data, error } = await consulta(fatias[idx]);
-            if (error) throw error;
-            saida[idx] = data || [];
+            const linhas = [];
+            for (let de = 0; ; de += PAGINA) {
+                const { data, error } = await consulta(fatias[idx]).range(de, de + PAGINA - 1);
+                if (error) throw error;
+                linhas.push(...(data || []));
+                if (!data || data.length < PAGINA) break;
+            }
+            saida[idx] = linhas;
         }
     };
     await Promise.all(Array.from({ length: Math.min(concorrencia, fatias.length) }, trabalhador));
@@ -101,7 +110,7 @@ async function carregarAlertasRetornoComentarios() {
 
         // Fatiado (ver consultaEmFatias): as fatias têm processos distintos, então a ordem
         // created_at desc dentro de cada uma basta para pegar o comentário mais recente.
-        const data = await consultaEmFatias(ids, 150, fatia => sbClient
+        const data = await consultaEmFatias(ids, 200, fatia => sbClient
             .from('alerta_retorno_comentarios')
             .select('processo_id, sigla, comentario')
             .in('processo_id', fatia)
@@ -648,17 +657,19 @@ async function sincronizarFiscaisDosProcessos() {
     // Fatiado (ver consultaEmFatias). Antes eram dois `.in()` com TODOS os códigos/ids de uma vez:
     // acima de alguns milhares a URL estourava, o erro era engolido por um `return` silencioso e o
     // fiscal ficava com o valor antigo; e o PostgREST truncava em 1000 linhas sem avisar.
-    const obras = await consultaEmFatias(codigos, 150, fatia => sbClient
+    const obras = await consultaEmFatias(codigos, 400, fatia => sbClient
         .from('contratos_edificacao')
         .select('id_obra, codigo_obra')
-        .in('codigo_obra', fatia));
+        .in('codigo_obra', fatia)
+        .order('id_obra', { ascending: true }));
     if (!obras.length) return;
 
     const idsObra = obras.map(obra => obra.id_obra).filter(id => id != null);
-    const comissao = await consultaEmFatias(idsObra, 100, fatia => sbClient
+    const comissao = await consultaEmFatias(idsObra, 500, fatia => sbClient
         .from('comissao_fiscalizacao')
         .select('id_obra, nome_completo, nome_referencia, tipo, matricula, atualizado_em')
-        .in('id_obra', fatia));
+        .in('id_obra', fatia)
+        .order('id', { ascending: true }));
 
     const porObra = new Map();
     obras.forEach(obra => porObra.set(obra.codigo_obra, []));
@@ -1001,7 +1012,7 @@ function mapProcessoRow(r) {
 // window.allData (ver financeiro.js) — chamar de novo aqui é barato.
 async function atualizarPainelAposEdicaoLocal() {
     await carregarDadosFinanceiro();
-    populateAllTabFilters();
+    populateAllTabFilters({ renderizarReuniao: false }); // updateDashboard() abaixo já renderiza a Reunião
     renderLastUpdate();
     // updateDashboard() já cobre updateHome() (atividades) e updateFinanceiro().
     updateDashboard();
@@ -1065,8 +1076,8 @@ async function removerProcessoLocal(id) {
 let _carregarDadosPromise = null;
 
 // Resolve depois do DOMContentLoaded — que só ocorre depois de as bibliotecas `defer` do
-// index.html (Plotly, jsPDF, html2pdf, docx, pdf-lib, SheetJS, ExcelJS, SweetAlert, DOMPurify:
-// alguns MB) baixarem e executarem — e depois de os demais handlers de DOMContentLoaded
+// index.html (Plotly, SweetAlert, DOMPurify; as de PDF/Excel são sob demanda) baixarem e
+// executarem — e depois de os demais handlers de DOMContentLoaded
 // (wireEvents, RBAC, máscaras) rodarem. A carga dos processos dispara ANTES disso, no fim deste
 // arquivo, e só a montagem de interface espera por esta promessa: a rede não precisa esperar
 // por bibliotecas de PDF/Excel para começar. — 30/09/2026
@@ -1197,7 +1208,18 @@ async function _carregarDadosSupabaseInterno() {
             }
         }
 
-        data = acumulado.filter(d => d.status !== 'EXCLUÍDO' && d.status !== 'EXCLUIDO');
+        // De-duplicação por id: se um processo for inserido/apagado enquanto as páginas paralelas
+        // estão em voo, a fronteira entre duas páginas desloca uma linha e ela pode vir repetida
+        // (a que sumiu entra na próxima recarga). Sem isto, contadores e totais ficavam inflados.
+        // — 01/10/2026
+        const vistos = new Set();
+        data = acumulado.filter(d => {
+            if (d.status === 'EXCLUÍDO' || d.status === 'EXCLUIDO') return false;
+            if (d.id == null) return true;
+            if (vistos.has(d.id)) return false;
+            vistos.add(d.id);
+            return true;
+        });
     } catch (err) {
         console.error('[ERRO] Falha ao carregar dados:', err);
         if (loader) {
@@ -1311,16 +1333,25 @@ async function _carregarDadosSupabaseInterno() {
                 // recusadas — e o histórico logo abaixo era escrito como se tivesse dado certo.
                 // Agora as falhas são contadas e o histórico só registra o que realmente foi
                 // gravado. — 22/09/2026
-                const resultados = await Promise.all(pendingMeta.map(async u => {
-                    try {
-                        const { error } = await sbClient.from('processos')
-                            .update({ data_compromisso_fiscal: u.data_compromisso_fiscal })
-                            .eq('id', u.id);
-                        return { u, ok: !error, erro: error ? error.message : null };
-                    } catch (e) {
-                        return { u, ok: false, erro: (e && e.message) ? e.message : String(e) };
+                // Pool limitado (6 por vez): centenas de PATCH simultâneos enchiam a fila de
+                // conexões do navegador e atrasavam a primeira tela. — 01/10/2026
+                const resultados = new Array(pendingMeta.length);
+                let proxMeta = 0;
+                const gravarMetas = async () => {
+                    while (proxMeta < pendingMeta.length) {
+                        const i = proxMeta++;
+                        const u = pendingMeta[i];
+                        try {
+                            const { error } = await sbClient.from('processos')
+                                .update({ data_compromisso_fiscal: u.data_compromisso_fiscal })
+                                .eq('id', u.id);
+                            resultados[i] = { u, ok: !error, erro: error ? error.message : null };
+                        } catch (e) {
+                            resultados[i] = { u, ok: false, erro: (e && e.message) ? e.message : String(e) };
+                        }
                     }
-                }));
+                };
+                await Promise.all(Array.from({ length: Math.min(6, pendingMeta.length) }, gravarMetas));
 
                 const falhas = resultados.filter(r => !r.ok);
                 if (falhas.length > 0) {
@@ -1333,8 +1364,9 @@ async function _carregarDadosSupabaseInterno() {
 
                 // Gravar histórico de metas em lote
                 if (pendingMeta.length > 0) try {
+                    const linhaPorId = new Map(window.allData.map(r => [r.id, r]));
                     const logs = pendingMeta.map(u => {
-                        const row = window.allData.find(r => r.id === u.id);
+                        const row = linhaPorId.get(u.id);
                         const st = row ? (row.status || "").toString().toUpperCase() : "";
                         const isReanalise = st.includes("REANÁLISE") || st.includes("REANALISE") || st.includes("DEVOLVIDO");
                         return {
@@ -1362,7 +1394,7 @@ async function _carregarDadosSupabaseInterno() {
 
         await carregarDadosFinanceiro();
 
-        populateAllTabFilters();
+        populateAllTabFilters({ renderizarReuniao: false }); // updateDashboard() abaixo já renderiza a Reunião
         renderLastUpdate();
         // updateDashboard() já chama updateHome() (que dispara carregarAtividadesResumoHome) e
         // updateFinanceiro(). Chamar as duas de novo logo depois redesenhava duas vezes todos os
@@ -2501,6 +2533,7 @@ function getMetaDate(row, setD) {
         // alterada quando na verdade não foi gravada.
         const valorAnteriorLS = localStorage.getItem(key);
         const dataAnterior = row.dataCompromissoFiscal;
+        row._metaLsVazio = false;
 
         if (!setD) localStorage.removeItem(key);
         else localStorage.setItem(key, valSupabase);
@@ -2563,7 +2596,12 @@ function getMetaDate(row, setD) {
         return setD;
     }
     if (row.dataCompromissoFiscal instanceof Date) return row.dataCompromissoFiscal;
+    // Cache negativo por linha: a maioria (Aprovados/Arquivados) não tem meta, e esta função roda
+    // várias vezes por linha a cada render/filtro/ordenação — cada uma lia o localStorage
+    // (síncrono). O localStorage só é gravado por este bloco (setD, que limpa o cache). — 01/10/2026
+    if (row._metaLsVazio) return null;
     const ls = localStorage.getItem(key); if (ls) { const d = isoParaDate(ls); if (d) { row.dataCompromissoFiscal = d; return d; } }
+    row._metaLsVazio = true;
     return null;
 }
 function getMetaSt(row) {
@@ -2656,7 +2694,7 @@ async function setPrioritario(processo, isPriority) {
 
             // Atualiza o resumo de atividades na Home, se disponível
             if (typeof carregarAtividadesResumoHome === 'function') {
-                try { carregarAtividadesResumoHome(); } catch (e) { /* noop */ }
+                try { carregarAtividadesResumoHome({ fresco: true }); } catch (e) { /* noop */ }
             }
         }
     } catch (e) {
@@ -3813,7 +3851,10 @@ function fillCommonStatusFilters() {
     } catch (e) { console.warn('fillCommonStatusFilters error', e); }
 }
 
-function populateAllTabFilters() {
+// `renderizarReuniao: false` quando o chamador roda updateDashboard() logo em seguida (que já
+// chama updateReuniao()): sem isso a tabela de Processos era reconstruída duas vezes a cada
+// carga/edição. — 01/10/2026
+function populateAllTabFilters({ renderizarReuniao = true } = {}) {
     populateFinanceiroFilters();
     fillCommonStatusFilters();
 
@@ -3830,7 +3871,8 @@ function populateAllTabFilters() {
         }
     });
 
-    updateReuniaoFilters(window.allData);
+    if (renderizarReuniao) updateReuniaoFilters(window.allData);
+    else mtBase = window.allData;
 
     // Verifica notificações de atraso (apenas admins ou autorizados)
     if (getCurrentUserRole() === 'admin') {

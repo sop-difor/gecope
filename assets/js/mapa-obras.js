@@ -402,11 +402,12 @@ function fetchComTimeout(url,opts,rotulo){
 }
 // `order`: PAGINAÇÃO SEM ORDER BY não é estável — o Postgres pode devolver as linhas em ordens
 // diferentes entre as páginas (mais ainda com páginas em paralelo e uma carga do SIGSOP
-// gravando no meio), duplicando uma linha e perdendo outra em silêncio. Quando a chamada não
-// informa uma chave, ordena por TODAS as colunas do select (a ordem fica determinística no
-// conteúdo, e duas linhas idênticas em todas as colunas lidas são intercambiáveis).
+// gravando no meio), duplicando uma linha e perdendo outra em silêncio. Toda chamada deve
+// informar `order` com a chave primária (índice, barato). O fallback de ordenar por TODAS as
+// colunas do select foi removido: obrigava o servidor a ordenar a tabela inteira em cada página
+// paralela e falhava em colunas `json`. — 01/10/2026
 async function fetchTable(tbl,{select='*',filter='',order=null}={}){
-  const ord=order || (select!=='*' ? select.split(',').map(c=>c.trim()+'.asc').join(',') : '');
+  const ord=order || '';
   const qs=`select=${encodeURIComponent(select)}${filter?'&'+filter:''}${ord?'&order='+ord:''}`;
   // apikey continua sendo a chave anônima (exigida pelo PostgREST em toda chamada,
   // mesmo autenticada) — quem identifica o usuário pro RLS é o Authorization,
@@ -464,7 +465,7 @@ async function fetchTableIn(tbl,opts,col,values,quote){
 // lista de ids cabe numa query — no histórico completo os ~350 ids estourariam a URL,
 // então busca a tabela de comissão inteira, só com as colunas usadas).
 async function fetchFiscais(idFilter){
-  const rows=await fetchTableIn(SB_COMISSAO,{select:COMISSAO_COLS},'id_obra',idFilter,false); const m={};
+  const rows=await fetchTableIn(SB_COMISSAO,{select:COMISSAO_COLS,order:'id.asc'},'id_obra',idFilter,false); const m={};
   const datasPorObra={};
   for(const r of rows){
     const data=String(r.atualizado_em||'').slice(0,10);
@@ -499,7 +500,7 @@ function advScopeNote(o,msg){ return (o.nObras||1)>1 ? `<div class="adv-scope-no
 // Mesma lógica de escopo que fetchFiscais: na carteira ativa filtra pelos contratos já
 // carregados (cabe numa URL); no histórico completo busca a tabela inteira (~580 linhas).
 async function fetchAditivos(nrFilter){
-  const rows=await fetchTableIn(SB_ADITIVOS,{select:ADITIVOS_COLS},'nr_contrato_sop',nrFilter,true); const m={};
+  const rows=await fetchTableIn(SB_ADITIVOS,{select:ADITIVOS_COLS,order:'id.asc'},'nr_contrato_sop',nrFilter,true); const m={};
   for(const r of rows){ const k=r.nr_contrato_sop; if(!k) continue; (m[k]=m[k]||[]).push(r); }
   for(const k in m) m[k].sort((a,b)=>
     adPubDate(b).localeCompare(adPubDate(a))
@@ -509,14 +510,14 @@ async function fetchAditivos(nrFilter){
 // nr_contrato_sop -> ficha do contrato (só os 2 totais de medição já calculados
 // upstream pelo SIGSOP — total_medido/percentual_total_medido, ver aba Medições do modal).
 async function fetchFichas(nrFilter){
-  const rows=await fetchTableIn(SB_FICHA,{select:FICHA_COLS},'nr_contrato_sop',nrFilter,true); const m={};
+  const rows=await fetchTableIn(SB_FICHA,{select:FICHA_COLS,order:'id_contrato.asc'},'nr_contrato_sop',nrFilter,true); const m={};
   for(const r of rows){ if(r.nr_contrato_sop) m[r.nr_contrato_sop]=r; }
   return m;
 }
 // id_obra -> lista de medições (para a curva "Evolução da medição" do Resumo).
 // Ordena por nr_medicao (as medições são sequenciais); periodo é só rótulo do eixo.
 async function fetchMedicoes(idFilter){
-  const rows=await fetchTableIn(SB_MEDICOES,{select:MEDICOES_COLS},'id_obra',idFilter,false); const m={};
+  const rows=await fetchTableIn(SB_MEDICOES,{select:MEDICOES_COLS,order:'id_medicao.asc'},'id_obra',idFilter,false); const m={};
   for(const r of rows){ const k=r.id_obra; if(k==null) continue; (m[k]=m[k]||[]).push(r); }
   for(const k in m) m[k].sort((a,b)=>(num(a.nr_medicao)-num(b.nr_medicao)) || String(a.periodo||'').localeCompare(String(b.periodo||'')));
   return m;
