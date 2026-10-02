@@ -1196,6 +1196,31 @@
      pro fundo sólido da trilha logo abaixo, dentro do mesmo bloco fixo no topo. */
   .modal .mtop{position:sticky;top:0;z-index:2;background:var(--bg-modal)}
   .modal .mtop .mh{border-bottom:0}
+  /* Janelas de distrito e de fiscal (E5): contexto sob o título e seletor de período. O
+     seletor mora no .mtop sticky — fica à vista ao rolar a janela, para trocar de período
+     sem voltar ao topo. Muda o MESMO estado de Controles (st.rp.periodo). */
+  .modal .dsh-context{display:flex;align-items:center;gap:6px;margin-top:5px;
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted)}
+  .modal .dsh-context svg{width:13px;height:13px;flex:none;stroke:currentColor}
+  .modal .mtop .mh:has(+ .dsh-per){padding-bottom:12px}
+  /* Janela do fiscal aberta por um distrito: diz, no cabeçalho, que o recorte é só dele. */
+  .modal .dsh-escopo{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 11px;border-radius:999px;
+        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-bright);
+        background:rgba(var(--ng-rgb),.12);border:1px solid rgba(var(--ng-rgb),.28)}
+  .modal .dsh-escopo svg{width:12px;height:12px;flex:none;stroke:currentColor}
+  .modal .dsh-per{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;padding:0 26px 14px;
+        border-bottom:1px solid rgba(var(--raise-rgb),.08)}
+  .modal .dsh-per-l{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted)}
+  .modal .dsh-per-seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;
+        background:rgba(var(--raise-rgb),.06);border:1px solid var(--card-border)}
+  .modal .dsh-per-seg button{border:0;background:transparent;cursor:pointer;border-radius:7px;padding:6px 14px;
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted);transition:background .15s,color .15s}
+  .modal .dsh-per-seg button:hover{color:var(--text-bright)}
+  .modal .dsh-per-seg button.on{background:rgba(var(--ng-rgb),.18);color:var(--text-brightest);
+        box-shadow:inset 0 0 0 1px rgba(var(--ng-rgb),.4)}
+  .modal .dsh-per-seg button:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
+  .modal .dsh-per-d{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:500;color:var(--text-dim)}
+  @media (max-width:520px){ .modal .dsh-per{padding:0 16px 12px} .modal .dsh-per-d{flex-basis:100%} }
   .modal .mtabs{display:flex;gap:6px;padding:0 26px 14px;overflow-x:auto;border-bottom:1px solid rgba(var(--raise-rgb),.08)}
   .modal .mtab{flex:none;white-space:nowrap;cursor:pointer;border:1px solid var(--card-border);background:var(--card-bg-2);color:var(--text-muted);
         border-radius:999px;padding:7px 16px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.3px;transition:.15s}
@@ -1935,12 +1960,6 @@
   .modal .dsh-hero-acima{border-color:rgba(var(--amber-rgb),.42);
         background:linear-gradient(160deg,rgba(var(--amber-rgb),.14),rgba(var(--amber-rgb),.04))}
   .modal .dsh-hero-acima::before{background:linear-gradient(var(--amber),var(--amber-deep))}
-  /* Amostra fina: existe número, mas frágil. Marca NEUTRA (moldura tracejada + texto
-     apagado) e não âmbar — âmbar já quer dizer "mais lento", e um fiscal rápido com 3
-     despachos não pode parecer um problema. A cor do herói continua a do delta. */
-  .modal .dsh-hero-fina{border-style:dashed}
-  .modal .dsh-fraco{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:500;line-height:1.4;
-        color:var(--text-dim);border-top:1px dashed var(--card-border);padding-top:7px;margin-top:1px}
   .modal .fcard-fina{font-family:Montserrat,sans-serif;font-size:10px;font-weight:500;color:var(--text-dim)}
 
   /* ---- grupos da lista de processos (janela do fiscal) ----
@@ -1962,13 +1981,15 @@
   .modal .gproc .adToggle{margin-top:9px}
   .modal .gproc .proc{margin-top:10px}
   /* O único tipo grande dos dois painéis: é o que se lê do fundo de uma sala de reunião. */
-  .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:42px;font-weight:600;line-height:1;
+  .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:48px;font-weight:600;line-height:1;
         color:var(--text-brightest);display:flex;align-items:baseline;gap:8px;margin-top:2px}
   .modal .dsh-un{font-family:Montserrat,sans-serif;font-size:13px;font-weight:600;color:var(--text-muted)}
-  .modal .dsh-delta{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;
-        font-size:11.5px;font-weight:600;line-height:1.35}
-  .modal .dsh-delta.acima{color:var(--amber-text)}
-  .modal .dsh-delta.abaixo{color:var(--ng-light)}
+  /* Diferença para a referência: uma pílula, com o sinal em cor (âmbar = mais lento). */
+  .modal .dsh-delta{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-family:Montserrat,sans-serif;
+        font-size:12px;font-weight:600;line-height:1.35;padding:5px 11px;border-radius:999px;
+        background:rgba(var(--raise-rgb),.07);color:var(--text-muted)}
+  .modal .dsh-delta.acima{color:var(--amber-text);background:rgba(var(--amber-rgb),.15)}
+  .modal .dsh-delta.abaixo{color:var(--ng-light);background:rgba(var(--ng-rgb),.14)}
   :root:not(.theme-dark) .modal .dsh-delta.abaixo{color:var(--badge-text)}
   .modal .dsh-seta{font-size:10px;flex:none}
   .modal .dsh-sub{font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-dim);line-height:1.4}
@@ -1983,7 +2004,11 @@
      com min 130px + gap 10px + 4 itens). 110px empurra o limiar de quebra pra ~465px,
      cobrindo a largura mínima testada (480px, modal a 96vw numa tela ~554px). Não afeta
      o card de 2 ladrilhos (usa `.dsh-tiles-cap`, mais específica, abaixo). */
-  .modal .dsh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  /* Faixa única de indicadores (E5, 2026-10-01): um cartão só, com divisórias de 1px
+     (o gap deixa à mostra o fundo, que é a cor da borda) — lê-se como um resumo, não como
+     quatro caixas soltas, e continua quebrando em linhas sem divisória torta. */
+  .modal .dsh-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:1px;
+        background:var(--card-border);border:1px solid var(--card-border);border-radius:12px;overflow:hidden}
   /* Variante com teto de 220px/coluna — achado rev-design, 2026-09-22: um teto na classe
      .dsh-tiles COMPARTILHADA (rodada 3) resolvia o card de 2 ladrilhos, mas sem `1fr` o
      número de colunas passa a ser calculado pelo teto em vez do mínimo — nas fileiras de
@@ -1992,17 +2017,21 @@
      pior que o espaço morto original). Fix: teto só nesta classe extra, aplicada só no
      card "Carga no período" (2 ladrilhos) — os demais usos mantêm `.dsh-tiles` puro,
      sem teto, como sempre foi. */
-  .modal .dsh-tiles.dsh-tiles-cap{grid-template-columns:repeat(auto-fit,minmax(130px,220px))}
-  .modal .dsh-tile{padding:11px 13px;display:flex;flex-direction:column;gap:3px;background:var(--card-bg-2)}
+  .modal .dsh-tiles.dsh-tiles-cap{grid-template-columns:repeat(auto-fit,minmax(130px,220px));width:fit-content;max-width:100%}
+  .modal .dsh-tile{padding:14px 16px;display:flex;flex-direction:column;gap:4px;background:var(--card-bg);
+        border:0;border-radius:0}
   /* Ladrilhos que abrem/rolam até a lista por trás do número (pedido do usuário,
      2026-09-23) — mesmo tratamento discreto de .fcard: só muda a borda no hover/foco,
      sem chevron nem sombra, pra não competir com o número (peso 3, "quase plano"). */
   .modal .dsh-tile-clic{cursor:pointer;transition:.15s}
-  .modal .dsh-tile-clic:hover{border-color:rgba(var(--ng-rgb),.4)}
-  .modal .dsh-tile-clic:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
-  .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text-brightest);line-height:1.1}
-  .modal .dsh-tl{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.5px;
-        text-transform:uppercase;color:var(--text-label)}
+  .modal .dsh-tile-clic:hover{background:rgba(var(--ng-rgb),.09)}
+  .modal .dsh-tile-clic:focus-visible{outline:2px solid var(--ng);outline-offset:-2px}
+  .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;color:var(--text-brightest);line-height:1.1}
+  .modal .dsh-tl{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;
+        color:var(--text-bright)}
+  /* títulos de seção das duas janelas: frase normal, e não caixa-alta espaçada */
+  .modal .mbody.dsh .sec-h{font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--text-brightest);margin:10px 0 8px}
+  .modal .mbody.dsh .gproc-h{font-size:13px;letter-spacing:0;text-transform:none;color:var(--text-bright)}
   .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
 
   /* ---- eixo de dias: a régua compartilhada ---- */
@@ -2052,6 +2081,86 @@
   .modal .sbar-dot.atraso{background:var(--amber)}
   .modal .sbar-dot.noprazo{background:var(--ng)}
   .modal .sbar-dot.semprazo{background:rgba(var(--raise-rgb),.32)}
+
+  /* ---- fila de hoje (janela de distrito) ----
+     Um cartão, três leituras: total (grande, à direita), proporção (barra) e contagem
+     (três números com a mesma cor da barra). A lista de processos fica atrás do botão. */
+  .modal .fila{gap:14px;padding:18px 20px}
+  .modal .fila-h{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .modal .fila-t{font-family:Montserrat,sans-serif;font-size:15px;font-weight:700;color:var(--text-brightest)}
+  .modal .fila-s{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-muted);margin-top:3px}
+  .modal .fila-tot{display:flex;align-items:baseline;gap:7px;flex:none}
+  .modal .fila-tot b{font-family:'Space Grotesk',sans-serif;font-size:38px;font-weight:600;line-height:1;color:var(--text-brightest)}
+  .modal .fila-tot span{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted)}
+  .modal .fila-bar{display:flex;gap:3px;height:14px}
+  .modal .fila-bar>i{display:block;min-width:6px;border-radius:5px}
+  .modal .fila-bar>i.atraso{background:var(--amber)}
+  .modal .fila-bar>i.noprazo{background:var(--ng)}
+  .modal .fila-bar>i.semprazo{background:rgba(var(--raise-rgb),.32)}
+  .modal .fila-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;
+        background:var(--card-border);border:1px solid var(--card-border);border-radius:10px;overflow:hidden}
+  .modal .fila-st{background:var(--card-bg);padding:11px 14px;display:flex;flex-direction:column;gap:2px}
+  .modal .fila-sn{display:flex;align-items:center;gap:8px;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;line-height:1.1;color:var(--text-brightest)}
+  .modal .fila-dot{width:9px;height:9px;border-radius:50%;flex:none;background:rgba(var(--raise-rgb),.32)}
+  .modal .fila-st.atraso .fila-dot{background:var(--amber)}
+  .modal .fila-st.noprazo .fila-dot{background:var(--ng)}
+  .modal .fila-sl{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-bright)}
+  .modal .fila-sp{font-family:Montserrat,sans-serif;font-size:11px;font-weight:500;color:var(--text-dim)}
+  .modal .fila-nota{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:500;color:var(--text-dim)}
+  .modal .fila .adToggle{align-self:flex-start;margin-top:0}
+  .modal .fila #fichaFilaDist{display:flex;flex-direction:column;gap:10px}
+  .modal .fila #fichaFilaDist[hidden]{display:none}
+  .modal .fila #fichaFilaDist .proc{margin-top:0}
+  /* ---- janela do fiscal: "Processos no período" ----
+     Resumo em fichas (quantos por status e por prazo) e, abaixo, os processos em linhas:
+     NUP e descrição à esquerda; situação do prazo, dias com o fiscal e meta à direita. */
+  .modal .op-resumo{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+  .modal .op-chip{display:inline-flex;align-items:baseline;gap:5px;padding:5px 12px;border-radius:999px;
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted);
+        background:rgba(var(--raise-rgb),.06);border:1px solid var(--card-border)}
+  .modal .op-chip b{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest)}
+  .modal .op-chip.atraso{color:var(--amber-text);background:rgba(var(--amber-rgb),.13);border-color:rgba(var(--amber-rgb),.35)}
+  .modal .op-chip.atraso b{color:var(--amber-text)}
+  .modal .op-chip.ok{color:var(--ng-light);background:rgba(var(--ng-rgb),.12);border-color:rgba(var(--ng-rgb),.3)}
+  :root:not(.theme-dark) .modal .op-chip.ok{color:var(--badge-text)}
+  .modal .pp-grupos{display:flex;flex-direction:column;gap:14px}
+  .modal .pp-grupo{border:1px solid var(--card-border);border-radius:12px;overflow:hidden;
+        background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2))}
+  .modal .pp-gh{display:flex;justify-content:space-between;align-items:baseline;padding:11px 16px;
+        font-family:Montserrat,sans-serif;font-size:13px;font-weight:700;color:var(--text-bright);
+        border-bottom:1px solid var(--card-border);background:rgba(var(--raise-rgb),.04)}
+  .modal .pp-gh b{font-family:'Space Grotesk',sans-serif;font-size:15px;color:var(--text-brightest)}
+  .modal .pp-grupo>.adToggle{margin:12px 16px;width:auto}
+  .modal .pp-lista[hidden]{display:none}
+  .modal .pp-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:12px 16px;
+        border-left:3px solid transparent}
+  .modal .pp-row+.pp-row{border-top:1px solid var(--card-border)}
+  .modal .pp-row.atraso{border-left-color:var(--amber)}
+  .modal .pp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .modal .pp-n{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest)}
+  .modal .pp-desc{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-bright);line-height:1.4;
+        display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .modal .pp-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;max-width:46%}
+  .modal .pp-b{padding:3px 11px;border-radius:999px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;
+        color:var(--text-muted);background:rgba(var(--raise-rgb),.1);white-space:nowrap}
+  .modal .pp-b.atraso{color:var(--amber-text);background:rgba(var(--amber-rgb),.17)}
+  .modal .pp-b.noprazo{color:var(--ng-light);background:rgba(var(--ng-rgb),.15)}
+  :root:not(.theme-dark) .modal .pp-b.noprazo{color:var(--badge-text)}
+  .modal .pp-info{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-dim);text-align:right}
+  @media (max-width:640px){
+    .modal .pp-row{flex-direction:column;gap:8px}
+    .modal .pp-side{align-items:flex-start;max-width:none}
+    .modal .pp-info{text-align:left}
+  }
+  /* grupos por status dentro da lista (Análise Fiscal / Reanálise Fiscal) */
+  .modal .fila-g{display:flex;flex-direction:column;gap:10px}
+  .modal .fila-g+.fila-g{border-top:1px dashed var(--card-border);padding-top:14px;margin-top:4px}
+  .modal .fila-gh{display:flex;justify-content:space-between;align-items:baseline;font-family:Montserrat,sans-serif;
+        font-size:13px;font-weight:700;color:var(--text-bright)}
+  .modal .fila-gh b{font-family:'Space Grotesk',sans-serif;font-size:15px;color:var(--text-brightest)}
+  .modal .fila-gs{font-family:Montserrat,sans-serif;font-size:11px;font-weight:500;color:var(--text-dim);margin-top:-6px}
+  /* meta do processo: data neutra no prazo, âmbar quando atrasado */
+  .proc-meta.ok{color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:600;font-size:11px}
 
   /* ---- cartões da equipe (janela de distrito) ---- */
   .modal .fcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(216px,1fr));gap:11px}
