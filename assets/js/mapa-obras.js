@@ -174,7 +174,7 @@ const FICHA_COLS='nr_contrato_sop,total_medido,percentual_total_medido,valor_ori
 // O "total medido" e a curva usam `total` (líquido); a tabela mostra os 3.
 // A situação da medição é sigla_status_medicao (a coluna "status" não existe — o SELECT
 // com ela fazia o PostgREST devolver 400 e a aba Medições/curva ficavam sempre vazias).
-const MEDICOES_COLS='id_obra,periodo,nr_medicao,valor_medido,valor_ref_glosa,valor_atual,nr_protocolo,total,sigla_status_medicao';
+const MEDICOES_COLS='id_obra,id_medicao,periodo,nr_medicao,valor_medido,valor_ref_glosa,valor_atual,nr_protocolo,total,sigla_status_medicao';
 // eletrica_vistorias: metadados dos relatórios de vistoria elétrica (o arquivo em si
 // fica no Google Drive — ver supabase/functions/eletrica-drive-token). excluido_em
 // filtrado aqui (não é policy: soft delete, ver sql/create_eletrica_vistorias.sql).
@@ -547,7 +547,10 @@ async function fetchObrasPorContrato(nrFilter){
 // Ordena por nr_medicao (as medições são sequenciais); periodo é só rótulo do eixo.
 async function fetchMedicoes(idFilter){
   const rows=await fetchTableIn(SB_MEDICOES,{select:MEDICOES_COLS,order:'id_medicao.asc'},'id_obra',idFilter,false); const m={};
-  for(const r of rows){ const k=r.id_obra; if(k==null) continue; (m[k]=m[k]||[]).push(r); }
+  // medição reemitida (mesmo nr_medicao, ex.: ABE e depois FEC) conta uma vez: fica a de maior id_medicao
+  const ult={};
+  for(const r of rows){ const k=r.id_obra; if(k==null) continue; const c=k+'#'+r.nr_medicao; if(r.nr_medicao==null||!ult[c]||num(r.id_medicao)>num(ult[c].id_medicao)) ult[c]=r; }
+  for(const r of rows){ const k=r.id_obra; if(k==null) continue; if(r.nr_medicao!=null && ult[k+'#'+r.nr_medicao]!==r) continue; (m[k]=m[k]||[]).push(r); }
   // desempate pelo período: "MM/AAAA" como texto ordena errado (01/2025 antes de 12/2024); vira AAAAMM
   const chavePer=v=>{ const t=/^(\d{1,2})\/(\d{4})$/.exec(String(v||'').trim()); return t?t[2]+t[1].padStart(2,'0'):String(v||''); };
   for(const k in m) m[k].sort((a,b)=>(num(a.nr_medicao)-num(b.nr_medicao)) || chavePer(a.periodo).localeCompare(chavePer(b.periodo)));
@@ -612,6 +615,16 @@ async function garantirRosterEletrica(){
 // andamento) pode terminar com o modo aberto, então um retrato congelado faria a volta para
 // Obras exibir a contagem de contratos do escopo anterior.
 // `replan` marca que o texto veio do modo Replanilhamentos.
+// tabelas auxiliares que falharam na última carga (vazio = tudo certo). Alimenta o selo do cabeçalho
+// (visível mesmo com o painel recolhido) e esconde as contagens da Elétrica quando faltam vist/agend.
+let _falhasAux=[];
+function setSeloParcial(falhas){
+  _falhasAux=falhas||[];
+  const el=document.getElementById('syncWarn'); if(!el) return;
+  el.hidden=!_falhasAux.length;
+  el.title=_falhasAux.length?'Não carregaram: '+_falhasAux.join(', ')+'. Contagens de fiscal, medição e vistoria podem estar incompletas. Recarregue a página para tentar de novo.':'';
+}
+function eletricaSemDados(){ return _falhasAux.some(n=>n.startsWith('eletrica_')); }
 function setStatus(txt,ok,lastSync,replan){
   _lastStatus={txt,ok,lastSync,replan:!!replan};
   if(!replan) _statusObras={txt,ok,lastSync,replan:false};
@@ -677,8 +690,8 @@ function showLoginRequired(msg){
 // v13: chave por USUÁRIO (antes era só por escopo: quem entrava com outra conta na mesma aba
 // reaproveitava, por até 1h, os dados da conta anterior) e o cache deixa de guardar respostas
 // parciais (ver fetchDadosBrutos).
-// v14: novo campo `nobras` (obras por contrato na base inteira, p/ a carteira ativa).
-function cacheKey(scope){ return 'gecope_mapa_cache_v14_'+(SESSION_UID||'anon')+'_'+scope; }
+// v15: vist/agend passam a vir sem filtro de ids (escopo = base inteira). v14: novo campo `nobras` (obras por contrato na base inteira, p/ a carteira ativa).
+function cacheKey(scope){ return 'gecope_mapa_cache_v15_'+(SESSION_UID||'anon')+'_'+scope; }
 function readCache(scope){
   try{
     const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
@@ -724,8 +737,8 @@ async function fetchDadosBrutos(scope){
     tol('aditivos_contrato',fetchAditivos(nrs)),
     tol('ficha_contrato',fetchFichas(nrs)),
     tol('medicoes',fetchMedicoes(ids)),
-    tol('eletrica_vistorias',fetchEletricaVistorias(ids)),
-    tol('eletrica_vistorias_agendadas',fetchEletricaAgendamentos(ids)),
+    tol('eletrica_vistorias',fetchEletricaVistorias()), // sem filtro de ids: tabelas pequenas, e assim painel/roster batem com o Cronograma
+    tol('eletrica_vistorias_agendadas',fetchEletricaAgendamentos()),
     // sem `tol`: ele devolve {} na falha, e {} é truthy — loadData() não cairia na contagem local
     // e todo contrato ficaria com nObras=1. Aqui a falha tem de virar null.
     nrs ? fetchObrasPorContrato(nrs).catch(e=>{ parcial=true; falhas.push('contratos_edificacao (obras por contrato)'); console.warn('contratos_edificacao (obras por contrato) indisponível:',e.message); return null; }) : Promise.resolve(null),
@@ -803,6 +816,7 @@ async function loadData(){
       o.medicaoBucket=medicaoBucket(o.medStats.pct);
       DB.municipios[cod].obras.push(o); }
     invalidateAggCache();
+    setSeloParcial(parcial?falhas:[]);
     const scopeTxt=scope==='ativa'?'carteira ativa':'histórico completo';
     // Comparação por string funciona porque `atualizado_em` vem do Postgres em ISO
     // (YYYY-MM-DD...), que ordena lexicograficamente igual a cronologicamente.
@@ -2230,6 +2244,7 @@ function renderEleEngenheiros(forceReflow){
   if(!forceReflow && !_rosterEletricaDirty) return;
   _rosterEletricaDirty=false;
   if(ENGENHEIROS_ELETRICA===null){ corpo.innerHTML='<div class="empty">Carregando…</div>'; return; }
+  if(eletricaSemDados()){ corpo.innerHTML='<div class="empty">Vistorias e agendamentos não carregaram — contagens ocultas para não mostrar zero falso. Recarregue a página.</div>'; return; }
   const lista=computarRosterEletrica();
   ROSTER_ELETRICA_COMPUTADO=lista;
   if(!lista.length){ corpo.innerHTML='<div class="empty">Nenhum engenheiro cadastrado com o papel Elétrica.</div>'; return; }
@@ -3807,7 +3822,7 @@ function buildEletricaPane(o){
             <button type="button" class="ele-dialog-x" id="eleAgendaDialogX" aria-label="Fechar">&times;</button></div>
           <form id="eleAgendaForm" class="eleform" novalidate>
             <div class="elefields">
-              <label>Data planejada<input type="date" id="eleAgendaData" required value="${hoje}"></label>
+              <label>Data planejada<input type="date" id="eleAgendaData" required min="${hoje}" value="${hoje}"></label>
               <label>Responsável<input type="text" id="eleAgendaResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
             </div>
             <div class="ele-erro" id="eleAgendaErro" hidden></div>
@@ -3986,6 +4001,7 @@ function wireEletricaPane(o){
     const elErroAgenda=pane.querySelector('#eleAgendaErro');
     const setErroAgenda=m=>{ if(elErroAgenda){ elErroAgenda.textContent=m||''; elErroAgenda.hidden=!m; } };
     if(!data){ setErroAgenda('Informe a data planejada.'); return; }
+    if(data<hojeISOLocal()){ setErroAgenda('A data planejada não pode ser anterior a hoje.'); return; }
     if(!resp){ setErroAgenda('Informe o responsável.'); return; }
     // uma obra não pode ter dois agendamentos abertos ao mesmo tempo (o banco também barra)
     if(agendamentoAbertoDe(o)){ setErroAgenda('Esta obra já tem um agendamento aberto. Cancele-o ou confirme a vistoria antes de agendar outro.'); return; }

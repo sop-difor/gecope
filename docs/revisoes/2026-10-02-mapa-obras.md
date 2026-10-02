@@ -115,6 +115,19 @@ Corrigido no código (`node --check` ok; página servida localmente com sessão 
 - Novo: `sql/add_unique_aberto_eletrica_vistorias_agendadas.sql` (fecha os agendamentos abertos que já têm relatório, recusa obras com dois abertos e cria o índice único).
 - Testado localmente com dados simulados: agendamento aberto + relatório antigo → Agendada; aberto + relatório posterior → Vistoriada; data passada → Pendente; sem nada, 80% medido → A vistoriar.
 
+## 2d. Fechamento — conferido no banco e corrigido (02/10/2026)
+Consultas só de leitura no banco real (projeto SOP.DIFOR):
+- **P1.4 `statusBucket`: sem ação.** Os únicos `status_obra` existentes são Aguardando OS, Concluída, Contrato Encerrado, Em Execução, Execução Fisíca Concluída e Paralisada; todos caem no bucket certo. Status desconhecido é risco só hipotético.
+- **P1.5 `fetchFiscais`: sem ação.** Das 3.309 obras com comissão, 18 têm datas de `atualizado_em` diferentes, e as linhas antigas são membros substituídos (ex.: obra 12328, Fiscal trocado em 30/09). Manter só a data mais recente está correto.
+- **P1.7 escopo da Elétrica: corrigido.** `eletrica_vistorias` (33 linhas) e `eletrica_vistorias_agendadas` (7) agora vêm sem filtro de ids, então painel, roster e cards batem com o Cronograma. Cache sobe para `v15`.
+- **P3.19 medição reemitida: corrigido.** Havia 1 caso (obra 12839, medição 6: ABE e depois FEC). `fetchMedicoes` fica com o maior `id_medicao` por `nr_medicao` (a coluna entrou em `MEDICOES_COLS`).
+- **P3.9 `min` no agendamento: corrigido.** O campo tem `min=hoje` e o envio recusa data anterior (data de Fortaleza). Numeração V1/V2 e rollback do Drive seguem abertos.
+- **P3.1 selo de falha parcial: corrigido.** Selo "⚠ dados incompletos" ao lado de "Base atualizada em" (visível com o painel recolhido; o `title` lista as tabelas). Se `eletrica_*` falhar, o painel de engenheiros mostra aviso no lugar de contagens zeradas.
+- **Banco:** o índice único de agendamento aberto **ainda não existe** e não há obra com dois agendamentos abertos, então `add_unique_aberto_eletrica_vistorias_agendadas.sql` roda sem recusar.
+- Teste local (REST simulado): carga sem erro de página; com `eletrica_*` devolvendo 500, o selo aparece e o status nomeia as tabelas; sem falha, o selo some. Não testados: dedupe de medição na tela, agendar com data passada, PDF.
+
+**Ainda aberto, depende de decisão:** P1.2 (`% medido` bruto × líquido, quais situações contam), P1.3 (limite de acréscimo 25% × 50% por tipo de contrato), P1.6 (métrica da Elétrica no mapa), P3.2 (voltar o alternador de carteira à tela). Sem decisão: P3.4 (`refreshMapCounts` no pan/zoom, mantido de propósito), P3.16 (eixo X por índice, cosmético), numeração V1/V2 e rollback do Drive.
+
 ## 3. O que falta para finalizar
 0. **Banco (Elétrica):** aplicar `sql/add_unique_aberto_eletrica_vistorias_agendadas.sql`. Se parar com "Obras com mais de um agendamento aberto", cancelar os a mais e rodar de novo. Conferir antes de publicar o front, ou logo depois (o front funciona nas duas ordens).
 1. **Banco (P0):** aplicar `sql/create_vw_painel_desempenho_fiscais.sql` (drop/create em `begin/commit`; também traz o fallback "Matrícula X" do fiscal) e, por último, `sql/fix_painel_responsavel_atual_suite.sql` (muda `responsavel_atual`, a carteira GECOPE vai cair; ler o cabeçalho antes).
