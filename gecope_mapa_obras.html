@@ -29,16 +29,17 @@
    - <body> — para manter a convenção bodclaudey.theme-dark compartilhada com o resto
      do GECOPE. */
 (function(){
+  // localStorage pode lançar (janela privada, dados bloqueados): nesse caso vale o tema do SO,
+  // como no JS — antes caía sempre em escuro e a página trocava de tema ao carregar o script.
+  var pref=null;
+  try{ pref=localStorage.getItem('gecope_theme'); }catch(e){}
+  var dark;
   try{
-    var pref=localStorage.getItem('gecope_theme');
-    var dark = pref ? (pref!=='light')
-                    : !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
-    document.documentElement.classList.toggle('theme-dark', dark);
-    document.body.classList.toggle('theme-dark', dark);
-  }catch(e){
-    document.documentElement.classList.add('theme-dark');
-    document.body.classList.add('theme-dark');
-  }
+    dark = pref ? (pref!=='light')
+                : !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+  }catch(e){ dark=true; }
+  document.documentElement.classList.toggle('theme-dark', dark);
+  document.body.classList.toggle('theme-dark', dark);
 })();
 </script>
 <header class="top">
