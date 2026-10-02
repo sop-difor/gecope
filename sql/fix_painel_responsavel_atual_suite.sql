@@ -176,7 +176,7 @@ select
   )::date as mes_conclusao,
   case
     when c.em_tramitacao and c.data_inicio_status is not null
-      then greatest(current_date - c.data_inicio_status, 0)
+      then greatest((now() at time zone 'America/Fortaleza')::date - c.data_inicio_status, 0)
   end as dias_em_aberto,
   case
     when c.encerrado and c.data_entrada is not null
@@ -185,7 +185,8 @@ select
   end as dias_ate_conclusao,
   case
     when c.responsavel_atual <> 'FISCALIZACAO' or c.data_compromisso_fiscal is null then null
-    when c.em_tramitacao then current_date > c.data_compromisso_fiscal
+    -- data de Fortaleza: current_date é UTC e, das 21h à meia-noite local, já é o dia seguinte
+    when c.em_tramitacao then (now() at time zone 'America/Fortaleza')::date > c.data_compromisso_fiscal
     when c.data_aprovacao_gecope is not null
       then c.data_aprovacao_gecope > c.data_compromisso_fiscal
   end as meta_estourada,

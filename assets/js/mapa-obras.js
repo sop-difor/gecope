@@ -55,6 +55,15 @@ const _geoP=Promise.all([
 ]);
 _geoP.catch(()=>{}); // o erro real é tratado no await, mais adiante — evita só o "unhandled rejection" no intervalo
 const _tokenP=obterTokenSessao();
+// Declarada no começo: o botão "Voltar" a chama por onmouseenter inline, e este arquivo é módulo
+// (tem `await` no topo) — o `window.` só existe depois de executado, então antes do GeoJSON chegar
+// o hover dava ReferenceError.
+// prefetch leve da página de destino ao passar o mouse no botão "Voltar"
+function prefetchPagina(url){
+  if(document.querySelector(`link[rel="prefetch"][href="${url}"]`)) return;
+  const link=document.createElement('link'); link.rel='prefetch'; link.href=url; document.head.appendChild(link);
+}
+window.prefetchPagina=prefetchPagina;
 /* ============================================================
    CONEXÃO COM O SUPABASE
    URL/chave vêm de config.js (window.SUPABASE_URL/KEY), a mesma
@@ -539,7 +548,9 @@ async function fetchObrasPorContrato(nrFilter){
 async function fetchMedicoes(idFilter){
   const rows=await fetchTableIn(SB_MEDICOES,{select:MEDICOES_COLS,order:'id_medicao.asc'},'id_obra',idFilter,false); const m={};
   for(const r of rows){ const k=r.id_obra; if(k==null) continue; (m[k]=m[k]||[]).push(r); }
-  for(const k in m) m[k].sort((a,b)=>(num(a.nr_medicao)-num(b.nr_medicao)) || String(a.periodo||'').localeCompare(String(b.periodo||'')));
+  // desempate pelo período: "MM/AAAA" como texto ordena errado (01/2025 antes de 12/2024); vira AAAAMM
+  const chavePer=v=>{ const t=/^(\d{1,2})\/(\d{4})$/.exec(String(v||'').trim()); return t?t[2]+t[1].padStart(2,'0'):String(v||''); };
+  for(const k in m) m[k].sort((a,b)=>(num(a.nr_medicao)-num(b.nr_medicao)) || chavePer(a.periodo).localeCompare(chavePer(b.periodo)));
   return m;
 }
 // id_obra -> relatórios de vistoria elétrica (mais recente primeiro). Mesmo padrão de
@@ -599,8 +610,6 @@ function setStatus(txt,ok,lastSync,replan){
   if(!replan) _statusObras={txt,ok,lastSync,replan:false};
   const el=document.getElementById('connStatus');
   if(el){el.textContent=txt; const d=el.parentElement.querySelector('.d'); const dot=ok?TOKENS.ng:TOKENS.amber; d.style.background=dot; d.style.boxShadow='0 0 10px '+dot;}
-  const b=document.querySelector('.badge');
-  if(b){ b.classList.toggle('demo',!ok); const t=document.getElementById('badgeTxt'); if(t) t.textContent = ok?'Base de dados · ao vivo':'Erro de conexão'; }
   const syncEl=document.getElementById('syncTime');
   if(syncEl) syncEl.textContent = ok ? (lastSync ? fmtDateTimeBR(lastSync) : '—') : '— (falha na conexão)';
 }
@@ -685,8 +694,8 @@ function writeCache(scope,d){
 async function fetchDadosBrutos(scope){
   const cached=readCache(scope);
   if(cached) return {rows:cached.rows, fisc:cached.fisc, adit:cached.adit||{}, ficha:cached.ficha||{}, medic:cached.medic||{}, vist:cached.vist||{}, agend:cached.agend||{}, nobras:cached.nobras||null, parcial:false};
-  let parcial=false;
-  const tol=(nome,p)=>p.catch(e=>{ parcial=true; console.warn(nome+' indisponível:',e.message); return {}; });
+  let parcial=false; const falhas=[]; // falhas: nomes das tabelas auxiliares que não vieram (aparecem no status)
+  const tol=(nome,p)=>p.catch(e=>{ parcial=true; falhas.push(nome); console.warn(nome+' indisponível:',e.message); return {}; });
   let rows, ids, nrs; // ids/nrs undefined = sem escopo (histórico: tabelas inteiras)
   let rowsP;
   if(scope==='ativa'){
@@ -710,10 +719,12 @@ async function fetchDadosBrutos(scope){
     tol('medicoes',fetchMedicoes(ids)),
     tol('eletrica_vistorias',fetchEletricaVistorias(ids)),
     tol('eletrica_vistorias_agendadas',fetchEletricaAgendamentos(ids)),
-    nrs ? tol('contratos_edificacao (obras por contrato)',fetchObrasPorContrato(nrs)) : Promise.resolve(null),
+    // sem `tol`: ele devolve {} na falha, e {} é truthy — loadData() não cairia na contagem local
+    // e todo contrato ficaria com nObras=1. Aqui a falha tem de virar null.
+    nrs ? fetchObrasPorContrato(nrs).catch(e=>{ parcial=true; falhas.push('contratos_edificacao (obras por contrato)'); console.warn('contratos_edificacao (obras por contrato) indisponível:',e.message); return null; }) : Promise.resolve(null),
   ]);
   if(rowsP) rows=await rowsP;
-  const dados={rows,fisc,adit,ficha,medic,vist,agend,nobras,parcial};
+  const dados={rows,fisc,adit,ficha,medic,vist,agend,nobras,parcial,falhas};
   if(!parcial) writeCache(scope,dados);
   return dados;
 }
@@ -731,7 +742,11 @@ async function loadData(){
   // cedo (ou um script automatizado) rodaria loadData() com SESSION_TOKEN ainda
   // null, caindo no fallback da chave anônima em fetchTable() — reabrindo
   // exatamente o buraco que esta fase existe para fechar.
-  if(!SESSION_TOKEN){ showLoginRequired('Faça login no GECOPE para consultar o módulo de Contratos.'); return; }
+  if(!SESSION_TOKEN){
+    // sem window.sbClient o problema não é login: o supabase-js/database.js não carregou (rede, CDN fora do ar).
+    // Pedir login aqui não resolve; "Tentar novamente" (recarregar) sim.
+    if(!window.sbClient){ showDataError('Não consegui carregar o componente de acesso ao banco. Verifique a conexão e tente novamente.'); return; }
+    showLoginRequired('Faça login no GECOPE para consultar o módulo de Contratos.'); return; }
   const seq=++_loadSeq;
   for(const c in DB.municipios) DB.municipios[c].obras=[];
   invalidateAggCache(); // sem isso, um hover no mapa durante o fetch devolveria contagens da era de filtro anterior
@@ -744,14 +759,14 @@ async function loadData(){
     _prefetchDados=null;
     if(!dados) dados=await fetchDadosBrutos(scope);
     if(seq!==_loadSeq) return; // outra carga começou depois desta — ela é quem preenche DB
-    const {fisc,adit,ficha,medic,vist,agend,parcial}=dados;
+    const {fisc,adit,ficha,medic,vist,agend,parcial}=dados, falhas=dados.falhas||[];
     // a paginação por offset pode, numa gravação do SIGSOP no meio da carga, trazer a mesma obra
     // duas vezes — sem isto ela entraria duplicada em DB.municipios[].obras (valor e contagem em dobro)
     const _vistas=new Set();
     const rows=dados.rows.filter(r=>r.id_obra==null || (!_vistas.has(r.id_obra) && _vistas.add(r.id_obra)));
     // 1 contrato : N obras — nº de obras de cada contrato NA BASE (`dados.nobras`, só vem na
     // carteira ativa, onde `rows` é um recorte). No histórico `rows` já é a base inteira. Só usado
-    // como sinal "tem mais de uma obra" (multiObra), não como número exibido ao usuário; se a
+    // como sinal "tem mais de uma obra" / "obra única" (multiObra, nObras===1), não como número exibido; se a
     // consulta auxiliar falhou, cai na contagem das obras carregadas (comportamento antigo).
     const obraCountBySop={...(dados.nobras||{})};
     if(!dados.nobras) for(const r of rows){ const k=r.nr_contrato_sop; if(k) obraCountBySop[k]=(obraCountBySop[k]||0)+1; }
@@ -786,7 +801,7 @@ async function loadData(){
     // (YYYY-MM-DD...), que ordena lexicograficamente igual a cronologicamente.
     let lastSync=null;
     for(const r of rows){ if(r.atualizado_em && (!lastSync || r.atualizado_em>lastSync)) lastSync=r.atualizado_em; }
-    setStatus(`Base de dados · ${rows.length} contrato${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}${parcial?' · ⚠ alguns dados auxiliares indisponíveis (fiscal/medição/vistoria) — recarregue para tentar de novo':''}`, true, lastSync);
+    setStatus(`Base de dados · ${rows.length} obra${rows.length===1?'':'s'}${sem?` (${sem} sem município no CE)`:''} · ${scopeTxt}${parcial?` · ⚠ dados auxiliares indisponíveis${falhas.length?` (${falhas.join(', ')})`:''} — contagens de fiscal/medição/vistoria podem estar incompletas; recarregue para tentar de novo`:''}`, true, lastSync);
     // #btnScope fica escondido no modo Replanilhamentos (body.modo-rp, CSS), mas uma
     // carga em andamento pode terminar já dentro do modo: o setStatus acima já atualizou
     // o retrato de Obras (_statusObras) para a volta, e aqui a linha de status volta a
@@ -905,7 +920,7 @@ async function loadProcessos(){
     // Os dois ficam fora de todas as métricas (foraDoCiclo); contados para não sumirem calados.
     if(p.situacao==='aprovado_sem_data') aprovSemData++;
     if(!p.situacao) semSituacao++;
-    // Sem data de despacho, o processo só entra no período "Hoje". Contado para que a
+    // Sem data de despacho, o processo fica fora de qualquer período (6 meses a 2 anos). Contado para que a
     // ausência apareça na conferência em vez de encolher os recortes em silêncio.
     if(p.despachado && !p.dataDespacho) despSemData++;
     // Despacho sem tempo conta nos despachos e fica fora da média: os dois motivos são
@@ -1030,12 +1045,12 @@ function passF(o){const f=st.f;
   if(f.q){
     // busca livre em TODOS os campos textuais da obra; ";" separa termos com lógica OU
     // (ex.: "ROBERTO BRINGEL; VIRNA" traz as obras de qualquer um dos dois fiscais).
-    const terms=f.q.split(';').map(t=>t.trim().toLowerCase()).filter(Boolean);
+    // sem acento nem caixa (como os dropdowns, normSearch); texto das obras calculado 1 vez em o._busca
+    const terms=f.q.split(';').map(t=>normSearch(t.trim())).filter(Boolean);
     if(terms.length){
-      const campos=[o.objeto,o.municipioTxt,o.fiscal,o.contratada,o.contratante,
-        o.ano!=null?String(o.ano):'',o.statusObra,o.contrato,o.codigo_obra];
-      const hit=terms.some(t=>campos.some(c=>String(c||'').toLowerCase().includes(t)));
-      if(!hit) return false;
+      if(o._busca==null) o._busca=normSearch([o.objeto,o.municipioTxt,o.fiscal,o.contratada,o.contratante,
+        o.ano!=null?String(o.ano):'',o.statusObra,o.contrato,o.codigo_obra].map(c=>c||'').join(' | '));
+      if(!terms.some(t=>o._busca.includes(t))) return false;
     }
   }
   return true;
@@ -1092,9 +1107,10 @@ function mval(a){return st.metric==='valor'?a.valor:st.metric==='aditivo'?a.adit
 // nos dias em que alguém confere os dois lado a lado.
 function corteDespacho(meses){
   if(meses==null) return null;
-  const h=new Date(); let y=h.getFullYear(), m=h.getMonth()-meses;
+  // "hoje" em Fortaleza, como a view (data_despacho): o navegador pode estar em outro fuso
+  const [hy,hm,hd]=hojeISOLocal().split('-').map(Number); let y=hy, m=hm-1-meses;
   y+=Math.floor(m/12); m=((m%12)+12)%12;
-  const d=Math.min(h.getDate(), new Date(y,m+1,0).getDate());
+  const d=Math.min(hd, new Date(y,m+1,0).getDate());
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 // O distrito vale para a entidade DISTRITO (local da obra), em qualquer nível: a lista de
@@ -1142,7 +1158,7 @@ function procsDoRecorteRaw(){
 // COM tempo medido, e `nTempo` viaja junto de propósito: média de desempenho sem o tamanho
 // da amostra ao lado convida à conclusão errada sobre uma pessoa.
 // Fila, atraso e GECOPE são a posição de HOJE; despachos, tempo e fiscais obedecem ao
-// período (em "Hoje" o corte é nulo = todo o histórico — ver corteDespacho).
+// período (ver corteDespacho).
 // `procs` é o card PROCESSOS (usuário, 2026-09-21): SEMPRE a fila de hoje, fixo, qualquer
 // que seja o período — não soma mais os despachados do período.
 // `fiscais` (usuário, 2026-09-21) é só quem DESPACHOU dentro do período — não soma mais
@@ -1160,7 +1176,7 @@ function aggProc(procs){
   const fiscais=new Set(), gecope=new Map(), filaPorStatus=new Map();
   const contaFiscal=p=>{ if(p.fiscalMat) fiscais.add(p.fiscalMat); else semMatricula++; };
   // data_despacho chega como 'AAAA-MM-DD' (coluna date): comparar texto é comparar data.
-  // corte null = "Hoje", que para despachos, tempo e fiscais é o histórico inteiro.
+  // corte null (nenhum período atual o usa) = histórico inteiro.
   const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
   for(const p of procs){
     total++;
@@ -1434,7 +1450,11 @@ function groupHover(){return {fillColor:TOKENS.mapOpenFill,color:TOKENS.mapLine,
 let _hoverPanelRaf=0;
 function renderPanelHover(){
   if(_hoverPanelRaf) return;
-  _hoverPanelRaf=requestAnimationFrame(()=>{ _hoverPanelRaf=0; if(panelVisible()) renderPanel(); });
+  _hoverPanelRaf=requestAnimationFrame(()=>{ _hoverPanelRaf=0; if(!panelVisible()) return;
+    // renderPanel reescreve body.innerHTML: sem isto o painel voltava ao topo a cada hover
+    const rolam=[_asideEl,document.getElementById('body')].filter(Boolean), tops=rolam.map(el=>el.scrollTop);
+    renderPanel();
+    rolam.forEach((el,i)=>{ el.scrollTop=tops[i]; }); });
 }
 function onGroup(f,l){
   const gid=f.properties.gid;
@@ -1923,10 +1943,9 @@ function setKPIs(){
 // da Elétrica (funil, cards, cronograma). Movida pra cá (antes só existia dentro do
 // bloco do Cronograma) porque agora statusAgendamentoEletrica()/categoriaEletricaObra()
 // também precisam dela; function declaration, então a ordem no arquivo não importa.
-function hojeISOLocal(){
-  const d=new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+// Fuso de Fortaleza (e não o do navegador), igual a data_despacho e meta_estourada no SQL.
+const _fmtHojeFortaleza=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'});
+function hojeISOLocal(){ return _fmtHojeFortaleza.format(new Date()); }
 // status de UM agendamento ativo (sem relatório ainda) — fonte ÚNICA da regra "data
 // passou sem confirmação = Pendente", usada por categoriaEletricaObra,
 // contarEletricaAgendadasVistoriadas, computarRosterEletrica e o Cronograma
@@ -2493,7 +2512,7 @@ function linhasPorObra(itensOrdenados,idPrefix){
 function wireEngObraRows(chave){
   document.querySelectorAll('.modal .eng-ver-row[data-idx]').forEach(row=>{
     row.addEventListener('click',()=>abreObraNaAbaEletrica(_engModalObrasRef[+row.dataset.idx],chave));
-    row.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); row.click(); } });
+    row.addEventListener('keydown',ev=>{ if(ev.target!==row) return; if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); row.click(); } });
   });
   // botão de baixar mora dentro da linha (role="button"); precisa de stopPropagation
   // senão o clique também "borbulha" e abre a obra por cima do download.
@@ -2566,9 +2585,10 @@ async function carregarVisitasCronograma(){
   const ids=[...new Set([...Object.keys(vist),...Object.keys(agend)].map(Number))];
   const faltam=ids.filter(id=>!noMapa.has(id));
   const lotes=[]; for(let i=0;i<faltam.length;i+=80) lotes.push(faltam.slice(i,i+80));
+  let lotesFalhos=0;
   const linhas=await Promise.all(lotes.map(l=>
     fetchTable(SB_TABLE,{select:CONTRATOS_COLS,filter:inListFilter('id_obra',l,false),order:'id_obra.asc'})
-      .catch(e=>{ console.warn('cronograma: obras fora da carteira indisponíveis:',e.message); return []; })));
+      .catch(e=>{ lotesFalhos++; console.warn('cronograma: obras fora da carteira indisponíveis:',e.message); return []; })));
   const reduzidas=new Map();
   for(const r of linhas.flat()) reduzidas.set(r.id_obra,mapRow(r));
   const hoje=hojeISOLocal();
@@ -2587,6 +2607,7 @@ async function carregarVisitasCronograma(){
       itens.push({...base,tipo:st==='vistoriada'?'realizada':st,data:ag.data_planejada,resp:ag.responsavel_nome,r:null});
     }
   }
+  itens.lotesFalhos=lotesFalhos; // as obras desse lote aparecem só como "Obra #id"
   return itens;
 }
 function abreCronogramaEletrica(opts){
@@ -2630,6 +2651,7 @@ function abreCronogramaEletrica(opts){
       _cronoItens=itens; _cronoCarregado=true;
       montaFiltrosCronograma();
       renderCorpoCronograma();
+      if(itens.lotesFalhos) toastEletrica('Parte das obras do cronograma não carregou: algumas linhas aparecem só como "Obra #número". Feche e abra de novo.','erro');
     }catch(e){
       if(seq!==_cronoSeq) return;
       console.warn('cronograma:',e);
@@ -3000,7 +3022,7 @@ function parseISODate(s){
 function prazoCalc(startStr,endStr){
   const start=parseISODate(startStr), end=parseISODate(endStr);
   if(!start||!end) return null;
-  const now=new Date(), today=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()));
+  const [ty,tm,td]=hojeISOLocal().split('-').map(Number), today=new Date(Date.UTC(ty,tm-1,td));
   const totalDays=Math.round((end-start)/86400000);
   const remainingDays=Math.round((end-today)/86400000);
   const pct=totalDays>0?Math.max(0,Math.min(100,(totalDays-remainingDays)/totalDays*100)):100;
@@ -3226,14 +3248,14 @@ function buildAdPrazoPane(o,raw){
     +block('Prazo de vigência','Período de validade jurídica do contrato','prazo_aprovado','prazo_vigencia_contrato',raw.data_inicio_real,raw.data_fim_vigencia_contrato,'Nenhum aditivo de prazo de vigência registrado.')
     +`</div>`;
 }
-// total_medido/percentual_total_medido vêm prontos de ficha_contrato (mesma origem/
-// escopo já usada pros outros totais do contrato) — evita somar as dezenas de linhas
-// mensais de medições no cliente só pra chegar num número que a base já calcula.
+// Os indicadores do CONTRATO (total_medido/percentual_total_medido) vêm de ficha_contrato. Já o % medido
+// DA OBRA (medObraStats) soma `total` das linhas de o.medicoes; só cai na ficha quando não há linhas e o
+// contrato é de obra única.
 // Aba "Medições" (Etapa B / Bloco 6 — modelo janela_contrato_melhorado): faixa de
 // 4 indicadores (da ficha, autoritativa) → tabela mensal de o.medicoes → rodapé
 // (também da ficha) → legendas STM. Sem STP/glosa/ajuste (não existem na base).
-// total_medido/percentual_total_medido continuam vindo de ficha_contrato — NÃO se
-// soma a tabela mês a mês pra chegar nesses números.
+// Nesta aba, total_medido/percentual_total_medido seguem vindo de ficha_contrato (nível contrato);
+// a soma mês a mês só existe em medObraStats(), para o nível da obra.
 function buildMedicoesPane(o,raw){
   const f=o.ficha;
   const meds=o.medicoes||[];
@@ -3409,7 +3431,8 @@ function medObraStats(o){
 function rsLineChart(pts){
   if(!pts.length) return `<div class="empty">Sem medições registradas para este contrato.</div>`;
   const W=920,H=210,PADL=8,PADR=14,PADT=16,PADB=24, iw=W-PADL-PADR, ih=H-PADT-PADB;
-  const maxY=Math.max(10,...pts.map(p=>p.y));
+  // eixo sempre de 0 a 100%: escalar até o maior ponto fazia 15% parecer quase concluído (acima de 100% o eixo cresce)
+  const maxY=Math.max(100,...pts.map(p=>p.y));
   const X=i=>PADL+(pts.length<2?iw/2:i/(pts.length-1)*iw);
   const Y=v=>PADT+ih-(Math.max(0,Math.min(maxY,v))/maxY)*ih;
   const grid=[0,.25,.5,.75,1].map(f=>`<line class="rs-lc-grid" x1="${PADL}" x2="${(W-PADR).toFixed(1)}" y1="${(PADT+ih*f).toFixed(1)}" y2="${(PADT+ih*f).toFixed(1)}"/>`).join('');
@@ -3800,7 +3823,7 @@ function buildEletricaPane(o){
           <input type="file" id="eleFile" accept=".pdf,.doc,.docx" hidden>
         </div>
         <div class="elefields">
-          <label>Data da vistoria<input type="date" id="eleData" required value="${hoje}"></label>
+          <label>Data da vistoria<input type="date" id="eleData" required max="${hoje}" value="${hoje}"></label>
           <label>Responsável<input type="text" id="eleResp" required maxlength="120" value="${escHtml(nomeSessao)}"></label>
           <label class="span2">NUP do processo (SUITE)<input type="text" id="eleNup" required maxlength="20" placeholder="00000.000000/0000-00" inputmode="numeric"></label>
           <label class="span2">Observação<textarea id="eleObs" maxlength="500" rows="2" placeholder="Opcional"></textarea></label>
@@ -3873,8 +3896,9 @@ function wireEletricaPane(o){
     btnDel.addEventListener('click',async()=>{
       if(!window.confirm('Excluir este relatório de vistoria? Essa ação não pode ser desfeita pelo app.')) return;
       btnDel.disabled=true;
-      const{error}=await window.sbClient.from('eletrica_vistorias').update({excluido_em:new Date().toISOString()}).eq('id',btnDel.dataset.id);
-      if(error){ window.alert('Não consegui excluir o relatório agora. Tente novamente.'); btnDel.disabled=false; return; }
+      // .select('id'): a RLS pode bloquear o UPDATE sem erro (0 linhas) — sem conferir, a UI dava sucesso falso
+      const{data:afet,error}=await window.sbClient.from('eletrica_vistorias').update({excluido_em:new Date().toISOString()}).eq('id',btnDel.dataset.id).select('id');
+      if(error||!afet||!afet.length){ window.alert('Não consegui excluir o relatório agora. Tente novamente.'); btnDel.disabled=false; return; }
       const novo=await fetchEletricaVistorias([o.id_obra]).catch(()=>null);
       o.relatoriosEletrica=novo?(novo[o.id_obra]||[]):(o.relatoriosEletrica||[]).filter(r=>String(r.id)!==String(btnDel.dataset.id));
       pane.innerHTML=buildEletricaPane(o);
@@ -3889,8 +3913,8 @@ function wireEletricaPane(o){
     if(!o.agendamentoEletrica) return;
     if(!window.confirm('Cancelar o agendamento de vistoria desta obra?')) return;
     btnCancelarAgenda.disabled=true;
-    const{error}=await window.sbClient.from(SB_ELETRICA_AGENDA).update({excluido_em:new Date().toISOString()}).eq('id',o.agendamentoEletrica.id);
-    if(error){ window.alert('Não consegui cancelar o agendamento agora. Tente novamente.'); btnCancelarAgenda.disabled=false; return; }
+    const{data:afet,error}=await window.sbClient.from(SB_ELETRICA_AGENDA).update({excluido_em:new Date().toISOString()}).eq('id',o.agendamentoEletrica.id).select('id');
+    if(error||!afet||!afet.length){ window.alert('Não consegui cancelar o agendamento agora. Tente novamente.'); btnCancelarAgenda.disabled=false; return; }
     o.agendamentoEletrica=null;
     pane.innerHTML=buildEletricaPane(o);
     wireEletricaPane(o);
@@ -3905,9 +3929,9 @@ function wireEletricaPane(o){
     if(!o.agendamentoEletrica) return;
     const marcar=chkRealizada.checked;
     chkRealizada.disabled=true;
-    const{error}=await window.sbClient.from(SB_ELETRICA_AGENDA)
-      .update({realizada_em:marcar?new Date().toISOString():null}).eq('id',o.agendamentoEletrica.id);
-    if(error){
+    const{data:afet,error}=await window.sbClient.from(SB_ELETRICA_AGENDA)
+      .update({realizada_em:marcar?new Date().toISOString():null}).eq('id',o.agendamentoEletrica.id).select('id');
+    if(error||!afet||!afet.length){
       window.alert(`Não consegui ${marcar?'confirmar':'desfazer a confirmação d'}a vistoria agora. Tente novamente.`);
       chkRealizada.checked=!marcar; chkRealizada.disabled=false; return;
     }
@@ -3989,8 +4013,9 @@ function wireEletricaPane(o){
   input.addEventListener('change',()=>{ if(input.files[0]) selecionarArquivo(input.files[0]); });
   // solto fora da caixa mas ainda dentro da aba: sem isso o navegador navega pro
   // arquivo (sai do SPA) — mesmo guard de curva_abc.js:943-944, aplicado ao pane.
-  pane.addEventListener('dragover',e=>e.preventDefault());
-  pane.addEventListener('drop',e=>{ e.preventDefault(); if(e.target===drop||drop.contains(e.target)) return; if(e.dataTransfer.files[0]) selecionarArquivo(e.dataTransfer.files[0]); });
+  // atribuição (e não addEventListener): wireEletricaPane roda a cada render e acumulava um par de ouvintes por vez
+  pane.ondragover=e=>e.preventDefault();
+  pane.ondrop=e=>{ e.preventDefault(); if(e.target===drop||drop.contains(e.target)) return; if(e.dataTransfer.files[0]) selecionarArquivo(e.dataTransfer.files[0]); };
 
   form.onsubmit=async(e)=>{
     e.preventDefault();
@@ -4000,6 +4025,8 @@ function wireEletricaPane(o){
     const nupProcesso=elNup.value.trim();
     if(!arquivo){ setErro('Selecione um arquivo.'); return; }
     if(!dataVistoria){ setErro('Informe a data da vistoria.'); return; }
+    // data futura viraria "vistoriada" antes de acontecer (o formulário é novalidate: o atributo max não barra)
+    if(dataVistoria>hojeISOLocal()){ setErro('A data da vistoria não pode ser futura.'); return; }
     if(!responsavel){ setErro('Informe o responsável.'); return; }
     // exige o NUP do processo aberto no SUITE (pedido do usuário, 29/09/2026): o
     // relatório tem que ser encaminhado por lá ao fiscal responsável, não só
@@ -4047,7 +4074,7 @@ function wireEletricaPane(o){
       o.relatoriosEletrica=novo[o.id_obra]||[];
       pane.innerHTML=buildEletricaPane(o);
       wireEletricaPane(o);
-      invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança // painéis "Elétrica"/"Engenheiros" refletem o novo relatório
+      invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados e painéis "Elétrica"/"Engenheiros" refletem o novo relatório
     }catch(err){
       setErro('Relatório enviado com sucesso, mas não consegui atualizar a lista aqui. Feche e reabra esta obra para ver.');
       btn.textContent=txtOriginal;
@@ -4287,6 +4314,11 @@ function procCard(p){
     +(p.naFila?`<div class="proc-meta${p.metaEstourada?'':' ok'}">${p.dataMeta?`Meta ${escHtml(fmtDateBR(p.dataMeta))}${p.metaEstourada?' · atrasado':''}`:'Sem data meta'}</div>`:'')+`</div>`;
 }
 const PROC_LISTA_MAX=15;
+// Resto de uma lista cortada em PROC_LISTA_MAX: <details> nativo (sem JS, funciona em painel e em janela), para que
+// nenhum processo fique inalcançável atrás de "Mostrando 15 de N".
+function restoProcsHtml(resto,fnItem){
+  return resto.length?`<details class="ver-resto"><summary>Ver os outros ${NUM.format(resto.length)}</summary>${resto.map(fnItem).join('')}</details>`:'';
+}
 /* ---- ranking de fiscais por tempo médio (E4) ----
    O mapa compara ÁREAS; esta seção compara PESSOAS, que é a pergunta que sobra depois
    dele: entre os fiscais deste recorte, quem está mais lento. Uma barra horizontal por
@@ -4305,15 +4337,9 @@ const QUAD_LISTA_ROLA=8;
 // (2026-09-21: só despacho no período), de propósito: o ranking também é onde um gestor
 // vê alguém com fila parada mas nenhum despacho ainda no período, e essa pessoa não pode
 // sumir da lista só porque não contribui pro card.
-// `opts.todosLotados` (E4, 2026-09-23) desliga esse corte por período: usada só pelos
-// cartões de fiscais da janela do distrito (equipeCardsHtml()), que precisam listar todo
-// fiscal que já atuou nas obras do distrito, mesmo sem fila nem despacho no período ativo
-// — a lista de PESSOAS fica estável, só os números de cada cartão seguem o período
-// (pedido do usuário: "os cards de todos os fiscais fiquem, independente do período").
 // `procs` já não é filtrado por período (vem de procsDoDistritoRaw/PROCESSOS, histórico
 // completo) — o corte de período mora inteiramente dentro de aggProc(), nunca aqui.
-function aggFiscais(procs,opts){
-  const todosLotados=!!(opts&&opts.todosLotados);
+function aggFiscais(procs){
   const porMat=new Map(); let semFiscal=0;
   for(const p of procs){
     // Processo sem matrícula não vira linha: "(sem fiscal)" não é uma pessoa, e juntar
@@ -4326,10 +4352,11 @@ function aggFiscais(procs,opts){
   const lista=[];
   porMat.forEach((ps,mat)=>{
     const a=aggProc(ps);
-    // mesma regra do KPI: só GECOPE não conta como presença — exceto com todosLotados,
-    // onde ter QUALQUER processo histórico (ps.length>0, já garantido por porMat) basta.
-    if(!todosLotados && !a.fila && !a.desp) return;
-    lista.push({mat, nome:ps[0].fiscalNome, gedop:ps[0].gedop,
+    // mesma regra do KPI: quem só tem processo na GECOPE não conta como presença
+    if(!a.fila && !a.desp) return;
+    // o primeiro processo pode ter vindo sem nome (fiscal fora de app_users); outro da mesma matrícula pode tê-lo
+    const nome=(ps.find(p=>p.fiscalNome && p.fiscalNome!=='(sem fiscal)')||ps[0]).fiscalNome;
+    lista.push({mat, nome, gedop:ps[0].gedop,
                 fila:a.fila, desp:a.desp, n:a.nTempo, tempo:a.tempoMedio,
                 prontos:a.prontos, semTempo:a.semTempo});
   });
@@ -4399,7 +4426,7 @@ function fiscaisRankingBlockHtml(procs,a){
   // fiscaisRankingLista. Some junto com o card, pela mesma régua de amostra (AMOSTRA_MIN).
   const avg=a&&a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
   const cab=`<div class="sec-h"><span>Fiscais · tempo médio</span>`
-    +`<span>${NUM.format(q.pts.length)} de ${NUM.format(q.nFiscais)}</span></div>`;
+    +`<span title="Fiscais com média no período, de todos que despacharam ou têm processo em tramitação">${NUM.format(q.pts.length)} de ${NUM.format(q.nFiscais)} com média</span></div>`;
   // Uma linha de recorte no lugar dos três parágrafos que a seção carregava (cobertura em
   // volume, legenda do traço e rodapé de exclusões, todos somados a seis números por
   // linha): o usuário pediu a seção limpa em 2026-09-17, e cada uma dessas contas passou
@@ -4574,17 +4601,6 @@ function tile(valor,label,sub,opts){
       ? `<div class="dsh-tl">${escHtml(label)}<button type="button" class="kpi-info" data-tip="${escHtml(opts.tip)}" aria-label="O que é ${escHtml(label)}?">${RS_ICO.info}</button></div>`
       : `<div class="dsh-tl">${escHtml(label)}</div>`+(sub?`<div class="dsh-ts">${escHtml(sub)}</div>`:''))+`</div>`;
 }
-// Barra empilhada da fila de hoje. Mesmo tri-estado do donut GECOPE × Fiscalização, e
-// pela mesma razão: processo SEM data de compromisso não é "no prazo", é um terceiro
-// grupo — somá-lo ao verde inflaria justamente o número que tranquiliza.
-function barraAtraso(atrasado,noPrazo,semPrazo){
-  const tot=atrasado+noPrazo+semPrazo;
-  if(!tot) return '';
-  const seg=(n,cls,rot)=>n?`<i class="${cls}" style="width:${(n/tot*100).toFixed(2)}%" title="${escHtml(`${rot}: ${NUM.format(n)}`)}"></i>`:'';
-  const item=(n,cls,rot)=>n?`<span class="sbar-i"><i class="sbar-dot ${cls}"></i>${escHtml(`${NUM.format(n)} ${rot}`)}</span>`:'';
-  return `<div class="sbar"><div class="sbar-track">${seg(atrasado,'atraso','Atrasado')}${seg(noPrazo,'noprazo','No prazo')}${seg(semPrazo,'semprazo','Sem prazo')}</div>`
-    +`<div class="sbar-leg">${item(atrasado,'atraso','atrasado'+(atrasado===1?'':'s'))}${item(noPrazo,'noprazo','no prazo')}${item(semPrazo,'semprazo','sem prazo')}</div></div>`;
-}
 /* Referências da janela do fiscal, TODAS no período ativo (decisão do usuário,
    2026-09-17: "tudo segue o período"). Antes a janela lia a carreira inteira da pessoa e
    a comparava com a média histórica; a lista de processos, porém, passou a ser separada
@@ -4741,7 +4757,7 @@ function equipeCardsHtml(procs,refMedia){
   // ficam escondidos.
   return `<div class="statwrap" id="secFiscalizacaoDist"><div class="sec-h"><span>Fiscalização</span>`
     +`<span>${NUM.format(lista.length)} ${lista.length===1?'fiscal':'fiscais'}</span></div>`
-    +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média dos distritos operacionais (${escHtml(fmtDias(avg))})`:''}. ${soFila?` ${NUM.format(nDespacharam)} ${nDespacharam===1?'despachou':'despacharam'} no período; ${NUM.format(soFila)} ${soFila===1?'tem':'têm'} só processo em tramitação.`:''} Clique num cartão para abrir o painel do fiscal, só com os processos deste distrito.</div>`
+    +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média do estado, por despacho (${escHtml(fmtDias(avg))})`:''}. ${soFila?` ${NUM.format(nDespacharam)} ${nDespacharam===1?'despachou':'despacharam'} no período; ${NUM.format(soFila)} ${soFila===1?'tem':'têm'} só processo em tramitação.`:''} Clique num cartão para abrir o painel do fiscal, só com os processos deste distrito.</div>`
     +`<div class="fcards">${comMedia.map(card).join('')}${sem.map(card).join('')}</div>${nota}</div>`;
 }
 // Cartão "Processos em tramitação" da janela do distrito. `a` é o aggProc() do distrito.
@@ -4764,7 +4780,7 @@ function filaDistritoHtml(a,noPrazo,semPrazo,filaDist){
     return `<div class="fila-g"><div class="fila-gh"><span>${escHtml(titulo(k))}</span><b>${NUM.format(ps.length)}</b></div>`
       +`<div class="fila-gs">Do que está há mais tempo com o fiscal para o que está há menos</div>`
       +mostra.map(procCard).join('')
-      +(ps.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(ps.length)}.</div>`:'')+`</div>`;
+      +restoProcsHtml(ps.slice(PROC_LISTA_MAX),procCard)+`</div>`;
   }).join('');
   const gecope=a.naGecope
     ? `<div class="fila-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} destas obras `
@@ -4812,7 +4828,7 @@ function abreModalDistrito(gid){
   // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pelas": a janela precisa
   // dizer a mesma coisa que o hover já diz.
   const sub=`<div class="dsh-context">${RS_ICO.dist}<span>Obras localizadas no distrito</span></div>`;
-  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média dos distritos operacionais')}`
+  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média do estado (por despacho)')}`
     +posicaoHtml('Desempenho do Distrito Operacional',coorteDistritos(),'gid',String(gid),est.media,'Média dos Distritos Operacionais','distritos comparáveis')
     +`</div>`;
   // E5, 2026-09-23 — "Fiscais" virou "Fiscais no período" (mesma convenção já usada em
@@ -4910,32 +4926,6 @@ function fichaFiscal(mat,gid){
   const valorObras=obrasList.reduce((s,p)=>s+(p.valorObra||0),0);
   return {todos, foraDoDistrito:doFiscal.length-todos.length, a, obras:obrasMap.size, obrasComValor, obrasList, procsPorObra, processosNoPeriodo:noPeriodo.length, valorObrasNoPeriodo:valorObras};
 }
-// Cartão de processo da ficha: NUP, descrição, contratada e contratante — não é o
-// procCard() da lista por cidade, que repete o nome do fiscal a cada linha (redundante
-// aqui, já que a janela inteira é de UM fiscal só). `estado` é o rótulo do grupo a que
-// ele pertence, e muda com o grupo: na fila diz o prazo, despachado diz a data.
-function fichaProcCard(p,estado){
-  return `<div class="proc${p.naFila&&p.metaEstourada===true?' meta':''}">`
-    +`<div class="proc-h"><span class="proc-n">${escHtml(p.processo)}</span>`
-    +(estado?`<span class="proc-s">${escHtml(estado)}</span>`:'')+`</div>`
-    +(p.objeto&&p.objeto!=='—'?`<div class="proc-o">${escHtml(p.objeto)}</div>`:'')
-    +`<div class="proc-m"><span>${escHtml(p.contratada)}</span><span>${escHtml(p.contratante)}</span></div></div>`;
-}
-// Cartão da lista "Obras" (ladrilho Obras/Obras atendidas): `o` é um PROCESSO qualquer
-// daquela obra (o primeiro achado ao agrupar por codigo_obra em fichaFiscal/
-// abreModalDistrito) — não é o cartão de contrato completo (obraCard, linha 1601), que
-// pede o array CONTRATOS/OBRAS carregado à parte; aqui os campos já vêm de
-// vw_painel_desempenho_fiscais (mapProcesso), então reaproveita-se o próprio processo.
-// Reusa a classe .proc (mesmo visual de fichaProcCard/procCard) para não abrir uma
-// terceira variante de cartão só para isto.
-function obraResumoCard(o){
-  return `<div class="proc">`
-    +`<div class="proc-h"><span class="proc-n">${escHtml(o.codigo_obra||'—')}</span>`
-    +(o.municipioTxt?`<span class="proc-s">${escHtml(o.municipioTxt)}</span>`:'')+`</div>`
-    +(o.objeto&&o.objeto!=='—'?`<div class="proc-o">${escHtml(o.objeto)}</div>`:'')
-    +`<div class="proc-m"><span>${escHtml(o.contratada)}</span>`
-    +`<span>${o.valorObra!=null?BRL.format(o.valorObra):'valor não informado'}</span></div></div>`;
-}
 // Rótulo de prazo de um processo que está com o fiscal agora. Tri-estado preservado: sem
 // data de compromisso não é "no prazo", é "sem prazo" (mesma regra do donut e da barra).
 function rotuloPrazo(p){
@@ -4947,32 +4937,6 @@ function rotuloPrazo(p){
 // atrasado primeiro, sem prazo por último; dentro de cada grupo, quem espera há mais
 // tempo primeiro (ver o .sort que usa isto).
 function ordemMeta(p){ return p.metaEstourada===true?0:p.metaEstourada===false?1:2; }
-/* Um grupo da lista de processos da janela do fiscal: cabeçalho com a contagem, e os
-   cartões atrás de um toggle — os dados macro primeiro, a lista no clique (pedido do
-   usuário, 2026-09-17). A janela mostrava os processos todos numa lista só, misturando
-   quem está com o fiscal agora e quem ele despachou há dois anos.
-   `extra` é HTML já pronto (não escapado aqui — quem chama monta com escHtml/helpers
-   próprios) injetado entre o cabeçalho e o toggle: o grupo Análise Fiscal usa para a
-   barra de atraso, que os outros dois grupos não têm.
-   `cardFn`, se vier, substitui o cartão padrão (fichaProcCard+rotulo): a janela do
-   fiscal omite o nome dele nos cartões (é sempre o mesmo); a janela do distrito cobre
-   VÁRIOS fiscais e precisa do procCard() que já imprime o nome de cada um. */
-// `nome`, se vier, é [singular,plural] do item da lista para o texto do toggle — só a
-// janela de Obras usa (não são "processos" ali, mesmo vindo do mesmo cartão/lista).
-function grupoProcs(id,titulo,sub,procs,rotulo,extra,cardFn,nome){
-  if(!procs.length) return '';
-  const mostra=procs.slice(0,PROC_LISTA_MAX);
-  const sing=nome?nome[0]:'processo', plur=nome?nome[1]:'processos';
-  return `<div class="gproc">`
-    +`<div class="gproc-h"><span>${escHtml(titulo)}</span><b>${NUM.format(procs.length)}</b></div>`
-    +(sub?`<div class="gproc-s">${escHtml(sub)}</div>`:'')
-    +(extra||'')
-    +verToggle(id,`Ver ${NUM.format(procs.length)} ${procs.length===1?sing:plur}`)
-    +`<div id="${id}" hidden>`
-    +mostra.map(p=>cardFn?cardFn(p):fichaProcCard(p,rotulo?rotulo(p):'')).join('')
-    +(procs.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(procs.length)}.</div>`:'')
-    +`</div></div>`;
-}
 // `voltarGid` (gid do distrito) só vem preenchido quando a janela abriu por cima de um
 // distrito (clique num .fcard) — nesse caso o cabeçalho troca o ✕ por "← Voltar", que
 // reabre aquela janela em vez de fechar tudo. Direto do ranking lateral, voltarGid é
@@ -4992,7 +4956,9 @@ function abreModalFiscal(mat,voltarGid){
   // O subtítulo declara o recorte da janela inteira: era "Carga completa", e passou a ser
   // o período ativo quando todos os números da tela passaram a segui-lo.
   const sub=`<div class="dsh-context">${RS_ICO.pessoa}<span>${ref.fiscalMat?`mat. ${escHtml(ref.fiscalMat)}`:'Fiscal'}${escHtml(lot)}</span></div>`
-    +(gDist?`<div class="dsh-escopo">${RS_ICO.dist}<span>Só processos de obras do distrito ${escHtml(nomeDist)}</span></div>`:'');
+    +(gDist?`<div class="dsh-escopo">${RS_ICO.dist}<span>Só processos de obras do distrito ${escHtml(nomeDist)}</span></div>`
+      // aberta do ranking com distritos selecionados: a janela mostra a carga do estado inteiro
+      :(st.sel&&st.sel.ids.size?`<div class="dsh-escopo">${RS_ICO.dist}<span>Carga em todo o estado, não só nos distritos selecionados no painel</span></div>`:''));
   const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,geral.media,gDist?'da média do distrito':'da média geral')}`
     +(gDist
       ? posicaoHtml(`Posição entre os fiscais de ${nomeDist}`,coorteFiscaisDistrito(gid),'mat',mat,geral.media,rotRef,'fiscais do distrito')
@@ -5006,7 +4972,7 @@ function abreModalFiscal(mat,voltarGid){
   // Só os despachos DO PERÍODO, como todo o resto da janela: a tira existe para explicar
   // o número grande logo acima, e pontos fora do recorte dele explicariam outra coisa.
   const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
-  const noPeriodo=p=>p.despachado && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte));
+  const noPeriodo=p=>p.despachado && !p.naFila && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte));
   const desps=f.todos.filter(p=>noPeriodo(p)&&p.tempoFiscal!=null)
                      .sort((x,y)=>x.tempoFiscal-y.tempoFiscal);
   const marcas=[];
@@ -5026,7 +4992,6 @@ function abreModalFiscal(mat,voltarGid){
   const atras=fila.filter(p=>p.metaEstourada===true).length;
   const noPrazo=fila.filter(p=>p.metaEstourada===false).length;
   const semPrazo=fila.filter(p=>p.metaEstourada==null).length;
-  const espera=fila.reduce((mx,p)=>p.diasNaUnidade!=null&&p.diasNaUnidade>mx?p.diasNaUnidade:mx,-1);
   // PROCESSOS usa a mesma definição do card homônimo do painel lateral (aggProc.procs):
   // sempre a posição de hoje (fila), qualquer que seja o período — por isso não tem mais
   // ladrilho "Em tramitação" ao lado: seria sempre o mesmo número (2026-09-21). Despachos
@@ -5076,8 +5041,7 @@ function abreModalFiscal(mat,voltarGid){
     return '<div class="pp-row'+(p.naFila&&p.metaEstourada===true?' atraso':'')+'"><div class="pp-main"><div class="pp-n">'+escHtml(p.processo)+'</div>'+objeto+'</div>'
       +'<div class="pp-side">'+badge+'<span class="pp-info">'+escHtml(info)+'</span></div></div>';
   };
-  const corpoGrupo=ps=>ps.slice(0,PROC_LISTA_MAX).map(linhaProc).join('')
-    +(ps.length>PROC_LISTA_MAX?'<div class="foot-note">Mostrando '+NUM.format(PROC_LISTA_MAX)+' de '+NUM.format(ps.length)+'.</div>':'');
+  const corpoGrupo=ps=>ps.slice(0,PROC_LISTA_MAX).map(linhaProc).join('')+restoProcsHtml(ps.slice(PROC_LISTA_MAX),linhaProc);
   const grupoSt=(titulo,ps)=>ps.length
     ? '<div class="pp-grupo"><div class="pp-gh"><span>'+escHtml(titulo)+'</span><b>'+NUM.format(ps.length)+'</b></div>'+corpoGrupo(ps)+'</div>':'';
   const grupoDesp=despOrd.length
@@ -5174,7 +5138,7 @@ function renderPanelReplan(scope,body){
     : 'Distritos contados pelo local da obra; os fiscais são os que atuaram nesses processos, não a equipe lotada no distrito.';
   // PROCESSOS é sempre a posição de HOJE, nunca o período de Controles (usuário,
   // 2026-09-21 — ver aggProc()). TEMPO MÉDIO, DESPACHOS e FISCAIS sempre seguem o
-  // período (em "Hoje" o corte é nulo = todo o histórico). O resto é contexto e vem
+  // período. O resto é contexto e vem
   // abaixo, em corpo menor.
   const fmtN=(n,s,p)=>`${NUM.format(n)} ${n===1?s:p}`;
   // Atrasado = passou da data de compromisso do fiscal. Processo SEM essa data não é "no
@@ -5289,9 +5253,9 @@ function renderPanelReplan(scope,body){
     const ordenados=[...procs].sort(rpOrdemProc), mostra=ordenados.slice(0,PROC_LISTA_MAX);
     lista=`<div class="statwrap">
       <div class="sec-h"><span>Processos</span><span>${NUM.format(procs.length)}</span></div>`
-      +`<div class="sec-sub">Primeiro os que estão há mais tempo com o fiscal; depois os que estão na GECOPE, os já despachados e os arquivados no trâmite.</div>`
+      +`<div class="sec-sub">Todos os processos da cidade, de qualquer período (os números acima seguem o período escolhido). Primeiro os que estão há mais tempo com o fiscal; depois os que estão na GECOPE, os já despachados e os arquivados no trâmite.</div>`
       +mostra.map(procCard).join('')
-      +(procs.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(procs.length)}, nesta ordem.</div>`:'')
+      +restoProcsHtml(ordenados.slice(PROC_LISTA_MAX),procCard)
       +`</div>`;
   }
   // Ordem de leitura: os quatro números do recorte, o contexto deles, as pessoas (E4), as
@@ -5594,7 +5558,7 @@ let _fSearchTimer=null;
 document.getElementById('fSearch').addEventListener('input',e=>{
   // PERFORMANCE: render() reestiliza toda a camada GeoJSON + roda o algoritmo de
   // declutter de rótulos a cada chamada — sem debounce isso rodava a cada tecla digitada.
-  st.f.q=e.target.value.trim(); // mantém o caso digitado (o chip mostra); passF() minúsculo no compare
+  st.f.q=e.target.value.trim(); // mantém o caso digitado (o chip mostra); passF() normaliza no compare
   clearTimeout(_fSearchTimer);
   _fSearchTimer=setTimeout(()=>{ invalidateAggCache(); render(); autoLocateSearch(); },150);
 });
@@ -5672,7 +5636,10 @@ const _ctrl=document.getElementById('ctrl'), _ctrlT=document.getElementById('ctr
 function fitCtrlHeight(){
   if(!_ctrl.classList.contains('show')) return;
   const top=_ctrl.getBoundingClientRect().top;
-  _ctrl.style.maxHeight=Math.max(160,window.innerHeight-top-14)+'px';
+  // limite = o que couber na tela E dentro do #mapWrap (no layout empilhado, ≤860px, o mapa tem 56vh e o
+  // painel passaria da borda dele; o CSS já previa isso com calc(100% - 28px))
+  const pai=_ctrl.offsetParent, fundo=pai?Math.min(window.innerHeight,pai.getBoundingClientRect().bottom):window.innerHeight;
+  _ctrl.style.maxHeight=Math.max(160,fundo-top-14)+'px';
 }
 // abrir/fechar Controles muda a largura que fitPad() precisa compensar à esquerda
 // (ver fitFull/fitGroup/fitCity) — sem o refit() aqui, o mapa só recentraria no
@@ -5821,12 +5788,6 @@ if(window.matchMedia){
 // O gatilho automático no 1º clique/tecla em qualquer lugar da página foi removido
 // a pedido — clicar fora do mapa não entra mais em tela cheia.
 
-// prefetch leve da página de destino ao passar o mouse no botão "Voltar"
-function prefetchPagina(url){
-  if(document.querySelector(`link[rel="prefetch"][href="${url}"]`)) return;
-  const link=document.createElement('link'); link.rel='prefetch'; link.href=url; document.head.appendChild(link);
-}
-window.prefetchPagina=prefetchPagina;
 
 // alterna entre a carteira ativa (padrão — obras que ainda podem ser geridas) e o
 // histórico completo (todas, incluindo as ~90% já concluídas/encerradas)
@@ -6478,7 +6439,11 @@ document.getElementById('body').addEventListener('keydown',e=>{
 // contadores e roda o declutter (layout forçado). Coalescer no quadro faz 1 passada em vez de 2.
 let _lblRaf=0;
 function updateLabelsSoon(){ if(_lblRaf) return; _lblRaf=requestAnimationFrame(()=>{ _lblRaf=0; updateLabels(); }); }
-map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabelsSoon(); });
+map.on('zoomend',()=>{ layer.setStyle(styleFeature);
+  if(groupLayer&&map.hasLayer(groupLayer)){ groupLayer.setStyle(groupStyle);
+    // setStyle em tudo apagava o destaque do distrito sob o mouse enquanto o painel seguia nele (st.hoverGroup)
+    if(_hoverGroupLayer && st.hoverGroup!=null) _hoverGroupLayer.setStyle(groupHover()); }
+  updateLabelsSoon(); });
 map.on('moveend',updateLabelsSoon);
 // clicar em espaço vazio do mapa (fora de qualquer distrito/região/município)
 // limpa a seleção combinada — caminho alternativo ao Esc que funciona igual
@@ -6562,7 +6527,19 @@ function ensureSize(){
 requestAnimationFrame(ensureSize);
 [200,900].forEach(t=>setTimeout(ensureSize,t)); // rede de segurança p/ layout tardio; o ResizeObserver cobre o resto
 ['load','resize','pageshow','orientationchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(ensureSize,60)));
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden) ensureSize(); });
+// Aba aberta de um dia para o outro: prazos vencidos, meta_estourada, dias na unidade e a "data de hoje" da Elétrica
+// ficavam congelados no dia da carga. Ao voltar à aba em outro dia (Fortaleza), recarrega os dados.
+let _diaDaCarga=hojeISOLocal();
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) return;
+  ensureSize();
+  const hoje=hojeISOLocal(); if(hoje===_diaDaCarga) return;
+  _diaDaCarga=hoje;
+  invalidateSessionCache(); invalidateAggCache();
+  _procCarregado=false; // Replanilhamentos relê a view (agora, se já estiver no modo; senão, na próxima entrada)
+  if(modoReplan()) loadProcessos().then(r=>{ if(r.ok && modoReplan()){ render(); atualizarStatusModo(); } }).catch(e=>console.error(e));
+  else loadData().catch(e=>console.error(e));
+});
 // fonte web muda a largura dos rótulos (não o tamanho do mapa): re-decide as colisões, sem reenquadrar
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>{ ensureSize(); updateLabels(); });
 if(window.ResizeObserver){ let t; new ResizeObserver(()=>{ clearTimeout(t); t=setTimeout(ensureSize,50); }).observe(document.getElementById('map')); }

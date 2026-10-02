@@ -353,6 +353,12 @@
   /* nota metodológica de rodapé de bloco: contexto que precisa estar disponível, mas
      nunca competindo com os números acima. */
   .foot-note{margin-top:9px;font-size:10.5px;line-height:1.45;color:var(--text-dim);font-weight:600}
+  /* "Ver os outros N" das listas de processos cortadas em 15 (restoProcsHtml) */
+  .ver-resto>summary{margin-top:9px;cursor:pointer;font-size:11px;font-weight:700;color:var(--badge-text);list-style:none}
+  .ver-resto>summary::-webkit-details-marker{display:none}
+  .ver-resto>summary::before{content:'▸ '}
+  .ver-resto[open]>summary::before{content:'▾ '}
+  .ver-resto>summary:focus-visible{outline:2px solid var(--badge-text);outline-offset:2px;border-radius:4px}
   /* Modo Replanilhamentos: os KPIs e os 3 gráficos de OBRAS saem da tela. Eles são
      markup estático, filhos diretos do aside, e sem isto o painel do modo novo começa
      a ~1.350px do topo de uma coluna de ~890px — o gestor troca de conjunto e continua
@@ -882,9 +888,6 @@
   .qdf:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
   .qdf-n{display:flex;flex-direction:column;gap:2px;min-width:0}
   .qdf-nome{font-size:11.5px;font-weight:600;color:var(--text-bright);min-width:0}
-  /* Contador de despachos: volta SÓ na linha de amostra fina — é a informação que muda a
-     leitura daquele número, e em nenhuma outra linha ela faria falta. */
-  .qdf-fina{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:500;color:var(--text-dim)}
   .qdf-v{flex:none;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
         color:var(--text-brightest);white-space:nowrap}
   .qdf .rbar{margin-top:0}
@@ -1077,15 +1080,6 @@
   .eng-stat-danger b{color:var(--danger-text)}
   @media (max-width:420px){ .eng-stats{flex-direction:column;gap:2px;align-items:flex-end} }
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
-  /* Barra VAZADA = média sobre menos de AMOSTRA_SOLIDA despachos (ver amostraFina no JS).
-     Hachura no lugar do preenchimento sólido: mantém a cor (que continua significando
-     "acima/abaixo da média") e o comprimento (que continua sendo o valor), e tira só a
-     solidez — que é exatamente o que falta ao número. A hachura é legível de longe numa
-     projeção, ao contrário de uma diferença de opacidade. */
-  .rbar.fina>i{background:repeating-linear-gradient(115deg,
-        rgba(var(--ng-rgb),.75) 0 4px, rgba(var(--ng-rgb),.18) 4px 9px)}
-  .rbar.amber.fina>i{background:repeating-linear-gradient(115deg,
-        rgba(var(--amber-rgb),.8) 0 4px, rgba(var(--amber-rgb),.20) 4px 9px)}
   /* Traço de referência (E4 — média do recorte) dentro da própria trilha da barra: mesma
      posição em todas as linhas, eixo comum sem precisar desenhar um eixo separado.
      Recessivo (raise-rgb, a mesma tinta que .rbar já usa pro fundo, só mais opaca) — é
@@ -1962,24 +1956,6 @@
   .modal .dsh-hero-acima::before{background:linear-gradient(var(--amber),var(--amber-deep))}
   .modal .fcard-fina{font-family:Montserrat,sans-serif;font-size:10px;font-weight:500;color:var(--text-dim)}
 
-  /* ---- grupos da lista de processos (janela do fiscal) ----
-     Cada grupo é uma faixa, não um cartão: os cartões já são os processos lá dentro, e
-     aninhar cartão em cartão apagaria a hierarquia. A faixa só delimita e conta. */
-  .modal .gproc{border-top:1px dashed var(--card-border);padding-top:12px;margin-top:12px}
-  .modal .gproc:first-of-type{border-top:0;padding-top:0;margin-top:0}
-  .modal .gproc-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
-        font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;
-        text-transform:uppercase;color:var(--text-label)}
-  .modal .gproc-h b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
-        color:var(--text-brightest);letter-spacing:0}
-  .modal .gproc-s{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;
-        color:var(--text-dim);margin-top:3px}
-  /* Análise Fiscal injeta a barra de atraso (e a nota do mais antigo) entre o cabeçalho
-     do grupo e o toggle — mesma folga que .adToggle já usa abaixo. */
-  .modal .gproc-h+.sbar,.modal .gproc-s+.sbar{margin-top:9px}
-  .modal .gproc .dsh-nota{margin-top:7px}
-  .modal .gproc .adToggle{margin-top:9px}
-  .modal .gproc .proc{margin-top:10px}
   /* O único tipo grande dos dois painéis: é o que se lê do fundo de uma sala de reunião. */
   .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:48px;font-weight:600;line-height:1;
         color:var(--text-brightest);display:flex;align-items:baseline;gap:8px;margin-top:2px}
@@ -2031,7 +2007,6 @@
         color:var(--text-bright)}
   /* títulos de seção das duas janelas: frase normal, e não caixa-alta espaçada */
   .modal .mbody.dsh .sec-h{font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--text-brightest);margin:10px 0 8px}
-  .modal .mbody.dsh .gproc-h{font-size:13px;letter-spacing:0;text-transform:none;color:var(--text-bright)}
   .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
 
   /* ---- eixo de dias: a régua compartilhada ---- */
@@ -2067,20 +2042,6 @@
   .modal .ed-key{width:12px;height:0;border-top:2px solid var(--ng);flex:none}
   .modal .ed-key.ref{border-top-style:dashed;border-top-width:2.5px;border-top-color:var(--text-brightest)}
 
-  /* ---- barra empilhada da fila de hoje ---- */
-  .modal .sbar{display:flex;flex-direction:column;gap:9px}
-  .modal .sbar-track{display:flex;height:12px;border-radius:6px;overflow:hidden;background:rgba(var(--raise-rgb),.10)}
-  .modal .sbar-track>i{display:block;height:100%}
-  .modal .sbar-track>i.atraso{background:var(--amber)}
-  .modal .sbar-track>i.noprazo{background:var(--ng)}
-  .modal .sbar-track>i.semprazo{background:rgba(var(--raise-rgb),.32)}
-  .modal .sbar-leg{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:Montserrat,sans-serif;
-        font-size:11.5px;font-weight:600;color:var(--text-data)}
-  .modal .sbar-i{display:inline-flex;align-items:center;gap:7px}
-  .modal .sbar-dot{width:9px;height:9px;border-radius:50%;flex:none}
-  .modal .sbar-dot.atraso{background:var(--amber)}
-  .modal .sbar-dot.noprazo{background:var(--ng)}
-  .modal .sbar-dot.semprazo{background:rgba(var(--raise-rgb),.32)}
 
   /* ---- fila de hoje (janela de distrito) ----
      Um cartão, três leituras: total (grande, à direita), proporção (barra) e contagem

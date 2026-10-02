@@ -308,7 +308,8 @@
             ]
         },
         docx: { global: 'docx', urls: ['https://unpkg.com/docx@7.1.0/build/index.js'] },
-        xlsx: { global: 'XLSX', urls: ['https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'] },
+        // versão fixa (era xlsx-latest, que muda sozinha e podia quebrar a leitura/exportação sem deploy)
+        xlsx: { global: 'XLSX', urls: ['https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'] },
         exceljs: { global: 'ExcelJS', urls: ['https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'] }
     };
     var _bibliotecasEmVoo = {};

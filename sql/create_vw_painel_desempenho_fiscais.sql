@@ -180,6 +180,9 @@ select
   coalesce(nullif(trim(u.full_name), ''),
            case when b.t_resp_matricula is not distinct from b.fiscal_matricula
                 then nullif(trim(b.fiscal), '') end,
+           -- quem despachou e saiu de app_users: a matrícula distingue duas pessoas que, sem
+           -- ela, virariam duas linhas "(sem fiscal)" idênticas
+           case when b.t_resp_matricula is not null then 'Matrícula ' || b.t_resp_matricula end,
            '(sem fiscal)')                                   as fiscal_nome,
   u.gedop                                                    as fiscal_gedop,
   u.gerencia                                                 as fiscal_gerencia,
