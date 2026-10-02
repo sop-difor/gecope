@@ -298,6 +298,9 @@
     var BIBLIOTECAS = {
         jspdf: {
             global: 'jspdf',
+            // "pronta" = jsPDF E o plugin autotable: se o 2º script falhar, window.jspdf já existe e a
+            // tentativa seguinte devolvia a lib sem o plugin (doc.autoTable is not a function) até recarregar a página
+            pronta: function () { return !!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && typeof window.jspdf.jsPDF.API.autoTable === 'function'); },
             urls: [
                 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
                 // o autotable se registra no jsPDF: precisa vir DEPOIS
@@ -314,8 +317,10 @@
         return new Promise(function (resolve, reject) {
             var s = document.createElement('script');
             s.src = url;
-            s.onload = function () { resolve(); };
-            s.onerror = function () { s.remove(); reject(new Error('Falha ao baixar ' + url)); };
+            // sem timeout, um CDN que pendura (sem onload nem onerror) deixava "Gerando…" para sempre
+            var t = setTimeout(function () { s.remove(); reject(new Error('Tempo esgotado ao baixar ' + url)); }, 30000);
+            s.onload = function () { clearTimeout(t); resolve(); };
+            s.onerror = function () { clearTimeout(t); s.remove(); reject(new Error('Falha ao baixar ' + url)); };
             document.head.appendChild(s);
         });
     }
@@ -323,12 +328,13 @@
     function carregarBiblioteca(nome) {
         var def = BIBLIOTECAS[nome];
         if (!def) return Promise.reject(new Error('Biblioteca desconhecida: ' + nome));
-        if (window[def.global]) return Promise.resolve(window[def.global]);
+        var pronta = function () { return def.pronta ? def.pronta() : !!window[def.global]; };
+        if (pronta()) return Promise.resolve(window[def.global]);
         if (_bibliotecasEmVoo[nome]) return _bibliotecasEmVoo[nome];
         var p = def.urls.reduce(function (cadeia, url) {
             return cadeia.then(function () { return carregarScriptExterno(url); });
         }, Promise.resolve()).then(function () {
-            if (!window[def.global]) throw new Error('Biblioteca ' + nome + ' não inicializou.');
+            if (!pronta()) throw new Error('Biblioteca ' + nome + ' não inicializou.');
             return window[def.global];
         });
         _bibliotecasEmVoo[nome] = p;

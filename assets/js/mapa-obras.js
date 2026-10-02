@@ -251,6 +251,10 @@ let _edTip=null, _edTipAlvo=null;
 // Timeout por requisição: sem ele, um fetch pendurado (rede móvel, gateway) deixava o painel
 // em "Carregando…" para sempre — nem o erro nem o "Tentar novamente" apareciam.
 const FETCH_TIMEOUT_MS=25000;
+// fila de requisições (ver fetchComTimeout): declarada aqui porque o prefetch do arranque já a usa, antes do await do GeoJSON
+const MAX_FETCH_SIMULTANEOS=6; let _fetchEmVoo=0; const _fetchFila=[];
+function _adquirirFetch(){ return new Promise(res=>{ if(_fetchEmVoo<MAX_FETCH_SIMULTANEOS){ _fetchEmVoo++; res(); } else _fetchFila.push(res); }); }
+function _liberarFetch(){ const prox=_fetchFila.shift(); if(prox) prox(); else _fetchEmVoo--; }
 // cache (sessionStorage) para não refazer o fetch inteiro a cada F5. As bases de origem
 // mudam no máximo 1x por dia (carga manual/mensal — ver docs/auditoria-egress-2026-09.md,
 // item 9), então 5min era bem mais curto do que precisava. 1h ainda mostra "Base atualizada
@@ -383,11 +387,20 @@ function mapRow(r){
 // Timeout por requisição: sem ele, um fetch pendurado (rede móvel, gateway) deixava o painel
 // em "Carregando…" para sempre — nem o erro nem o "Tentar novamente" apareciam.
 // (FETCH_TIMEOUT_MS é declarada junto do prefetch, antes do await do GeoJSON)
-function fetchComTimeout(url,opts,rotulo){
+// O relógio só começa quando a requisição ENTRA em execução (fila de MAX_FETCH_SIMULTANEOS) e só
+// para depois de o corpo ser lido: antes, com o histórico completo (dezenas de páginas disparadas
+// juntas) as últimas estouravam os 25s ainda na fila, e um corpo que travava no meio pendurava
+// o painel em "Carregando…" para sempre (o timer morria assim que os headers chegavam).
+// Devolve {resp,data}; `data` é o JSON já lido (null se !resp.ok).
+async function fetchComTimeout(url,opts,rotulo){
+  await _adquirirFetch();
   const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),FETCH_TIMEOUT_MS);
-  return fetch(url,{...opts,signal:ctl.signal})
-    .catch(e=>{ throw e&&e.name==='AbortError' ? new Error('tempo esgotado ao consultar '+rotulo) : e; })
-    .finally(()=>clearTimeout(t));
+  try{
+    const resp=await fetch(url,{...opts,signal:ctl.signal});
+    const data=resp.ok ? await resp.json() : null;
+    return {resp,data};
+  }catch(e){ throw e&&e.name==='AbortError' ? new Error('tempo esgotado ao consultar '+rotulo) : e; }
+  finally{ clearTimeout(t); _liberarFetch(); }
 }
 // `order`: PAGINAÇÃO SEM ORDER BY não é estável — o Postgres pode devolver as linhas em ordens
 // diferentes entre as páginas (mais ainda com páginas em paralelo e uma carga do SIGSOP
@@ -395,7 +408,7 @@ function fetchComTimeout(url,opts,rotulo){
 // informar `order` com a chave primária (índice, barato). O fallback de ordenar por TODAS as
 // colunas do select foi removido: obrigava o servidor a ordenar a tabela inteira em cada página
 // paralela e falhava em colunas `json`. — 01/10/2026
-async function fetchTable(tbl,{select='*',filter='',order=null}={}){
+async function fetchTable(tbl,{select='*',filter='',order=null}={},_tentativa=0){
   const ord=order || '';
   const qs=`select=${encodeURIComponent(select)}${filter?'&'+filter:''}${ord?'&order='+ord:''}`;
   // apikey continua sendo a chave anônima (exigida pelo PostgREST em toda chamada,
@@ -403,9 +416,8 @@ async function fetchTable(tbl,{select='*',filter='',order=null}={}){
   // que é o token VIGENTE da sessão logada (ver tokenVigente), não mais a chave anônima.
   const headers={apikey:SB_KEY, Authorization:'Bearer '+((await tokenVigente())||SB_KEY)};
   const PAGE=1000;
-  const first=await fetchComTimeout(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`0-${PAGE-1}`, Prefer:'count=exact'}},tbl);
+  const {resp:first,data:firstChunk}=await fetchComTimeout(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`0-${PAGE-1}`, Prefer:'count=exact'}},tbl);
   if(!first.ok) throw new Error('HTTP '+first.status+' em '+tbl+' — verifique URL/chave/RLS');
-  const firstChunk=await first.json();
   const range=first.headers.get('content-range'); // "0-999/3577"
   const total=range && range.includes('/') ? parseInt(range.split('/')[1],10) : NaN;
   if(!isFinite(total)){ console.warn('Content-Range ausente/inválido em '+tbl+' — assumindo que a 1ª página já é a tabela inteira ('+firstChunk.length+' linhas). Se a tabela tiver mais que isso, os dados vêm truncados.'); return firstChunk; }
@@ -418,10 +430,17 @@ async function fetchTable(tbl,{select='*',filter='',order=null}={}){
   for(let from=step; from<total; from+=step){
     const to=Math.min(from+step-1,total-1);
     pageReqs.push(fetchComTimeout(`${SB_URL}/rest/v1/${tbl}?${qs}`,{headers:{...headers, Range:`${from}-${to}`}},tbl)
-      .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status+' em '+tbl); return r.json(); }));
+      .then(({resp,data})=>{ if(!resp.ok) throw new Error('HTTP '+resp.status+' em '+tbl); return data; }));
   }
   const rest=await Promise.all(pageReqs);
-  return firstChunk.concat(...rest);
+  const out=firstChunk.concat(...rest);
+  // A tabela pode mudar entre as páginas (carga do SIGSOP gravando no meio): com offset, isso
+  // duplica uma linha e perde outra sem erro. O total da 1ª página denuncia — refaz 1 vez.
+  if(out.length!==total && _tentativa<1){
+    console.warn(`${tbl}: ${out.length} linhas lidas de ${total} esperadas — refazendo a consulta.`);
+    return fetchTable(tbl,{select,filter,order},_tentativa+1);
+  }
+  return out;
 }
 // monta o filtro `col=in.(...)` de uma query PostgREST. Valores de coluna texto
 // (quote=true) vão entre aspas duplas, com qualquer aspa embutida escapada — sem
@@ -431,7 +450,9 @@ async function fetchTable(tbl,{select='*',filter='',order=null}={}){
 // usado no filtro de status_obra em loadData().
 function inListFilter(col,values,quote){
   if(!values||!values.length) return '';
-  const list=quote ? values.map(v=>`"${String(v).replace(/"/g,'\\"')}"`).join(',') : values.join(',');
+  // cada item é codificado (&, #, +, % num nr_contrato_sop quebravam a query inteira) e a barra
+  // invertida também é escapada, além da aspa.
+  const list=(quote ? values.map(v=>`"${String(v).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`) : values.map(String)).map(encodeURIComponent).join(',');
   return `${col}=in.(${list})`;
 }
 // fetchTable com escopo `col in (values)` FATIADO. O supabase/PostgREST manda o `in.(...)` na
@@ -501,6 +522,16 @@ async function fetchAditivos(nrFilter){
 async function fetchFichas(nrFilter){
   const rows=await fetchTableIn(SB_FICHA,{select:FICHA_COLS,order:'id_contrato.asc'},'nr_contrato_sop',nrFilter,true); const m={};
   for(const r of rows){ if(r.nr_contrato_sop) m[r.nr_contrato_sop]=r; }
+  return m;
+}
+// nr_contrato_sop -> nº de obras do contrato NA BASE INTEIRA (1 contrato : N obras, até 14).
+// Só na carteira ativa: lá `rows` traz apenas as obras ativas, e contar `rows` dava nObras=1
+// para a obra ativa de um contrato com outras encerradas — o que liga os fallbacks "obra única"
+// (ficha do contrato inteira como % da obra; Σ dos aditivos do contrato como aditivo da obra) e
+// apaga os avisos de escopo. No histórico, `rows` já é a base toda e a contagem local basta.
+async function fetchObrasPorContrato(nrFilter){
+  const rows=await fetchTableIn(SB_TABLE,{select:'id_obra,nr_contrato_sop',order:'id_obra.asc'},'nr_contrato_sop',nrFilter,true); const m={};
+  for(const r of rows){ const k=r.nr_contrato_sop; if(k) m[k]=(m[k]||0)+1; }
   return m;
 }
 // id_obra -> lista de medições (para a curva "Evolução da medição" do Resumo).
@@ -630,7 +661,8 @@ function showLoginRequired(msg){
 // v13: chave por USUÁRIO (antes era só por escopo: quem entrava com outra conta na mesma aba
 // reaproveitava, por até 1h, os dados da conta anterior) e o cache deixa de guardar respostas
 // parciais (ver fetchDadosBrutos).
-function cacheKey(scope){ return 'gecope_mapa_cache_v13_'+(SESSION_UID||'anon')+'_'+scope; }
+// v14: novo campo `nobras` (obras por contrato na base inteira, p/ a carteira ativa).
+function cacheKey(scope){ return 'gecope_mapa_cache_v14_'+(SESSION_UID||'anon')+'_'+scope; }
 function readCache(scope){
   try{
     const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
@@ -640,7 +672,7 @@ function readCache(scope){
   }catch{ return null; }
 }
 function writeCache(scope,d){
-  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows:d.rows,fisc:d.fisc,adit:d.adit,ficha:d.ficha,medic:d.medic,vist:d.vist,agend:d.agend})); }
+  try{ sessionStorage.setItem(cacheKey(scope), JSON.stringify({ts:Date.now(),rows:d.rows,fisc:d.fisc,adit:d.adit,ficha:d.ficha,medic:d.medic,vist:d.vist,agend:d.agend,nobras:d.nobras})); }
   catch(e){ /* quota/privacidade — cache é só um bônus de velocidade, ignora e segue sem ele */ }
 }
 
@@ -652,7 +684,7 @@ function writeCache(scope,d){
 // medição/fiscal/vistoria, sem erro visível.
 async function fetchDadosBrutos(scope){
   const cached=readCache(scope);
-  if(cached) return {rows:cached.rows, fisc:cached.fisc, adit:cached.adit||{}, ficha:cached.ficha||{}, medic:cached.medic||{}, vist:cached.vist||{}, agend:cached.agend||{}, parcial:false};
+  if(cached) return {rows:cached.rows, fisc:cached.fisc, adit:cached.adit||{}, ficha:cached.ficha||{}, medic:cached.medic||{}, vist:cached.vist||{}, agend:cached.agend||{}, nobras:cached.nobras||null, parcial:false};
   let parcial=false;
   const tol=(nome,p)=>p.catch(e=>{ parcial=true; console.warn(nome+' indisponível:',e.message); return {}; });
   let rows, ids, nrs; // ids/nrs undefined = sem escopo (histórico: tabelas inteiras)
@@ -671,20 +703,26 @@ async function fetchDadosBrutos(scope){
     rowsP=fetchTable(SB_TABLE,{select:CONTRATOS_COLS,order:'id_obra.asc'});
     rowsP.catch(()=>{}); // o erro é relançado no await abaixo; aqui só evita o aviso de rejeição não tratada
   }
-  const [fisc,adit,ficha,medic,vist,agend]=await Promise.all([
+  const [fisc,adit,ficha,medic,vist,agend,nobras]=await Promise.all([
     tol('comissao_fiscalizacao',fetchFiscais(ids)),
     tol('aditivos_contrato',fetchAditivos(nrs)),
     tol('ficha_contrato',fetchFichas(nrs)),
     tol('medicoes',fetchMedicoes(ids)),
     tol('eletrica_vistorias',fetchEletricaVistorias(ids)),
     tol('eletrica_vistorias_agendadas',fetchEletricaAgendamentos(ids)),
+    nrs ? tol('contratos_edificacao (obras por contrato)',fetchObrasPorContrato(nrs)) : Promise.resolve(null),
   ]);
   if(rowsP) rows=await rowsP;
-  const dados={rows,fisc,adit,ficha,medic,vist,agend,parcial};
+  const dados={rows,fisc,adit,ficha,medic,vist,agend,nobras,parcial};
   if(!parcial) writeCache(scope,dados);
   return dados;
 }
 
+// Sequência de cargas: só a ÚLTIMA loadData() iniciada pode preencher DB. Sem isto, uma carga lenta
+// (ex.: a inicial, ainda em andamento) e outra disparada logo depois (troca de escopo/recarga)
+// zeravam as obras no início e depois ambas faziam push → obras duplicadas, KPIs inflados, e a
+// resposta mais lenta ainda sobrescrevia o status/escopo exibidos.
+let _loadSeq=0;
 async function loadData(){
   // Achado do rev-seguranca (Fase 2): esta é a única checagem que vale — o gate no
   // fim do arquivo é só o caminho "normal" de entrada, mas #btnScope (Carteira
@@ -694,6 +732,7 @@ async function loadData(){
   // null, caindo no fallback da chave anônima em fetchTable() — reabrindo
   // exatamente o buraco que esta fase existe para fechar.
   if(!SESSION_TOKEN){ showLoginRequired('Faça login no GECOPE para consultar o módulo de Contratos.'); return; }
+  const seq=++_loadSeq;
   for(const c in DB.municipios) DB.municipios[c].obras=[];
   invalidateAggCache(); // sem isso, um hover no mapa durante o fetch devolveria contagens da era de filtro anterior
   try{
@@ -704,12 +743,18 @@ async function loadData(){
     if(_prefetchDados && _prefetchDados.scope===scope){ const p=_prefetchDados.promise; _prefetchDados=null; dados=await p; }
     _prefetchDados=null;
     if(!dados) dados=await fetchDadosBrutos(scope);
-    const {rows,fisc,adit,ficha,medic,vist,agend,parcial}=dados;
-    // 1 contrato : N obras — conta quantas obras de cada contrato estão CARREGADAS
-    // (na carteira ativa é só as ativas; no histórico completo é todas). Só usado como
-    // sinal "tem mais de uma obra" (multiObra), não como número exibido ao usuário.
-    const obraCountBySop={};
-    for(const r of rows){ const k=r.nr_contrato_sop; if(k) obraCountBySop[k]=(obraCountBySop[k]||0)+1; }
+    if(seq!==_loadSeq) return; // outra carga começou depois desta — ela é quem preenche DB
+    const {fisc,adit,ficha,medic,vist,agend,parcial}=dados;
+    // a paginação por offset pode, numa gravação do SIGSOP no meio da carga, trazer a mesma obra
+    // duas vezes — sem isto ela entraria duplicada em DB.municipios[].obras (valor e contagem em dobro)
+    const _vistas=new Set();
+    const rows=dados.rows.filter(r=>r.id_obra==null || (!_vistas.has(r.id_obra) && _vistas.add(r.id_obra)));
+    // 1 contrato : N obras — nº de obras de cada contrato NA BASE (`dados.nobras`, só vem na
+    // carteira ativa, onde `rows` é um recorte). No histórico `rows` já é a base inteira. Só usado
+    // como sinal "tem mais de uma obra" (multiObra), não como número exibido ao usuário; se a
+    // consulta auxiliar falhou, cai na contagem das obras carregadas (comportamento antigo).
+    const obraCountBySop={...(dados.nobras||{})};
+    if(!dados.nobras) for(const r of rows){ const k=r.nr_contrato_sop; if(k) obraCountBySop[k]=(obraCountBySop[k]||0)+1; }
     let sem=0;
     for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); const com=fisc[o.id_obra]||[]; o.comissao=com; const _fi=pickFiscal(com); o.fiscal=_fi?_fi.nome:'—'; o.fiscalTipo=_fi?_fi.tipo:'FISCAL';
       const nrKey=r.nr_contrato_sop; o.aditivos=(nrKey&&adit[nrKey])||[]; o.ficha=(nrKey&&ficha[nrKey])||null;
@@ -732,7 +777,8 @@ async function loadData(){
       const _g=grpById(gidOf(cod)); o.distrito=_g?_g.nome:null;
       // filtro "Medição (% executado)" — NÍVEL OBRA (Σ das medições da obra ÷ valor da
       // obra), como o resto do modal; fallback na ficha só em contrato de obra única.
-      o.medicaoBucket=medicaoBucket(medObraStats(o).pct);
+      o.medStats=medObraStats(o); // os dados da obra não mudam depois daqui: cache p/ os caminhos quentes
+      o.medicaoBucket=medicaoBucket(o.medStats.pct);
       DB.municipios[cod].obras.push(o); }
     invalidateAggCache();
     const scopeTxt=scope==='ativa'?'carteira ativa':'histórico completo';
@@ -748,6 +794,7 @@ async function loadData(){
     if(modoReplan()) atualizarStatusModo();
   }catch(e){
     console.error(e);
+    if(seq!==_loadSeq) return; // erro de uma carga já superada — a vigente decide o que mostrar
     showDataError('Não foi possível carregar os contratos: '+e.message);
     return;
   }
@@ -1020,7 +1067,9 @@ function invalidateAggCache(){ _obrasOfCache=new Map(); _atencaoEletricaDirty=tr
 // UI deveria evitar.
 function invalidateSessionCache(){
   invalidateAggCache();
-  try{ sessionStorage.removeItem(cacheKey(st.dataScope)); }catch(e){ /* privacidade/quota — segue sem cache mesmo */ }
+  // as DUAS chaves: a mutação vale para os dois escopos, e deixar a do outro viva reidratava
+  // (por até 1h) o agendamento já cancelado ao alternar entre carteira ativa e histórico.
+  try{ ['ativa','historico'].forEach(sc=>sessionStorage.removeItem(cacheKey(sc))); }catch(e){ /* privacidade/quota — segue sem cache mesmo */ }
 }
 function obrasOf(id){
   let hit=_obrasOfCache.get(id);
@@ -1323,7 +1372,7 @@ function onEach(f,l){
     _hoverCityLayer=l;
     l.setStyle({weight:1.8,color:TOKENS.mapLine}); l.bringToFront();
     tip.setLatLng(l.getBounds().getCenter()).setContent(tipHtml(id)).addTo(map); });
-  l.on('mouseout',()=>{ if(_hoverCityLayer===l) _hoverCityLayer=null; layer.resetStyle(l); tip.remove(); });
+  l.on('mouseout',()=>{ layer.resetStyle(l); if(_hoverCityLayer!==l) return; _hoverCityLayer=null; tip.remove(); });
   l.on('click',e=>onClick(f.properties.id,e));
 }
 function onClick(id,e){
@@ -1379,6 +1428,14 @@ function groupStyle(f){
   return {fillColor:BASE,color:TOKENS.mapGroupBorder,weight:gw(),fillOpacity,opacity:.9};
 }
 function groupHover(){return {fillColor:TOKENS.mapOpenFill,color:TOKENS.mapLine,weight:gw()+0.8,fillOpacity:.72};}
+// Hover de distrito refaz o painel inteiro (KPIs + lista/ranking, centenas de nós com filtro ativo,
+// aggProc/aggFiscais em Replanilhamentos). Passar de um distrito a outro dispara mouseout+mouseover
+// no mesmo quadro: coalescer num rAF faz 1 render com o estado final em vez de 2.
+let _hoverPanelRaf=0;
+function renderPanelHover(){
+  if(_hoverPanelRaf) return;
+  _hoverPanelRaf=requestAnimationFrame(()=>{ _hoverPanelRaf=0; if(panelVisible()) renderPanel(); });
+}
 function onGroup(f,l){
   const gid=f.properties.gid;
   // Etapa C: distrito "sem correspondência" (filtro ativo, 0 contratos) não reage.
@@ -1390,7 +1447,7 @@ function onGroup(f,l){
   l.on('mouseover',()=>{ if(inert()) return;
     if(_hoverGroupLayer && _hoverGroupLayer!==l) groupLayer.resetStyle(_hoverGroupLayer);
     _hoverGroupLayer=l;
-    l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; if(panelVisible()) renderPanel();
+    l.setStyle(groupHover()); l.bringToFront(); st.hoverGroup=gid; renderPanelHover();
     // com filtro ativo, _groupValByGid já tem esse valor (calculado em render() logo
     // antes do groupLayer.setStyle() que acabou de rodar) — não recalcula à toa aqui.
     if(modoReplan()){
@@ -1408,7 +1465,10 @@ function onGroup(f,l){
       return;
     }
     tip.setLatLng(l.getBounds().getCenter()).setContent(`<b>${f.properties.nome}</b><br>${METRIC[st.metric].label}: ${METRIC[st.metric].fmt(v)}`).addTo(map); });
-  l.on('mouseout',()=>{ if(_hoverGroupLayer===l) _hoverGroupLayer=null; groupLayer.resetStyle(l); st.hoverGroup=null; if(panelVisible()) renderPanel(); tip.remove(); });
+  // Se o mouseover do vizinho B chegou ANTES deste mouseout (ver comentário em _hoverGroupLayer),
+  // B é a camada vigente: só o estilo de A é desfeito — limpar hoverGroup/tooltip aqui apagaria os de B.
+  l.on('mouseout',()=>{ groupLayer.resetStyle(l); if(_hoverGroupLayer!==l) return;
+    _hoverGroupLayer=null; st.hoverGroup=null; renderPanelHover(); tip.remove(); });
   // Ctrl/Cmd+clique num distrito/região soma à seleção combinada em vez de entrar nele
   l.on('click',e=>{ if(inert()) return;
     if(e.originalEvent&&(e.originalEvent.ctrlKey||e.originalEvent.metaKey)){ toggleSelection('group',gid); return; }
@@ -2282,6 +2342,7 @@ function abreModalEngenheiroEletrica(chave){
   const mesesChart=`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.chart} Vistorias mês a mês</div><div id="engChartMes"></div></div>`;
   const anoChart=anos.length>=2?`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.chart} Vistorias ano a ano</div><div id="engChartAno"></div></div>`:'';
   const sub=e.email?`<div class="msub">${RS_ICO.pessoa}<span>${escHtml(e.email)}</span></div>`:'';
+  _lastModalObra=null; // outra janela no #modal: repaintTheme() não pode reabrir a obra antiga por cima
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(e.nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
@@ -2535,6 +2596,7 @@ function abreCronogramaEletrica(opts){
   }
   _cronoItens=[]; _cronoCarregado=false;
   const seta=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  _lastModalObra=null; // outra janela no #modal: repaintTheme() não pode reabrir a obra antiga por cima
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">Cronograma de Vistorias</div></div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
@@ -3094,28 +3156,36 @@ function buildAdPrazoPane(o,raw){
     const prorrog=lista.reduce((s,a)=>s+num(a[aditField]),0);
     const original=num(raw[origField]);
     const vigente=original+prorrog;                    // prazo contratual (não o span de datas)
-    const base=original>0?original:(vigente||1);       // evita ÷0 se a coluna vier zerada
+    // sem prazo original na base (coluna vazia) não há % a calcular: antes a base virava o vigente,
+    // o bloco saía em 100% e a tela afirmava que "as prorrogações dobraram o prazo" — falso.
+    const semOrig=!(original>0);
+    const base=semOrig?0:original;
     const pctBlock=base>0?prorrog/base*100:0;
     const cor=pctBlock>=100?TOKENS.statusStop:(pctBlock>=50?TOKENS.statusWait:TOKENS.ng);
-    let acc=original;
+    const sgn=d=>d<0?'−':'+';
+    // `lista` vem da publicação mais recente para a mais antiga; o acumulado só faz sentido somado
+    // em ordem CRONOLÓGICA (antes crescia do aditivo mais novo para o mais antigo e só a última linha batia com "Vigente").
+    const accPor=new Map(); { let acc=original; [...lista].reverse().forEach(a=>{ acc+=num(a[aditField]); accPor.set(a,acc); }); }
     const trows=lista.map((a,i)=>{
-      const d=num(a[aditField]); acc+=d;
+      const d=num(a[aditField]); const acc=accPor.get(a);
       return `<div class="adp-row${i%2?' odd':''}">
         <div class="adp-rmain">
           <div class="adp-num">${fmtVal(a.nr_aditivo)}</div>
           <div class="adp-nup"><span class="adp-nup-p">${fmtVal(a.nr_protocolo)}</span></div>
           <div class="adp-pub">${fmtDateBR(adPubDate(a))}</div>
-          <div class="adp-cell"><span class="adp-v">+${dd(d)}</span><span class="adp-pill">+${base>0?fmtPct1(d/base*100)+'%':'—'}</span></div>
+          <div class="adp-cell"><span class="adp-v">${sgn(d)}${dd(Math.abs(d))}</span><span class="adp-pill">${base>0?sgn(d)+fmtPct1(Math.abs(d)/base*100)+'%':'—'}</span></div>
           <div class="adp-acc">${dd(acc)}</div>
         </div>${adObsRow(a,'adp')}</div>`;
     }).join('');
     const tableInner=lista.length
       ? `<div class="adp-hrow"><div>Nº</div><div>NUP · nº do processo</div><div>Publicação</div><div class="r">Prorrogação</div><div class="r">Prazo acumulado</div></div>${trows}`
       : `<div class="empty" style="padding:14px 16px">${vazioLabel}</div>`;
-    const origW=100/(1+pctBlock/100);
-    const txt=pctBlock>=100
-      ? 'As prorrogações já dobraram o prazo originalmente contratado.'
-      : `Prorrogações somam ${fmtPct1(pctBlock)}% do prazo original.`;
+    const origW=Math.min(100,100/(1+Math.max(0,pctBlock)/100));
+    const txt=semOrig
+      ? 'Prazo original não informado na base.'
+      : pctBlock>=100
+        ? 'As prorrogações já dobraram o prazo originalmente contratado.'
+        : `Prorrogações somam ${fmtPct1(pctBlock)}% do prazo original.`;
     const minis=c?`<div class="adp-minis">
         <div class="adp-mini"><div class="rs-lbl">Data-limite</div><div class="adp-mv">${fmtDateBR(endStr)}</div></div>
         <div class="adp-mini"><div class="rs-lbl">Falta para encerrar</div><div class="adp-mv" style="color:${statusTextColor(c.color)}">${escHtml(c.daysTxt)}</div></div>
@@ -3128,7 +3198,7 @@ function buildAdPrazoPane(o,raw){
         <div><div class="adp-h">${titulo}</div><div class="adp-sub">${sub}</div></div>
         <div class="adp-trio">
           <div><div class="rs-lbl">Original</div><div class="adp-d">${dd(original)}</div></div>
-          <div><div class="rs-lbl">Prorrogado</div><div class="adp-d" style="color:${statusTextColor(cor)}">${prorrog?'+'+dd(prorrog):'—'}</div></div>
+          <div><div class="rs-lbl">Prorrogado</div><div class="adp-d" style="color:${statusTextColor(cor)}">${prorrog?sgn(prorrog)+dd(Math.abs(prorrog)):'—'}</div></div>
           <div><div class="rs-lbl">Vigente</div><div class="adp-d">${dd(vigente)}</div></div>
         </div>
       </div>
@@ -3143,7 +3213,9 @@ function buildAdPrazoPane(o,raw){
   };
   const cE=prazoCalc(raw.data_inicio_real,raw.data_fim_previsto);
   const cV=prazoCalc(raw.data_inicio_real,raw.data_fim_vigencia_contrato);
-  if(!prazoList.length && !cE && !cV)
+  // o prazo contratual original (prazo_execucao/prazo_vigencia_contrato) aparece mesmo sem aditivos
+  // nem datas (obra "Aguardando OS") — não esconder só porque não há o que listar.
+  if(!prazoList.length && !cE && !cV && !(num(raw.prazo_execucao)>0) && !(num(raw.prazo_vigencia_contrato)>0))
     return `<div class="msec">Aditivos de prazo</div><div class="empty">Nenhum aditivo de prazo registrado para este contrato.</div>`;
   // "Original" (prazo_execucao/prazo_vigencia_contrato) é por OBRA; as prorrogações
   // (aditivos_contrato) são do CONTRATO. Nos contratos multi-obra os dois níveis
@@ -3319,6 +3391,7 @@ function wireBaixarRelatorio(raiz){
 // usar o MESMO. Sem linhas de medição da obra: só cai na ficha (NÍVEL CONTRATO) quando é
 // contrato de obra única; multi-obra fica "—" (a ficha somaria todas as obras).
 function medObraStats(o){
+  if(o.medStats) return o.medStats; // preenchido 1x no loadData (obraEmAtencaoEletrica/passF/roster chamam isto por obra a cada render)
   const meds=o.medicoes||[];
   const denom=num(o.valor)||Math.max(0,...meds.map(m=>num(m.valor_atual)))||0;
   if(meds.length){
@@ -3371,7 +3444,10 @@ function buildResumoPane(o,raw){
   const dd=n=>NUM.format(Math.abs(n))+' dia'+(Math.abs(n)===1?'':'s');
   const cExec=prazoCalc(raw.data_inicio_real,raw.data_fim_previsto);
   const cVig=prazoCalc(raw.data_inicio_real,raw.data_fim_vigencia_contrato);
-  const paral=num(raw.dias_paralisado);
+  // obra encerrada/concluída: prazo vencido e dias_paralisado residual são história, não alerta
+  // (no histórico completo uma obra de 2023 aparecia "vencida há 600 dias", em vermelho).
+  const encerrada=o.stBucket==='ok';
+  const paral=encerrada?0:num(raw.dias_paralisado);
   const com=(o.comissao&&o.comissao.length)?o.comissao:[];
   const fiscalResp=pickFiscal(com);
 
@@ -3399,7 +3475,7 @@ function buildResumoPane(o,raw){
       <div class="rs-st-days" style="color:${c?statusTextColor(c.color):'var(--text-dim)'}">${c?escHtml(c.daysTxt):'datas insuficientes'}</div>
       ${extra||''}</div>`;
   };
-  const obraCol=paral>0?TOKENS.statusStop:(cExec?cExec.color:null);
+  const obraCol=encerrada?TOKENS.statusOk:(paral>0?TOKENS.statusStop:(cExec?cExec.color:null));
   const r2=`<div class="rs-row rs-status">`
     +stCard('Situação da obra', fmtVal(raw.status_obra), cExec, raw.data_inicio_real, raw.data_fim_previsto, obraCol,
        paral>0?`<div class="rs-st-paral">Paralisada há ${dd(paral)}</div>`:'')
@@ -3454,9 +3530,13 @@ function buildResumoPane(o,raw){
   // ---- R5 — pontos de atenção (só rotula valores já exibidos; limiares fixos) ----
   const att=[];
   if(paral>0) att.push([TOKENS.statusStop, `Obra paralisada há ${dd(paral)}.`]);
-  if(cExec&&cExec.overdue) att.push([TOKENS.statusStop, `Prazo de execução vencido há ${dd(cExec.remainingDays)}.`]);
-  else if(cExec&&cExec.color===TOKENS.amber) att.push([TOKENS.amber, `Prazo de execução encerra em ${dd(cExec.remainingDays)}.`]);
-  if(cVig&&cVig.overdue) att.push([TOKENS.statusStop, `Vigência contratual vencida há ${dd(cVig.remainingDays)}.`]);
+  if(!encerrada){
+    if(cExec&&cExec.overdue) att.push([TOKENS.statusStop, `Prazo de execução vencido há ${dd(cExec.remainingDays)}.`]);
+    else if(cExec&&cExec.color===TOKENS.amber) att.push([TOKENS.amber, `Prazo de execução encerra em ${dd(cExec.remainingDays)}.`]);
+    if(cVig&&cVig.overdue) att.push([TOKENS.statusStop, `Vigência contratual vencida há ${dd(cVig.remainingDays)}.`]);
+  }
+  // as barras travam em 100% e o saldo em 0: sem este ponto, medição acima do valor da obra ficava invisível
+  if(medPct!=null && medPct>100.5) att.push([TOKENS.amber, `Medição acumulada de ${pct1(medPct)} — acima do valor ${multiObra?'da obra':'atual do contrato'}.`]);
   if(pctAcr>=25) att.push([TOKENS.statusStop, `Acréscimos somam ${pct1(pctAcr)} do valor original — acima do limite de 25% do art. 125 da Lei 14.133/2021.`]);
   else if(pctAdit>=10) att.push([TOKENS.amber, `Aditivos somam ${pct1(pctAdit)} do valor original.`]);
   if(!att.length) att.push([TOKENS.ng, 'Nenhum ponto de atenção identificado neste contrato.']);
@@ -3644,8 +3724,8 @@ function buildEletricaPane(o){
   // PAPEIS_REPLAN). wireEletricaPane() liga abrir/fechar dos diálogos depois que este
   // HTML entra no DOM.
   const podeEnviar=PAPEIS_ELETRICA_ESCRITA.includes(USER_PAPEL);
-  const hoje=new Date().toISOString().slice(0,10);
-  const nomeSessao=sessionStorage.getItem('sop_user_name')||'';
+  const hoje=hojeISOLocal(); // toISOString() é UTC: depois das 21h em Fortaleza virava "amanhã" e divergia do painel/Cronograma
+  let nomeSessao=''; try{ nomeSessao=sessionStorage.getItem('sop_user_name')||''; }catch(e){ /* storage bloqueado: segue sem pré-preencher o responsável */ }
   // agendamento de vistoria: independente do relatório (tabelas irmãs, sem FK — ver
   // sql/create_eletrica_vistorias_agendadas.sql). Clicar na obra na lista "Atenção,
   // Elétrica!" abre esta aba direto (pedido do usuário, 24/09/2026) — daqui o
@@ -3799,7 +3879,7 @@ function wireEletricaPane(o){
       o.relatoriosEletrica=novo?(novo[o.id_obra]||[]):(o.relatoriosEletrica||[]).filter(r=>String(r.id)!==String(btnDel.dataset.id));
       pane.innerHTML=buildEletricaPane(o);
       wireEletricaPane(o);
-      invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros();
+      invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança
     });
   });
   // "Cancelar agendamento": soft delete (mesma UPDATE+excluido_em de
@@ -3814,7 +3894,7 @@ function wireEletricaPane(o){
     o.agendamentoEletrica=null;
     pane.innerHTML=buildEletricaPane(o);
     wireEletricaPane(o);
-    invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros();
+    invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança
   });
   // Checkbox "Vistoria realizada": grava/limpa realizada_em (sql/
   // add_realizada_eletrica_vistorias_agendadas.sql) — só existe depois que a data
@@ -3834,7 +3914,7 @@ function wireEletricaPane(o){
     o.agendamentoEletrica={...o.agendamentoEletrica, realizada_em:marcar?new Date().toISOString():null};
     pane.innerHTML=buildEletricaPane(o);
     wireEletricaPane(o);
-    invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros();
+    invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança
   });
   // "Agendar vistoria" abre um diálogo próprio (mesmo padrão do de "Inserir
   // relatório" logo abaixo) com data planejada + responsável.
@@ -3868,7 +3948,7 @@ function wireEletricaPane(o){
       o.agendamentoEletrica=inserida;
       pane.innerHTML=buildEletricaPane(o);
       wireEletricaPane(o);
-      invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros();
+      invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança
     }catch(err){
       setErroAgenda('Não consegui salvar o agendamento agora. Tente novamente.');
       btnSalvar.disabled=false; btnSalvar.textContent=txtOriginal;
@@ -3967,7 +4047,7 @@ function wireEletricaPane(o){
       o.relatoriosEletrica=novo[o.id_obra]||[];
       pane.innerHTML=buildEletricaPane(o);
       wireEletricaPane(o);
-      invalidateSessionCache(); renderAtencaoEletrica(); renderEleEngenheiros(); // painéis "Elétrica"/"Engenheiros" refletem o novo relatório
+      invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança // painéis "Elétrica"/"Engenheiros" refletem o novo relatório
     }catch(err){
       setErro('Relatório enviado com sucesso, mas não consegui atualizar a lista aqui. Feche e reabra esta obra para ver.');
       btn.textContent=txtOriginal;
@@ -4016,7 +4096,7 @@ function wireAdToggles(){
     };
   });
 }
-function closeModal(){ escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
+function closeModal(){ _lastModalObra=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
 // Fecha OU volta um nível: se a janela do fiscal está aberta por cima de um distrito
 // (o botão "#modalVoltar" existe), Esc e clicar fora devem se comportar como o próprio
 // "← Voltar" faria — não só o clique nele. Sem isso os dois gestos mais comuns de
@@ -4678,7 +4758,8 @@ function filaDistritoHtml(a,noPrazo,semPrazo,filaDist){
   const ordemSt=k=>k==='ANÁLISE FISCAL'?0:k==='REANÁLISE FISCAL'?1:2;
   const titulo=k=>k.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
   const listaHtml=[...grupos.entries()].sort((x,y)=>ordemSt(x[0])-ordemSt(y[0])||x[0].localeCompare(y[0],'pt-BR')).map(([k,ps])=>{
-    ps.sort((x,y)=>(y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
+    // atrasados primeiro (a lista corta em PROC_LISTA_MAX: sem isto os N atrasados do cabeçalho podiam ficar de fora)
+    ps.sort((x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
     const mostra=ps.slice(0,PROC_LISTA_MAX);
     return `<div class="fila-g"><div class="fila-gh"><span>${escHtml(titulo(k))}</span><b>${NUM.format(ps.length)}</b></div>`
       +`<div class="fila-gs">Do que está há mais tempo com o fiscal para o que está há menos</div>`
@@ -4770,6 +4851,7 @@ function abreModalDistrito(gid){
   const corpo=a.total
     ? topo+tiles+equipeSecao+hoje
     : `<div class="empty">Nenhum processo de replanilhamento nas obras deste distrito.</div>`;
+  _lastModalObra=null; // outra janela no #modal: repaintTheme() não pode reabrir a obra antiga por cima
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
@@ -4971,7 +5053,9 @@ function abreModalFiscal(mat,voltarGid){
   // vêm separados por status (Análise Fiscal, Reanálise Fiscal), cada processo com a
   // situação do prazo (no prazo / em atraso / sem prazo); os despachados ficam num grupo
   // recolhido. Do que está há mais tempo com o fiscal para o que está há menos.
-  const porDias=(x,y)=>(y.diasNaUnidade??-1)-(x.diasNaUnidade??-1);
+  // atrasados primeiro, depois mais dias com o fiscal — a lista corta em PROC_LISTA_MAX e o cabeçalho
+  // anuncia os atrasados; ordenar só por dias desfazia a ordem de `fila` e podia esconder todos eles
+  const porDias=(x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1);
   const stNorm=p=>String(p.statusTxt||'').trim().toUpperCase();
   const emAnalise=fila.filter(p=>stNorm(p)==='ANÁLISE FISCAL').sort(porDias);
   const emReanalise=fila.filter(p=>stNorm(p)==='REANÁLISE FISCAL').sort(porDias);
@@ -5019,6 +5103,7 @@ function abreModalFiscal(mat,voltarGid){
   const acoes=voltarGid
     ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para o distrito">${RS_ICO.voltar}<span>Voltar</span></button>`
     : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
+  _lastModalObra=null; // outra janela no #modal: repaintTheme() não pode reabrir a obra antiga por cima
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(ref.fiscalNome)}</div>${sub}</div>
       <div class="mh-actions">${acoes}</div>
@@ -5270,7 +5355,7 @@ function renderPanel(){
     scope.innerHTML=`Distrito selecionado${resultsSuffix(ids)}`;
     const ents=cityEntries(ids);
     body.innerHTML=`<div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:${TOKENS.textBrightest};text-shadow:0 0 20px rgba(${TOKENS.ngRgb},.22)">${g.nome}</div>`
-      +`<div class="sec-h"><span>Cidades (${ids.length})</span><span>clique p/ abrir</span></div>`+rankRows(ents,'city')
+      +`<div class="sec-h"><span>Cidades (${ents.length})</span><span>clique p/ abrir</span></div>`+rankRows(ents,'city')
       +`<div class="sec-h" style="margin-top:20px"><span>Contratos do distrito</span></div>`+obrasCards(ids);
   } else {
     const id=st.city, g=grpById(gidOf(id));
@@ -5346,6 +5431,9 @@ function render(){
   // ==='group') também só existe nesse nível (goGroup/goCity/goState/goSub sempre
   // zeram st.sel antes de sair dele), então esta guarda não perde o "reflete seleção
   // sem esperar o zoomend" que esta chamada existe pra garantir.
+  // setLayer ANTES do bloco: ao (re)adicionar a camada o Leaflet recria o <path> de cada distrito
+  // (SVG._initPath), e o pointer-events/classe aplicados antes iam para um nó descartado.
+  setLayer(groupLayer, st.level===1);
   if(st.level===1 && groupLayer){
     groupLayer.setStyle(groupStyle);
     // Etapa C: distrito "sem correspondência" fica sem pointer (cursor normal, não navegável)
@@ -5354,7 +5442,7 @@ function render(){
       l._path.classList.toggle('sem-amostra', semAmostraGrp(l.feature.properties.gid)); });
   }
   setLayer(stateShape, false); // Etapa D: nível 0 removido — stateShape nunca é exibido
-  setLayer(groupLayer, st.level===1); if(st.level===1 && groupLayer) groupLayer.bringToFront();
+  if(st.level===1 && groupLayer) groupLayer.bringToFront();
   renderCrumb(); renderPanel(); renderFoot(); renderFilterChips(); renderFilterChipsRp();
   syncControlesModo(); renderLegendaReplan();
 }
@@ -5488,6 +5576,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{
   const m=document.querySelector('.msel.on'); if(!m) return;
   if(e.target.tagName==='INPUT' && e.target.type!=='checkbox') return;
+  if(e.ctrlKey||e.metaKey||e.altKey) return; // Ctrl+R/F/C etc. continuam do navegador (antes viravam busca + preventDefault)
   if(e.key==='Escape'){ m.classList.remove('on'); mselResetQuery(m); return; }
   if(e.key==='Backspace'){ mselQuery=mselQuery.slice(0,-1); mselFilterOpts(m); e.preventDefault(); }
   else if(e.key.length===1 && /[a-zA-Z0-9À-ÿ]/.test(e.key)){ mselQuery+=e.key; mselFilterOpts(m); e.preventDefault(); }
@@ -5514,6 +5603,7 @@ document.getElementById('fSearch').addEventListener('input',e=>{
 function clearAllFilters(){
   Object.keys(st.f).forEach(k=>{ if(st.f[k] instanceof Set) st.f[k].clear(); });
   st.f.q=''; const fs=document.getElementById('fSearch'); if(fs) fs.value='';
+  eleFiltroCategoria=null; // filtro dos cards da Elétrica também conta em hasActiveFilter()
   _fHost.querySelectorAll('.msel-opt input').forEach(cb=>cb.checked=false);
   // Escopado a _fHost pelo mesmo motivo do laço de fillFilters() acima: sem isso pega
   // também os .msel do Replanilhamentos e quebra em st.f['situacao']/st.f['prazo'].
@@ -5537,6 +5627,12 @@ function renderFilterChips(){
       chips.push(`<span class="chip fchip" data-key="${escHtml(d.key)}" data-val="${escHtml(v)}" role="button" tabindex="0" title="Remover ${escHtml(lab)}">${escHtml(lab)} <b class="x" aria-hidden="true">✕</b></span>`);
     });
   });
+  // card ativo do resumo da Elétrica: recorta mapa e painel (passF/hasActiveFilter), então precisa
+  // de chip — antes o recorte era invisível e "Limpar tudo" não o desfazia.
+  if(st.metric==='eletrica' && eleFiltroCategoria){
+    const lab='Elétrica: '+({avistoriar:'a vistoriar',agendadas:'agendadas',pendentes:'pendentes',vistoriadas:'vistoriadas',obras:'obras'}[eleFiltroCategoria]||eleFiltroCategoria);
+    chips.push(`<span class="chip fchip" data-key="__ele" role="button" tabindex="0" title="Remover ${escHtml(lab)}">${escHtml(lab)} <b class="x" aria-hidden="true">✕</b></span>`);
+  }
   host.innerHTML = chips.length
     ? chips.join('')+`<button type="button" class="fchip-clear" id="fchipClear">Limpar tudo</button>`
     : '';
@@ -5552,6 +5648,7 @@ function renderFilterChips(){
 function removeFilterChip(chip){
   const key=chip.dataset.key;
   if(key==='__q'){ st.f.q=''; const fs=document.getElementById('fSearch'); if(fs) fs.value=''; }
+  else if(key==='__ele'){ eleFiltroCategoria=null; }
   else {
     const val=chip.dataset.val; st.f[key].delete(val); updateMselBtn(key);
     document.querySelectorAll(`.msel[data-key="${key}"] .msel-opt input`).forEach(cb=>{ if(cb.value===val) cb.checked=false; });
@@ -5686,7 +5783,10 @@ function repaintTheme(){
   if(!layer) return; // troca antes do init do mapa: o render() inicial já pinta no tema certo
   if(stateShape) stateShape.setStyle({fillColor:TOKENS.mapStateFill,color:`rgba(${TOKENS.ngRgb},.42)`});
   const _mbg=document.getElementById('modalBg');
-  if(_mbg&&_mbg.classList.contains('show')&&_lastModalObra) openModal(_lastModalObra,_lastModalVoltarChave);
+  // não reabre com um diálogo da Elétrica aberto: o modal é refeito por innerHTML e o formulário
+  // (campos digitados, arquivo escolhido) seria perdido — vale também para a troca automática do SO.
+  const _dlgAberto=document.querySelector('#eleDialogBg:not([hidden]), #eleAgendaDialogBg:not([hidden])');
+  if(_mbg&&_mbg.classList.contains('show')&&_lastModalObra&&!_dlgAberto) openModal(_lastModalObra,_lastModalVoltarChave);
   render();
 }
 function setTheme(dark){
@@ -5751,7 +5851,9 @@ syncScopeBtn(false);
 // atrás em outra tela não teria como forçar isso antes do cache expirar sozinho.
 const _btnRefresh=document.getElementById('btnRefresh'), _btnRefreshTxt=document.getElementById('btnRefreshTxt');
 if(_btnRefresh) _btnRefresh.addEventListener('click',()=>{
-  try{ sessionStorage.removeItem(cacheKey(st.dataScope)); }catch(e){ /* privacidade/quota — segue sem cache mesmo */ }
+  // as DUAS chaves: a mutação vale para os dois escopos, e deixar a do outro viva reidratava
+  // (por até 1h) o agendamento já cancelado ao alternar entre carteira ativa e histórico.
+  try{ ['ativa','historico'].forEach(sc=>sessionStorage.removeItem(cacheKey(sc))); }catch(e){ /* privacidade/quota — segue sem cache mesmo */ }
   _btnRefresh.disabled=true;
   if(_btnRefreshTxt) _btnRefreshTxt.textContent='Atualizando…';
   loadData().finally(()=>{
@@ -6196,6 +6298,10 @@ document.getElementById('segMetric').addEventListener('click',e=>{
     });
     fillFilters();
   }
+  // passF()/hasActiveFilter() mudam com st.metric (filtro de categoria da Elétrica): sem invalidar,
+  // obrasOf() devolvia o cache da métrica anterior (já recortado, ou sem o recorte) e os KPIs/mapa
+  // mostravam um subconjunto sem chip explicando.
+  invalidateAggCache();
   render();
 });
 document.getElementById('crumb').addEventListener('click',e=>{
@@ -6368,8 +6474,12 @@ document.getElementById('body').addEventListener('keydown',e=>{
   }
   activateOnKey(e,'.qdf,.rrow,.obra,.chip.mun.locate,.chip-sel');
 });
-map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabels(); });
-map.on('moveend',()=>updateLabels());
+// O Leaflet dispara zoomend E moveend a cada passo de zoom: cada updateLabels() reescreve ~184
+// contadores e roda o declutter (layout forçado). Coalescer no quadro faz 1 passada em vez de 2.
+let _lblRaf=0;
+function updateLabelsSoon(){ if(_lblRaf) return; _lblRaf=requestAnimationFrame(()=>{ _lblRaf=0; updateLabels(); }); }
+map.on('zoomend',()=>{ layer.setStyle(styleFeature); if(groupLayer&&map.hasLayer(groupLayer))groupLayer.setStyle(groupStyle); updateLabelsSoon(); });
+map.on('moveend',updateLabelsSoon);
 // clicar em espaço vazio do mapa (fora de qualquer distrito/região/município)
 // limpa a seleção combinada — caminho alternativo ao Esc que funciona igual
 // dentro e fora de tela cheia, sem depender do navegador (ver histórico de
@@ -6420,7 +6530,10 @@ render();
 // vale tanto pra esta chamada inicial quanto pro clique em #btnScope).
 (async()=>{
   SESSION_TOKEN=await _tokenP; // já resolvido (o arranque o disparou lá no topo)
-  loadData();   // sem sessão, mostra o aviso de login (showLoginRequired); com falha real, showDataError
+  // sem sessão, mostra o aviso de login (showLoginRequired); com falha real de rede, showDataError.
+  // O .catch cobre o que o try interno de loadData() não cobre (fillFilters/render/refit lançando
+  // depois de boot-loading já removido): antes virava rejeição não tratada e a tela ficava vazia, sem aviso.
+  loadData().catch(e=>{ console.error(e); showDataError('Erro ao montar o painel: '+(e&&e.message||e)); });
   // Roster da Elétrica também em paralelo — pequeno, independente da carga de obras,
   // não vale atrasar o painel esperando por ele (mesmo espírito do papel, abaixo).
   garantirRosterEletrica();

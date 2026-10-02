@@ -169,7 +169,8 @@ select
   case
     when b.status_norm in ('ANÁLISE FISCAL', 'DEVOLVIDO P/ REANÁLISE FISCAL')
       and b.data_compromisso_fiscal is not null
-      then current_date > b.data_compromisso_fiscal
+      -- data de Fortaleza, como data_despacho: current_date é UTC e, das 21h à meia-noite local, já é o dia seguinte
+      then (now() at time zone 'America/Fortaleza')::date > b.data_compromisso_fiscal
   end                                                        as meta_estourada,
 
   -- fiscal que responde pelo processo (sem filtro de role — ver cabeçalho)
