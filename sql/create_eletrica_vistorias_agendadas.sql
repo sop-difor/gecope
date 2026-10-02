@@ -20,6 +20,10 @@
 -- impõe. Equipe pequena, mesmo espírito de risco aceito documentado em
 -- eletrica_vistorias.
 --
+-- ATUALIZAÇÃO 02/10/2026: o trecho acima sobre "sem UNIQUE" ficou superado. Agora o relatório FECHA o
+-- agendamento aberto (realizada_em) e o banco impõe no máximo UM agendamento aberto por obra — ver
+-- sql/add_unique_aberto_eletrica_vistorias_agendadas.sql.
+--
 -- Uso: rode este arquivo inteiro no SQL Editor do Supabase (Dashboard > SQL Editor).
 -- Pré-requisito: sql/create_eletrica_vistorias.sql já aplicado (usa a mesma
 -- contratos_edificacao_pode_ler() e o mesmo meu_papel() criados/usados lá).

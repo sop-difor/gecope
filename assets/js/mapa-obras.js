@@ -561,12 +561,19 @@ async function fetchEletricaVistorias(idFilter){
   for(const k in m) m[k].sort((a,b)=>String(b.data_vistoria||'').localeCompare(String(a.data_vistoria||'')));
   return m;
 }
-// agendamento de vistoria (id_obra -> agendamento ativo mais recente, ou undefined).
-// Só 1 por obra é exibido mesmo que existisse mais de um ativo no banco (a UI evita
-// criar 2, ver sql/create_eletrica_vistorias_agendadas.sql) — pega o mais recente.
+// agendamento de vistoria (id_obra -> agendamento, ou undefined). Uma obra pode ter vários ao
+// longo do tempo, mas só UM aberto por vez (realizada_em nulo; índice único parcial em
+// sql/add_unique_aberto_eletrica_vistorias_agendadas.sql). Devolve o aberto, se houver;
+// senão o mais recente já realizado (que alimenta "Realizada"/histórico).
 async function fetchEletricaAgendamentos(idFilter){
   const rows=await fetchTableIn(SB_ELETRICA_AGENDA,{select:ELETRICA_AGENDA_COLS,filter:'excluido_em=is.null',order:'id.asc'},'id_obra',idFilter,false); const m={};
-  for(const r of rows){ const k=r.id_obra; if(k==null) continue; if(!m[k]||r.criado_em>m[k].criado_em) m[k]=r; }
+  const melhor=(a,b)=>{ // a é melhor que b?
+    if(!b) return true;
+    const ab=!a.realizada_em, bb=!b.realizada_em;
+    if(ab!==bb) return ab;
+    return String(a.criado_em||'')>String(b.criado_em||'');
+  };
+  for(const r of rows){ const k=r.id_obra; if(k==null) continue; if(melhor(r,m[k])) m[k]=r; }
   return m;
 }
 // roster oficial da "Elétrica" (Q6 do grill de 25/09/2026): app_users com
@@ -1020,13 +1027,8 @@ function passF(o){const f=st.f;
   // card mostraria menos obras do que o número exibido.
   if(st.metric==='eletrica' && eleFiltroCategoria){
     if(eleFiltroCategoria==='agendadas'||eleFiltroCategoria==='pendentes'||eleFiltroCategoria==='vistoriadas'){
-      const temRel=o.relatoriosEletrica&&o.relatoriosEletrica.length;
-      if(eleFiltroCategoria==='vistoriadas'){
-        if(!(temRel || statusAgendamentoEletrica(o.agendamentoEletrica)==='vistoriada')) return false;
-      } else {
-        if(temRel) return false;
-        if(statusAgendamentoEletrica(o.agendamentoEletrica)!==(eleFiltroCategoria==='agendadas'?'agendada':'pendente')) return false;
-      }
+      const sx=statusEletricaObra(o);
+      if(sx!==(eleFiltroCategoria==='vistoriadas'?'vistoriada':eleFiltroCategoria==='agendadas'?'agendada':'pendente')) return false;
     } else {
       const c=categoriaEletricaObra(o);
       if(!c.ativo) return false; // 'obras'/'avistoriar' só existem na carteira ativa da elétrica
@@ -1945,7 +1947,9 @@ function setKPIs(){
 // também precisam dela; function declaration, então a ordem no arquivo não importa.
 // Fuso de Fortaleza (e não o do navegador), igual a data_despacho e meta_estourada no SQL.
 const _fmtHojeFortaleza=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'});
-function hojeISOLocal(){ return _fmtHojeFortaleza.format(new Date()); }
+// cache curto: statusEletricaObra() roda por obra dentro de passF()
+let _hojeCache={t:0,v:''};
+function hojeISOLocal(){ const t=Date.now(); if(t-_hojeCache.t>30000) _hojeCache={t,v:_fmtHojeFortaleza.format(new Date(t))}; return _hojeCache.v; }
 // status de UM agendamento ativo (sem relatório ainda) — fonte ÚNICA da regra "data
 // passou sem confirmação = Pendente", usada por categoriaEletricaObra,
 // contarEletricaAgendadasVistoriadas, computarRosterEletrica e o Cronograma
@@ -1959,6 +1963,29 @@ function statusAgendamentoEletrica(ag,hoje){
   if(!ag) return null;
   if(ag.realizada_em) return 'vistoriada';
   return String(ag.data_planejada||'')<(hoje||hojeISOLocal()) ? 'pendente' : 'agendada';
+}
+// Ciclo de vida (regras do usuário, 02/10/2026):
+//  - Agendada: o engenheiro marcou uma data (agendamento ABERTO, data ainda não passou).
+//  - Pendente: agendamento aberto cuja data passou sem confirmação de que a vistoria ocorreu.
+//  - Vistoriada: o engenheiro anexou o relatório (ou confirmou a realização no checkbox).
+//  - Enviar o relatório FECHA o agendamento aberto (realizada_em). Uma obra pode ter vários
+//    agendamentos ao longo do tempo, nunca dois abertos ao mesmo tempo.
+// Aberto = sem realizada_em E sem relatório gravado depois dele. A 2ª condição torna a leitura
+// correta mesmo se o UPDATE de fechamento falhar ou for bloqueado pela RLS, e para dados antigos.
+function agAbertoCom(ag,rel){
+  if(!ag || ag.realizada_em) return null;
+  if((rel||[]).some(r=>String(r.criado_em||'')>=String(ag.criado_em||''))) return null;
+  return ag;
+}
+function agendamentoAbertoDe(o){ return agAbertoCom(o.agendamentoEletrica,o.relatoriosEletrica); }
+// Fonte ÚNICA da situação da obra na Elétrica: 'agendada' | 'pendente' | 'vistoriada' | null
+// (null = nem agendamento nem vistoria; quem chama decide se é "a vistoriar"). Agendamento
+// aberto vale mais que um relatório antigo: nova visita marcada = a obra volta a ser Agendada.
+function statusEletricaObra(o,hoje){
+  const ab=agendamentoAbertoDe(o);
+  if(ab) return statusAgendamentoEletrica(ab,hoje);
+  const ag=o.agendamentoEletrica;
+  return ((o.relatoriosEletrica&&o.relatoriosEletrica.length) || (ag&&ag.realizada_em)) ? 'vistoriada' : null;
 }
 // universo-base + categoria do funil "Elétrica" de UMA obra (rodada de 25/09/2026,
 // grill) — fonte única usada tanto pelo painel (obrasComAtencaoEletrica, abaixo)
@@ -1983,13 +2010,11 @@ function categoriaEletricaObra(o){
   if(!ativo) return {ativo:false, categoria:null, pct:null, rel:[], agendamento:null};
   const pct=medObraStats(o).pct;
   const rel=o.relatoriosEletrica||[];
-  // agendamento só é relevante enquanto não há relatório — depois disso a obra já
-  // saiu do "a vistoriar" e o agendamento correspondente é ignorado aqui (não é
-  // apagado no banco, ver sql/create_eletrica_vistorias_agendadas.sql).
-  const agendamento=rel.length?null:(o.agendamentoEletrica||null);
-  let categoria=null;
-  if(rel.length) categoria='vistoriada';
-  else if(pct!=null && pct>=LIMIAR_ELETRICA) categoria=agendamento?statusAgendamentoEletrica(agendamento):'avistoriar';
+  const agendamento=agendamentoAbertoDe(o);
+  // situação única (statusEletricaObra): agendamento aberto, ou vistoriada por histórico;
+  // sem nenhum dos dois, só vira "a vistoriar" a partir de LIMIAR_ELETRICA% de medição.
+  let categoria=statusEletricaObra(o);
+  if(!categoria && pct!=null && pct>=LIMIAR_ELETRICA) categoria='avistoriar';
   return {ativo, categoria, pct, rel, agendamento};
 }
 // Painel "Elétrica": olha TODA a carteira carregada, não o recorte de filtro do
@@ -2027,8 +2052,7 @@ function contarEletricaAgendadasVistoriadas(){
   const hoje=hojeISOLocal();
   for(const cod in DB.municipios){
     for(const o of DB.municipios[cod].obras){
-      if(o.relatoriosEletrica&&o.relatoriosEletrica.length){ vistoriadas++; continue; }
-      const st=statusAgendamentoEletrica(o.agendamentoEletrica,hoje);
+      const st=statusEletricaObra(o,hoje);
       if(st==='vistoriada') vistoriadas++;
       else if(st==='pendente') pendentes++;
       else if(st==='agendada') agendadas++;
@@ -2167,12 +2191,13 @@ function computarRosterEletrica(){
   for(const cod in DB.municipios){
     for(const o of DB.municipios[cod].obras){
       for(const r of (o.relatoriosEletrica||[])) acha(r.responsavel_nome).vistoriadas.push({o,data:r.data_vistoria,r});
-      const ag=o.agendamentoEletrica;
-      if(ag && !(o.relatoriosEletrica&&o.relatoriosEletrica.length)){
-        const alvo=acha(ag.responsavel_nome), st=statusAgendamentoEletrica(ag,hoje);
-        if(st==='vistoriada') alvo.vistoriadas.push({o,data:ag.data_planejada,r:null});
-        else if(st==='pendente') alvo.pendentes.push({o,data:ag.data_planejada});
-        else alvo.agendadas.push({o,data:ag.data_planejada});
+      const ag=o.agendamentoEletrica, aberto=agendamentoAbertoDe(o);
+      if(aberto){
+        const alvo=acha(aberto.responsavel_nome);
+        if(statusAgendamentoEletrica(aberto,hoje)==='pendente') alvo.pendentes.push({o,data:aberto.data_planejada});
+        else alvo.agendadas.push({o,data:aberto.data_planejada});
+      } else if(ag && ag.realizada_em && !(o.relatoriosEletrica&&o.relatoriosEletrica.length)){
+        acha(ag.responsavel_nome).vistoriadas.push({o,data:ag.data_planejada,r:null}); // confirmada, sem relatório
       }
       // "a vistoriar" (categoria='avistoriar', mesma regra do card do resumo): a obra
       // ainda não tem relatório nem agendamento, então não tem responsavel_nome pra
@@ -2598,14 +2623,11 @@ async function carregarVisitasCronograma(){
     const carregada=noMapa.get(id)||null;
     const base={id,o:carregada||reduzidas.get(id)||null,clicavel:!!carregada};
     for(const r of rel) itens.push({...base,tipo:'vistoriada',data:r.data_vistoria,resp:r.responsavel_nome,r});
-    const ag=agend[id];
-    if(ag && (!rel.length || String(ag.data_planejada||'')>String(rel[0].data_vistoria||''))){
-      // 'vistoriada' de statusAgendamentoEletrica (confirmada) vira 'realizada' aqui —
-      // rótulo próprio pra não se confundir com a linha que TEM relatório (acima), já
-      // que esta não ganha botão de baixar (r:null).
-      const st=statusAgendamentoEletrica(ag,hoje);
-      itens.push({...base,tipo:st==='vistoriada'?'realizada':st,data:ag.data_planejada,resp:ag.responsavel_nome,r:null});
-    }
+    const ag=agend[id], aberto=agAbertoCom(ag,rel);
+    // aberto: Agendada/Pendente. Fechado SEM relatório (confirmado no checkbox): "Realizada", sem
+    // botão de baixar (r:null). Fechado COM relatório: a linha do relatório já o representa.
+    if(aberto) itens.push({...base,tipo:statusAgendamentoEletrica(aberto,hoje),data:aberto.data_planejada,resp:aberto.responsavel_nome,r:null});
+    else if(ag && ag.realizada_em && !rel.length) itens.push({...base,tipo:'realizada',data:ag.data_planejada,resp:ag.responsavel_nome,r:null});
   }
   itens.lotesFalhos=lotesFalhos; // as obras desse lote aparecem só como "Obra #id"
   return itens;
@@ -3729,7 +3751,7 @@ function buildEletricaPane(o){
           ? {cls:'ok',txt:'Vistoriada', sub:`${rel.length} relatório${rel.length===1?'':'s'} enviado${rel.length===1?'':'s'}`}
           : {cls:'teal',txt:'Realizada', sub:'vistoria confirmada pelo engenheiro, ainda sem relatório enviado'})
       : cat.categoria==='agendada'
-        ? {cls:'info',txt:'Vistoria agendada', sub:`medição ${fmtPct1(pct)}% · aguardando a data agendada`}
+        ? {cls:'info',txt:'Vistoria agendada', sub:`medição ${pct==null?'—':fmtPct1(pct)+'%'} · aguardando a data agendada`}
         : cat.categoria==='pendente'
           ? {cls:'danger',txt:'Pendente', sub:'a data agendada passou e a vistoria ainda não foi confirmada'}
           : cat.categoria==='avistoriar'
@@ -3754,7 +3776,11 @@ function buildEletricaPane(o){
   // Elétrica!" abre esta aba direto (pedido do usuário, 24/09/2026) — daqui o
   // usuário escolhe agendar OU inserir um relatório, sem UI própria na lista.
   // Cancelamento é soft-delete (UPDATE excluido_em), nunca DELETE físico.
-  const agenda=o.agendamentoEletrica;
+  // Mostra o agendamento ABERTO; ou, se a obra não tem aberto, o último confirmado SEM relatório (para
+  // poder desmarcar a confirmação). Com o agendamento fechado (ou fechado pelo relatório) o botão de
+  // agendar volta: uma obra pode ter vários agendamentos ao longo do tempo, nunca dois abertos.
+  const aberta=agendamentoAbertoDe(o);
+  const agenda=aberta || ((o.agendamentoEletrica&&o.agendamentoEletrica.realizada_em&&!rel.length)?o.agendamentoEletrica:null);
   // Confirmação de realização (grill de 29/09/2026, realizada_em — sql/
   // add_realizada_eletrica_vistorias_agendadas.sql): só aparece depois que a data
   // planejada passou (Q6 do grill — antes disso a visita ainda nem devia ter
@@ -3765,17 +3791,16 @@ function buildEletricaPane(o){
   // vermelho, realizada em teal, agendada (data futura) no azul de sempre.
   const agendaStatus=agenda?statusAgendamentoEletrica(agenda,hoje):null;
   const agendaCls=agendaStatus==='pendente'?'danger':agendaStatus==='vistoriada'?'teal':'info';
-  const agendaSecao=!podeEnviar?'':agenda
-    ?`<div class="msec">Agendamento de vistoria</div>
-      <div class="ele-agenda-info ${agendaCls}">
+  const agendaInfoHtml=agenda
+    ?`<div class="ele-agenda-info ${agendaCls}">
         <span>Agendada para <b>${fmtDateBR(agenda.data_planejada)}</b> · ${escHtml(agenda.responsavel_nome)}${agenda.realizada_em?' · <span class="ele-agenda-ok">vistoria confirmada</span>':''}</span>
         <div class="ele-agenda-acoes">
           ${agendaVenceu?`<label class="ele-agenda-check"><input type="checkbox" id="eleAgendaRealizada"${agenda.realizada_em?' checked':''}><span>Vistoria realizada</span></label>`:''}
           <button type="button" class="ele-agenda-cancelar-btn" id="eleAgendaCancelarBtn">Cancelar agendamento</button>
         </div>
       </div>`
-    :`<div class="msec">Agendamento de vistoria</div>
-      <button type="button" class="ele-btn ele-insert-btn" id="eleAbrirAgenda">Agendar vistoria</button>
+    :'';
+  const agendaNovoHtml=aberta?'':`<button type="button" class="ele-btn ele-insert-btn" id="eleAbrirAgenda">${agenda||(o.agendamentoEletrica&&o.agendamentoEletrica.realizada_em)?'Agendar nova vistoria':'Agendar vistoria'}</button>
       <div class="ele-dialog-bg" id="eleAgendaDialogBg" hidden>
         <div class="ele-dialog" role="dialog" aria-modal="true" aria-label="Agendar vistoria">
           <div class="ele-dialog-head"><span>Agendar vistoria</span>
@@ -3790,6 +3815,7 @@ function buildEletricaPane(o){
           </form>
         </div>
       </div>`;
+  const agendaSecao=!podeEnviar?'':`<div class="msec">Agendamento de vistoria</div>${agendaInfoHtml}${agendaNovoHtml}`;
 
   const versaoPorId=versaoPorIdRelatorio(rel);
   const lista=rel.length
@@ -3915,7 +3941,9 @@ function wireEletricaPane(o){
     btnCancelarAgenda.disabled=true;
     const{data:afet,error}=await window.sbClient.from(SB_ELETRICA_AGENDA).update({excluido_em:new Date().toISOString()}).eq('id',o.agendamentoEletrica.id).select('id');
     if(error||!afet||!afet.length){ window.alert('Não consegui cancelar o agendamento agora. Tente novamente.'); btnCancelarAgenda.disabled=false; return; }
-    o.agendamentoEletrica=null;
+    // relê: cancelado o aberto, pode restar um agendamento anterior já realizado (histórico)
+    const restante=await fetchEletricaAgendamentos([o.id_obra]).catch(()=>({}));
+    o.agendamentoEletrica=restante[o.id_obra]||null;
     pane.innerHTML=buildEletricaPane(o);
     wireEletricaPane(o);
     invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança
@@ -3959,12 +3987,22 @@ function wireEletricaPane(o){
     const setErroAgenda=m=>{ if(elErroAgenda){ elErroAgenda.textContent=m||''; elErroAgenda.hidden=!m; } };
     if(!data){ setErroAgenda('Informe a data planejada.'); return; }
     if(!resp){ setErroAgenda('Informe o responsável.'); return; }
+    // uma obra não pode ter dois agendamentos abertos ao mesmo tempo (o banco também barra)
+    if(agendamentoAbertoDe(o)){ setErroAgenda('Esta obra já tem um agendamento aberto. Cancele-o ou confirme a vistoria antes de agendar outro.'); return; }
     setErroAgenda('');
     const btnSalvar=pane.querySelector('#eleAgendaBtnSalvar');
     btnSalvar.disabled=true; const txtOriginal=btnSalvar.textContent; btnSalvar.textContent='Agendando…';
     try{
       const{data:sessao}=await window.sbClient.auth.getSession();
       const email=sessao&&sessao.session&&sessao.session.user?sessao.session.user.email:'';
+      // resto "aberto" no banco que a leitura já trata como fechado (relatório posterior; o UPDATE de
+      // fechamento falhou antes): fecha agora, senão o índice único de agendamento aberto barra o novo
+      const velho=o.agendamentoEletrica;
+      if(velho && !velho.realizada_em){
+        const{data:fch,error:efch}=await window.sbClient.from(SB_ELETRICA_AGENDA)
+          .update({realizada_em:new Date().toISOString()}).eq('id',velho.id).is('realizada_em',null).select('id');
+        if(efch||!fch||!fch.length) throw efch||new Error('não consegui fechar o agendamento anterior');
+      }
       const{data:inserida,error}=await window.sbClient.from(SB_ELETRICA_AGENDA)
         .insert({id_obra:o.id_obra,data_planejada:data,responsavel_nome:resp,criado_por_email:email||''})
         .select(ELETRICA_AGENDA_COLS).single();
@@ -3974,7 +4012,9 @@ function wireEletricaPane(o){
       wireEletricaPane(o);
       invalidateSessionCache(); render(); renderEleEngenheiros(); // render(): mapa/lista filtrados também refletem a mudança
     }catch(err){
-      setErroAgenda('Não consegui salvar o agendamento agora. Tente novamente.');
+      setErroAgenda(err&&err.code==='23505'
+        ? 'Esta obra já tem um agendamento aberto (alguém acabou de agendar). Feche e reabra a obra para ver.'
+        : 'Não consegui salvar o agendamento agora. Tente novamente.');
       btnSalvar.disabled=false; btnSalvar.textContent=txtOriginal;
     }
   });
@@ -4070,6 +4110,18 @@ function wireEletricaPane(o){
     // ATUALIZAÇÃO DA TELA, não do envio. Tratada à parte para não fazer o usuário
     // reenviar (e duplicar) um relatório que já foi salvo com sucesso.
     try{
+      // regra: enviar o relatório FECHA o agendamento aberto (realizada_em). Se o UPDATE falhar ou a
+      // RLS bloquear, nada se perde: agAbertoCom() já trata como fechado o agendamento anterior a um
+      // relatório; só não fica gravado. Por isso não bloqueia o fluxo.
+      const aberto=agendamentoAbertoDe(o);
+      if(aberto){
+        try{
+          const{data:fechado,error:erroFecha}=await window.sbClient.from(SB_ELETRICA_AGENDA)
+            .update({realizada_em:new Date().toISOString()}).eq('id',aberto.id).is('realizada_em',null).select(ELETRICA_AGENDA_COLS);
+          if(!erroFecha&&fechado&&fechado.length) o.agendamentoEletrica=fechado[0];
+          else console.warn('não consegui fechar o agendamento após o relatório:',erroFecha&&erroFecha.message);
+        }catch(e){ console.warn('não consegui fechar o agendamento após o relatório:',e.message); }
+      }
       const novo=await fetchEletricaVistorias([o.id_obra]);
       o.relatoriosEletrica=novo[o.id_obra]||[];
       pane.innerHTML=buildEletricaPane(o);
