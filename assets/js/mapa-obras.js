@@ -223,28 +223,17 @@ const RP_METRICA={
   desp:{label:'Despachos'},
   fila:{label:'Processos'},
 };
+// Só três períodos (pedido do usuário, 2026-10-01): "Hoje"/todo o histórico saiu. O corte
+// de corteDespacho() continua aceitando meses null, mas nenhum período o usa.
 const RP_PERIODO={'6m':{meses:6,txt:'últimos 6 meses'},'12m':{meses:12,txt:'últimos 12 meses'},
-                  '24m':{meses:24,txt:'últimos 24 meses'},
-                  // "Hoje" (antes "Tudo"): processos com o fiscal agora; despachos e tempo
-                  // médio do histórico inteiro — pedido do usuário, 2026-09-16.
-                  'hoje':{meses:null,txt:'todo o histórico'}};
-// Duas réguas de amostra, e não uma (decisão do usuário, 2026-09-17).
-//
-// AMOSTRA_MIN é o piso para EXISTIR média: abaixo disto não há número em lugar nenhum —
-// nem cor no mapa, nem KPI, nem linha no ranking. Era 5 até 2026-09-17, e com esse corte
-// só 11 dos 58 fiscais apareciam no ranking: um painel que não respondia à pergunta que
-// existe para responder. Baixado para 2 a pedido do usuário.
-//
-// AMOSTRA_SOLIDA é o piso para o número ser tratado como FIRME. Entre os dois, a média é
-// mostrada mas marcada como fina — porque a dispersão DENTRO de um mesmo fiscal é enorme
-// (a tira de despachos da janela mostra o mesmo fiscal indo de 24 a 338 dias), e com 2
-// ou 3 casos um único processo travado decide o número. Sem a marca, alguém com 2
-// despachos seria ordenado nominalmente ao lado de alguém com 30, na mesma lista, diante
-// de um conselho deliberativo — e é isso que a barra vazada e o contador impedem.
-const AMOSTRA_MIN=2;
-const AMOSTRA_SOLIDA=5;
-// Amostra que existe mas não é firme (ver acima): vale só onde uma PESSOA é nomeada.
-function amostraFina(n){ return n>=AMOSTRA_MIN && n<AMOSTRA_SOLIDA; }
+                  '24m':{meses:24,txt:'últimos 2 anos'}};
+// Rótulos curtos do seletor de período (janelas de distrito e de fiscal).
+const RP_PERIODO_ROT={'6m':'6 meses','12m':'1 ano','24m':'2 anos'};
+// Régua única da média (pedido do usuário, 2026-10-01): a média sai de TODOS os despachos
+// com tempo medido que a pessoa/área tem no período — 6, 2 ou 1. Com 1 despacho a média é
+// o tempo daquele processo. Era 2 (e, antes, 5), com marcação de "amostra fina" abaixo de 5;
+// a marcação saiu: as janelas dizem sempre sobre quantos despachos a média foi tirada.
+const AMOSTRA_MIN=1;
 // janelinha do botão "i" dos KPIs (mostraRpTip). Declarada aqui, e não junto das funções,
 // porque renderPanelReplan pode rodar antes de o script chegar lá.
 let _rpTip=null, _rpTipAlvo=null;
@@ -823,6 +812,8 @@ function mapProcesso(r){
     // meta"). Colapsar os dois faria o denominador de "N além da meta" virar a fila
     // inteira e subestimar o atraso.
     metaEstourada:r.meta_estourada==null?null:r.meta_estourada===true,
+    // data de compromisso do fiscal = a data meta do processo (null = sem meta cadastrada)
+    dataMeta:r.data_compromisso_fiscal||null,
     fiscalMat:r.fiscal_matricula||'', fiscalNome:r.fiscal_nome||'(sem fiscal)',
     fiscalCadastrado:r.fiscal_cadastrado===true,
     gedop:r.fiscal_gedop||'', gerencia:r.fiscal_gerencia||'', gid:gidDeGedop(r.fiscal_gedop),
@@ -1266,7 +1257,7 @@ function rpTip(nome,r,onde){
   if(m==='fila') sub=rpQuandoProc();
   else if(m==='desp') sub=per;
   else if(r && r.v!=null) sub=`em ${desp} · ${per}`;
-  else sub=`só ${desp} · ${per} — a média pede ao menos ${AMOSTRA_MIN}`;
+  else sub=`sem despacho com tempo medido · ${per}`;
   return `<b>${escHtml(nome)}</b><br>${RP_METRICA[m].label}: ${rpFmt(r?r.v:null)}`
     +`<span class="tip-sub">${escHtml(sub)}</span><span class="tip-sub">${escHtml(onde)}</span>`;
 }
@@ -4025,7 +4016,7 @@ function wireAdToggles(){
     };
   });
 }
-function closeModal(){ escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; }
+function closeModal(){ escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
 // Fecha OU volta um nível: se a janela do fiscal está aberta por cima de um distrito
 // (o botão "#modalVoltar" existe), Esc e clicar fora devem se comportar como o próprio
 // "← Voltar" faria — não só o clique nele. Sem isso os dois gestos mais comuns de
@@ -4055,6 +4046,8 @@ document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id=
 // é de onde a janela do fiscal sabe que foi aberta por cima de um distrito, e não do
 // ranking lateral — é essa origem que decide se o cabeçalho mostra "← Voltar" ou "✕".
 document.getElementById('modal').addEventListener('click',e=>{
+  const per=e.target.closest('[data-rp-per]');
+  if(per){ trocaPeriodoJanela(per.dataset.rpPer); return; }
   const abre=e.target.closest('.chip.abre');
   if(abre){ abrirJanela(abre); return; }
   const fc=e.target.closest('.fcard');
@@ -4211,7 +4204,7 @@ function procCard(p){
     +(p.objeto&&p.objeto!=='—'?`<div class="proc-o">${escHtml(p.objeto)}</div>`:'')
     +`<div class="proc-m"><span>${escHtml(p.fiscalNome)}</span>`
     +`<span>${escHtml(estado)}${tempo?` · ${escHtml(tempo)}`:''}</span></div>`
-    +(p.metaEstourada?`<div class="proc-meta">Atrasado</div>`:'')+`</div>`;
+    +(p.naFila?`<div class="proc-meta${p.metaEstourada?'':' ok'}">${p.dataMeta?`Meta ${escHtml(fmtDateBR(p.dataMeta))}${p.metaEstourada?' · atrasado':''}`:'Sem data meta'}</div>`:'')+`</div>`;
 }
 const PROC_LISTA_MAX=15;
 /* ---- ranking de fiscais por tempo médio (E4) ----
@@ -4264,9 +4257,8 @@ function aggFiscais(procs,opts){
 }
 function rpFiscaisRanking(procs){
   const {lista,semFiscal}=aggFiscais(procs);
-  // Mesma régua de amostra do mapa, da legenda e dos KPIs: sem AMOSTRA_MIN despachos COM
-  // TEMPO MEDIDO não há média, e sem média não há linha. Quem passa do piso mas não chega
-  // a AMOSTRA_SOLIDA entra marcado, não escondido (ver fiscaisRankingLista).
+  // Mesma régua de amostra do mapa, da legenda e dos KPIs: sem despacho COM TEMPO MEDIDO
+  // não há média, e sem média não há linha.
   const pts=lista.filter(f=>f.n>=AMOSTRA_MIN);
   // Do mais lento para o mais rápido: a mesma pergunta que o painel inteiro faz.
   pts.sort((a,b)=>b.tempo-a.tempo || b.desp-a.desp || a.nome.localeCompare(b.nome,'pt-BR'));
@@ -4296,16 +4288,11 @@ function fiscaisRankingLista(q,avg){
   const ref=refPct!=null?`<b class="rbar-ref" style="left:${refPct}%"></b>`:'';
   return q.pts.map(p=>{
     const acima=avg!=null&&p.tempo>avg;
-    // Amostra fina: o contador de despachos volta SÓ nesta linha, e a barra fica vazada.
-    // A limpeza pedida em 2026-09-17 continua valendo para quem tem número firme — a
-    // informação extra aparece exatamente onde ela muda a leitura, e em lugar nenhum mais.
-    const fina=amostraFina(p.n);
-    const cont=fina?`<span class="qdf-fina">${escHtml(`${NUM.format(p.n)} desp.`)}</span>`:'';
     return `<div class="qdf" role="button" tabindex="0" data-mat="${escHtml(p.mat)}"`
-      +` title="Ver painel de ${escHtml(p.nome)}" aria-label="Ver painel de ${escHtml(p.nome)}${fina?`, média sobre ${NUM.format(p.n)} despachos`:''}">`
-      +`<div class="qdf-top"><span class="qdf-n"><span class="qdf-nome">${escHtml(p.nome)}</span>${cont}</span>`
+      +` title="Ver painel de ${escHtml(p.nome)}" aria-label="Ver painel de ${escHtml(p.nome)}, média sobre ${NUM.format(p.n)} despacho${p.n===1?'':'s'}">`
+      +`<div class="qdf-top"><span class="qdf-n"><span class="qdf-nome">${escHtml(p.nome)}</span></span>`
       +`<span class="qdf-v">${escHtml(fmtDias(p.tempo))}</span></div>`
-      +`<div class="rbar${acima?' amber':''}${fina?' fina':''}"><i style="width:${Math.max(4,p.tempo/max*100)}%"></i>${ref}</div></div>`;
+      +`<div class="rbar${acima?' amber':''}"><i style="width:${Math.max(4,p.tempo/max*100)}%"></i>${ref}</div></div>`;
   }).join('');
 }
 function rpFiscaisRankingHtml(procs,a){
@@ -4341,17 +4328,12 @@ function fiscaisRankingBlockHtml(procs,a){
   // "do mais lento ao mais rápido" saiu: a ordem é visível na própria coluna de números e
   // nas barras, e a linha precisa caber em uma só. A barra vazada, porém, precisa ser
   // explicada — é a única marca da lista cujo significado não se deduz olhando.
-  // Duas legendas e a dica de clique já enchem a linha: "número frágil" sai, porque a
-  // barra vazada mais o contador de despachos ao lado do nome já dizem isso, e a janela
-  // do fiscal soletra a ressalva por extenso para quem abrir.
-  const temFina=q.pts.some(p=>amostraFina(p.n));
   const sub=`<div class="sec-sub">${escHtml(per
     +(avg!=null?` · traço = média do recorte (${fmtDias(avg)}) · âmbar = acima do traço`:'')
-    +(temFina?` · barra vazada = menos de ${AMOSTRA_SOLIDA} despachos`:'')
     +'. Clique para ver o painel.')}</div>`;
   if(!q.pts.length){
     return `<div class="statwrap">${cab}`
-      +`<div class="empty">Nenhum fiscal deste recorte despachou ${AMOSTRA_MIN} vezes no período — sem média, não há barra para comparar.</div></div>`;
+      +`<div class="empty">Nenhum fiscal deste recorte tem despacho com tempo medido no período — sem média, não há barra para comparar.</div></div>`;
   }
   // A lista ganha rolagem própria a partir de QUAD_LISTA_ROLA nomes, em vez de corte: todo
   // fiscal listado precisa continuar alcançável, mas sem empurrar o ranking dos 11
@@ -4361,8 +4343,7 @@ function fiscaisRankingBlockHtml(procs,a){
   // mas os despachos não têm tempo medido. Uma linha, e só quando o caso existe.
   const nota=q.semTempoBastante
     ? `<div class="foot-note">${escHtml(`${NUM.format(q.semTempoBastante)} ${q.semTempoBastante===1?'fiscal despachou':'fiscais despacharam'} `
-      +`${AMOSTRA_MIN} vezes ou mais no período, mas sem tempo medido no SUITE em ${AMOSTRA_MIN} `
-      +`${AMOSTRA_MIN===1?'delas':'deles'} — a média sai do tempo, não da contagem.`)}</div>`
+      +`no período, mas nenhum despacho tem tempo medido no SUITE — a média sai do tempo, não da contagem.`)}</div>`
     : '';
   return `<div class="statwrap">${cab}${sub}<div class="qdf-box${rola}">${fiscaisRankingLista(q,avg)}</div>${nota}</div>`;
 }
@@ -4372,6 +4353,41 @@ function fiscaisRankingBlockHtml(procs,a){
    obra já usa (#modalBg/#modal) em vez de um segundo overlay: só um modal fica aberto por
    vez, e o padrão de abrir/fechar/clicar fora já existe e já foi revisado. */
 
+// Seletor de período das janelas de distrito e de fiscal (pedido do usuário, 2026-10-01):
+// o período é o MESMO estado de Controles (st.rp.periodo) — trocar aqui redesenha o mapa
+// por trás e a própria janela, sem fechá-la. Mostra também a data de corte, para que
+// "últimos 6 meses" seja um intervalo que se pode conferir.
+function periodoJanelaHtml(){
+  const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
+  const botoes=Object.keys(RP_PERIODO).map(k=>`<button type="button" data-rp-per="${k}" aria-pressed="${k===st.rp.periodo}"${k===st.rp.periodo?' class="on"':''}>${RP_PERIODO_ROT[k]}</button>`).join('');
+  return `<div class="dsh-per"><span class="dsh-per-l" id="dshPerL">Período</span>`
+    +`<div class="dsh-per-seg" role="group" aria-labelledby="dshPerL">${botoes}</div>`
+    +(corte?`<span class="dsh-per-d">Despachos de ${escHtml(fmtDateBR(corte))} até hoje</span>`:'')+`</div>`;
+}
+// Troca o período e refaz a janela aberta no mesmo ponto: rolagem e listas abertas voltam
+// como estavam. A janela atual vem de dataset.rpJanela ('d|gid' ou 'f|mat|gidDeOrigem').
+function trocaPeriodoJanela(v){
+  if(!RP_PERIODO[v] || st.rp.periodo===v) return;
+  const modal=document.getElementById('modal');
+  const [tipo,a,b]=(modal.dataset.rpJanela||'').split('|');
+  if(tipo!=='d' && tipo!=='f') return;
+  const rolagem=modal.scrollTop;
+  const abertos=[...modal.querySelectorAll('[data-target][aria-expanded="true"]')].map(x=>x.dataset.target);
+  st.rp.periodo=v;
+  document.querySelectorAll('#segRpPeriodo button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+  render();
+  if(tipo==='d') abreModalDistrito(a); else abreModalFiscal(a,b||undefined);
+  abertos.forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.hidden=false;
+    modal.querySelectorAll('[data-target="'+id+'"]').forEach(btn=>{
+      btn.setAttribute('aria-expanded','true');
+      const car=btn.querySelector('.adToggle-car'); if(car) car.textContent='▴';
+    });
+  });
+  modal.scrollTop=rolagem;
+  const novo=modal.querySelector('.dsh-per-seg button.on'); if(novo) novo.focus({preventScroll:true});
+}
 function mostraJanelaGenerica(){
   escondeEdTip();   // o innerHTML já trocou; a bolinha-âncora de uma tooltip antiga sumiu junto
   document.getElementById('modalBg').classList.add('show');
@@ -4441,26 +4457,22 @@ function eixoDias(pts,marcas,opts){
 // referência logo abaixo. Um por janela — é o único lugar com tipo grande, e o resto do
 // painel fica deliberadamente quieto em volta dele.
 function heroTempo(valor,n,referencia,rotuloRef){
+  const rot=`<div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor</div>`;
   if(valor==null){
-    return `<div class="dsh-hero dsh-hero-vazio"><div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor</div>`
-      +`<div class="dsh-big">—</div>`
-      +`<div class="dsh-sub">${escHtml(n?`só ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido — a média pede ao menos ${AMOSTRA_MIN}`
-        :'nenhum despacho com tempo medido')}</div></div>`;
+    return `<div class="dsh-hero dsh-hero-vazio">${rot}<div class="dsh-big">—</div>`
+      +`<div class="dsh-sub">Nenhum despacho com tempo medido neste período</div></div>`;
   }
   const d=referencia!=null?valor-referencia:null;
   // O sinal é o que o conselho lê primeiro: acima da referência é âmbar e aponta para
-  // cima, abaixo é verde e aponta para baixo. Sem referência, nenhuma das duas.
-  const delta=d==null?'':`<div class="dsh-delta ${d>0?'acima':'abaixo'}">`
-    +`<span class="dsh-seta">${d>0?'▲':'▼'}</span>${escHtml(`${fmtDias(Math.abs(d))} ${d>0?'acima':'abaixo'} ${rotuloRef} (${fmtDias(referencia)})`)}</div>`;
-  // Amostra fina: o aviso fica colado no número grande, não no rodapé da janela. É o
-  // número que vai ser lido em voz alta numa reunião, e a ressalva precisa viajar junto.
-  const fraco=amostraFina(n)
-    ? `<div class="dsh-fraco">${escHtml(`Amostra pequena: com ${NUM.format(n)} despachos, um único processo travado move bastante esta média.`)}</div>`
-    : '';
-  return `<div class="dsh-hero${d!=null&&d>0?' dsh-hero-acima':''}${amostraFina(n)?' dsh-hero-fina':''}"><div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor</div>`
+  // cima, abaixo é verde e aponta para baixo, na média é neutro. Sem referência, nada.
+  const igual=d!=null&&Math.abs(d)<0.5;
+  const delta=d==null?'':igual
+    ? `<div class="dsh-delta igual">Sem diferença para a referência (${escHtml(fmtDias(referencia))})</div>`
+    : `<div class="dsh-delta ${d>0?'acima':'abaixo'}"><span class="dsh-seta">${d>0?'▲':'▼'}</span>${escHtml(`${fmtDias(Math.abs(d))} ${d>0?'acima':'abaixo'} ${rotuloRef} (${fmtDias(referencia)})`)}</div>`;
+  return `<div class="dsh-hero${d!=null&&!igual&&d>0?' dsh-hero-acima':''}">${rot}`
     +`<div class="dsh-big">${escHtml(fmtDias(valor).replace(' dias',''))}<span class="dsh-un">dias</span></div>`
     +delta
-    +`<div class="dsh-sub">${escHtml(`em ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido`)}</div>${fraco}</div>`;
+    +`<div class="dsh-sub">${escHtml(`Média de ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido`)}</div></div>`;
 }
 // Ladrilho pequeno: o terceiro e mais leve peso de superfície da janela (herói → gráfico →
 // ladrilho). Não repete o .mkpi do modal de obra para não herdar o tamanho dele aqui.
@@ -4516,6 +4528,19 @@ function refGeral(){
 // recortada por onde a janela foi aberta (hover/seleção no mapa, ou um cartão dentro de um
 // distrito específico): a pergunta "essa pessoa é rápida ou lenta" não muda com a fatia
 // geográfica de onde alguém entrou.
+// Janela do fiscal aberta por um distrito: a média de referência é a do DISTRITO (todos os
+// despachos com tempo medido das obras dele no período — ponderada, portanto, pelo número de
+// despachos de cada fiscal) e a coorte é só quem despachou nessas obras.
+function refDoDistrito(gid){
+  const a=aggProc(procsDoDistritoRaw(gid));
+  return {media:a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null, n:a.nTempo};
+}
+function coorteFiscaisDistrito(gid){
+  return aggFiscais(procsDoDistritoRaw(gid)).lista
+    .filter(f=>f.n>=AMOSTRA_MIN)
+    .map(f=>({mat:f.mat, nome:f.nome, n:f.n, media:f.tempo}))
+    .sort((x,y)=>x.media-y.media);
+}
 function coorteFiscais(){
   return aggFiscais(groupsList().flatMap(g=>procsEquipeDistrito(g.id))).lista
     .filter(f=>f.n>=AMOSTRA_MIN)
@@ -4594,14 +4619,18 @@ function baseDaMedia(f){
 // 2026-09-17). Do mais lento ao mais rápido — a mesma pergunta que o painel inteiro faz.
 // Quem ainda não tem amostra comparável vai para o fim com "sem média", e não com um
 // número: a régua de AMOSTRA_MIN vale aqui igual ao mapa, ao ranking e aos KPIs.
-// `todosLotados:true` (E4, 2026-09-23): a lista de PESSOAS é sempre o histórico completo
-// do distrito, nunca recortada pelo período ativo — só os números de cada cartão (f.desp,
-// f.fila, f.tempo…) seguem o período, porque vêm de aggProc() dentro de aggFiscais(), que
-// sempre respeita st.rp.periodo. Pedido do usuário: os cartões não podem sumir/reaparecer
-// ao trocar o período, só os números dentro deles mudam.
+// Pedido do usuário, 2026-10-01 (reverte o de 2026-09-23, que fixava toda a equipe): a lista
+// é de quem ATUOU nas obras deste distrito — despachou no período escolhido OU tem processo
+// na fila hoje —, e muda com o período. Lotado no distrito que não fez nada nele não
+// aparece; quem só tem fila vem como "sem média". Os números de cada cartão (f.desp, f.fila,
+// f.tempo…) saem de aggProc() sobre os processos do distrito, portanto só contam o distrito.
 function equipeCardsHtml(procs,refMedia){
-  const {lista,semFiscal}=aggFiscais(procs,{todosLotados:true});
-  if(!lista.length) return '';
+  const {lista,semFiscal}=aggFiscais(procs);
+  if(!lista.length){
+    return `<div class="statwrap" id="secFiscalizacaoDist"><div class="sec-h"><span>Fiscalização</span><span>0 fiscais</span></div>`
+      +`<div class="empty">Nenhum fiscal despachou nas obras deste distrito no período, nem tem processo em tramitação nelas.</div></div>`;
+  }
+  const nDespacharam=lista.filter(f=>f.desp>0).length, soFila=lista.length-nDespacharam;
   const comMedia=lista.filter(f=>f.n>=AMOSTRA_MIN).sort((a,b)=>b.tempo-a.tempo);
   const sem=lista.filter(f=>f.n<AMOSTRA_MIN)
                  .sort((a,b)=>b.desp-a.desp||a.nome.localeCompare(b.nome,'pt-BR'));
@@ -4611,13 +4640,12 @@ function equipeCardsHtml(procs,refMedia){
   // verde um fiscal de 100 dias num distrito lento — e ele é âmbar no ranking do painel.
   const avg=refMedia!=null?refMedia:null;
   const card=f=>{
-    const tem=f.n>=AMOSTRA_MIN, fina=amostraFina(f.n), acima=avg!=null&&f.tempo>avg;
+    const tem=f.n>=AMOSTRA_MIN, acima=avg!=null&&f.tempo>avg;
     const valor=tem?escHtml(fmtDias(f.tempo)):'<span class="fcard-sem">sem média</span>';
-    // Mesma marca do ranking, pela mesma razão: aqui também uma pessoa é nomeada.
-    const barra=tem?`<div class="rbar${acima?' amber':''}${fina?' fina':''}"><i style="width:${Math.max(4,f.tempo/max*100)}%"></i></div>`:'';
+    const barra=tem?`<div class="rbar${acima?' amber':''}"><i style="width:${Math.max(4,f.tempo/max*100)}%"></i></div>`:'';
     // Sem média, o cartão precisa dizer POR QUE — era o buraco que o usuário encontrou em
     // Fortaleza (2026-09-17): fiscal com mais de 2 despachos e nenhum número, sem pista.
-    const aviso=(!tem||fina)?`<div class="fcard-fina">${escHtml(baseDaMedia(f))}</div>`:'';
+    const aviso=(!tem||f.n<f.desp)?`<div class="fcard-fina">${escHtml(baseDaMedia(f))}</div>`:'';
     return `<div class="fcard" role="button" tabindex="0" data-mat="${escHtml(f.mat)}"`
       +` title="Ver painel de ${escHtml(f.nome)}" aria-label="Ver painel de ${escHtml(f.nome)}">`
       +`<div class="fcard-n">${escHtml(f.nome)}</div>`
@@ -4633,8 +4661,45 @@ function equipeCardsHtml(procs,refMedia){
   // ficam escondidos.
   return `<div class="statwrap" id="secFiscalizacaoDist"><div class="sec-h"><span>Fiscalização</span>`
     +`<span>${NUM.format(lista.length)} ${lista.length===1?'fiscal':'fiscais'}</span></div>`
-    +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média dos distritos operacionais (${escHtml(fmtDias(avg))})`:''}. Clique num cartão para abrir o painel do fiscal.</div>`
+    +`<div class="sec-sub">Do mais lento ao mais rápido${avg!=null?` · âmbar = acima da média dos distritos operacionais (${escHtml(fmtDias(avg))})`:''}. ${soFila?` ${NUM.format(nDespacharam)} ${nDespacharam===1?'despachou':'despacharam'} no período; ${NUM.format(soFila)} ${soFila===1?'tem':'têm'} só processo em tramitação.`:''} Clique num cartão para abrir o painel do fiscal, só com os processos deste distrito.</div>`
     +`<div class="fcards">${comMedia.map(card).join('')}${sem.map(card).join('')}</div>${nota}</div>`;
+}
+// Cartão "Processos em tramitação" da janela do distrito. `a` é o aggProc() do distrito.
+function filaDistritoHtml(a,noPrazo,semPrazo,filaDist){
+  const tot=a.fila;
+  const pct=n=>`${NUM.format(Math.round(n/tot*100))}%`;
+  const seg=(n,cls,rot)=>n?`<i class="${cls}" style="flex:${n} 1 0" title="${escHtml(`${rot}: ${NUM.format(n)}`)}"></i>`:'';
+  const stat=(n,cls,sing,plur)=>n?`<div class="fila-st ${cls}"><div class="fila-sn"><i class="fila-dot"></i>${NUM.format(n)}</div>`
+    +`<div class="fila-sl">${n===1?sing:plur}</div><div class="fila-sp">${pct(n)} da fila</div></div>`:'';
+  // Lista por status da fila (Análise Fiscal e Reanálise Fiscal), e dentro de cada um do
+  // processo há mais tempo com o fiscal para o há menos (sem dias, no fim).
+  const grupos=new Map();
+  filaDist.forEach(p=>{ const k=String(p.statusTxt||'—').trim().toUpperCase(); if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(p); });
+  const ordemSt=k=>k==='ANÁLISE FISCAL'?0:k==='REANÁLISE FISCAL'?1:2;
+  const titulo=k=>k.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
+  const listaHtml=[...grupos.entries()].sort((x,y)=>ordemSt(x[0])-ordemSt(y[0])||x[0].localeCompare(y[0],'pt-BR')).map(([k,ps])=>{
+    ps.sort((x,y)=>(y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
+    const mostra=ps.slice(0,PROC_LISTA_MAX);
+    return `<div class="fila-g"><div class="fila-gh"><span>${escHtml(titulo(k))}</span><b>${NUM.format(ps.length)}</b></div>`
+      +`<div class="fila-gs">Do que está há mais tempo com o fiscal para o que está há menos</div>`
+      +mostra.map(procCard).join('')
+      +(ps.length>mostra.length?`<div class="foot-note">Mostrando ${NUM.format(mostra.length)} de ${NUM.format(ps.length)}.</div>`:'')+`</div>`;
+  }).join('');
+  const gecope=a.naGecope
+    ? `<div class="fila-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} destas obras `
+        +`${a.naGecope===1?'está':'estão'} na GECOPE, fora das mãos do fiscal.`)}</div>`
+    : '';
+  return `<div class="dsh-plot fila">`
+    +`<div class="fila-h"><div><div class="fila-t">Processos em tramitação</div>`
+    +`<div class="fila-s">Com a fiscalização agora, em Análise Fiscal ou Reanálise Fiscal</div></div>`
+    +`<div class="fila-tot"><b>${NUM.format(tot)}</b><span>${tot===1?'processo':'processos'}</span></div></div>`
+    +`<div class="fila-bar" role="img" aria-label="${escHtml(`${a.metaEst} atrasados, ${noPrazo} no prazo, ${semPrazo} sem prazo`)}">`
+    +`${seg(a.metaEst,'atraso','Atrasado')}${seg(noPrazo,'noprazo','No prazo')}${seg(semPrazo,'semprazo','Sem prazo')}</div>`
+    +`<div class="fila-stats">${stat(a.metaEst,'atraso','atrasado','atrasados')}${stat(noPrazo,'noprazo','no prazo','no prazo')}`
+    +`${stat(semPrazo,'semprazo','sem prazo','sem prazo')}</div>`
+    +gecope
+    +verToggle('fichaFilaDist',`Ver os ${NUM.format(tot)} ${tot===1?'processo':'processos'}`)
+    +`<div id="fichaFilaDist" hidden>${listaHtml}</div></div>`;
 }
 function abreModalDistrito(gid){
   const g=grpById(gid); if(!g) return;
@@ -4659,14 +4724,13 @@ function abreModalDistrito(gid){
     const dentro=p.naFila || (p.despachado && (corteObras==null || (!!p.dataDespacho && p.dataDespacho>=corteObras)));
     if(dentro && !obrasMapDist.has(p.codigo_obra)) obrasMapDist.set(p.codigo_obra,p);
   }
-  const obrasListDist=[...obrasMapDist.values()].sort((x,y)=>(y.valorObra??-1)-(x.valorObra??-1));
   // Mesmo tri-estado do card/donut GECOPE × Fiscalização: sem prazo não é "no prazo".
   const noPrazo=Math.max(0,a.comMeta-a.metaEst), semPrazo=Math.max(0,a.fila-a.comMeta);
   const est=refEstadoPeriodo();
   const media=a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
   // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pelas": a janela precisa
   // dizer a mesma coisa que o hover já diz.
-  const sub=`<div class="msub">${RS_ICO.dist}<span>Obras localizadas no distrito · ${escHtml(per)}</span></div>`;
+  const sub=`<div class="dsh-context">${RS_ICO.dist}<span>Obras localizadas no distrito</span></div>`;
   const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média dos distritos operacionais')}`
     +posicaoHtml('Desempenho do Distrito Operacional',coorteDistritos(),'gid',String(gid),est.media,'Média dos Distritos Operacionais','distritos comparáveis')
     +`</div>`;
@@ -4685,57 +4749,37 @@ function abreModalDistrito(gid){
   // fica sempre visível — não há o que abrir/esconder ali.
   const tiles=`<div class="dsh-tiles">`
     +tile(NUM.format(a.procs),'Processos',rpQuandoProc(),{target:'fichaFilaDist'})
-    +tile(NUM.format(a.desp),'Despachos',per,{target:'fichaDespDist'})
+    +tile(NUM.format(a.desp),'Despachos',per)
     +tile(NUM.format(a.fiscais),'Fiscais no período',per,{scrollTo:'secFiscalizacaoDist'})
-    +tile(NUM.format(obrasMapDist.size),'Obras atendidas','dos processos acima',{target:'fichaObrasDist'})
-    +`</div><div class="dsh-nota">Processos é sempre a fila de hoje; despachos, fiscais e obras seguem o período escolhido em Controles.</div>`;
-  // A fila de hoje, na mesma linguagem horizontal do resto da janela. O donut de atraso
-  // do painel lateral diria o mesmo aqui — uma barra a mais, um gráfico a menos.
-  // Lista dos processos por trás da barra: usuário relatou (2026-09-21) que dava pra ver
-  // "com a fiscalização hoje" mas não QUAIS processos são esses. procCard() (não
+    +tile(NUM.format(obrasMapDist.size),'Obras atendidas',per)
+    +`</div><div class="dsh-nota">Processos é sempre a fila de hoje; despachos, fiscais e obras seguem o período escolhido acima.</div>`;
+  // Processos em tramitação (redesenhada em 2026-10-01): um cartão só, que responde em ordem às três
+  // perguntas do gestor — quantos processos estão com a fiscalização, quantos deles estão
+  // atrasados, e quais são. O total vai grande à direita; a barra e os três números logo
+  // abaixo dizem a mesma coisa de dois jeitos (proporção e contagem); a lista fica atrás de
+  // um botão. Despachados e Obras atendidas saíram desta janela (pedido do usuário,
+  // 2026-10-01): moram na janela do fiscal, só com as obras dele. procCard() (não
   // fichaProcCard, que omite o fiscal) porque o recorte do distrito tem vários fiscais.
-  const filaDist=procs.filter(p=>p.naFila)
-    .sort((x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
-  const hoje=a.fila
-    ? `<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.pessoa} Com a fiscalização hoje</div>`
-      +barraAtraso(a.metaEst,noPrazo,semPrazo)
-      +`<div class="dsh-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} destas obras `
-        +`${a.naGecope===1?'está':'estão'} na GECOPE, fora das mãos do fiscal.`)}</div>`
-      +grupoProcs('fichaFilaDist','Processos','',filaDist,null,'',procCard)
-      +`</div>`
-    : '';
-  // Despachados do período — mesmo corte de aggProc() (corteObras), então a contagem bate
-  // com o ladrilho Despachos acima. Não existia lista nenhuma aqui antes: o distrito só
-  // mostrava a fila de hoje, nunca quem já tinha despachado no período.
-  const despDist=procs.filter(p=>p.despachado && (corteObras==null || (!!p.dataDespacho && p.dataDespacho>=corteObras)))
-    .sort((x,y)=>String(y.dataDespacho||'').localeCompare(String(x.dataDespacho||'')));
-  const rotDespDist=p=>p.dataDespacho?fmtDateBR(p.dataDespacho):'sem data';
-  const despSecao=despDist.length
-    ? `<div class="dsh-plot">${grupoProcs('fichaDespDist',`Despachados · ${per}`,
-        'Do mais recente para o mais antigo.',despDist,rotDespDist,'',procCard)}</div>`
-    : '';
-  // Obras atendidas: uma obra por linha (não um processo), agrupadas em obrasMapDist —
-  // mesmo recorte "hoje na fila OU despachado no período" que soma o número do ladrilho.
-  const obrasSecao=obrasListDist.length
-    ? `<div class="dsh-plot">${grupoProcs('fichaObrasDist','Obras atendidas','',obrasListDist,null,'',obraResumoCard,['obra','obras'])}</div>`
-    : '';
+  const filaDist=procs.filter(p=>p.naFila);
+  const hoje=a.fila ? filaDistritoHtml(a,noPrazo,semPrazo,filaDist) : '';
   // A régua "Fiscal × Obra" que restringia esta seção à lotação do fiscal foi removida
   // (2026-09-23): o painel considera sempre o distrito da obra, então a comparação passa a
   // ser sobre quem trabalhou nas obras deste distrito — mesmo critério do ranking lateral
   // (rpFiscaisRankingHtml, ajustado junto).
   const equipeSecao=equipeCardsHtml(procs,est.media);
   const corpo=a.total
-    ? topo+tiles+hoje+despSecao+obrasSecao+equipeSecao
+    ? topo+tiles+equipeSecao+hoje
     : `<div class="empty">Nenhum processo de replanilhamento nas obras deste distrito.</div>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(nome)}</div>${sub}</div>
       <div class="mh-actions"><button class="mx" id="modalX" aria-label="Fechar">✕</button></div>
-    </div></div>
+    </div>${periodoJanelaHtml()}</div>
     <div class="mbody dsh">${avisoFiltroRpHtml()}${corpo}</div>`;
   // A janela de distrito é sempre a "casa" — nunca chega por "← Voltar" de outra janela —,
   // mas grava o próprio gid no #modal (sobrevive à troca de innerHTML) para que um fiscal
   // aberto por cima saiba pra onde voltar. Ver o listener de .fcard, acima.
   document.getElementById('modal').dataset.rpDistrito=String(gid);
+  document.getElementById('modal').dataset.rpJanela='d|'+gid;
   mostraJanelaGenerica();
 }
 
@@ -4743,10 +4787,13 @@ function abreModalDistrito(gid){
 // aberta nunca serviu para avaliar alguém), medida no PERÍODO ativo. Passa por aggProc() de
 // propósito — a mesma função que imprime os KPIs do painel e monta o ranking —, para que
 // nenhum número da janela possa divergir do que a tela ao lado afirma. `todos` continua
-// sendo a lista completa: é dela que sai o grupo "Fora deste recorte", que existe para a
+// sendo a lista completa: é dela que sai o grupo "Outros processos", que existe para a
 // conta da lista fechar em vez de sumirem processos em silêncio.
-function fichaFiscal(mat){
-  const todos=PROCESSOS.filter(p=>p.fiscalMat===mat);
+// `gid` (distrito de origem da janela, opcional): com ele, a ficha é só dos processos de obras
+// daquele distrito — o resto da carga do fiscal fica fora e é apenas contado (`foraDoDistrito`).
+function fichaFiscal(mat,gid){
+  const doFiscal=PROCESSOS.filter(p=>p.fiscalMat===mat);
+  const todos=gid!=null&&gid!==''?doFiscal.filter(p=>String(p.gidObra)===String(gid)):doFiscal;
   const a=aggProc(todos);
   // Obras do RECORTE, não da carga inteira: era o único número da janela que ainda
   // contava a carreira, e um ladrilho fora do período no meio de três dentro dele é
@@ -4766,10 +4813,12 @@ function fichaFiscal(mat){
   // — mesmo princípio do "N de M" já usado em rpFiscaisRanking (nFiscais, acima).
   // Guarda o PROCESSO representante (não só o valor): é dele que sai o cartão da lista por
   // trás do ladrilho "Obras" (obraResumoCard, mesmo padrão de abreModalDistrito).
-  const obrasMap=new Map();
+  const obrasMap=new Map(), procsPorObra=new Map();
   let obrasComValor=0;
   for(const p of noPeriodo){
     if(!p.codigo_obra) continue;
+    if(!procsPorObra.has(p.codigo_obra)) procsPorObra.set(p.codigo_obra,[]);
+    procsPorObra.get(p.codigo_obra).push(p);
     if(!obrasMap.has(p.codigo_obra)){
       obrasMap.set(p.codigo_obra, p);
       if(p.valorObra!=null) obrasComValor++;
@@ -4777,7 +4826,7 @@ function fichaFiscal(mat){
   }
   const obrasList=[...obrasMap.values()].sort((x,y)=>(y.valorObra??-1)-(x.valorObra??-1));
   const valorObras=obrasList.reduce((s,p)=>s+(p.valorObra||0),0);
-  return {todos, a, obras:obrasMap.size, obrasComValor, obrasList, processosNoPeriodo:noPeriodo.length, valorObrasNoPeriodo:valorObras};
+  return {todos, foraDoDistrito:doFiscal.length-todos.length, a, obras:obrasMap.size, obrasComValor, obrasList, procsPorObra, processosNoPeriodo:noPeriodo.length, valorObrasNoPeriodo:valorObras};
 }
 // Cartão de processo da ficha: NUP, descrição, contratada e contratante — não é o
 // procCard() da lista por cidade, que repete o nome do fiscal a cada linha (redundante
@@ -4809,7 +4858,8 @@ function obraResumoCard(o){
 // data de compromisso não é "no prazo", é "sem prazo" (mesma regra do donut e da barra).
 function rotuloPrazo(p){
   const q=p.metaEstourada===true?'Atrasado':p.metaEstourada===false?'No prazo':'Sem prazo';
-  return p.diasNaUnidade!=null ? `${q} · ${NUM.format(p.diasNaUnidade)} dia${p.diasNaUnidade===1?'':'s'}` : q;
+  const base=p.diasNaUnidade!=null ? `${q} · ${NUM.format(p.diasNaUnidade)} dia${p.diasNaUnidade===1?'':'s'}` : q;
+  return p.dataMeta ? `${base} · meta ${fmtDateBR(p.dataMeta)}` : base;
 }
 // Ordem de leitura da fila de hoje (janela de fiscal e de distrito, mesma régua):
 // atrasado primeiro, sem prazo por último; dentro de cada grupo, quem espera há mais
@@ -4848,17 +4898,23 @@ function grupoProcs(id,titulo,sub,procs,rotulo,extra,cardFn,nome){
 // "Voltar" já implica que dar zoom-out primeiro no distrito exige aquele clique, e o ✕
 // continua alcançável a partir de lá (ou por Esc/clique fora, que sempre fecham tudo).
 function abreModalFiscal(mat,voltarGid){
-  const f=fichaFiscal(mat); if(!f.todos.length) return;
+  const gid=voltarGid||null;
+  const f=fichaFiscal(mat,gid); if(!f.todos.length) return;
+  const gDist=gid?grpById(gid):null, nomeDist=gDist?gDist.nome.replace(/^D\.O\.\s*/,''):'';
   const ref=f.todos[0], a=f.a;
-  const geral=refGeral();
+  const geral=gDist?refDoDistrito(gid):refGeral();
+  const rotRef=gDist?'Média do distrito':'Média geral';
   const media=a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
   const lot=ref.gedop?` · ${ref.gedop}`:'';
   const perTxt=RP_PERIODO[st.rp.periodo].txt;
   // O subtítulo declara o recorte da janela inteira: era "Carga completa", e passou a ser
   // o período ativo quando todos os números da tela passaram a segui-lo.
-  const sub=`<div class="msub">${RS_ICO.pessoa}<span>${escHtml(perTxt)}${ref.fiscalMat?` · mat. ${escHtml(ref.fiscalMat)}`:''}${escHtml(lot)}</span></div>`;
-  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,geral.media,'da média geral')}`
-    +posicaoHtml('Onde este fiscal está',coorteFiscais(),'mat',mat,geral.media,'Média geral','fiscais comparáveis')
+  const sub=`<div class="dsh-context">${RS_ICO.pessoa}<span>${ref.fiscalMat?`mat. ${escHtml(ref.fiscalMat)}`:'Fiscal'}${escHtml(lot)}</span></div>`
+    +(gDist?`<div class="dsh-escopo">${RS_ICO.dist}<span>Só processos de obras do distrito ${escHtml(nomeDist)}</span></div>`:'');
+  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,geral.media,gDist?'da média do distrito':'da média geral')}`
+    +(gDist
+      ? posicaoHtml(`Posição entre os fiscais de ${nomeDist}`,coorteFiscaisDistrito(gid),'mat',mat,geral.media,rotRef,'fiscais do distrito')
+      : posicaoHtml('Onde este fiscal está',coorteFiscais(),'mat',mat,geral.media,rotRef,'fiscais comparáveis'))
     +`</div>`;
   // A TIRA DE DESPACHOS — a explicação da média que o usuário pediu ao clicar no nome
   // (2026-09-17). Um ponto por despacho no mesmo eixo de dias das outras comparações:
@@ -4873,7 +4929,7 @@ function abreModalFiscal(mat,voltarGid){
                      .sort((x,y)=>x.tempoFiscal-y.tempoFiscal);
   const marcas=[];
   if(media!=null) marcas.push({v:media,label:'Média do fiscal',cls:'med'});
-  if(geral.media!=null) marcas.push({v:geral.media,label:'Média geral',cls:'ref'});
+  if(geral.media!=null) marcas.push({v:geral.media,label:rotRef,cls:'ref'});
   const lento=desps.length?desps[desps.length-1]:null;
   const nota=desps.length>=2
     ? `Mais demorado: ${lento.processo}, ${fmtDias(lento.tempoFiscal)}. Mais rápido: ${desps[0].processo}, ${fmtDias(desps[0].tempoFiscal)}.`
@@ -4893,83 +4949,82 @@ function abreModalFiscal(mat,voltarGid){
   // sempre a posição de hoje (fila), qualquer que seja o período — por isso não tem mais
   // ladrilho "Em tramitação" ao lado: seria sempre o mesmo número (2026-09-21). Despachos
   // e Obras continuam seguindo o período.
-  // Cada ladrilho abre a lista correspondente mais abaixo (pedido do usuário, 2026-09-23):
-  // Processos → o grupo Análise Fiscal (fichaFila); Despachos → o grupo Despachados
-  // (fichaDesp), ambos já existentes em `processos`; Obras → o grupo novo dentro de
-  // "Carga no período" (fichaObrasFiscal), mesmo recorte que soma f.obras.
-  const tiles=`<div class="dsh-tiles">`
-    +tile(NUM.format(a.procs),'Processos',rpQuandoProc(),{target:'fichaFila'})
-    +tile(NUM.format(a.desp),'Despachos',perTxt,{target:'fichaDesp'})
-    +tile(NUM.format(f.obras),'Obras','dos processos acima',{target:'fichaObrasFiscal'})
-    +`</div>`;
-  // Card "Carga no período" — pedido do usuário em 2026-09-22 (grill sobre a correlação
-  // carga×tempo, docs/painel-fiscais/diagnostico-carga-concorrente-tempo.sql): gestor
-  // quer ver, juntos, quantos processos esse fiscal teve e o valor somado das obras deles
-  // DENTRO do período ativo — não o "instantâneo de hoje" que o ladrilho PROCESSOS
-  // (acima) sempre mostra. Rótulo "no período" nos dois ladrilhos de propósito: mesmo
-  // princípio de nunca deixar dois números de significado diferente (fila de hoje ×
-  // janela de tempo) parecerem a mesma coisa por terem o mesmo nome curto.
-  // Ressalva de não-causalidade e "N de M obras" — achados rev-produto/rev-correcao,
-  // 2026-09-22: a correlação que motivou este card é fraca e, numa regressão com
-  // processos+valor juntos, nenhuma das duas variáveis é significativa isoladamente
-  // (docs/painel-fiscais/, E12) — sem o aviso, um valor alto ao lado de um tempo alto lê
-  // como causa, o que os dados não sustentam. E sem o "N de M", a soma parece completa
-  // mesmo quando faltou valor de alguma obra (cobertura ~99%, não 100%).
-  // Achado rev-design, rodada 2: a ressalva no `sec-sub` (3 frases coladas) sobrecarregava
-  // a hierarquia do card, e o subtítulo longo no ladrilho ("N de M obras com valor
-  // conhecido") estourava `.dsh-ts` em larguras intermediárias, empurrando só aquele
-  // ladrilho pra 2 linhas. Fix: ressalva move pro `.dsh-nota` (mesma legenda secundária já
-  // usada em `hoje`/`fichaProcCard`, abaixo dos tiles, sem orçamento de largura fixo) e o
-  // subtítulo do ladrilho encurta pro mesmo porte de `perTxt`.
-  // Achado rev-produto, rodada 2 (2ª vez que bloqueia — escalado ao usuário, que autorizou
-  // esta correção): o card tinha um terceiro ladrilho "Obras no período" mostrando
-  // `f.obras`, o MESMO valor do ladrilho "Obras" já existente em `tiles` (acima) — este já
-  // era escopado ao período antes deste diff, então "no período" duplicava sem avisar.
-  // Removido; "Obras" continua disponível no card de cima, sem repetição.
-  const covObras=f.obras>f.obrasComValor
-    ? `${NUM.format(f.obrasComValor)}/${NUM.format(f.obras)} com valor`
-    : perTxt;
-  // Lista por trás do ladrilho "Obras" (acima) e do ladrilho "Valor das obras" logo
-  // abaixo — mesmo Map (f.obrasList, de fichaFiscal) que soma os dois números.
-  const obrasGrupo=f.obrasList.length
-    ? grupoProcs('fichaObrasFiscal','Obras','',f.obrasList,null,'',obraResumoCard,['obra','obras'])
-    : '';
-  const cargaPeriodo=`<div class="statwrap">
-    <div class="sec-h"><span>Carga no período</span></div>
-    <div class="sec-sub">${escHtml(`${perTxt}. Diferente do ladrilho "Processos" acima, que é sempre a fila de hoje — aqui os números seguem o período escolhido em Controles.`)}</div>
-    <div class="dsh-tiles dsh-tiles-cap">`
-      +tile(NUM.format(f.processosNoPeriodo),'Processos no período',perTxt)
-      +tile(f.valorObrasNoPeriodo>0?BRL.format(f.valorObrasNoPeriodo):'—','Valor das obras',covObras)
-    +`</div>`
-    +`<div class="dsh-nota">${escHtml('Valor é exposição financeira das obras, não medida de desempenho: a relação com o tempo de despacho é fraca e não se sustenta separada da carga de processos.')}</div>`
-    +obrasGrupo
-    +`</div>`;
-  // PROCESSOS: uma seção só, com três subgrupos disjuntos que somam o total do
-  // cabeçalho — Análise Fiscal (com o fiscal agora), Despachados (no período ativo) e
-  // Fora deste recorte (o resto, pra conta fechar em vez de sumir processo em silêncio).
-  // Antes eram duas seções soltas (uma pra "hoje", outra chamada "Processos" só com os
-  // outros dois grupos); usuário relatou que a divisão ficava confusa (2026-09-21).
-  const analiseExtra=barraAtraso(atras,noPrazo,semPrazo)
-    +(espera>=0?`<div class="dsh-nota">${escHtml(`O mais antigo está há ${NUM.format(espera)} dia${espera===1?'':'s'} na unidade do fiscal.`)}</div>`:'');
-  const despPer=f.todos.filter(noPeriodo)
-    .sort((x,y)=>String(y.dataDespacho||'').localeCompare(String(x.dataDespacho||'')));
-  const dentro=new Set([...fila,...despPer]);
-  const resto=f.todos.filter(p=>!dentro.has(p)).sort(rpOrdemProc);
-  const rotDesp=p=>p.dataDespacho?fmtDateBR(p.dataDespacho):'sem data';
-  const processos=`<div class="statwrap"><div class="sec-h"><span>Processos</span><span>${NUM.format(f.todos.length)}</span></div>`
-    +grupoProcs('fichaFila','Análise Fiscal','',fila,rotuloPrazo,analiseExtra)
-    +grupoProcs('fichaDesp',`Despachados · ${perTxt}`,'Do mais recente para o mais antigo.',despPer,rotDesp)
-    +grupoProcs('fichaResto','Fora deste recorte',
-        'Na GECOPE, despachados antes do período ou arquivados no meio do trâmite.',resto,null)
-    +`</div>`;
+  // Parte de baixo da janela (redesenhada em 2026-10-01): uma só seção, "Obras e processos".
+  // Quatro ladrilhos no topo (Processos de hoje, Despachos, Obras e Valor das obras — os três
+  // últimos no período) e, abaixo, uma linha por obra; clicar na obra abre os processos DELA
+  // no período. Substitui o card "Carga no período" e os grupos Análise Fiscal / Despachados:
+  // o que eles diziam agora está nos ladrilhos, no resumo da seção e dentro de cada obra.
+  // "Outros processos" fecha a conta (o que não entra nos números do período).
+  // O valor é exposição financeira, e não medida de desempenho (a relação com o tempo de
+  // despacho é fraca): a ressalva mora no "i" do ladrilho, e não num parágrafo solto.
+  const tipValor='Soma do valor das obras com processo no período — exposição financeira, não medida de desempenho: a relação com o tempo de despacho é fraca.'
+    +(f.obras>f.obrasComValor?'\n\nValor conhecido em '+NUM.format(f.obrasComValor)+' de '+NUM.format(f.obras)+' obras.':'');
+  const tiles='<div class="dsh-tiles">'
+    +tile(NUM.format(a.procs),'Processos',rpQuandoProc(),{scrollTo:'secProcessosFiscal'})
+    +tile(NUM.format(a.desp),'Despachos',perTxt,{scrollTo:'secProcessosFiscal'})
+    +tile(NUM.format(f.obras),'Obras',perTxt,{scrollTo:'secProcessosFiscal'})
+    +tile(f.valorObrasNoPeriodo>0?BRL.format(f.valorObrasNoPeriodo):'—','Valor das obras',perTxt,{tip:tipValor})
+    +'</div>';
+  const despPer=f.todos.filter(noPeriodo);
+  // Lista de processos do fiscal NO PERÍODO (pedido do usuário, 2026-10-01 — substituiu
+  // "Obras e processos"): sem agrupar por obra, só o processo e a descrição. Em tramitação
+  // vêm separados por status (Análise Fiscal, Reanálise Fiscal), cada processo com a
+  // situação do prazo (no prazo / em atraso / sem prazo); os despachados ficam num grupo
+  // recolhido. Do que está há mais tempo com o fiscal para o que está há menos.
+  const porDias=(x,y)=>(y.diasNaUnidade??-1)-(x.diasNaUnidade??-1);
+  const stNorm=p=>String(p.statusTxt||'').trim().toUpperCase();
+  const emAnalise=fila.filter(p=>stNorm(p)==='ANÁLISE FISCAL').sort(porDias);
+  const emReanalise=fila.filter(p=>stNorm(p)==='REANÁLISE FISCAL').sort(porDias);
+  const outrosSt=fila.filter(p=>stNorm(p)!=='ANÁLISE FISCAL'&&stNorm(p)!=='REANÁLISE FISCAL').sort(porDias);
+  const despOrd=despPer.slice().sort((x,y)=>String(y.dataDespacho||'').localeCompare(String(x.dataDespacho||'')));
+  const linhaProc=p=>{
+    const objeto=p.objeto&&p.objeto!=='—'?'<div class="pp-desc">'+escHtml(p.objeto)+'</div>':'';
+    let badge, info;
+    if(p.naFila){
+      const k=p.metaEstourada===true?'atraso':p.metaEstourada===false?'noprazo':'semprazo';
+      badge='<span class="pp-b '+k+'">'+(k==='atraso'?'Em atraso':k==='noprazo'?'No prazo':'Sem prazo')+'</span>';
+      info=[p.diasNaUnidade!=null?NUM.format(p.diasNaUnidade)+' dia'+(p.diasNaUnidade===1?'':'s')+' com o fiscal':'',
+            p.dataMeta?'meta '+fmtDateBR(p.dataMeta):'sem data meta'].filter(Boolean).join(' · ');
+    }else{
+      badge='<span class="pp-b desp">Despachado</span>';
+      info=(p.dataDespacho?'em '+fmtDateBR(p.dataDespacho):'sem data')+(p.tempoFiscal!=null?' · '+fmtDias(p.tempoFiscal)+' no setor':'');
+    }
+    return '<div class="pp-row'+(p.naFila&&p.metaEstourada===true?' atraso':'')+'"><div class="pp-main"><div class="pp-n">'+escHtml(p.processo)+'</div>'+objeto+'</div>'
+      +'<div class="pp-side">'+badge+'<span class="pp-info">'+escHtml(info)+'</span></div></div>';
+  };
+  const corpoGrupo=ps=>ps.slice(0,PROC_LISTA_MAX).map(linhaProc).join('')
+    +(ps.length>PROC_LISTA_MAX?'<div class="foot-note">Mostrando '+NUM.format(PROC_LISTA_MAX)+' de '+NUM.format(ps.length)+'.</div>':'');
+  const grupoSt=(titulo,ps)=>ps.length
+    ? '<div class="pp-grupo"><div class="pp-gh"><span>'+escHtml(titulo)+'</span><b>'+NUM.format(ps.length)+'</b></div>'+corpoGrupo(ps)+'</div>':'';
+  const grupoDesp=despOrd.length
+    ? '<div class="pp-grupo"><div class="pp-gh"><span>Despachados</span><b>'+NUM.format(despOrd.length)+'</b></div>'
+      +verToggle('ppDespachados','Ver '+(despOrd.length===1?'o processo despachado':'os '+NUM.format(despOrd.length)+' despachados'))
+      +'<div class="pp-lista" id="ppDespachados" hidden>'+corpoGrupo(despOrd)+'</div></div>':'';
+  const chip=(n,txt,cls)=>n?'<span class="op-chip'+(cls?' '+cls:'')+'"><b>'+NUM.format(n)+'</b> '+txt+'</span>':'';
+  const resumo='<div class="op-resumo">'
+    +chip(f.processosNoPeriodo,f.processosNoPeriodo===1?'processo no período':'processos no período')
+    +chip(emAnalise.length,'em Análise Fiscal')+chip(emReanalise.length,'em Reanálise Fiscal')
+    +chip(atras,'em atraso','atraso')+chip(noPrazo,'no prazo','ok')+chip(semPrazo,'sem prazo')
+    +chip(despPer.length,despPer.length===1?'despachado':'despachados')
+    +'</div>';
+  const obrasProcessos='<div class="statwrap op" id="secProcessosFiscal"><div class="sec-h"><span>Processos no período</span><span>'+perTxt+'</span></div>'
+    +resumo
+    +(f.processosNoPeriodo
+      ? '<div class="pp-grupos">'+grupoSt('Análise Fiscal',emAnalise)+grupoSt('Reanálise Fiscal',emReanalise)+grupoSt('Outros status',outrosSt)+grupoDesp+'</div>'
+      : '<div class="empty">Nenhum processo deste fiscal no período.</div>')
+    +(gDist&&f.foraDoDistrito
+      ? '<div class="foot-note">'+escHtml('Este fiscal tem mais '+NUM.format(f.foraDoDistrito)+' processo'+(f.foraDoDistrito===1?'':'s')+' em obras de outros distritos operacionais, que não aparecem aqui.')+'</div>'
+      : '')
+    +'</div>';
   const acoes=voltarGid
     ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para o distrito">${RS_ICO.voltar}<span>Voltar</span></button>`
     : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
       <div class="mh-titles"><div class="mt">${escHtml(ref.fiscalNome)}</div>${sub}</div>
       <div class="mh-actions">${acoes}</div>
-    </div></div>
-    <div class="mbody dsh">${avisoFiltroRpHtml()}${topo}${tira}${tiles}${cargaPeriodo}${processos}</div>`;
+    </div>${periodoJanelaHtml()}</div>
+    <div class="mbody dsh">${avisoFiltroRpHtml()}${topo}${tira}${tiles}${obrasProcessos}</div>`;
+  document.getElementById('modal').dataset.rpJanela='f|'+mat+'|'+(voltarGid||'');
   mostraJanelaGenerica();
   const v=document.getElementById('modalVoltar');
   if(v) v.onclick=()=>abreModalDistrito(voltarGid);
@@ -5006,7 +5061,7 @@ function renderPanelReplan(scope,body){
   if(d&&d.semMunicipio) anomalias.push(linha('Sem município reconhecido', NUM.format(d.semMunicipio), 'fora da contagem pelo local da obra'));
   if(d&&d.semGedop) anomalias.push(linha('Fiscal sem lotação', NUM.format(d.semGedop), 'fora da contagem pela equipe'));
   if(d&&d.gedopSemDistrito) anomalias.push(linha('Lotação fora dos 11 distritos', NUM.format(d.gedopSemDistrito), 'fora da contagem pela equipe'));
-  if(d&&d.despSemData) anomalias.push(linha('Despachado sem data', NUM.format(d.despSemData), 'só entra no período “Hoje”'));
+  if(d&&d.despSemData) anomalias.push(linha('Despachado sem data', NUM.format(d.despSemData), 'fora de todos os períodos'));
   if(d&&d.despSemTempo) anomalias.push(linha('Despachado sem tempo no SUITE', NUM.format(d.despSemTempo), 'conta como despacho, fora do tempo médio'));
   if(d&&d.aprovSemData) anomalias.push(linha('Aprovado sem data de aprovação', NUM.format(d.aprovSemData), 'fora de todas as contagens'));
   if(d&&d.semSituacao) anomalias.push(linha('Sem cálculo do SUITE', NUM.format(d.semSituacao), 'fora de todas as contagens'));
@@ -5028,7 +5083,6 @@ function renderPanelReplan(scope,body){
   }
   // Mesma regra do mapa (rpValor): abaixo de AMOSTRA_MIN a média não é exibida — o
   // painel não pode mostrar um número que o mapa se recusou a pintar.
-  const nDesp=`${NUM.format(a.nTempo)} despacho${a.nTempo===1?'':'s'}`;
   const tempo = a.nTempo>=AMOSTRA_MIN ? fmtDias(a.tempoMedio) : '—';
   const nota = st.level>=2
     ? 'Dentro do distrito, cidades e totais contam pelo local da obra; os fiscais são os que atuaram nesses processos, não necessariamente a equipe lotada aqui.'
@@ -5062,7 +5116,7 @@ function renderPanelReplan(scope,body){
     +'Conta só o tempo de quem despachou, desde que assumiu o processo; o tempo de um fiscal anterior não entra. '
     +'Processo aberto já pronto (menos de 1 dia com o fiscal) conta como despacho, mas não entra na média.\n\n'
     +`Calculada sobre ${fmtN(a.nTempo,'despacho','despachos')} — ${per}. `
-    +`Com menos de ${AMOSTRA_MIN} despachos a média não é mostrada: um único processo decidiria o resultado.`;
+    +'Com um único despacho, a média é o tempo desse processo.';
   const tipDesp='Processos aprovados pela GECOPE (Aprovado, ou Arquivado com data de aprovação), na data em que '
     +`saíram da unidade do fiscal no SUITE (sem passagem por ela, na data da ida à GECOPE) — ${per}.\n\n`
     +'Arquivado sem data de aprovação não conta.';
@@ -5077,7 +5131,7 @@ function renderPanelReplan(scope,body){
   const kpis=`<div class="kpis">
       ${kpi('Processos', NUM.format(a.procs), tipProc, procSub)}
       ${kpi('Tempo médio', tempo, tipTempo,
-            a.nTempo>=AMOSTRA_MIN ? '' : escHtml(a.nTempo ? `só ${nDesp}` : 'nenhum despacho'))}
+            a.nTempo>=AMOSTRA_MIN ? '' : 'nenhum despacho com tempo medido')}
       ${kpi('Despachos', NUM.format(a.desp), tipDesp)}
       ${kpi('Fiscais', NUM.format(a.fiscais), tipFiscais,
             a.semMatricula ? escHtml(`${fmtN(a.semMatricula,'processo','processos')} sem matrícula`) : '')}
@@ -5742,14 +5796,14 @@ function renderLegendaReplan(){
   const temValor = (st.level===1?[..._rpGrp.values()]:[..._rpMun.values()]).some(r=>r.v!=null && r.v>0);
   const topo = m==='tempo' ? `${Math.round(max)} dias` : NUM.format(temValor?max:0);
   const escala = semEscala
-    ? `<div class="rp-leg-s">Nenhuma ${st.level===1?'área':'cidade'} com ${AMOSTRA_MIN} despachos ou mais neste período.</div>`
+    ? `<div class="rp-leg-s">Nenhuma ${st.level===1?'área':'cidade'} com despacho de tempo medido neste período.</div>`
     : `<div class="rp-leg-bar" aria-hidden="true"></div><div class="rp-leg-esc"><span>0</span><span>${escHtml(topo)}</span></div>`;
   _rpLeg.innerHTML=`<div class="rp-leg-t">${escHtml(RP_METRICA[m].label)}</div>`
     +`<div class="rp-leg-s">${escHtml(rpRecorteTxt(st.level===1))}</div>`
     +escala
     // o cinza só precisa de nome enquanto divide o mapa com a escala; quando TUDO está
     // cinza, a frase acima já explicou.
-    +(m==='tempo'&&!semEscala?`<div class="rp-leg-item"><span class="rp-leg-sw" aria-hidden="true"></span>Menos de ${AMOSTRA_MIN} despachos — sem dado</div>`:'');
+    +(m==='tempo'&&!semEscala?`<div class="rp-leg-item"><span class="rp-leg-sw" aria-hidden="true"></span>Sem despacho no período — sem dado</div>`:'');
 }
 // Janelinha de explicação dos KPIs do modo Replanilhamentos (botão "i"). Um único
 // elemento no <body>, posicionado por coordenada: dentro do cartão (overflow:hidden) ela
