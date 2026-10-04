@@ -861,6 +861,15 @@
         text-align:justify;pointer-events:none;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
   .kpi-tip p{margin:0 0 7px}
   .kpi-tip p:last-child{margin-bottom:0}
+  /* Cabeçalho opcional (ladrilhos da janela de distrito): título + etiqueta de escopo
+     ("Hoje" ou o período). A etiqueta é o que diferencia a fila de hoje dos números que
+     seguem o seletor de período; o corpo segue justificado, como nos demais tooltips. */
+  .kpi-tip-h{display:flex;align-items:center;justify-content:space-between;gap:10px;
+        margin:0 0 7px;padding-bottom:7px;border-bottom:1px solid var(--card-border)}
+  .kpi-tip-h b{font-size:12px;font-weight:700;color:var(--text-brightest);line-height:1.3;text-align:left}
+  .kpi-tip-chip{flex:none;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;
+        letter-spacing:.2px;white-space:nowrap;color:var(--ng-light);background:rgba(var(--ng-rgb),.14)}
+  :root:not(.theme-dark) .kpi-tip-chip{color:var(--badge-text)}
   /* Tooltip da bolinha do eixoDias() (mostraEdTip): mesma casca do .kpi-tip, texto curto
      e centralizado (é sempre "Nome: N dias" numa linha só, não um parágrafo). */
   .ed-tip{max-width:200px;text-align:center;pointer-events:none}
@@ -1955,7 +1964,6 @@
   .modal .dsh-hero-acima{border-color:rgba(var(--amber-rgb),.42);
         background:linear-gradient(160deg,rgba(var(--amber-rgb),.14),rgba(var(--amber-rgb),.04))}
   .modal .dsh-hero-acima::before{background:linear-gradient(var(--amber),var(--amber-deep))}
-  .modal .fcard-fina{font-family:Montserrat,sans-serif;font-size:10px;font-weight:500;color:var(--text-dim)}
 
   /* O único tipo grande dos dois painéis: é o que se lê do fundo de uma sala de reunião. */
   .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:48px;font-weight:600;line-height:1;
@@ -2073,46 +2081,70 @@
   .modal .fila #fichaFilaDist{display:flex;flex-direction:column;gap:10px}
   .modal .fila #fichaFilaDist[hidden]{display:none}
   .modal .fila #fichaFilaDist .proc{margin-top:0}
-  /* ---- janela do fiscal: "Processos no período" ----
-     Resumo em fichas (quantos por status e por prazo) e, abaixo, os processos em linhas:
-     NUP e descrição à esquerda; situação do prazo, dias com o fiscal e meta à direita. */
-  .modal .op-resumo{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
-  .modal .op-chip{display:inline-flex;align-items:baseline;gap:5px;padding:5px 12px;border-radius:999px;
-        font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted);
-        background:rgba(var(--raise-rgb),.06);border:1px solid var(--card-border)}
-  .modal .op-chip b{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest)}
-  .modal .op-chip.atraso{color:var(--amber-text);background:rgba(var(--amber-rgb),.13);border-color:rgba(var(--amber-rgb),.35)}
-  .modal .op-chip.atraso b{color:var(--amber-text)}
-  .modal .op-chip.ok{color:var(--ng-light);background:rgba(var(--ng-rgb),.12);border-color:rgba(var(--ng-rgb),.3)}
-  :root:not(.theme-dark) .modal .op-chip.ok{color:var(--badge-text)}
+  /* Fiscalização recolhida (2026-10-04): mesmo cartão da fila; os extremos (mais lento / mais
+     rápido) levam o nome do fiscal no subtítulo, cortado com reticências se não couber. */
+  .modal .fila #fichaFiscaisDist{display:flex;flex-direction:column;gap:12px}
+  .modal .fila #fichaFiscaisDist[hidden]{display:none}
+  .modal .fila-st{min-width:0}
+  .modal .fila-sp.fis-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ---- janela do fiscal: "Com o fiscal agora" e "Despachados no período" ----
+     Fila de hoje: ladrilhos de contagem (status e prazo) e, abaixo, um bloco por status com os
+     processos em colunas: NUP + descrição | dias com o fiscal | data meta | prazo (selo, barra
+     do prazo consumido e texto). Os despachados seguem a mesma grade, só sem a coluna de prazo. */
+  .modal .cf-stats{margin:0 0 14px}
   .modal .pp-grupos{display:flex;flex-direction:column;gap:14px}
   .modal .pp-grupo{border:1px solid var(--card-border);border-radius:12px;overflow:hidden;
         background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2))}
-  .modal .pp-gh{display:flex;justify-content:space-between;align-items:baseline;padding:11px 16px;
-        font-family:Montserrat,sans-serif;font-size:13px;font-weight:700;color:var(--text-bright);
+  .modal .pp-gh{display:flex;align-items:baseline;gap:12px;padding:11px 16px;
+        font-family:Montserrat,sans-serif;font-size:13px;font-weight:500;color:var(--text-bright);
         border-bottom:1px solid var(--card-border);background:rgba(var(--raise-rgb),.04)}
-  .modal .pp-gh b{font-family:'Space Grotesk',sans-serif;font-size:15px;color:var(--text-brightest)}
+  .modal .pp-gh b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:500;color:var(--text-brightest)}
+  .modal .cf-gs{margin-left:auto;font-size:11.5px;font-weight:400;color:var(--text-dim)}
+  .modal .cf-gs .atraso{color:var(--amber-text)}
   .modal .pp-grupo>.adToggle{margin:12px 16px;width:auto}
   .modal .pp-lista[hidden]{display:none}
-  .modal .pp-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:12px 16px;
-        border-left:3px solid transparent}
-  .modal .pp-row+.pp-row{border-top:1px solid var(--card-border)}
-  .modal .pp-row.atraso{border-left-color:var(--amber)}
-  .modal .pp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .modal .cf-vazio{padding:14px 16px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:400;color:var(--text-dim)}
+  .modal .cf-cols,.modal .cf-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 104px 172px;align-items:center;column-gap:18px;padding:0 16px}
+  .modal .cf-cols.desp,.modal .cf-row.desp{grid-template-columns:minmax(0,1fr) 120px 120px}
+  .modal .cf-cols{padding-top:8px;padding-bottom:8px;border-bottom:1px solid var(--card-border);
+        font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dimmer)}
+  .modal .cf-cols:not(.desp) span:nth-child(2),.modal .cf-cols:not(.desp) span:nth-child(3),
+  .modal .cf-cols.desp span:nth-child(2),.modal .cf-cols.desp span:nth-child(3){text-align:center}
+  .modal .cf-row{padding-top:12px;padding-bottom:12px;border-left:3px solid transparent;padding-left:13px}
+  .modal .cf-row+.cf-row{border-top:1px solid var(--card-border)}
+  .modal .cf-row.atraso{border-left-color:var(--amber);background:rgba(var(--amber-rgb),.05)}
+  .modal .cf-cols{padding-left:16px}
+  .modal .pp-main{min-width:0;display:flex;flex-direction:column;gap:3px}
   .modal .pp-n{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest)}
-  .modal .pp-desc{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-bright);line-height:1.4;
+  .modal .pp-desc{font-family:Montserrat,sans-serif;font-size:12px;font-weight:400;color:var(--text-bright);line-height:1.4;
         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .modal .pp-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;max-width:46%}
-  .modal .pp-b{padding:3px 11px;border-radius:999px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;
+  .modal .cf-c{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;min-width:0}
+  .modal .cf-c::before{content:attr(data-l);display:none;font-family:Montserrat,sans-serif;font-size:10px;font-weight:500;
+        letter-spacing:.04em;text-transform:uppercase;color:var(--text-dimmer)}
+  .modal .cf-c b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:400;line-height:1.2;color:var(--text-brightest)}
+  .modal .cf-c span{font-family:Montserrat,sans-serif;font-size:11px;font-weight:400;color:var(--text-dim)}
+  .modal .cf-row:not(.desp) .cf-c:nth-child(2) b{font-size:20px}
+  .modal .cf-prazo{gap:6px;align-items:flex-start}
+  .modal .cf-prazo::before{display:none}
+  .modal .pp-b{padding:3px 11px;border-radius:999px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:500;
         color:var(--text-muted);background:rgba(var(--raise-rgb),.1);white-space:nowrap}
   .modal .pp-b.atraso{color:var(--amber-text);background:rgba(var(--amber-rgb),.17)}
   .modal .pp-b.noprazo{color:var(--ng-light);background:rgba(var(--ng-rgb),.15)}
   :root:not(.theme-dark) .modal .pp-b.noprazo{color:var(--badge-text)}
-  .modal .pp-info{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-dim);text-align:right}
-  @media (max-width:640px){
-    .modal .pp-row{flex-direction:column;gap:8px}
-    .modal .pp-side{align-items:flex-start;max-width:none}
-    .modal .pp-info{text-align:left}
+  .modal .cf-bar{display:block;width:100%;height:5px;border-radius:3px;overflow:hidden;background:rgba(var(--raise-rgb),.12)}
+  .modal .cf-bar u{display:block;height:100%;border-radius:3px;text-decoration:none}
+  .modal .cf-bar.noprazo u{background:var(--ng)}
+  .modal .cf-bar.atraso u{background:var(--amber)}
+  .modal .cf-pt{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:400;color:var(--text-dim)}
+  .modal .cf-pt.atraso{color:var(--amber-text)}
+  @media (max-width:760px){
+    .modal .cf-cols{display:none}
+    .modal .cf-row,.modal .cf-row.desp{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:10px;column-gap:12px}
+    .modal .cf-row .pp-main{grid-column:1/-1}
+    .modal .cf-c::before{display:block}
+    .modal .cf-c{align-items:flex-start;text-align:left}
+    .modal .cf-prazo{grid-column:1/-1}
+    .modal .cf-row.desp .cf-c:last-child{grid-column:auto}
   }
   /* grupos por status dentro da lista (Análise Fiscal / Reanálise Fiscal) */
   .modal .fila-g{display:flex;flex-direction:column;gap:10px}
@@ -2133,11 +2165,35 @@
   :root.theme-dark .modal .fcard:hover{box-shadow:0 10px 24px rgba(var(--shadow-rgb),.38)}
   :root:not(.theme-dark) .modal .fcard:hover{box-shadow:0 2px 4px rgba(var(--shadow-rgb),.08),0 10px 22px rgba(var(--shadow-rgb),.07)}
   .modal .fcard:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
-  .modal .fcard-n{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-bright);line-height:1.3}
-  .modal .fcard-v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:var(--text-brightest);line-height:1.1}
+  /* Alturas fixas por bloco (2026-10-03): nome reserva 2 linhas e o valor 1 linha de 22px, para
+     o número, a barra, a base da média e o rodapé caírem nos mesmos pontos em todos os cartões,
+     tenha o nome 1 ou 2 linhas, tenha o fiscal média ou não. */
+  .modal .fcard-n{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-bright);line-height:1.3;
+        min-height:2.6em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .modal .fcard-v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:var(--text-brightest);line-height:1.1;
+        min-height:1.1em;display:flex;align-items:center}
   .modal .fcard-sem{font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--text-dimmer)}
-  .modal .fcard-s{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
   .modal .fcard .rbar{margin-top:2px}
+  /* Base da média (2026-10-03): uma linha diz sobre quantos despachos ela foi tirada e, só
+     quando falta algum, uma segunda diz quais ficaram de fora — antes era uma frase única e
+     confusa. Com borda à esquerda, lê-se como uma nota do número acima, não como outro dado. */
+  .modal .fcard-base{display:flex;flex-direction:column;gap:2px;margin-top:2px;padding-left:8px;
+        border-left:2px solid rgba(var(--ng-rgb),.35);font-family:Montserrat,sans-serif;
+        font-size:10.5px;font-weight:600;line-height:1.35;color:var(--text-muted)}
+  .modal .fcard-base.sem{border-left-color:var(--card-border)}
+  /* altura reservada = 1 linha de 10.5px + N-1 linhas de 10px (+2px de gap cada), definida
+     pela grade (fcards-bN, ver equipeCardsHtml) para valer igual em todos os cartões */
+  .modal .fcards-b1 .fcard-base{min-height:14px}
+  .modal .fcards-b2 .fcard-base{min-height:29px}
+  .modal .fcards-b3 .fcard-base{min-height:44px}
+  .modal .fcard-base-m{font-weight:500;font-size:10px;color:var(--text-dim)}
+  /* Rodapé: dois números rotulados, separados por um fio — despachos no período | em tramitação */
+  .modal .fcard-rod{display:grid;grid-template-columns:1fr 1fr;margin-top:auto;padding-top:9px;
+        border-top:1px solid var(--card-border)}
+  .modal .fcard-rn{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .modal .fcard-rn+.fcard-rn{padding-left:12px;border-left:1px solid var(--card-border)}
+  .modal .fcard-rn b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;line-height:1.1;color:var(--text-brightest)}
+  .modal .fcard-rn span{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
 
   .empty{color:var(--text-dim);font-size:12.5px;padding:10px 0}
   .foot{font-size:10.5px;color:var(--text-dimmer);margin-top:20px;line-height:1.55;border-top:1px solid rgba(var(--raise-rgb),.08);padding-top:12px}
