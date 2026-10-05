@@ -1006,7 +1006,7 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
   // fora de st. Sobrevive à volta a Obras (inerte: só o painel do modo novo a lê).
   // E6 — filtros do modo Replanilhamentos, sobre PROCESSOS: estado próprio (nunca `f`
   // abaixo, que é de contratos e fica intacto na troca de modo). Ver FILTER_DEFS_RP.
-  rp:{metrica:'tempo', periodo:'6m', filtro:{q:'', situacao:new Set(), prazo:new Set()}},
+  rp:{metrica:'tempo', periodo:'6m', fiscaisAberto:false, filtro:{q:'', situacao:new Set(), prazo:new Set()}},
   sel:null, // Ctrl+clique em vários distritos/municípios: {kind:'group'|'city', ids:Set}
   // Etapa C: chaves novas declaradas já como Set (as defs em FILTER_DEFS e a UI
   // entram no Bloco 2 — até lá ficam vazias e inertes).
@@ -2895,22 +2895,6 @@ function rankRows(entries,onClick){
      <div class="t"><span class="nm">${escHtml(e.nome)} ${e.sub?`<span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${fmt(e.v)}</span></div>
      <div class="rbar${amber}"><i style="width:${Math.max(4,(e.v||0)/max*100)}%"></i></div></div>`).join('');
 }
-// E5 — mesma linha do ranking, só que no modo Replanilhamentos e no nível dos distritos:
-// cada um ganha um chip para abrir a janela de detalhe (ver abreModalDistrito), aninhado
-// dentro de .nm como .chip.mun.locate já é aninhado dentro de .obra — mesmo padrão, não um
-// segundo controle interativo inventado. Função separada, e não um ramo dentro de
-// rankRows(): ela é comum ao modo Obras, que não pode herdar o chip por engano.
-function rpRankRowsHtml(entries,kind){
-  const max=Math.max(1,...entries.map(e=>e.v||0));
-  return entries.map(e=>{
-    const abre=kind==='group'
-      ? ` <span class="chip abre" role="button" tabindex="0" data-abre="distrito" data-gid="${e.k}" title="Ver janela do distrito" aria-label="Ver janela do distrito ${escHtml(e.nome)}">${RS_ICO.dist}</span>`
-      : '';
-    return `<div class="rrow${rpTempo()?' warm':''}" role="button" tabindex="0" data-k="${e.k}" data-kind="${kind}">
-     <div class="t"><span class="nm">${escHtml(e.nome)}${abre}${e.sub?` <span class="sub2">· ${escHtml(e.sub)}</span>`:''}</span><span class="vv">${rpFmt(e.v)}</span></div>
-     <div class="rbar${rpTempo()?' amber':''}"><i style="width:${Math.max(4,(e.v||0)/max*100)}%"></i></div></div>`;
-  }).join('');
-}
 // ativação de .rrow (painel de ranking e popover de irmãos usam o mesmo HTML/dataset)
 function goRrow(rr){ if(rr.dataset.kind==='group')goGroup(rr.dataset.k); else goCity(rr.dataset.k); }
 // Enter/Espaço → clique, pros cards que são <div role="button"> em vez de <button> nativo
@@ -3125,11 +3109,11 @@ function adCompute(o,raw){
     outrosList:list.filter(a=>!hasValor(a)&&!hasPrazo(a)),
   };
 }
-// Aba "Aditivos de valor" (Etapa B / Bloco 4 — modelo janela_contrato_melhorado):
-// faixa de 5 cartões → tabela por aditivo (com pílula de %) → widget do art. 125.
-// As Σ acréscimo/supressão/repercussão são AS MESMAS que o pane usava para as
-// barras divergentes — nenhum número muda; a barra do art. 125 é Σ acréscimo ÷
-// valor_original contra a constante legal de 25% (não é dado novo).
+// Aditivos de valor: UMA tabela (um aditivo por linha, total no pé) e uma frase sobre o limite do
+// art. 125. Sem faixa de cartões nem barras — valor original, aditivo e atual já estão em "Valores"
+// na ficha. Mesmo desenho das tabelas de Medições/Comissão (.fc-tab/.fc-tg/.fc-tr). As Σ
+// acréscimo/supressão/repercussão são as mesmas de antes; o limite é Σ acréscimo ÷ valor_original
+// contra a constante legal de 25% (não é dado novo).
 function buildAdValorPane(o,raw){
   const {valorList,outrosList,orig}=adCompute(o,raw);
   if(!valorList.length && !outrosList.length)
@@ -3144,49 +3128,36 @@ function buildAdValorPane(o,raw){
     const acres =valorList.reduce((s,a)=>s+num(a.valor_aprovado),0);
     const supr  =valorList.reduce((s,a)=>s+num(a.valor_supressao),0);
     const reperc=valorList.reduce((s,a)=>s+num(a.valor_repercussao),0);
-    const repClsT=reperc>0?'pos':reperc<0?'neg':'zero';
 
-    const strip=`<div class="adv-strip">
-      <div class="adv-c"><div class="rs-lbl">Valor original</div><div class="adv-n">${BRL2.format(orig)}</div></div>
-      <div class="adv-c"><div class="rs-lbl">Acréscimos</div><div class="adv-n pos">${BRL2.format(acres)}</div><div class="adv-s">${pctS(acres)} do original</div></div>
-      <div class="adv-c"><div class="rs-lbl">Supressões</div><div class="adv-n neg">${supr?'−'+BRL2.format(supr):BRL2.format(0)}</div><div class="adv-s">${pctS(supr)} do original</div></div>
-      <div class="adv-c"><div class="rs-lbl">Repercussão líquida</div><div class="adv-n ${repClsT}">${signedBRL(reperc)}</div><div class="adv-s ${repClsT}">${pctS(Math.abs(reperc))} do original</div></div>
-      <div class="adv-c adv-hero"><div class="rs-lbl">Valor atual${(o.nObras||1)>1?' (contrato)':''}</div><div class="adv-n">${BRL2.format(num(o.valorContrato))}</div><div class="adv-s">${NUM.format(valorList.length)} aditivo${valorList.length===1?'':'s'} de valor</div></div>
-    </div>`;
-
-    const cell=(val,cls,pill)=>`<div class="adv-cell"><span class="adv-v ${cls}">${val}</span>${pill||''}</div>`;
-    const trows=valorList.map((a,i)=>{
-      const av=num(a.valor_aprovado), sv=num(a.valor_supressao), rv=num(a.valor_repercussao);
-      const aC=cell(av>0?BRL2.format(av):'—', av>0?'pos':'zero', av>0?`<span class="adv-pill pos">+${pctS(av)}</span>`:'');
-      const sC=cell(sv>0?'−'+BRL2.format(sv):'—', sv>0?'neg':'zero', sv>0?`<span class="adv-pill neg">−${pctS(sv)}</span>`:'');
-      const rC=cell(rv!==0?signedBRL(rv):'—', rv>0?'pos':rv<0?'neg':'zero', rv!==0?`<span class="adv-pill ${rv<0?'neg':'pos'}">${rv<0?'−':'+'}${pctS(Math.abs(rv))}</span>`:'');
-      return `<div class="adv-row${i%2?' odd':''}">
-        <div class="adv-rmain">
-          <div class="adv-num">${fmtVal(a.nr_aditivo)}</div>
-          <div class="adv-nup"><span class="adv-nup-p">${fmtVal(a.nr_protocolo)}</span></div>
-          <div class="adv-pub">${fmtDateBR(adPubDate(a))}</div>
-          ${aC}${sC}${rC}
-        </div>${adObsRow(a,'adv')}</div>`;
-    }).join('');
-    const table=`<div class="adv-table">
-      <div class="adv-thead"><div class="rs-lbl">Aditivos de valor (${valorList.length})</div><span class="adv-note">Valores em reais · pílula = % sobre o valor original</span></div>
-      <div class="adv-scroll"><div class="adv-grid">
-        <div class="adv-hrow"><div>Nº</div><div>NUP · nº do processo</div><div>Publicação</div><div class="r">Acréscimo</div><div class="r">Supressão</div><div class="r">Repercussão</div></div>
-        ${trows}
-      </div></div></div>`;
+    // valor em reais + % sobre o original logo abaixo; só o negativo ganha cor
+    const vc=(n,tipo)=>{
+      if(!n) return '<div class="r fc-zero">—</div>';
+      const neg=tipo==='s'||n<0;
+      const val=tipo==='s'?'−'+BRL2.format(Math.abs(n)):tipo==='r'?signedBRL(n):BRL2.format(n);
+      return `<div class="r"><span${neg?' class="fc-neg"':''}>${val}</span><span class="fc-pc">${neg?'−':'+'}${pctS(Math.abs(n))}</span></div>`;
+    };
+    const trows=valorList.map(a=>`<div class="fc-tr">
+        <div class="fc-num">${fmtVal(a.nr_aditivo)}</div>
+        <div class="fc-n">${fmtVal(a.nr_protocolo)}</div>
+        <div class="fc-n">${fmtDateBR(adPubDate(a))}</div>
+        ${vc(num(a.valor_aprovado),'a')}${vc(num(a.valor_supressao),'s')}${vc(num(a.valor_repercussao),'r')}
+        ${adObsRow(a,'fc')}</div>`).join('');
+    const total=valorList.length>1
+      ? `<div class="fc-tr t"><div class="fc-tl">Total dos ${NUM.format(valorList.length)} aditivos</div>${vc(acres,'a')}${vc(supr,'s')}${vc(reperc,'r')}</div>`
+      : '';
 
     const pctA=orig?acres/orig*100:0;
-    const lc=pctA>=25?TOKENS.statusStop:pctA>=20?TOKENS.statusWait:TOKENS.ng;
+    const lc=pctA>=25?TOKENS.statusStop:pctA>=20?TOKENS.amber:null;
     const lTxt=pctA>=25
-      ? 'Limite de 25% atingido — novo acréscimo depende de justificativa e enquadramento legal.'
-      : `Margem disponível de ${fmtPct1(25-pctA)}% do valor original.`;
-    const limite=`<div class="adv-limite">
-      <div class="rs-lbl">Limite legal de acréscimo · art. 125 da Lei 14.133/2021</div>
-      <div class="adv-lim-row"><span>Acréscimo acumulado sobre o valor original</span><b style="color:${statusTextColor(lc)}">${fmtPct1(pctA)}% de 25,0%</b></div>
-      <div class="adv-lim-bar"><i style="width:${Math.min(100,pctA/25*100).toFixed(1)}%;background:${lc}"></i></div>
-      <div class="adv-lim-txt" style="color:${statusTextColor(lc)}">${lTxt}</div></div>`;
+      ? 'Limite atingido: novo acréscimo depende de justificativa e enquadramento legal.'
+      : `Margem restante de ${fmtPct1(25-pctA)}%.`;
+    const limite=`<p class="fc-lim"${lc?` style="color:${statusTextColor(lc)}"`:''}>Os acréscimos somam ${fmtPct1(pctA)}% do valor original; o limite legal é 25% (art. 125 da Lei 14.133/2021). ${lTxt}</p>`;
 
-    out+=strip+table+limite;
+    out+=`<h4 class="fc-sh">Aditivos de valor</h4><div class="fc-hnote">Percentuais sobre o valor original do contrato.</div>
+      <div class="fc-tab"><div class="fc-tg fc-adv">
+        <div class="fc-tr h"><div>Nº</div><div>Processo (NUP)</div><div>Publicação</div><div class="r">Acréscimo</div><div class="r">Supressão</div><div class="r">Repercussão</div></div>
+        ${trows}${total}
+      </div></div>${limite}`;
   }
 
   if(outrosList.length){
@@ -3195,168 +3166,68 @@ function buildAdValorPane(o,raw){
   }
   return out;
 }
-// Aba "Aditivos de prazo" (Etapa B / Bloco 5 — modelo janela_contrato_melhorado):
-// dois blocos (execução / vigência), cada um com cabeçalho Original·Prorrogado·Vigente
-// em dias, 3 mini-cartões (calendário, via prazoCalc), tabela com "Prazo acumulado" e
-// barra empilhada. "Original" = coluna autoritativa do contrato (prazo_execucao /
-// prazo_vigencia_contrato — 100% preenchidas na base); "Prorrogado" = Σ dos dias dos
-// aditivos de prazo (auditável linha a linha na tabela); "Vigente" = Original +
-// Prorrogado (prazo CONTRATUAL). Antes o "Original" saía do intervalo de datas menos
-// as prorrogações, e o intervalo absorvia os dias de paralisação — inflava o número.
+// Aditivos de prazo: um bloco por prazo (execução / vigência), cada um um livro-caixa em dias —
+// prazo original, uma linha por prorrogação (em ordem cronológica) e o prazo vigente no pé; a coluna
+// "Prazo acumulado" fecha com o vigente. "Original" = coluna autoritativa do contrato (prazo_execucao /
+// prazo_vigencia_contrato — 100% preenchidas na base); "Prorrogado" = Σ dos dias dos aditivos de
+// prazo (auditável linha a linha); "Vigente" = Original + Prorrogado (prazo CONTRATUAL, não o span de
+// datas, que absorve as paralisações). Data-limite e dias restantes já aparecem em "Prazos" e em
+// "Dados do contrato", por isso não se repetem aqui.
 function buildAdPrazoPane(o,raw){
   const {prazoList}=adCompute(o,raw);
   const dd=n=>{ const r=Math.round(n); return NUM.format(r)+' dia'+(Math.abs(r)===1?'':'s'); };
-  const block=(titulo,sub,aditField,origField,startStr,endStr,vazioLabel)=>{
-    // c = janela de CALENDÁRIO (inclui paralisações) — só alimenta os 3 mini-cartões.
-    // O trio Original/Prorrogado/Vigente e a tabela são CONTRATUAIS e não dependem de
-    // datas: aparecem mesmo em contrato "Aguardando OS" sem data_inicio_real.
-    const c=prazoCalc(startStr,endStr);
-    const lista=prazoList.filter(a=>num(a[aditField]));
+  const sgn=d=>d<0?'−':'+';
+  const block=(titulo,sub,aditField,origField,vazioLabel)=>{
+    // `prazoList` vem da publicação mais recente para a mais antiga; o acumulado só faz sentido somado
+    // em ordem CRONOLÓGICA, então a tabela é invertida.
+    const lista=prazoList.filter(a=>num(a[aditField])).reverse();
     const prorrog=lista.reduce((s,a)=>s+num(a[aditField]),0);
     const original=num(raw[origField]);
-    const vigente=original+prorrog;                    // prazo contratual (não o span de datas)
+    const vigente=original+prorrog;
     // sem prazo original na base (coluna vazia) não há % a calcular: antes a base virava o vigente,
     // o bloco saía em 100% e a tela afirmava que "as prorrogações dobraram o prazo" — falso.
     const semOrig=!(original>0);
     const base=semOrig?0:original;
     const pctBlock=base>0?prorrog/base*100:0;
-    const cor=pctBlock>=100?TOKENS.statusStop:(pctBlock>=50?TOKENS.statusWait:TOKENS.ng);
-    const sgn=d=>d<0?'−':'+';
-    // `lista` vem da publicação mais recente para a mais antiga; o acumulado só faz sentido somado
-    // em ordem CRONOLÓGICA (antes crescia do aditivo mais novo para o mais antigo e só a última linha batia com "Vigente").
-    const accPor=new Map(); { let acc=original; [...lista].reverse().forEach(a=>{ acc+=num(a[aditField]); accPor.set(a,acc); }); }
-    const trows=lista.map((a,i)=>{
-      const d=num(a[aditField]); const acc=accPor.get(a);
-      return `<div class="adp-row${i%2?' odd':''}">
-        <div class="adp-rmain">
-          <div class="adp-num">${fmtVal(a.nr_aditivo)}</div>
-          <div class="adp-nup"><span class="adp-nup-p">${fmtVal(a.nr_protocolo)}</span></div>
-          <div class="adp-pub">${fmtDateBR(adPubDate(a))}</div>
-          <div class="adp-cell"><span class="adp-v">${sgn(d)}${dd(Math.abs(d))}</span><span class="adp-pill">${base>0?sgn(d)+fmtPct1(Math.abs(d)/base*100)+'%':'—'}</span></div>
-          <div class="adp-acc">${dd(acc)}</div>
-        </div>${adObsRow(a,'adp')}</div>`;
+    const cor=pctBlock>=100?TOKENS.statusStop:(pctBlock>=50?TOKENS.amber:null);
+    const pc=d=>base>0?`<span class="fc-pc">${sgn(d)}${fmtPct1(Math.abs(d)/base*100)}%</span>`:'';
+    let acc=original;
+    const trows=lista.map(a=>{
+      const d=num(a[aditField]); acc+=d;
+      return `<div class="fc-tr">
+        <div class="fc-num">${fmtVal(a.nr_aditivo)}</div>
+        <div class="fc-n">${fmtVal(a.nr_protocolo)}</div>
+        <div class="fc-n">${fmtDateBR(adPubDate(a))}</div>
+        <div class="r">${sgn(d)}${dd(Math.abs(d))}${pc(d)}</div>
+        <div class="r fc-b">${dd(acc)}</div>
+        ${adObsRow(a,'fc')}</div>`;
     }).join('');
-    const tableInner=lista.length
-      ? `<div class="adp-hrow"><div>Nº</div><div>NUP · nº do processo</div><div>Publicação</div><div class="r">Prorrogação</div><div class="r">Prazo acumulado</div></div>${trows}`
-      : `<div class="empty" style="padding:14px 16px">${vazioLabel}</div>`;
-    const origW=Math.min(100,100/(1+Math.max(0,pctBlock)/100));
     const txt=semOrig
       ? 'Prazo original não informado na base.'
       : pctBlock>=100
         ? 'As prorrogações já dobraram o prazo originalmente contratado.'
-        : `Prorrogações somam ${fmtPct1(pctBlock)}% do prazo original.`;
-    const minis=c?`<div class="adp-minis">
-        <div class="adp-mini"><div class="rs-lbl">Data-limite</div><div class="adp-mv">${fmtDateBR(endStr)}</div></div>
-        <div class="adp-mini"><div class="rs-lbl">Falta para encerrar</div><div class="adp-mv" style="color:${statusTextColor(c.color)}">${escHtml(c.daysTxt)}</div></div>
-        <div class="adp-mini"><div class="rs-lbl">Prazo decorrido</div><div class="adp-mv">${fmtPct1(c.pct)}%</div>
-          <div class="adp-mini-bar"><i style="width:${c.pct.toFixed(1)}%;background:${c.color}"></i></div></div>
-      </div>
-      <div class="adp-cal-note">Datas de calendário — incluem paralisações; podem não fechar com o prazo contratual acima.</div>`:'';
-    return `<div class="adp-block">
-      <div class="adp-head">
-        <div><div class="adp-h">${titulo}</div><div class="adp-sub">${sub}</div></div>
-        <div class="adp-trio">
-          <div><div class="rs-lbl">Original</div><div class="adp-d">${dd(original)}</div></div>
-          <div><div class="rs-lbl">Prorrogado</div><div class="adp-d" style="color:${statusTextColor(cor)}">${prorrog?sgn(prorrog)+dd(Math.abs(prorrog)):'—'}</div></div>
-          <div><div class="rs-lbl">Vigente</div><div class="adp-d">${dd(vigente)}</div></div>
-        </div>
-      </div>
-      ${minis}
-      <div class="adp-scroll"><div class="adp-grid">${tableInner}</div></div>
-      <div class="adp-foot">
-        <div class="adp-stack"><i style="width:${origW.toFixed(1)}%"></i></div>
-        <div class="adp-leg"><span><i class="d-o"></i>Prazo original</span><span><i class="d-p"></i>Prorrogações</span>
-          <b style="color:${statusTextColor(cor)}">${txt}</b></div>
-      </div>
-    </div>`;
+        : `As prorrogações somam ${fmtPct1(pctBlock)}% do prazo original.`;
+    const corpo=lista.length
+      ? `<div class="fc-tab"><div class="fc-tg fc-adp">
+          <div class="fc-tr h"><div>Nº</div><div>Processo (NUP)</div><div>Publicação</div><div class="r">Prorrogação</div><div class="r">Prazo acumulado</div></div>
+          <div class="fc-tr"><div class="fc-tl">Prazo original</div><div></div><div class="r fc-b">${semOrig?'—':dd(original)}</div></div>
+          ${trows}
+          ${lista.length>1?`<div class="fc-tr t"><div class="fc-tl">Prazo vigente</div><div class="r">${sgn(prorrog)}${dd(Math.abs(prorrog))}${pc(prorrog)}</div><div class="r">${dd(vigente)}</div></div>`:''}
+        </div></div>
+        <p class="fc-lim"${cor?` style="color:${statusTextColor(cor)}"`:''}>${txt}</p>`
+      : `<div class="empty">${vazioLabel}</div>`;
+    return `<div class="fc-adblk"><h4 class="fc-sh">${titulo}</h4><div class="fc-hnote">${sub}</div>${corpo}</div>`;
   };
-  const cE=prazoCalc(raw.data_inicio_real,raw.data_fim_previsto);
-  const cV=prazoCalc(raw.data_inicio_real,raw.data_fim_vigencia_contrato);
   // o prazo contratual original (prazo_execucao/prazo_vigencia_contrato) aparece mesmo sem aditivos
-  // nem datas (obra "Aguardando OS") — não esconder só porque não há o que listar.
-  if(!prazoList.length && !cE && !cV && !(num(raw.prazo_execucao)>0) && !(num(raw.prazo_vigencia_contrato)>0))
+  // (obra "Aguardando OS") — não esconder só porque não há o que listar.
+  if(!prazoList.length && !(num(raw.prazo_execucao)>0) && !(num(raw.prazo_vigencia_contrato)>0))
     return `<div class="msec">Aditivos de prazo</div><div class="empty">Nenhum aditivo de prazo registrado para este contrato.</div>`;
   // "Original" (prazo_execucao/prazo_vigencia_contrato) é por OBRA; as prorrogações
   // (aditivos_contrato) são do CONTRATO. Nos contratos multi-obra os dois níveis
   // aparecem juntos — aviso explícito.
-  return `<div class="adp-wrap">`
-    +advScopeNote(o,'Original é o prazo desta obra; as prorrogações vêm dos aditivos do contrato (a base não os separa por obra).')
-    +block('Prazo de execução','Período para conclusão física da obra','execucao_aprovado','prazo_execucao',raw.data_inicio_real,raw.data_fim_previsto,'Nenhum aditivo de prazo de execução registrado.')
-    +block('Prazo de vigência','Período de validade jurídica do contrato','prazo_aprovado','prazo_vigencia_contrato',raw.data_inicio_real,raw.data_fim_vigencia_contrato,'Nenhum aditivo de prazo de vigência registrado.')
-    +`</div>`;
-}
-// Os indicadores do CONTRATO (total_medido/percentual_total_medido) vêm de ficha_contrato. Já o % medido
-// DA OBRA (medObraStats) soma `total` das linhas de o.medicoes; só cai na ficha quando não há linhas e o
-// contrato é de obra única.
-// Aba "Medições" (Etapa B / Bloco 6 — modelo janela_contrato_melhorado): faixa de
-// 4 indicadores (da ficha, autoritativa) → tabela mensal de o.medicoes → rodapé
-// (também da ficha) → legendas STM. Sem STP/glosa/ajuste (não existem na base).
-// Nesta aba, total_medido/percentual_total_medido seguem vindo de ficha_contrato (nível contrato);
-// a soma mês a mês só existe em medObraStats(), para o nível da obra.
-function buildMedicoesPane(o,raw){
-  const f=o.ficha;
-  const meds=o.medicoes||[];
-  if(!f && !meds.length)
-    return `<div class="msec">Medições</div><div class="empty">Sem dados de medição disponíveis para este contrato.</div>`;
-
-  const multiObra=(o.nObras||1)>1;
-  const {total,pct,saldo}=medObraStats(o);   // total/pct/saldo NO NÍVEL DA OBRA
-  const pctW=pct==null?0:Math.max(0,Math.min(100,pct));
-  const lastM=meds[meds.length-1];
-  const ultima=lastM?`${fmtVal(lastM.periodo)}${lastM.nr_medicao!=null?' · '+NUM.format(lastM.nr_medicao)+'ª medição':''}`:'—';
-  const qtdTxt=meds.length
-    ? (meds.length===1?'1 medição registrada':`${NUM.format(meds.length)} medições registradas`)
-    : 'sem medições desta obra';
-  const nota=advScopeNote(o,`Medições desta obra${f&&f.percentual_total_medido!=null?` · medido no contrato (todas as obras): ${fmtPct1(num(f.percentual_total_medido))}%`:''}.`);
-
-  const strip=`<div class="med-strip">
-    <div class="med-c"><div class="rs-lbl">Total medido${multiObra?' na obra':''}</div><div class="med-n">${total==null?'—':BRL2.format(total)}</div><div class="med-s">${qtdTxt}</div></div>
-    <div class="med-c"><div class="rs-lbl">Saldo da obra</div><div class="med-n">${saldo==null?'—':BRL2.format(saldo)}</div><div class="med-s">Sobre ${BRL2.format(num(o.valor))}</div></div>
-    <div class="med-c"><div class="rs-lbl">Percentual executado</div><div class="med-n pos">${pct==null?'—':fmtPct1(pct)+'%'}</div>
-      <div class="rs-bar"><i class="g" style="width:${pctW.toFixed(1)}%"></i></div></div>
-    <div class="med-c med-hero"><div class="rs-lbl">Última medição</div><div class="med-n">${ultima}</div></div>
-  </div>`;
-
-  let tableBlock;
-  if(meds.length){
-    const glosaTot=meds.reduce((s,m)=>s+num(m.valor_ref_glosa),0);
-    const brutoTot=meds.reduce((s,m)=>s+num(m.valor_medido),0);
-    // bruto − glosa − líquido: em algumas obras `total` já embute outras retenções
-    // (não registradas em valor_ref_glosa). Mostra a diferença pra o rodapé sempre fechar.
-    const outrasRet=(total==null)?0:Math.round((brutoTot-glosaTot-total)*100)/100;
-    const trows=meds.map((m,i)=>{ const g=num(m.valor_ref_glosa); return `<div class="med-row${i%2?' odd':''}">
-      <div class="med-nr">${fmtVal(m.nr_medicao)}</div>
-      <div><span class="med-stm">${fmtVal(m.sigla_status_medicao)}</span></div>
-      <div class="med-per">${fmtVal(m.periodo)}</div>
-      <div class="med-proto">${fmtVal(m.nr_protocolo)}</div>
-      <div class="med-val">${BRL2.format(num(m.valor_medido))}</div>
-      <div class="med-val med-glosa">${g>0?'−'+BRL2.format(g):'—'}</div>
-      <div class="med-tot">${BRL2.format(num(m.total))}</div>
-    </div>`; }).join('');
-    const foot=`<div class="med-foot">
-      <div><div class="rs-lbl">Medido (bruto)</div><div class="med-fn">${BRL2.format(brutoTot)}</div></div>
-      <div><div class="rs-lbl">Glosas</div><div class="med-fn med-glosa">${glosaTot>0?'−'+BRL2.format(glosaTot):BRL2.format(0)}</div></div>
-      ${outrasRet>=0.01?`<div><div class="rs-lbl">Outras retenções</div><div class="med-fn med-glosa">−${BRL2.format(outrasRet)}</div></div>`:''}
-      <div><div class="rs-lbl">Total medido (líquido)</div><div class="med-fn pos">${total==null?'—':BRL2.format(total)}</div></div>
-      <div><div class="rs-lbl">Saldo da obra</div><div class="med-fn">${saldo==null?'—':BRL2.format(saldo)}</div></div>
-      <div><div class="rs-lbl">Percentual</div><div class="med-fn pos">${pct==null?'—':fmtPct1(pct)+'%'}</div></div>
-    </div>`;
-    tableBlock=`<div class="med-table">
-      <div class="med-thead"><div class="rs-lbl">Medições ${multiObra?'da obra':'do contrato'}</div><span class="adv-note">STM = situação da medição · Medido = bruto · Total = líquido (após glosa) · valores em reais</span></div>
-      <div class="med-scroll"><div class="med-grid">
-        <div class="med-hrow"><div>Nr</div><div>STM</div><div>Período</div><div>Protocolo</div><div class="r">Medido</div><div class="r">Glosa</div><div class="r">Total</div></div>
-        ${trows}${foot}
-      </div></div></div>`;
-  } else {
-    tableBlock=`<div class="med-table"><div class="med-thead"><div class="rs-lbl">Medições ${multiObra?'da obra':'do contrato'}</div></div>`
-      +`<div class="empty" style="padding:14px 16px">Sem medições registradas para esta obra.</div></div>`;
-  }
-
-  const legend=meds.length?`<div class="med-leg">
-    <div class="rs-lbl">Legendas de situação da medição (STM)</div>
-    <div class="med-leg-grid">${STM_LEGENDA.map(([c,t])=>`<div class="med-leg-i"><b>${escHtml(c)}</b><span>${escHtml(t)}</span></div>`).join('')}</div></div>`:'';
-
-  return nota+strip+tableBlock+legend;
+  return advScopeNote(o,'Original é o prazo desta obra; as prorrogações vêm dos aditivos do contrato (a base não os separa por obra).')
+    +block('Prazo de execução','Período para conclusão física da obra','execucao_aprovado','prazo_execucao','Nenhum aditivo de prazo de execução registrado.')
+    +block('Prazo de vigência','Período de validade jurídica do contrato','prazo_aprovado','prazo_vigencia_contrato','Nenhum aditivo de prazo de vigência registrado.');
 }
 // ---- Aba "Resumo" (dashboard executivo — Etapa B, revisado a partir de modelo do
 // usuário). Só leitura; valores de UMA obra já carregada. Os percentuais são razão de
@@ -3377,6 +3248,8 @@ const RS_ICO={
   baixar:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 20h14"/></svg>',
   info:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.6" r=".9" fill="currentColor" stroke="none"/></svg>',
   suite:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/><path d="M14 4h6v6"/><path d="M20 4 11 13"/></svg>',
+  lapis:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+  ficha:'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9.5 12h5M9.5 15.5h5"/></svg>',
 };
 // Baixa o relatório pelo GECOPE: a Edge Function eletrica-drive-download confere a sessão
 // e a RLS e devolve o arquivo lido do Drive privado da conta do setor. O link direto do
@@ -3469,9 +3342,17 @@ function rsLineChart(pts){
   if(!pts.length) return `<div class="empty">Sem medições registradas para este contrato.</div>`;
   const W=920,H=210,PADL=8,PADR=14,PADT=16,PADB=24, iw=W-PADL-PADR, ih=H-PADT-PADB;
   // eixo sempre de 0 a 100%: escalar até o maior ponto fazia 15% parecer quase concluído (acima de 100% o eixo cresce)
-  const maxY=Math.max(100,...pts.map(p=>p.y));
+  // acima de 100% o teto sobe em múltiplos de 40 (120, 160…): com 4 intervalos, os degraus do eixo vertical saem inteiros
+  const topo=Math.max(100,...pts.map(p=>p.y));
+  const maxY=topo>100?Math.ceil(topo/40)*40:100;
   const X=i=>PADL+(pts.length<2?iw/2:i/(pts.length-1)*iw);
   const Y=v=>PADT+ih-(Math.max(0,Math.min(maxY,v))/maxY)*ih;
+  // Eixo vertical (pedido do usuário, 2026-10-05): os percentuais são HTML ao lado do SVG, e não <text>,
+  // porque o SVG é esticado à largura do cartão (preserveAspectRatio="none") e deformaria os rótulos.
+  // Cada rótulo fica na altura da sua linha de grade (mesma proporção de H); a escala é a de Y().
+  const fmtTick=v=>NUM.format(Math.round(v))+'%';
+  const yAxis=[1,.75,.5,.25,0].map(f=>`<span style="top:${((PADT+ih*(1-f))/H*100).toFixed(2)}%">${fmtTick(maxY*f)}</span>`).join('');
+  const eixo=`<line class="rs-lc-axis" x1="${PADL}" x2="${PADL}" y1="${PADT}" y2="${PADT+ih}"/>`;
   const grid=[0,.25,.5,.75,1].map(f=>`<line class="rs-lc-grid" x1="${PADL}" x2="${(W-PADR).toFixed(1)}" y1="${(PADT+ih*f).toFixed(1)}" y2="${(PADT+ih*f).toFixed(1)}"/>`).join('');
   const line=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
   const area=`${line} L${X(pts.length-1).toFixed(1)},${(PADT+ih).toFixed(1)} L${X(0).toFixed(1)},${(PADT+ih).toFixed(1)} Z`;
@@ -3479,115 +3360,66 @@ function rsLineChart(pts){
   const idxs=pts.length<=6?pts.map((_,i)=>i):[0,Math.round((pts.length-1)/2),pts.length-1];
   const xlabs=idxs.map(i=>`<text x="${X(i).toFixed(1)}" y="${H-7}" text-anchor="${i===0?'start':i===pts.length-1?'end':'middle'}" class="rs-lc-lab">${escHtml(String(pts[i].label||'').slice(0,7))}</text>`).join('');
   const last=pts[pts.length-1];
-  return `<svg viewBox="0 0 ${W} ${H}" class="rs-lc" preserveAspectRatio="none" role="img" aria-label="Evolução da medição: ${fmtPct1(last.y)}% no último período">
-    ${grid}<path class="rs-lc-area" d="${area}"/><path class="rs-lc-line" d="${line}"/>${dots}
-    <text x="${X(pts.length-1).toFixed(1)}" y="${Math.max(12,Y(last.y)-7).toFixed(1)}" text-anchor="end" class="rs-lc-val">${fmtPct1(last.y)}%</text>${xlabs}</svg>`;
+  return `<div class="rs-lc-wrap"><div class="rs-lc-y" aria-hidden="true">${yAxis}</div>`
+    +`<svg viewBox="0 0 ${W} ${H}" class="rs-lc" preserveAspectRatio="none" role="img" aria-label="Evolução da medição: ${fmtPct1(last.y)}% no último período">
+    ${grid}${eixo}<path class="rs-lc-area" d="${area}"/><path class="rs-lc-line" d="${line}"/>${dots}
+    <text x="${X(pts.length-1).toFixed(1)}" y="${Math.max(12,Y(last.y)-7).toFixed(1)}" text-anchor="end" class="rs-lc-val">${fmtPct1(last.y)}%</text>${xlabs}</svg></div>`;
 }
-function buildResumoPane(o,raw){
-  const orig=num(raw.valor_original);
-  const aditRows=o.aditivos||[];
-  // `o.aditivo` já foi corrigido no loadData (Σ repercussão líquida dos aditivos,
-  // fallback total_aditivo) — o campo cru do contrato vem zerado em ~1/3 dos casos.
-  const adit=num(o.aditivo);
-  // acréscimo BRUTO (Σ valor_aprovado) — é o que o art. 125 da Lei 14.133/2021 limita
-  // a 25%; supressões não entram nessa conta (usado só nos "pontos de atenção", R5).
+// ---- Aba "Ficha Obra" (remodelação de 04/10/2026 a partir do modelo ficha_obra.pdf do SIGSOP) ----
+// Os blocos seguem a ordem e as posições da ficha impressa: Dados do contrato → Dados da obra,
+// Prazos e Valores (3 colunas) → Comissão de fiscalização → Medições. O que a base não tem fica
+// de fora de propósito (Dt Propos./Orçam., Fonte de Rec., Valor PI, STP, Ajuste, divisão do
+// reajuste em Preço × Medição, Histórico). Os extras entram fora do corpo da ficha: a faixa de
+// pontos de atenção só aparece quando há alerta; a curva de evolução fecha a página. Os aditivos
+// de valor/prazo (buildAdValorPane/buildAdPrazoPane, inalterados) viram detalhe recolhível dos
+// blocos Valores e Prazos.
+// Escopo dos números: valor atual do contrato e aditivos são do CONTRATO; o resto é da OBRA.
+// Cada parte da ficha é um cartão: faixa de título (ícone de traço na cor de acento + nome) e corpo.
+// A cor de acento é uma só de propósito — vermelho/âmbar/verde ficam reservados ao que significam
+// dentro do conteúdo (situação, alerta), nunca ao cartão.
+const FC_ICO={
+  contrato:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6"/><path d="M9 16h6"/>',
+  obra:'<path d="M3 21h18"/><path d="M6 21V9l6-5 6 5v12"/><path d="M10 21v-5h4v5"/>',
+  prazos:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16"/><path d="M9 3v4"/><path d="M15 3v4"/>',
+  valores:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10"/><path d="M14.5 9.2c-.6-.8-1.6-1.2-2.6-1.2-1.7 0-2.9.9-2.9 2.1 0 1.3 1.1 1.8 2.9 2.3 1.8.5 2.9 1 2.9 2.3 0 1.2-1.2 2.1-2.9 2.1-1 0-2-.4-2.6-1.2"/>',
+  comissao:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18 14.4c1.8.9 3 2.7 3 5.6"/>',
+  medicoes:'<path d="M4 20V11"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/>',
+};
+function fcSec(titulo,ico,corpo,cls){
+  return `<section class="${cls||'fc-sec'}"><h3 class="fc-h"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${FC_ICO[ico]}</svg><span>${titulo}</span></h3><div class="fc-body">${corpo}</div></section>`;
+}
+function buildFichaPane(o,raw){
   const multiObra=(o.nObras||1)>1;
+  const orig=num(raw.valor_original);
+  // `o.aditivo` já foi corrigido no loadData (Σ repercussão líquida, fallback total_aditivo)
+  const adit=num(o.aditivo);
+  const aditRows=o.aditivos||[];
   const origC=num(o.valorOriginalContrato)||orig;        // valor original do CONTRATO (todas as obras)
-  // art. 125: acréscimo BRUTO ÷ valor original DO CONTRATO (o limite legal é do contrato,
-  // e os aditivos_contrato não separam por obra).
+  // art. 125 da Lei 14.133/2021: acréscimo BRUTO ÷ valor original DO CONTRATO (limite legal é do contrato)
   const pctAcr=origC?aditRows.reduce((s,a)=>s+num(a.valor_aprovado),0)/origC*100:0;
   const med=medObraStats(o);                             // medição NO NÍVEL DA OBRA
-  const medTot=med.total, medPct=med.pct;
-  const pR=medPct==null?0:Math.max(0,Math.min(100,medPct)); // % para as barras (clamp 0-100)
-  const pctAdit=orig?adit/orig*100:0;                    // repercussão líquida da OBRA ÷ valor original da OBRA
+  const medTot=med.total, medPct=med.pct, saldo=med.saldo;
+  const pctAdit=orig?adit/orig*100:0;
   const pct1=v=>fmtPct1(v)+'%';
   const dd=n=>NUM.format(Math.abs(n))+' dia'+(Math.abs(n)===1?'':'s');
   const cExec=prazoCalc(raw.data_inicio_real,raw.data_fim_previsto);
   const cVig=prazoCalc(raw.data_inicio_real,raw.data_fim_vigencia_contrato);
   // obra encerrada/concluída: prazo vencido e dias_paralisado residual são história, não alerta
-  // (no histórico completo uma obra de 2023 aparecia "vencida há 600 dias", em vermelho).
   const encerrada=o.stBucket==='ok';
   const paral=encerrada?0:num(raw.dias_paralisado);
   const com=(o.comissao&&o.comissao.length)?o.comissao:[];
-  const fiscalResp=pickFiscal(com);
+  const {valorList,prazoList,outrosList}=adCompute(o,raw);
 
-  // ---- R1 — cartão de identificação (objeto + grade de 4) ----
-  const idCell=(label,val,sub)=>`<div class="rs-id-cell"><div class="rs-lbl">${label}</div><div class="rs-id-v">${val}</div>${sub?`<div class="rs-id-sub">${sub}</div>`:''}</div>`;
-  const fiscSub=`${com.length?NUM.format(com.length)+' membro'+(com.length===1?'':'s'):'sem comissão'} · <button type="button" class="mlink" id="mResumoVerComissao">ver aba &rarr;</button>`;
-  const r1=`<div class="rs-row"><div class="rs-id">
-    <div><div class="rs-lbl">${RS_ICO.obj} Objeto ${multiObra?'da obra':'do contrato'}</div><div class="rs-obj-txt">${escHtml(o.objeto)}</div></div>
-    <div class="rs-id-grid">
-      ${idCell('Município', fmtVal(raw.municipio||o.municipioTxt))}
-      ${idCell('Distrito Operacional', fmtVal(raw.distrito_operacional))}
-      ${idCell('Contratada', fmtVal(raw.contratada), 'CNPJ '+fmtCNPJ(raw.cnpj_contratada))}
-      ${idCell('Fiscalização', fiscalResp?escHtml(fiscalResp.nome):'—', fiscSub)}
-    </div></div></div>`;
+  const cel=(l,v,cls)=>`<div class="fc-c${cls?' '+cls:''}"><div class="fc-l">${l}</div><div class="fc-v">${v}</div></div>`;
+  const lin=(l,v,cls)=>`<div class="fc-r${cls?' '+cls:''}"><dt>${l}</dt><dd>${v}</dd></div>`;
+  // situação = ponto colorido + texto neutro (a cor é do TOKENS de prazo, como nos cartões antigos)
+  const stat=(txt,col)=>`<span class="fc-st"><i style="background:${col||'var(--text-dim)'}"></i>${fmtVal(txt)}</span>`;
+  const comCnpj=(n,c)=>`${fmtVal(n)}<span class="fc-cnpj">${fmtCNPJ(c)}</span>`;
+  const dias=n=>num(n)>0?dd(num(n)):'—';
+  const colObra=encerrada?TOKENS.statusOk:(paral>0?TOKENS.statusStop:(cExec?cExec.color:null));
+  const colContrato=encerrada?TOKENS.statusOk:(cVig?cVig.color:null);
 
-  // ---- R2 — 2 cartões de status (obra / contrato), cor de TOKENS.status* ----
-  const stCard=(label,word,c,ini,fim,colOverride,extra)=>{
-    const fill=colOverride||(c?c.color:null)||'var(--text-dim)';        // preenchimento (ponto, barra)
-    const txt=colOverride?statusTextColor(colOverride):(c?statusTextColor(c.color):'var(--text-dim)'); // texto (AA)
-    return `<div class="rs-st">
-      <div class="rs-st-head"><i class="rs-st-dot" style="background:${fill}"></i>
-        <div class="rs-st-hx"><div class="rs-lbl">${label}</div><div class="rs-st-word" style="color:${txt}">${word||'—'}</div></div></div>
-      <div class="rs-st-dates"><span>${fmtDateBR(ini)}</span><span>${fmtDateBR(fim)}</span></div>
-      <div class="rs-st-track"><i style="width:${c?c.pct.toFixed(1):0}%;background:${fill}"></i></div>
-      <div class="rs-st-days" style="color:${c?statusTextColor(c.color):'var(--text-dim)'}">${c?escHtml(c.daysTxt):'datas insuficientes'}</div>
-      ${extra||''}</div>`;
-  };
-  const obraCol=encerrada?TOKENS.statusOk:(paral>0?TOKENS.statusStop:(cExec?cExec.color:null));
-  const r2=`<div class="rs-row rs-status">`
-    +stCard('Situação da obra', fmtVal(raw.status_obra), cExec, raw.data_inicio_real, raw.data_fim_previsto, obraCol,
-       paral>0?`<div class="rs-st-paral">Paralisada há ${dd(paral)}</div>`:'')
-    +stCard('Situação do contrato', fmtVal(raw.status_contrato), cVig, raw.data_inicio_real, raw.data_fim_vigencia_contrato)
-    +`</div>`;
-
-  // ---- R3 — faixa de 4 indicadores ----
-  // O card "Aditivos" mostra a REPERCUSSÃO LÍQUIDA (adit = Σ acréscimo − supressão),
-  // que pode ser NEGATIVA (supressão líquida): sinal explícito ("−"), barra travada
-  // em ≥0, cor neutra. O limite do art. 125 (acréscimo BRUTO) é aferido à parte, no
-  // R5, com pctAcr — não nesta barra.
-  const aditCol=pctAdit>=25?TOKENS.statusStop:pctAdit>=10?TOKENS.amber:TOKENS.ng;
-  const aditSubColor=adit<0?'var(--text-dim)':statusTextColor(aditCol);
-  const aditPctTxt=`${adit<0?'−':'+'}${pct1(Math.abs(pctAdit))}`;
-  const aditContrato=aditRows.reduce((s,a)=>s+num(a.valor_repercussao),0); // Σ nível contrato
-  const saldo=med.saldo;
-  const valTxt=multiObra?'do valor da obra':'do valor atual';
-  const heroCard=`<div class="rs-card rs-hero"><span class="rs-ic sm">${RS_ICO.valor}</span><div class="rs-lbl">Valor ${multiObra?'desta obra':'atual do contrato'}</div>
-    <div class="rs-num big">${BRL2.format(o.valor)}</div>
-    <div class="rs-card-sub">Original: ${BRL2.format(orig)}</div>
-    ${multiObra?`<div class="rs-card-sub">Contrato (todas as obras): ${BRL2.format(num(o.valorContrato))}</div>`:''}</div>`;
-  const aditCard=`<div class="rs-card"><div class="rs-lbl">Aditivos${multiObra?' da obra':''}</div>
-    <div class="rs-num">${signedBRL(adit)}</div>
-    <div class="rs-card-sub" style="color:${aditSubColor}">${aditPctTxt} sobre o valor original</div>
-    ${multiObra?`<div class="rs-card-sub">Contrato: ${signedBRL(aditContrato)}</div>`:''}
-    <div class="rs-bar"><i style="width:${Math.max(0,Math.min(100,pctAdit/25*100)).toFixed(1)}%;background:${adit<0?'var(--text-dim)':aditCol}"></i></div></div>`;
-  const medCard=`<div class="rs-card"><div class="rs-lbl">Total medido${multiObra?' na obra':''}</div>
-    <div class="rs-num">${medTot==null?'—':BRL2.format(medTot)}</div>
-    <div class="rs-card-sub">${medPct==null?(med.fonte==='nenhuma'?'sem medições registradas':'—'):pct1(medPct)+' '+valTxt}${med.fonte==='ficha'?' (ficha do contrato)':''}</div>
-    ${multiObra&&o.ficha&&o.ficha.percentual_total_medido!=null?`<div class="rs-card-sub">Contrato: ${fmtPct1(num(o.ficha.percentual_total_medido))}% medido</div>`:''}
-    <div class="rs-bar"><i class="g" style="width:${pR.toFixed(1)}%"></i></div></div>`;
-  const saldoCard=`<div class="rs-card"><div class="rs-lbl">Saldo a medir</div>
-    <div class="rs-num">${saldo==null?'—':BRL2.format(saldo)}</div>
-    <div class="rs-card-sub">${medPct==null?'—':pct1(Math.max(0,100-pR))+' '+valTxt}</div>
-    <div class="rs-bar"><i class="b" style="width:${medPct==null?0:Math.max(0,100-pR).toFixed(1)}%"></i></div></div>`;
-  const r3=`<div class="rs-row rs-ind">${heroCard}${aditCard}${medCard}${saldoCard}</div>`;
-
-  // ---- R4 — curva de evolução da medição (largura total, com grade) ----
-  // acumula o `total` LÍQUIDO por período (glosas já descontadas), na ordem de nr_medicao
-  // (o.medicoes já vem ordenado de fetchMedicoes). Denominador = `med.denom` (valor DA
-  // OBRA) — o mesmo dos cards de medição; assim a curva e o card "% executado" fecham.
-  const meds=o.medicoes||[];
-  const medDenom=med.denom;
-  let accMed=0;
-  const pts=meds.map(m=>{ accMed+=num(m.total); return {label:m.periodo, y:medDenom?accMed/medDenom*100:0}; }).filter(p=>isFinite(p.y));
-  const lastM=meds[meds.length-1];
-  const ultimaTxt=lastM?`Última medição: ${fmtVal(lastM.periodo)}${lastM.nr_medicao!=null?' · '+NUM.format(lastM.nr_medicao)+'ª':''}`:'';
-  const r4=`<div class="rs-row"><div class="rs-chartbox">
-    <div class="rs-cb-head"><div class="rs-lbl">${RS_ICO.chart} Evolução da medição (%)</div>${ultimaTxt?`<span class="rs-cb-sub">${escHtml(ultimaTxt)}</span>`:''}</div>
-    ${rsLineChart(pts)}</div></div>`;
-
-  // ---- R5 — pontos de atenção (só rotula valores já exibidos; limiares fixos) ----
+  // ---- pontos de atenção (só rotula valores já exibidos; limiares fixos) ----
   const att=[];
   if(paral>0) att.push([TOKENS.statusStop, `Obra paralisada há ${dd(paral)}.`]);
   if(!encerrada){
@@ -3599,30 +3431,178 @@ function buildResumoPane(o,raw){
   if(medPct!=null && medPct>100.5) att.push([TOKENS.amber, `Medição acumulada de ${pct1(medPct)} — acima do valor ${multiObra?'da obra':'atual do contrato'}.`]);
   if(pctAcr>=25) att.push([TOKENS.statusStop, `Acréscimos somam ${pct1(pctAcr)} do valor original — acima do limite de 25% do art. 125 da Lei 14.133/2021.`]);
   else if(pctAdit>=10) att.push([TOKENS.amber, `Aditivos somam ${pct1(pctAdit)} do valor original.`]);
-  if(!att.length) att.push([TOKENS.ng, 'Nenhum ponto de atenção identificado neste contrato.']);
-  const r5=`<div class="rs-row"><div class="rs-att">
-    <div class="rs-lbl">${RS_ICO.clock} Pontos de atenção</div>
-    <div class="rs-att-grid">${att.map(([c,t])=>`<div class="rs-att-i"><i style="background:${c}"></i><span>${escHtml(t)}</span></div>`).join('')}</div>
-  </div></div>`;
+  // sem alerta a faixa não existe (um "tudo certo" fixo no topo viraria ruído); borda na cor do mais grave
+  const attHTML=att.length
+    ? `<div class="fc-att" role="status" style="border-left-color:${att.some(a=>a[0]===TOKENS.statusStop)?TOKENS.statusStop:TOKENS.amber}">`
+      +att.map(([c,t])=>`<div class="fc-att-i"><i style="background:${c}"></i><span>${escHtml(t)}</span></div>`).join('')+`</div>`
+    : '';
 
-  // ---- R6 — "Detalhes do contrato" recolhível (fechado por padrão). Reusa .adToggle. ----
-  const detFields=[
-    ['CÓDIGO DA OBRA', fmtVal(raw.codigo_obra)],
-    ['TIPO DE CONTRATO', fmtVal(raw.descricao_tipo_contrato||o.tipo)],
-    ['SAC', fmtVal(raw.nr_contrato_sic)],
-    ['ORDEM DE SERVIÇO', fmtVal(raw.nr_os)],
-    ['DATA DE ASSINATURA', fmtDateBR(raw.data_assinatura)],
-    ['CONTRATANTE', fmtVal(raw.contratante)],
-    ['CNPJ DO CONTRATANTE', fmtCNPJ(raw.cnpj_contratante)],
-    ['TOTAL DE REAJUSTE', BRL2.format(num(raw.total_reajuste))],
-    ['TOTAL REALINHADO', BRL2.format(num(raw.total_realinhado))],
-  ];
-  const detalhes=`<button type="button" class="adToggle" data-target="mDetList" aria-expanded="false" aria-controls="mDetList">`
-    +`<span>Detalhes do contrato</span> <span class="adToggle-car">&#9662;</span></button>`
-    +`<div id="mDetList" hidden><div class="mgrid" style="margin-top:10px">`
-    +detFields.map(([l,d])=>`<div><div class="l">${l}</div><div class="d">${d}</div></div>`).join('')
-    +`</div></div>`;
-  return r1+r2+r3+r4+r5+detalhes;
+  // ---- Dados do contrato (3 colunas independentes: identificação | partes | vigência). Colunas, e não grade
+  //      de linhas: com linhas, o CNPJ de Contratada/Contratante esticava a altura das células vizinhas ----
+  const bContrato=fcSec('Dados do contrato','contrato',`<div class="fc-contrato">
+      <div class="fc-cc s4">
+        ${cel('Contrato',fmtContratoExt(raw.nr_contrato_ext))}
+        ${cel('Código da obra',fmtVal(raw.codigo_obra||o.codigo_obra))}
+        ${cel('Situação',stat(raw.status_contrato,colContrato))}
+      </div>
+      <div class="fc-cc s5">
+        ${cel('Contratada',comCnpj(raw.contratada,raw.cnpj_contratada))}
+        ${cel('Contratante',comCnpj(raw.contratante,raw.cnpj_contratante))}
+      </div>
+      <div class="fc-cc s3">
+        ${cel('Data de assinatura',fmtDateBR(raw.data_assinatura))}
+        ${cel('Prazo de vigência',dias(raw.prazo_vigencia_contrato))}
+        ${cel('Fim da vigência',fmtDateBR(raw.data_fim_vigencia_contrato))}
+      </div>
+    </div>`);
+
+  // ---- Dados da obra | Prazos | Valores ----
+  const diasAdit=prazoList.reduce((s,a)=>s+num(a.execucao_aprovado),0);
+  const fimTxt=fmtDateBR(raw.data_fim_previsto)+((cExec&&!encerrada)?`<span class="fc-sub" style="color:${statusTextColor(cExec.color)}">${escHtml(cExec.daysTxt)}</span>`:'');
+  const reaj=num(raw.total_reajuste), realin=num(raw.total_realinhado);
+  const toggleBtn=(id,txt)=>`<button type="button" class="adToggle fc-more" data-target="${id}" aria-expanded="false" aria-controls="${id}"><span>${txt}</span> <span class="adToggle-car">&#9662;</span></button>`;
+  const temAdValor=valorList.length||outrosList.length;
+  // tooltip do "Total aditivo": o detalhe que o número resume (acréscimo, supressão, repercussão líquida e
+  // % sobre o valor original). Mesmo botão "i" (.kpi-info → mostraRpTip) dos cartões do painel. Os
+  // aditivos_contrato são do CONTRATO, então em contrato multi-obra o tooltip diz isso.
+  let aditTip='';
+  if(valorList.length){
+    const acres=valorList.reduce((x,a)=>x+num(a.valor_aprovado),0);
+    const supr=valorList.reduce((x,a)=>x+num(a.valor_supressao),0);
+    const reperc=valorList.reduce((x,a)=>x+num(a.valor_repercussao),0);
+    const pc=v=>origC?fmtPct1(Math.abs(v)/origC*100)+'%':'—';
+    const linhas=[
+      `Acréscimos: ${BRL2.format(acres)} (+${pc(acres)})`,
+      `Supressões: ${supr?'−':''}${BRL2.format(supr)} (${supr?'−':''}${pc(supr)})`,
+      `Repercussão: ${signedBRL(reperc)} (${reperc<0?'−':'+'}${pc(reperc)})`,
+      'Percentuais sobre o valor original'+(multiObra?' do contrato. Os aditivos são do contrato inteiro: a base não os separa por obra.':'.'),
+    ];
+    aditTip=`<button type="button" class="kpi-info" data-tip="${escHtml(linhas.join('\n\n'))}" data-tip-t="Total aditivo"`
+      +(multiObra?` data-tip-chip="Contrato"`:'')+` aria-label="Detalhe do total aditivo">${RS_ICO.info}</button>`;
+  }
+  const bObra=fcSec('Dados da obra','obra',`<dl class="fc-list">
+      ${lin('Código',fmtVal(raw.codigo_obra||o.codigo_obra))}
+      ${lin('Situação',stat(raw.status_obra,colObra))}
+      ${lin('Município',fmtVal(raw.municipio||o.municipioTxt))}
+      ${lin('Distrito operacional',fmtVal(raw.distrito_operacional))}
+    </dl>`,'fc-col');
+  const bPrazos=fcSec('Prazos','prazos',`<dl class="fc-list">
+      ${lin('Nº da OS',fmtVal(raw.nr_os))}
+      ${lin('Início real',fmtDateBR(raw.data_inicio_real))}
+      ${lin('Prazo de execução',dias(raw.prazo_execucao))}
+      ${lin('Dias aditivados'+(multiObra&&diasAdit?' (contrato)':''),NUM.format(diasAdit))}
+      ${lin('Dias paralisados',`<span${paral>0?` style="color:${statusTextColor(TOKENS.statusStop)}"`:''}>${NUM.format(num(raw.dias_paralisado))}</span>`)}
+      ${lin('Fim previsto',fimTxt)}
+    </dl>${prazoList.length?toggleBtn('mFcAdPrazo',`Aditivos de prazo (${NUM.format(prazoList.length)})`):''}`,'fc-col');
+  // livro-caixa: original → aditivo → reajuste → atual, filete antes do total. Os valores vêm
+  // direto da base (valor atual é o do SIGSOP, não a soma das linhas — por isso sem sinais de "=").
+  const bValores=fcSec('Valores','valores',`<dl class="fc-list fc-ledger">
+      ${lin('Valor original',BRL2.format(orig))}
+      ${lin('Total aditivo'+aditTip,signedBRL(adit))}
+      ${lin('Reajuste',BRL2.format(reaj))}
+      ${realin?lin('Total realinhado',BRL2.format(realin)):''}
+      ${lin(multiObra?'Valor atual da obra':'Valor atual',BRL2.format(num(o.valor)),'tot')}
+    </dl>${temAdValor?toggleBtn('mFcAdValor',`Aditivos de valor (${NUM.format(valorList.length+outrosList.length)})`):''}`,'fc-col');
+  const painelAd=(id,html)=>`<div id="${id}" class="fc-ad" hidden>${html}</div>`;
+  const bTri=`<div class="fc-tri">${bObra}${bPrazos}${bValores}</div>`
+    +(prazoList.length?painelAd('mFcAdPrazo',buildAdPrazoPane(o,raw)):'')
+    +(temAdValor?painelAd('mFcAdValor',buildAdValorPane(o,raw)):'');
+
+  // ---- Comissão de fiscalização (Tipo · Matrícula · Nome completo, ordem de exibição de fetchFiscais) ----
+  const tipoFmt=t=>{ const s=String(t||'').toLowerCase(); return escHtml(s.charAt(0).toUpperCase()+s.slice(1)); };
+  const bCom=fcSec('Comissão de fiscalização','comissao',(com.length
+      ? `<div class="fc-tab"><div class="fc-tg fc-com">
+          <div class="fc-tr h"><div>Tipo</div><div>Matrícula</div><div>Nome completo</div></div>
+          ${com.map(m=>`<div class="fc-tr"><div>${tipoFmt(m.tipo)}</div><div class="fc-n">${fmtVal(m.matricula)}</div><div>${fmtVal(m.nome)}</div></div>`).join('')}
+        </div></div>`
+      : `<div class="empty">Sem dados de fiscalização para este contrato.</div>`));
+
+  // ---- Medições (NR · STM · Período · Protocolo · Medido · Glosa · Total) + totais da ficha ----
+  const meds=o.medicoes||[];
+  let bMed='';
+  if(meds.length){
+    const trows=meds.map(m=>{ const g=num(m.valor_ref_glosa); return `<div class="fc-tr">
+        <div class="fc-n">${fmtVal(m.nr_medicao)}</div>
+        <div><span class="fc-stm">${fmtVal(m.sigla_status_medicao)}</span></div>
+        <div>${fmtVal(m.periodo)}</div>
+        <div class="fc-n">${fmtVal(m.nr_protocolo)}</div>
+        <div class="r">${BRL2.format(num(m.valor_medido))}</div>
+        <div class="r">${g>0?'−'+BRL2.format(g):'—'}</div>
+        <div class="r fc-b">${BRL2.format(num(m.total))}</div></div>`; }).join('');
+    bMed+=`<div class="fc-tab"><div class="fc-tg fc-med">
+        <div class="fc-tr h"><div>Nr</div><div>STM</div><div>Período</div><div>Protocolo</div><div class="r">Medido</div><div class="r">Glosa</div><div class="r">Total</div></div>
+        ${trows}</div></div>`;
+  } else {
+    bMed+=`<div class="empty">Sem medições registradas para esta obra.</div>`;
+  }
+  const fi=(l,v)=>`<div class="fc-fi"><div class="fc-l">${l}</div><div class="fc-fv">${v}</div></div>`;
+  if(medTot!=null){
+    // bruto − glosa − líquido: em algumas obras `total` já embute outras retenções (não
+    // registradas em valor_ref_glosa). Mostra a diferença pra o rodapé sempre fechar.
+    const glosaTot=meds.reduce((s,m)=>s+num(m.valor_ref_glosa),0);
+    const brutoTot=meds.reduce((s,m)=>s+num(m.valor_medido),0);
+    const outrasRet=Math.round((brutoTot-glosaTot-medTot)*100)/100;
+    bMed+=`<div class="fc-foot">
+      ${meds.length?fi('Medido (bruto)',BRL2.format(brutoTot))+fi('Glosas',glosaTot>0?'−'+BRL2.format(glosaTot):BRL2.format(0)):''}
+      ${meds.length&&outrasRet>=0.01?fi('Outras retenções','−'+BRL2.format(outrasRet)):''}
+      ${fi('Total medido',BRL2.format(medTot))}
+      ${fi('Percentual executado',medPct==null?'—':fmtPct1(medPct)+'%')}
+      ${fi('Saldo da obra',saldo==null?'—':BRL2.format(saldo))}
+    </div>`;
+  }
+  if(meds.length)
+    bMed+=toggleBtn('mFcLeg','Legenda das situações (STM)')
+      +`<div id="mFcLeg" class="fc-leg" hidden>${STM_LEGENDA.map(([c,t])=>`<div><b>${escHtml(c)}</b><span>${escHtml(t)}</span></div>`).join('')}</div>`;
+  bMed=fcSec('Medições','medicoes',bMed);
+
+  // ---- Evolução da medição: Σ do `total` LÍQUIDO por período (na ordem de nr_medicao) ÷ valor da obra ----
+  let acc=0;
+  const pts=meds.map(m=>{ acc+=num(m.total); return {label:m.periodo, y:med.denom?acc/med.denom*100:0}; }).filter(p=>isFinite(p.y));
+  const lastM=meds[meds.length-1];
+  const ultimaTxt=lastM?`Última medição: ${fmtVal(lastM.periodo)}${lastM.nr_medicao!=null?' · '+NUM.format(lastM.nr_medicao)+'ª':''}`:'';
+  const bCurva=pts.length
+    ? `<section class="fc-sec fc-sec-toggle">${toggleBtn('mFcCurva','Evolução da medição')}`
+      +`<div id="mFcCurva" class="fc-curva" hidden>${ultimaTxt?`<div class="fc-hnote">${ultimaTxt}</div>`:''}${rsLineChart(pts)}</div></section>`
+    : '';
+
+  return attHTML+bContrato+bTri+bCom+bMed+bCurva;
+}
+// obras do mesmo contrato que estão carregadas na tela (DB.municipios[].obras vem do recorte da
+// carteira: na ativa só as obras ativas, no histórico a base inteira). Ordem estável por código.
+function obrasDoContrato(o){
+  const sop=o.raw&&o.raw.nr_contrato_sop;
+  const out=[];
+  if(sop) for(const c in DB.municipios) for(const x of DB.municipios[c].obras) if(x.raw&&x.raw.nr_contrato_sop===sop) out.push(x);
+  if(!out.includes(o)) out.push(o);
+  return out.sort((a,b)=>String(a.codigo_obra||a.id_obra).localeCompare(String(b.codigo_obra||b.id_obra),'pt-BR',{numeric:true}));
+}
+// chips de troca de obra (só em contrato com mais de uma obra); passa de 5 vira menu suspenso
+const FICHA_MAX_CHIPS=5;
+function fichaObrasNav(o,lista){
+  if((o.nObras||1)<2) return '';
+  const rot=x=>escHtml(x.codigo_obra||('#'+x.id_obra));
+  let nav;
+  if(lista.length>FICHA_MAX_CHIPS){
+    nav=`<label class="fc-obra-selw"><span class="fc-l">Obra</span><select class="fc-obra-sel" id="fcObraSel" aria-label="Trocar de obra do contrato">`
+      +lista.map((x,i)=>`<option value="${i}"${x===o?' selected':''}>${rot(x)}${x.municipioTxt?' — '+escHtml(x.municipioTxt):''}</option>`).join('')+`</select></label>`;
+  } else {
+    nav=lista.map((x,i)=>`<button type="button" class="fc-obra${x===o?' on':''}" data-i="${i}" aria-pressed="${x===o}" title="${escHtml(x.municipioTxt||'')}">${rot(x)}</button>`).join('');
+  }
+  // na carteira ativa as obras encerradas do contrato não estão carregadas — avisa em vez de esconder
+  const falta=(o.nObras||1)>lista.length
+    ? `<span class="fc-obras-nota">O contrato tem ${NUM.format(o.nObras)} obras; ${NUM.format(lista.length)} ${lista.length===1?'está':'estão'} carregada${lista.length===1?'':'s'} nesta carteira${st.dataScope==='ativa'?'. O histórico mostra todas':''}.</span>`
+    : '';
+  return `<div class="fc-obras" role="group" aria-label="Obras do contrato">${nav}${falta}</div>`;
+}
+function wireFichaObras(lista,voltarChave){
+  const trocar=i=>{
+    const x=lista[i]; if(!x||x===_lastModalObra) return;
+    const t=document.querySelector('.modal .mtab.on'); const aba=t?t.dataset.tab:'ficha';
+    openModal(x,voltarChave);
+    if(aba!=='ficha'){ const n=document.querySelector(`.modal .mtab[data-tab="${aba}"]`); if(n) n.click(); }
+  };
+  document.querySelectorAll('.modal .fc-obra').forEach(b=>{ b.onclick=()=>trocar(+b.dataset.i); });
+  const sel=document.getElementById('fcObraSel'); if(sel) sel.onchange=()=>trocar(+sel.value);
 }
 // obra atualmente exibida no modal — guardada só para redesenhar o modal na troca
 // de tema ao vivo (os gráficos internos carregam cor de TOKENS no innerHTML).
@@ -3639,83 +3619,47 @@ let _lastModalVoltarChave=null;
 function openModal(o,voltarChave){
   _lastModalObra=o; _lastModalVoltarChave=voltarChave||null;
   const raw=o.raw||{};
-  const resumoHTML=buildResumoPane(o,raw);
-  const fiscalizacaoHTML=buildFiscalizacaoPane(o);
-  const adValorHTML=buildAdValorPane(o,raw);
-  const adPrazoHTML=buildAdPrazoPane(o,raw);
-  const medicoesHTML=buildMedicoesPane(o,raw);
+  // 2 abas (remodelação de 04/10/2026): "Ficha Obra" (modelo ficha_obra.pdf; aditivos, medições
+  // e comissão viraram blocos dela) e "Elétrica" (inalterada).
+  const fichaHTML=buildFichaPane(o,raw);
   const eletricaHTML=buildEletricaPane(o);
-  // "Localizar no mapa": fecha o modal e navega até o município da obra (nível 3),
-  // pelo mesmo goCity() de um clique no mapa — não altera filtros, métrica nem escopo.
-  const munCod=o.municipioTxt?NAMEIDX[normTxt(o.municipioTxt)]:null;
-  const munTxt=escHtml(o.municipioTxt||raw.municipio||'');
-  const locateBtn=munCod
-    ? `<button type="button" class="m-locate" id="modalLocate" title="Fechar e ver ${munTxt} no mapa">${PIN_SVG}<span>Localizar no mapa</span></button>`
-    : `<button type="button" class="m-locate" id="modalLocate" disabled title="Este contrato não tem município mapeável no Ceará">${PIN_SVG}<span>Localizar no mapa</span></button>`;
+  const irmas=(o.nObras||1)>1?obrasDoContrato(o):[];
+  // (o botão "Localizar no mapa" deste cabeçalho foi removido a pedido do usuário, 2026-10-05: levava
+  // para o mapa e perdia o caminho de volta)
   // com voltarChave, "✕" vira "← Voltar" pro modal do engenheiro (mesma troca que
   // abreModalFiscal faz com voltarGid) — Esc/clique fora continuam funcionando igual,
   // fecharOuVoltar() já clica em #modalVoltar quando ele existe.
+  const voltarTitulo=voltarChave===CRONO_CHAVE_VOLTAR?'Voltar para o cronograma':voltarChave===FICHA_CHAVE_PROCESSO?'Voltar para o processo':'Voltar para o engenheiro';
   const fecharBtn=voltarChave
-    ? `<button type="button" class="m-locate" id="modalVoltar" title="${voltarChave===CRONO_CHAVE_VOLTAR?'Voltar para o cronograma':'Voltar para o engenheiro'}">${RS_ICO.voltar}<span>Voltar</span></button>`
+    ? `<button type="button" class="m-locate" id="modalVoltar" title="${voltarTitulo}">${RS_ICO.voltar}<span>Voltar</span></button>`
     : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
   document.getElementById('modal').innerHTML=
-    `<div class="mtop" data-tab="resumo">
+    `<div class="mtop" data-tab="ficha">
        <div class="mh"><div class="mh-titles">
-           <div class="mt">DADOS DO CONTRATO Nº ${fmtContratoExt(raw.nr_contrato_ext)}</div>
-           ${(o.nObras||1)>1?`<div class="mobra">${RS_ICO.dist}<span>Obra ${escHtml(o.codigo_obra||('#'+o.id_obra))} · uma das obras deste contrato</span></div>`:''}
-           <div class="msub">${RS_ICO.chart}<span>Resumo executivo do contrato</span></div></div>
-         <div class="mh-actions">${locateBtn}${fecharBtn}</div></div>
+           <div class="mt">Ficha Obra</div>
+           <div class="fc-ctr"><span>Contrato</span> <b>${fmtContratoExt(raw.nr_contrato_ext)}</b>${(o.nObras||1)>1?'':`<span class="fc-ctr-obra">${escHtml(o.codigo_obra||('#'+o.id_obra))}</span>`}</div>
+           ${fichaObrasNav(o,irmas)}</div>
+         <div class="mh-actions">${fecharBtn}</div></div>
        <div class="mtabs" role="tablist">
-         <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneResumo" data-tab="resumo">Resumo</button>
-         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneAdValor" data-tab="aditivos-valor">Aditivos de valor</button>
-         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneAdPrazo" data-tab="aditivos-prazo">Aditivos de prazo</button>
-         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneMedicoes" data-tab="medicoes">Medições</button>
-         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneFiscalizacao" data-tab="fiscalizacao">Fiscalização</button>
+         <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneFicha" data-tab="ficha">Ficha Obra</button>
          <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneEletrica" data-tab="eletrica">Elétrica</button>
        </div>
      </div>
-     <div class="mbody" data-tab="resumo">
+     <div class="mbody" data-tab="ficha">
        <div class="mobj">${escHtml(o.objeto)}</div>
-       <div class="mpane" id="mPaneResumo" role="tabpanel" data-pane="resumo">${resumoHTML}</div>
-       <div class="mpane" id="mPaneAdValor" role="tabpanel" data-pane="aditivos-valor" hidden>${adValorHTML}</div>
-       <div class="mpane" id="mPaneAdPrazo" role="tabpanel" data-pane="aditivos-prazo" hidden>${adPrazoHTML}</div>
-       <div class="mpane" id="mPaneMedicoes" role="tabpanel" data-pane="medicoes" hidden>${medicoesHTML}</div>
-       <div class="mpane" id="mPaneFiscalizacao" role="tabpanel" data-pane="fiscalizacao" hidden>${fiscalizacaoHTML}</div>
+       <div class="mpane" id="mPaneFicha" role="tabpanel" data-pane="ficha">${fichaHTML}</div>
        <div class="mpane" id="mPaneEletrica" role="tabpanel" data-pane="eletrica" hidden>${eletricaHTML}</div>
        <div class="mupd">Atualizado em ${fmtDateTimeBR(raw.atualizado_em)}</div>
      </div>`;
   document.getElementById('modalBg').classList.add('show');
   const _mx=document.getElementById('modalX'); if(_mx) _mx.onclick=closeModal;
   const _voltar=document.getElementById('modalVoltar');
-  if(_voltar) _voltar.onclick=()=>voltarChave===CRONO_CHAVE_VOLTAR?abreCronogramaEletrica({preservar:true}):abreModalEngenheiroEletrica(voltarChave);
-  const _loc=document.getElementById('modalLocate');
-  if(_loc && munCod) _loc.onclick=()=>{ closeModal(); goCity(munCod); };
-  const _vc=document.getElementById('mResumoVerComissao');
-  if(_vc) _vc.onclick=()=>{ const t=document.querySelector('.modal .mtab[data-tab="fiscalizacao"]'); if(t) t.click(); };
+  if(_voltar) _voltar.onclick=()=>voltarChave===CRONO_CHAVE_VOLTAR?abreCronogramaEletrica({preservar:true})
+    :voltarChave===FICHA_CHAVE_PROCESSO?voltaParaProcesso():abreModalEngenheiroEletrica(voltarChave);
   wireModalTabs();
+  wireFichaObras(irmas,voltarChave);
   wireAdToggles();
   wireEletricaPane(o);
-}
-// Aba "Fiscalização": fiscal titular em destaque + suplente (se houver) + comissão
-// completa. Ordenação/classificação já vêm prontas de fetchFiscais (rank desc via
-// classifyComissao). A matrícula (comissao_fiscalizacao.matricula) aparece quando
-// preenchida — nem todo integrante tem.
-function buildFiscalizacaoPane(o){
-  const com=(o.comissao&&o.comissao.length)?o.comissao:[];
-  if(!com.length) return `<div class="empty">Sem dados de fiscalização para este contrato.</div>`;
-  // com[] já vem ordenado por rank de EXIBIÇÃO (fetchFiscais). O fiscal responsável
-  // NÃO é necessariamente com[0] — é pickFiscal (Fiscal, senão 1º Membro).
-  const titular=pickFiscal(com);
-  const suplente=com.find(m=>m.tipo==='SUPLENTE');
-  // matrícula (quando houver) sempre no mesmo <span class="mcommat"> — some da lista e
-  // do card sem herdar o uppercase de .rs-fi-func.
-  const matTag=m=>m.matricula?` <span class="mcommat">· mat. ${escHtml(m.matricula)}</span>`:'';
-  const fiCard=(label,m)=>`<div class="rs-fi-card"><span class="rs-ic sm">${RS_ICO.pessoa}</span>
-    <div><div class="rs-lbl">${label}</div><div class="rs-fi-nome">${escHtml(m.nome)}</div><div class="rs-fi-func">${escHtml(m.tipo)}${matTag(m)}</div></div></div>`;
-  const top=`<div class="rs-fi-top">${fiCard('Fiscal responsável',titular)}${(suplente&&suplente!==titular)?fiCard('Suplente',suplente):''}</div>`;
-  const list=`<div class="msec">Comissão de fiscalização (${com.length})</div>`
-    +`<div class="mcomlist">${com.map(m=>`<div class="mcomrow"><span class="mcomtipo">${escHtml(m.tipo)}</span><span class="mcomnome">${escHtml(m.nome)}${matTag(m)}</span></div>`).join('')}</div>`;
-  return top+list;
 }
 // mapa id do relatório -> número de versão (V1, V2, …), pela ordem de ENVIO (criado_em),
 // não pela ordem de exibição por data_vistoria — um relatório de vistoria retroativa não
@@ -4158,8 +4102,8 @@ function wireModalTabs(){
   tabs.forEach(t=>t.onclick=()=>{
     tabs.forEach(x=>{ const on=x===t; x.classList.toggle('on',on); x.setAttribute('aria-selected',String(on)); });
     document.querySelectorAll('.modal .mpane').forEach(p=>{ p.hidden=p.dataset.pane!==t.dataset.tab; });
-    if(body) body.dataset.tab=t.dataset.tab; // a aba Resumo esconde a linha .mobj (o objeto já está no cartão)
-    if(top) top.dataset.tab=t.dataset.tab;   // e o subtítulo "Resumo executivo do contrato" no cabeçalho
+    if(body) body.dataset.tab=t.dataset.tab;
+    if(top) top.dataset.tab=t.dataset.tab;
     // telas estreitas: as abas não cabem todas; traz a aba ativa para dentro da faixa
     // rolável (block:'nearest' evita pulo vertical da página).
     try{ t.scrollIntoView({inline:'nearest',block:'nearest'}); }catch(_){}
@@ -4169,7 +4113,7 @@ function wireModalTabs(){
 // lista de aditivo (valor/prazo) — reconstruído a cada openModal(), então não precisa
 // de delegação de evento nem de limpar listener velho.
 function wireAdToggles(){
-  document.querySelectorAll('.modal .adToggle, .modal .dsh-tile[data-target]').forEach(btn=>{
+  document.querySelectorAll('.modal .adToggle, .modal .dsh-tile[data-target], .modal .dd-cab').forEach(btn=>{
     btn.onclick=ev=>{
       if(ev&&ev.target.closest&&ev.target.closest('.kpi-info')) return;
       const el=document.getElementById(btn.dataset.target); if(!el) return;
@@ -4179,6 +4123,14 @@ function wireAdToggles(){
       // Abriu por um ladrilho lá em cima, a lista pode estar fora da tela — sem isso o
       // clique "não faz nada" aos olhos de quem não rolou a janela primeiro.
       if(willOpen) requestAnimationFrame(()=>el.scrollIntoView({behavior:'smooth',block:'nearest'}));
+    };
+  });
+  // números da linha do cartão do tempo médio (janela do distrito): "processos" e "fiscais" abrem o cartão deles
+  document.querySelectorAll('.modal .dd-n[data-card]').forEach(n=>{
+    n.onclick=()=>{
+      const cab=document.querySelector('.modal .dd-cab[data-target="'+n.dataset.card+'"]'); if(!cab) return;
+      if(cab.getAttribute('aria-expanded')!=='true') cab.click();
+      else document.getElementById(n.dataset.card).scrollIntoView({behavior:'smooth',block:'nearest'});
     };
   });
   // Ladrilho que só aponta pra uma seção JÁ visível (ex.: "Fiscais no período" → os
@@ -4191,7 +4143,7 @@ function wireAdToggles(){
     };
   });
 }
-function closeModal(){ _lastModalObra=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
+function closeModal(){ _lastModalObra=null; _origemProc=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
 // Fecha OU volta um nível: se a janela do fiscal está aberta por cima de um distrito
 // (o botão "#modalVoltar" existe), Esc e clicar fora devem se comportar como o próprio
 // "← Voltar" faria — não só o clique nele. Sem isso os dois gestos mais comuns de
@@ -4203,6 +4155,7 @@ function closeModal(){ _lastModalObra=null; escondeEdTip(); document.getElementB
 // este guard, apertar Esc DEPOIS de já ter fechado tudo clicaria nesse botão fantasma e
 // REABRIRIA o modal — pior que o beco original. Só age com o modal de fato visível.
 function fecharOuVoltar(){
+  if(_metaPop){ fechaMetaPop(); return; }   // a janelinha da meta é a camada de cima
   // diálogos da aba Elétrica ("novo relatório"/"agendar vistoria") são uma camada
   // acima do modal — Esc fecha o que estiver aberto primeiro, mesmo padrão de
   // early-return por camada já usado no handler de Esc que limpa a seleção combinada
@@ -4215,26 +4168,26 @@ function fecharOuVoltar(){
   const v=document.getElementById('modalVoltar'); if(v){ v.click(); return; } closeModal();
 }
 document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') fecharOuVoltar(); });
-// E5 — a janela de distrito lista a equipe em cartões (.fcard), e cada um abre o painel
+// E5 — a janela de distrito lista a equipe em linhas (.frow), e cada uma abre o painel
 // daquele fiscal por cima. #modal fica fora de #body, então precisa do próprio listener.
 // `dataset.rpDistrito` (gravado por abreModalDistrito, sobrevive à troca de innerHTML)
 // é de onde a janela do fiscal sabe que foi aberta por cima de um distrito, e não do
 // ranking lateral — é essa origem que decide se o cabeçalho mostra "← Voltar" ou "✕".
 document.getElementById('modal').addEventListener('click',e=>{
+  const mb=e.target.closest('.metaBtn');
+  if(mb){ abreMetaPop(mb); return; }
+  const fb=e.target.closest('.fichaBtn');
+  if(fb){ abreFichaDoProcesso(fb); return; }
   const per=e.target.closest('[data-rp-per]');
   if(per){ trocaPeriodoJanela(per.dataset.rpPer); return; }
-  const abre=e.target.closest('.chip.abre');
-  if(abre){ abrirJanela(abre); return; }
-  const fc=e.target.closest('.fcard');
+  const fc=e.target.closest('.frow');
   if(fc){ abreModalFiscal(fc.dataset.mat,document.getElementById('modal').dataset.rpDistrito); return; }
 });
 document.getElementById('modal').addEventListener('keydown',e=>{
   if(e.key!=='Enter'&&e.key!==' ') return;
-  const abre=e.target.closest('.chip.abre');
-  if(abre){ e.preventDefault(); abrirJanela(abre); return; }
-  const fc=e.target.closest('.fcard');
+  const fc=e.target.closest('.frow');
   if(fc){ e.preventDefault(); abreModalFiscal(fc.dataset.mat,document.getElementById('modal').dataset.rpDistrito); return; }
-  const tl=e.target.closest('.dsh-tile[role="button"]');
+  const tl=e.target.closest('.dsh-tile[role="button"],.dd-cab[role="button"],.dd-n[role="button"]');
   if(tl && !e.target.closest('.kpi-info')){ e.preventDefault(); tl.click(); }
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') fecharOuVoltar(); });
@@ -4324,29 +4277,6 @@ function donutLeg(segs){
   ).join('')}</div>`;
 }
 // ---- painel do modo Replanilhamentos (E3) ----
-// Ranking do recorte: distritos no nível 1 (pelo local da obra), cidades dentro de um
-// distrito. Ordenado pela métrica, do maior para o menor — é o que o mapa pinta, em
-// forma de lista navegável. Área sem número comparável (amostra curta) vai para o fim,
-// mas continua na lista: ela existe e é navegável, só não tem média.
-function rpRanking(){
-  if(st.level>=3) return null;
-  const kind = st.level<=1 ? 'group' : 'city';
-  // Reaproveita o que rpPreparaMapa() já agregou para pintar o mapa: mesmas áreas, mesmo
-  // recorte, mesma passada. A lista não pode divergir do mapa nem por engano, e o hover de
-  // distrito — que redesenha o painel, não o mapa — deixa de repetir 11 agregações.
-  const de=r=>({v:r.v, tot:r.tot, sub:st.rp.metrica==='tempo'?`${NUM.format(r.n)} desp.`:''});
-  const vazio={v:null,n:0,tot:0};
-  const ents = kind==='group'
-    ? groupsList().map(g=>({k:g.id,nome:g.nome.replace(/^D\.O\.\s*/,''),...de(_rpGrp.get(String(g.id))||vazio)}))
-    // parênteses: sem eles o .filter parece aplicar-se ao ternário inteiro
-    : (idsOfGroup(st.group).map(id=>({k:id,nome:DB.municipios[id].nome,...de(_rpMun.get(id)||vazio)}))
-                           .filter(e=>e.tot>0));   // cidade sem processo nenhum só alongaria a lista
-  // Desempate por volume e depois por nome: quando NENHUMA área tem média (comum entre
-  // cidades), ordenar só pelo valor deixaria a lista na ordem do arquivo GeoJSON, que não
-  // diz nada — quem tem mais processos é a leitura útil que sobra.
-  ents.sort((a,b)=>(b.v==null?-1:b.v)-(a.v==null?-1:a.v) || b.tot-a.tot || a.nome.localeCompare(b.nome,'pt-BR'));
-  return {kind,ents};
-}
 // Ordem de leitura da lista de processos: quem está parado na fila há mais tempo primeiro,
 // depois o que está na GECOPE, o histórico já despachado (mais recente antes) e, no fim, os
 // arquivados no meio do trâmite.
@@ -4357,6 +4287,173 @@ function rpOrdemProc(a,b){
   if(a.naFila) return (b.diasNaUnidade??-1)-(a.diasNaUnidade??-1);
   if(a.despachado) return String(b.dataDespacho||'').localeCompare(String(a.dataDespacho||''));
   return 0;
+}
+// ---- Ficha da obra a partir de um processo (pedido do usuário, 2026-10-05) ----
+// Todo processo listado (cartão do distrito/da cidade, linha do fiscal) ganha um botão só de ícone ao
+// lado do número, que abre a ficha da obra dele. A obra é achada pelo codigo_obra no município do
+// processo (mesma origem das duas bases). Sem obra carregada (encerrada: sai de contratos_edificacao,
+// ver mapProcesso), o botão aparece apagado e diz o porquê, para as linhas não mudarem de alinhamento.
+// Aberto de dentro de uma janela do modo Replanilhamentos, o "← Voltar" da ficha reabre aquela mesma
+// janela no mesmo ponto: rolagem, listas abertas e período (que é global) — e destaca o processo de origem.
+function obraDoProcesso(p){
+  if(!p.codigo_obra) return null;
+  const m=p.municipioCod?DB.municipios[p.municipioCod]:null;
+  return (m&&m.obras.find(x=>x.codigo_obra===p.codigo_obra))||null;
+}
+function fichaBtn(p){
+  const ok=!!obraDoProcesso(p);
+  const rot=ok?'Ficha da obra':(p.codigo_obra?'Obra encerrada':'Processo sem obra vinculada');
+  return `<button type="button" class="fichaBtn" data-ficha-proc="${escHtml(String(p.id))}" title="${rot}" aria-label="${ok?'Abrir a ficha da obra do processo '+escHtml(p.processo):rot}"${ok?'':' aria-disabled="true"'}>${RS_ICO.ficha}</button>`;
+}
+const FICHA_CHAVE_PROCESSO='__processo__';
+let _origemProc=null;   // estado da janela de onde a ficha foi aberta; vive enquanto a ficha estiver aberta
+// rolagem + listas abertas (botões .adToggle e <details> "Ver os outros N") de uma janela do modal
+function estadoJanela(modal){
+  return {
+    rolagem:modal.scrollTop,
+    abertos:[...modal.querySelectorAll('[data-target][aria-expanded="true"]')].map(x=>x.dataset.target),
+    detalhes:[...modal.querySelectorAll('details.ver-resto')].map((d,i)=>d.open?i:-1).filter(i=>i>=0),
+  };
+}
+function aplicaEstadoJanela(modal,est){
+  est.abertos.forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.hidden=false;
+    modal.querySelectorAll('[data-target="'+id+'"]').forEach(btn=>{
+      btn.setAttribute('aria-expanded','true');
+      const car=btn.querySelector('.adToggle-car'); if(car) car.textContent='▴';
+    });
+  });
+  const dets=modal.querySelectorAll('details.ver-resto');
+  est.detalhes.forEach(i=>{ if(dets[i]) dets[i].open=true; });
+  modal.scrollTop=est.rolagem;
+}
+function abreFichaDoProcesso(btn){
+  if(btn.getAttribute('aria-disabled')==='true') return;
+  const p=PROCESSOS.find(x=>String(x.id)===btn.dataset.fichaProc); if(!p) return;
+  const o=obraDoProcesso(p); if(!o) return;
+  const modal=document.getElementById('modal');
+  // só as janelas de distrito/fiscal têm para onde voltar; no painel lateral a ficha abre por cima do
+  // mapa e fechar já devolve o painel como estava
+  if(btn.closest('#modal') && modal.dataset.rpJanela){
+    _origemProc={...estadoJanela(modal), janela:modal.dataset.rpJanela, pid:String(p.id)};
+    openModal(o,FICHA_CHAVE_PROCESSO);
+  } else {
+    _origemProc=null;
+    openModal(o);
+  }
+  modal.scrollTop=0;   // openModal não zera a rolagem: a ficha herdaria a da janela de origem
+}
+function voltaParaProcesso(){
+  const s=_origemProc; _origemProc=null;
+  if(!s){ closeModal(); return; }
+  const modal=document.getElementById('modal');
+  const [tipo,a,b]=s.janela.split('|');
+  if(tipo==='d') abreModalDistrito(a); else abreModalFiscal(a,b||undefined);
+  if(_lastModalObra){ closeModal(); return; }   // a janela de origem não abriu (sem dados): não deixar a ficha sem saída
+  aplicaEstadoJanela(modal,s);
+  realcaProcessoNaJanela(modal,s.pid);
+}
+// destaca (e foca o botão de ficha de) um processo da janela que acabou de ser reaberta
+function realcaProcessoNaJanela(modal,pid){
+  const linha=modal.querySelector('[data-pid="'+pid+'"]'); if(!linha) return;
+  const mr=modal.getBoundingClientRect(), lr=linha.getBoundingClientRect();
+  if(lr.top<mr.top+60||lr.bottom>mr.bottom-20) linha.scrollIntoView({block:'center'});
+  linha.classList.add('proc-volta');
+  linha.addEventListener('animationend',()=>linha.classList.remove('proc-volta'),{once:true});
+  const b=linha.querySelector('.fichaBtn'); if(b) b.focus({preventScroll:true});
+}
+// ---- Meta do processo editável na janela do fiscal (pedido do usuário, 2026-10-05) ----
+// Mesma regra do módulo Processos: só administrador altera a meta manualmente (o trigger
+// processos_restringir_prioridade_meta recusa o resto), então o botão nem aparece para os demais. Grava o mesmo campo
+// (processos.data_compromisso_fiscal), o histórico (historico_metas) e a atividade — o módulo Processos mostra a meta
+// nova ao carregar. O `meta:<processo>` do localStorage também é atualizado: é o cache que aquele módulo usa quando o
+// banco não traz data, e uma meta removida aqui "ressuscitaria" por ele.
+function ehAdmin(){ return USER_PAPEL==='admin'; }
+function metaBtnHtml(p){
+  const nome=escHtml(p.processo);
+  return p.dataMeta
+    ? `<button type="button" class="metaBtn" data-meta-pid="${escHtml(String(p.id))}" title="Alterar a meta" aria-label="Alterar a meta do processo ${nome}">`
+      +`<b>${fmtDateBR(p.dataMeta)}</b>${RS_ICO.lapis}</button>`
+    : `<button type="button" class="metaBtn vazio" data-meta-pid="${escHtml(String(p.id))}" title="Definir a meta" aria-label="Definir a meta do processo ${nome}">`
+      +`<span>Definir meta</span>${RS_ICO.lapis}</button>`;
+}
+let _metaPop=null;
+function fechaMetaPop(){
+  if(!_metaPop) return;
+  const m=document.getElementById('modal');
+  document.removeEventListener('mousedown',_metaPop.fora,true); window.removeEventListener('resize',fechaMetaPop);
+  if(m) m.removeEventListener('scroll',fechaMetaPop);
+  const voltaFoco=_metaPop.btn; _metaPop.el.remove(); _metaPop=null;
+  if(voltaFoco&&voltaFoco.isConnected) voltaFoco.focus({preventScroll:true});
+}
+function abreMetaPop(btn){
+  if(!ehAdmin()) return;
+  const p=PROCESSOS.find(x=>String(x.id)===btn.dataset.metaPid); if(!p) return;
+  const jaAberta=_metaPop&&_metaPop.btn===btn; fechaMetaPop(); if(jaAberta) return;   // clicar de novo no mesmo botão fecha
+  const el=document.createElement('div'); el.className='metaPop'; el.setAttribute('role','dialog'); el.setAttribute('aria-label','Meta do processo '+p.processo);
+  const dataAtual=/^\d{4}-\d{2}-\d{2}/.test(p.dataMeta||'')?p.dataMeta.slice(0,10):'';
+  el.innerHTML=`<div class="metaPop-t">Meta do processo</div><div class="metaPop-n">${escHtml(p.processo)}</div>`
+    +`<label class="metaPop-l" for="metaPopData">Data máxima esperada</label>`
+    +`<input id="metaPopData" type="date" value="${dataAtual}">`
+    +`<div class="metaPop-e" role="alert" hidden></div>`
+    +`<div class="metaPop-a">${dataAtual?'<button type="button" class="metaPop-rm">Remover</button>':''}<span class="metaPop-sp"></span>`
+    +`<button type="button" class="metaPop-c">Cancelar</button><button type="button" class="metaPop-ok">Salvar</button></div>`;
+  document.body.appendChild(el);
+  const r=btn.getBoundingClientRect(), w=el.offsetWidth, h=el.offsetHeight;
+  el.style.left=Math.max(12,Math.min(r.right-w,window.innerWidth-w-12))+'px';
+  el.style.top=(r.bottom+8+h>window.innerHeight-12?Math.max(12,r.top-8-h):r.bottom+8)+'px';
+  const fora=e=>{ if(!el.contains(e.target)&&!btn.contains(e.target)) fechaMetaPop(); };
+  _metaPop={el,btn,fora};
+  document.addEventListener('mousedown',fora,true); window.addEventListener('resize',fechaMetaPop);
+  document.getElementById('modal').addEventListener('scroll',fechaMetaPop,{passive:true});
+  const inp=el.querySelector('#metaPopData'), err=el.querySelector('.metaPop-e');
+  const erro=t=>{ err.textContent=t; err.hidden=!t; };
+  const ocupa=on=>el.querySelectorAll('button,input').forEach(x=>{ x.disabled=on; });
+  const grava=async iso=>{
+    erro(''); ocupa(true);
+    try{ await salvaMetaProcesso(p,iso); fechaMetaPop(); }
+    catch(e){ ocupa(false); erro('Não foi possível salvar a meta: '+(e&&e.message?e.message:e)); }
+  };
+  el.querySelector('.metaPop-c').onclick=fechaMetaPop;
+  el.querySelector('.metaPop-ok').onclick=()=>{ if(!inp.value){ erro('Escolha uma data ou use Remover.'); inp.focus(); return; } grava(inp.value); };
+  const rm=el.querySelector('.metaPop-rm'); if(rm) rm.onclick=()=>grava(null);
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); el.querySelector('.metaPop-ok').click(); } });
+  inp.focus();
+}
+async function salvaMetaProcesso(p,iso){
+  const {data,error}=await window.sbClient.from('processos').update({data_compromisso_fiscal:iso}).eq('id',p.id).select('id');
+  if(error) throw error;
+  if(!data||!data.length) throw new Error('o banco recusou a alteração (só administradores alteram a meta).');
+  // dados em memória: a mesma regra da view (atraso = hoje depois da meta, só para quem está na fila do fiscal)
+  p.dataMeta=iso||null;
+  if(p.raw) p.raw.data_compromisso_fiscal=p.dataMeta;
+  if(p.naFila) p.metaEstourada=iso?hojeISOLocal()>iso:null;
+  try{ const k='meta:'+p.processo; if(iso) localStorage.setItem(k,iso); else localStorage.removeItem(k); }catch(e){ /* storage bloqueado: só perde o cache */ }
+  // histórico e atividade não bloqueiam a tela: a meta já está gravada; falha só vai para o console
+  (async()=>{
+    try{
+      let autor=''; try{ autor=sessionStorage.getItem('sop_user_name')||''; }catch(e){}
+      if(!autor){ const {data:s}=await window.sbClient.auth.getSession(); autor=(s&&s.session&&s.session.user&&s.session.user.email)||'Usuário'; }
+      const {error:eh}=await window.sbClient.from('historico_metas').upsert([{
+        processo_id:p.id, registros:hojeISOLocal(), dias_estipulados:iso?diasAteMeta(iso):null, meta:iso||null, autor
+      }],{onConflict:'processo_id,registros,meta,dias_estipulados,autor',ignoreDuplicates:true});
+      if(eh) console.error('Falha ao registrar o histórico da meta:',eh.message);
+      const acao=iso?`definiu a meta para ${iso.split('-').reverse().join('/')}`:'removeu a meta';
+      const {error:ea}=await window.sbClient.from('app_atividades').insert([{
+        usuario:autor, perfil:USER_PAPEL||'admin', descricao:`Usuário ${acao} no processo Nº ${p.processo}`, tipo:'PROCESSO',
+        contexto:p.processo, obra:p.objeto&&p.objeto!=='—'?p.objeto:'', fiscal:p.fiscalNome||''
+      }]);
+      if(ea) console.error('Falha ao registrar a atividade da meta:',ea.message);
+    }catch(e){ console.error('Falha ao registrar histórico/atividade da meta:',e); }
+  })();
+  // refaz o painel e a janela do fiscal no mesmo ponto: contagens de atraso, totais do mapa e a linha alterada
+  const modal=document.getElementById('modal');
+  const [tipo,a,b]=(modal.dataset.rpJanela||'').split('|');
+  const est=estadoJanela(modal);
+  invalidateAggCache(); render();
+  if(tipo==='f'){ abreModalFiscal(a,b||undefined); aplicaEstadoJanela(modal,est); realcaProcessoNaJanela(modal,String(p.id)); }
+  else if(tipo==='d'){ abreModalDistrito(a); aplicaEstadoJanela(modal,est); }
 }
 function procCard(p){
   const estado = p.naFila
@@ -4371,8 +4468,8 @@ function procCard(p){
   const tempo = !p.despachado ? ''
     : p.tempoFiscal!=null ? `${fmtDias(p.tempoFiscal)} no setor`
     : p.abertoJaPronto ? 'aberto já pronto' : '';
-  return `<div class="proc${p.metaEstourada?' meta':''}">`
-    +`<div class="proc-h"><span class="proc-n">${escHtml(p.processo)}</span>`
+  return `<div class="proc${p.metaEstourada?' meta':''}" data-pid="${escHtml(String(p.id))}">`
+    +`<div class="proc-h"><span class="proc-id"><span class="proc-n">${escHtml(p.processo)}</span>${fichaBtn(p)}</span>`
     +`<span class="proc-s">${escHtml(p.statusTxt)}</span></div>`
     // objeto ausente vem como '—' de mapProcesso: uma linha inteira do cartão para um
     // travessão não diz nada, então ela some
@@ -4396,8 +4493,10 @@ function restoProcsHtml(resto,fnItem){
    gestor lê-lo; trocado por decisão do usuário em 2026-09-17. O número de despachos
    aparece ao lado de cada barra — explica o volume por trás do tempo, mas não é o que a
    barra mede. */
-// Acima disto a lista de fiscais rola dentro da própria caixa (ver .qdf-rola no CSS).
-const QUAD_LISTA_ROLA=8;
+// Lista compacta de fiscais: os N mais lentos, os N mais rápidos e, entre eles, só a contagem de
+// quem ficou de fora; "Ver todos" expande (st.rp.fiscaisAberto). Fixados = fiscais buscados que
+// cairiam no meio escondido.
+const FQ_LENTOS=5, FQ_RAPIDOS=3, FQ_FIXADOS_MAX=3;
 // Agregado por fiscal. NÃO reimplementa as regras de aggProc: agrupa os processos por
 // matrícula e chama a mesma função que alimenta os KPIs logo acima, para que o número de
 // um fiscal nunca possa divergir do total que o painel afirma três centímetros acima.
@@ -4445,30 +4544,80 @@ function rpFiscaisRanking(procs){
   const semTempoBastante=lista.filter(f=>f.n<AMOSTRA_MIN && f.desp>=AMOSTRA_MIN).length;
   return {pts, nFiscais:lista.length, semFiscal, semTempoBastante};
 }
-// Uma linha por fiscal: nome à esquerda, tempo médio à direita, barra proporcional
-// abaixo — e nada mais. Pedido do usuário em 2026-09-17: "apenas o nome do Fiscal e o
-// Tempo médio dele e só"; despachos, lotação, delta sobre a média e fila poluíam a
-// leitura sem explicar o número. A explicação inteira passou para a janela do fiscal,
-// que a própria linha abre no clique.
-// A barra usa o mais lento da lista como 100% e os demais relativos a ele (mesma técnica
-// de .rbar/rankRows() do ranking de distritos/cidades, não uma escala inventada aqui).
-// `avg` é a média do RECORTE inteiro (a.tempoMedio, o mesmo número do card "Tempo médio"
-// no topo do painel) — não a média só de quem entrou na lista, que se moveria a cada
-// fiscal excluído por amostra e deixaria de bater com o card três centímetros acima.
-// Vira um traço vertical dentro de cada barra (mesma posição em todas, eixo comum), e
-// quem está acima dele — mais lento que o próprio recorte — ganha a barra em âmbar.
-function fiscaisRankingLista(q,avg){
-  const max=Math.max(1,avg||0,...q.pts.map(p=>p.tempo));
-  const refPct=avg!=null?Math.max(0,Math.min(100,avg/max*100)):null;
-  const ref=refPct!=null?`<b class="rbar-ref" style="left:${refPct}%"></b>`:'';
-  return q.pts.map(p=>{
-    const acima=avg!=null&&p.tempo>avg;
-    return `<div class="qdf" role="button" tabindex="0" data-mat="${escHtml(p.mat)}"`
-      +` title="Ver painel de ${escHtml(p.nome)}" aria-label="Ver painel de ${escHtml(p.nome)}, média sobre ${NUM.format(p.n)} despacho${p.n===1?'':'s'}">`
-      +`<div class="qdf-top"><span class="qdf-n"><span class="qdf-nome">${escHtml(p.nome)}</span></span>`
-      +`<span class="qdf-v">${escHtml(fmtDias(p.tempo))}</span></div>`
-      +`<div class="rbar${acima?' amber':''}"><i style="width:${Math.max(4,p.tempo/max*100)}%"></i>${ref}</div></div>`;
-  }).join('');
+// Lista de fiscais em "pirulitos" (pedido do usuário, 2026-10-05, no lugar das barras): uma linha
+// por pessoa — nome à esquerda, haste de 0 até um ponto, tempo à direita. Três leituras que a barra
+// não dava: (1) o ponto cresce com o nº de despachos, então média alta sobre 2 despachos não
+// parece igual à de 40; (2) a média do recorte é UMA linha vertical que atravessa a lista inteira
+// (cada linha desenha o seu trecho, e as linhas encostam umas nas outras), e a dispersão do grupo
+// vira uma nuvem de pontos em torno dela; (3) âmbar = mais lento que essa linha, mesma regra de antes.
+// Escala linear a partir de 0 (sem zoom nem faixa de tolerância: um limiar novo seria uma segunda
+// definição de "lento", diferente da do mapa e do card do topo).
+// Nomes longos em colunas estreitas: primeiro nome + iniciais do meio + sobrenome final
+// ("DAVI DE ANDRADE CORDEIRO GADELHA" → "Davi A. C. Gadelha"). O nome inteiro vai no title e no
+// aria-label, e a janela do fiscal abre no clique.
+const FQ_PARTICULAS=new Set(['DE','DA','DO','DAS','DOS','E']);
+const FQ_SUFIXOS=new Set(['JUNIOR','JÚNIOR','JR','FILHO','NETO','SOBRINHO']);
+function nomeCurtoFiscal(nome){
+  const cap=w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();
+  const t=String(nome||'').trim().split(/\s+/).filter((w,i)=>w && (i===0||!FQ_PARTICULAS.has(w.toUpperCase())));
+  if(t.length<=2) return t.map(cap).join(' ');
+  // "Junior", "Filho"… fazem parte do sobrenome: ficam inteiros junto do sobrenome anterior
+  const fim=FQ_SUFIXOS.has(t[t.length-1].toUpperCase()) && t.length>=4 ? 2 : 1;
+  const meio=t.slice(1,t.length-fim).map(w=>w.charAt(0).toUpperCase()+'.');
+  return [cap(t[0]),...meio,...t.slice(t.length-fim).map(cap)].join(' ');
+}
+// Uma linha. `pos`/`total` só entram no title (posição na ordem do mais lento ao mais rápido).
+function fqLinha(p,pos,total,esc){
+  const acima=esc.avg!=null&&p.tempo>esc.avg;
+  const pct=Math.max(0,Math.min(100,p.tempo/esc.max*100));
+  // área proporcional ao volume: 6px (poucos despachos) a 14px (o maior volume da lista)
+  const d=(6+8*Math.sqrt(p.n/esc.nmax)).toFixed(1);
+  const marca=esc.hits?(esc.hits.has(p.mat)?' hit':' dim'):'';
+  const resumo=`${fmtDias(p.tempo)}, média sobre ${NUM.format(p.n)} despacho${p.n===1?'':'s'}`;
+  const fila=p.fila?` · ${NUM.format(p.fila)} na fila agora`:'';
+  const tip=`${p.nome} — ${resumo}${fila} · ${pos}º de ${NUM.format(total)}. Clique para ver o painel.`;
+  return `<div class="fq-row${acima?' amber':''}${marca}" role="button" tabindex="0" data-mat="${escHtml(p.mat)}"`
+    +` title="${escHtml(tip)}" aria-label="${escHtml('Ver painel de '+p.nome+', '+resumo)}">`
+    +`<span class="fq-nome">${escHtml(nomeCurtoFiscal(p.nome))}</span>`
+    +`<span class="fq-plot"><i class="fq-haste" style="width:${pct}%"></i>`
+    +(esc.avg!=null?`<b class="fq-media" style="left:${esc.mediaPct}%"></b>`:'')
+    +`<i class="fq-ponto" style="left:${pct}%;width:${d}px;height:${d}px"></i></span>`
+    +`<span class="fq-v">${escHtml(fmtDias(p.tempo))}</span></div>`;
+}
+// Cabeçalho da régua: o valor da média escrito sobre a linha. O rótulo se ancora pelo lado quando
+// a média está perto de uma ponta, para não vazar da coluna.
+function fqCabMedia(esc){
+  if(esc.avg==null) return '';
+  const al=esc.mediaPct>72?' fim':esc.mediaPct<28?' ini':'';
+  return `<div class="fq-cab" aria-hidden="true"><span></span><span class="fq-plot">`
+    +`<b class="fq-media" style="left:${esc.mediaPct}%"></b>`
+    +`<span class="fq-media-r${al}" style="left:${esc.mediaPct}%">média ${escHtml(fmtDias(esc.avg))}</span></span><span></span></div>`;
+}
+function fiscaisRankingLista(q,avg,hits){
+  const pts=q.pts, total=pts.length;
+  const max=Math.max(1,avg||0,...pts.map(p=>p.tempo));
+  const esc={avg,max,nmax:Math.max(1,...pts.map(p=>p.n)),hits,
+             mediaPct:avg!=null?Math.max(0,Math.min(100,avg/max*100)):null};
+  const linha=i=>fqLinha(pts[i],i+1,total,esc);
+  const todos=()=>pts.map((_,i)=>linha(i)).join('');
+  const escondidos=total-FQ_LENTOS-FQ_RAPIDOS;
+  // Sem nada que valha esconder (0 ou 1 fiscal no meio), a lista inteira cabe e o botão não existe.
+  if(escondidos<=1) return fqCabMedia(esc)+todos();
+  if(st.rp.fiscaisAberto){
+    return fqCabMedia(esc)+todos()
+      +`<button type="button" class="fq-toggle fq-fim">Mostrar só os extremos</button>`;
+  }
+  const lentos=[...Array(FQ_LENTOS).keys()];
+  const rapidos=[...Array(FQ_RAPIDOS).keys()].map(k=>total-FQ_RAPIDOS+k);
+  const visiveis=new Set([...lentos,...rapidos]);
+  // Fiscal buscado que cairia no meio escondido é fixado no topo — quem busca um nome não pode
+  // perdê-lo atrás de "N fiscais entre eles".
+  const fixados=hits?pts.map((p,i)=>i).filter(i=>hits.has(pts[i].mat)&&!visiveis.has(i)).slice(0,FQ_FIXADOS_MAX):[];
+  const entre=`<button type="button" class="fq-toggle fq-gap">${escHtml(`${NUM.format(escondidos)} fiscais entre eles`)}</button>`;
+  return fqCabMedia(esc)
+    +(fixados.length?fixados.map(linha).join('')+'<div class="fq-sep" aria-hidden="true"></div>':'')
+    +lentos.map(linha).join('')+entre+rapidos.map(linha).join('')
+    +`<button type="button" class="fq-toggle fq-fim">${escHtml(`Ver todos os ${NUM.format(total)}`)}</button>`;
 }
 function rpFiscaisRankingHtml(procs,a){
   // Do nível 2 para baixo o recorte é geográfico (município/cidade): os fiscais que
@@ -4487,40 +4636,48 @@ function rpFiscaisRankingHtml(procs,a){
 // E5 — núcleo do ranking de fiscais, separado de rpFiscaisRankingHtml() porque este
 // devolve, antes dele, o aviso de por que a comparação não existe fora do nível distrito.
 function fiscaisRankingBlockHtml(procs,a){
-  const q=rpFiscaisRanking(procs);
+  // `procs`/`a` são o recorte do painel, JÁ com o filtro "Buscar fiscal". Esta lista ignora só essa
+  // busca (pedido do usuário, 2026-10-05): ao buscar um nome, ele é destacado e o resto do grupo
+  // esmaece, para ver onde a pessoa cai em relação a todos. Um ponto sozinho numa régua vazia, e uma
+  // média que seria só a dele, não diriam nada. KPIs e mapa continuam filtrados.
+  const busca=st.rp.filtro.q;
+  const base=busca?procsDoRecorteRaw().filter(p=>passFRp(p,true)):procs;
+  const ag=busca?aggProc(base):a;
+  const q=rpFiscaisRanking(base);
   if(!q.nFiscais && !q.semFiscal) return '';
   const per=RP_PERIODO[st.rp.periodo].txt;
-  // Média do card "Tempo médio" (topo do painel), não uma média local da lista — ver
-  // fiscaisRankingLista. Some junto com o card, pela mesma régua de amostra (AMOSTRA_MIN).
-  const avg=a&&a.nTempo>=AMOSTRA_MIN?a.tempoMedio:null;
+  // Média do recorte sem a busca; sem a busca é a mesma do card "Tempo médio" (topo do painel).
+  // Some junto com o card, pela mesma régua de amostra (AMOSTRA_MIN).
+  const avg=ag&&ag.nTempo>=AMOSTRA_MIN?ag.tempoMedio:null;
   const cab=`<div class="sec-h"><span>Fiscais · tempo médio</span>`
     +`<span title="Fiscais com média no período, de todos que despacharam ou têm processo em tramitação">${NUM.format(q.pts.length)} de ${NUM.format(q.nFiscais)} com média</span></div>`;
-  // Uma linha de recorte no lugar dos três parágrafos que a seção carregava (cobertura em
-  // volume, legenda do traço e rodapé de exclusões, todos somados a seis números por
-  // linha): o usuário pediu a seção limpa em 2026-09-17, e cada uma dessas contas passou
-  // para a janela do fiscal, onde há espaço para explicá-la. O "N de M" do cabeçalho
-  // continua confessando a cobertura parcial, que é o essencial que não podia sair daqui.
-  // "do mais lento ao mais rápido" saiu: a ordem é visível na própria coluna de números e
-  // nas barras, e a linha precisa caber em uma só. A barra vazada, porém, precisa ser
-  // explicada — é a única marca da lista cujo significado não se deduz olhando.
-  const sub=`<div class="sec-sub">${escHtml(per
-    +(avg!=null?` · traço = média do recorte (${fmtDias(avg)}) · âmbar = acima do traço`:'')
-    +'. Clique para ver o painel.')}</div>`;
+  // A linha da média e o tamanho do ponto são as duas marcas cujo significado não se deduz
+  // olhando; a linha de recorte as explica em uma frase só.
+  const sub=`<div class="sec-sub">${escHtml(per+(avg!=null?` · linha = média do recorte · âmbar = acima dela`:'')
+    +' · ponto maior = mais despachos. Clique para ver o painel.')}</div>`;
   if(!q.pts.length){
     return `<div class="statwrap">${cab}`
-      +`<div class="empty">Nenhum fiscal deste recorte tem despacho com tempo medido no período — sem média, não há barra para comparar.</div></div>`;
+      +`<div class="empty">Nenhum fiscal deste recorte tem despacho com tempo medido no período — sem média, não há ponto para comparar.</div></div>`;
   }
-  // A lista ganha rolagem própria a partir de QUAD_LISTA_ROLA nomes, em vez de corte: todo
-  // fiscal listado precisa continuar alcançável, mas sem empurrar o ranking dos 11
-  // distritos para fora da primeira dobra.
-  const rola=q.pts.length>QUAD_LISTA_ROLA?' qdf-rola':'';
+  // Fiscais que casam com a busca (mesma regra de passFRp) entre os que têm média. Sem nenhum, a
+  // lista não esmaece ninguém e uma nota explica por que o buscado não aparece.
+  const alvo=busca?normSearch(busca):'';
+  const hits=alvo?new Set(q.pts.filter(p=>normSearch(`${p.nome} ${p.mat}`).includes(alvo)).map(p=>p.mat)):null;
+  const semHit=hits&&!hits.size;
+  // "Acima" é estritamente acima da média (a mesma regra do âmbar); igual conta como abaixo.
+  const nAcima=avg!=null?q.pts.filter(p=>p.tempo>avg).length:0;
+  const resumo=avg!=null
+    ? `<div class="fq-resumo"><span class="fq-chave amber"><i></i><b>${NUM.format(nAcima)}</b> acima da média</span>`
+      +`<span class="fq-chave"><i></i><b>${NUM.format(q.pts.length-nAcima)}</b> abaixo</span></div>`
+    : '';
+  const notas=[];
+  if(semHit) notas.push(`Nenhum fiscal da busca “${busca}” tem média neste recorte.`);
   // A única exclusão que o leitor não consegue deduzir do cabeçalho: despachou o bastante,
   // mas os despachos não têm tempo medido. Uma linha, e só quando o caso existe.
-  const nota=q.semTempoBastante
-    ? `<div class="foot-note">${escHtml(`${NUM.format(q.semTempoBastante)} ${q.semTempoBastante===1?'fiscal despachou':'fiscais despacharam'} `
-      +`no período, mas nenhum despacho tem tempo medido no SUITE — a média sai do tempo, não da contagem.`)}</div>`
-    : '';
-  return `<div class="statwrap">${cab}${sub}<div class="qdf-box${rola}">${fiscaisRankingLista(q,avg)}</div>${nota}</div>`;
+  if(q.semTempoBastante) notas.push(`${NUM.format(q.semTempoBastante)} ${q.semTempoBastante===1?'fiscal despachou':'fiscais despacharam'} `
+    +`no período, mas nenhum despacho tem tempo medido no SUITE — a média sai do tempo, não da contagem.`);
+  const nota=notas.map(t=>`<div class="foot-note">${escHtml(t)}</div>`).join('');
+  return `<div class="statwrap fq">${cab}${sub}${resumo}<div class="fq-lista">${fiscaisRankingLista(q,avg,semHit?null:hits)}</div>${nota}</div>`;
 }
 
 /* ---- E5 — janelas de detalhe de distrito e de fiscal ----
@@ -4546,21 +4703,12 @@ function trocaPeriodoJanela(v){
   const modal=document.getElementById('modal');
   const [tipo,a,b]=(modal.dataset.rpJanela||'').split('|');
   if(tipo!=='d' && tipo!=='f') return;
-  const rolagem=modal.scrollTop;
-  const abertos=[...modal.querySelectorAll('[data-target][aria-expanded="true"]')].map(x=>x.dataset.target);
+  const est=estadoJanela(modal);
   st.rp.periodo=v;
   document.querySelectorAll('#segRpPeriodo button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
   render();
   if(tipo==='d') abreModalDistrito(a); else abreModalFiscal(a,b||undefined);
-  abertos.forEach(id=>{
-    const el=document.getElementById(id); if(!el) return;
-    el.hidden=false;
-    modal.querySelectorAll('[data-target="'+id+'"]').forEach(btn=>{
-      btn.setAttribute('aria-expanded','true');
-      const car=btn.querySelector('.adToggle-car'); if(car) car.textContent='▴';
-    });
-  });
-  modal.scrollTop=rolagem;
+  aplicaEstadoJanela(modal,est);
   const novo=modal.querySelector('.dsh-per-seg button.on'); if(novo) novo.focus({preventScroll:true});
 }
 function mostraJanelaGenerica(){
@@ -4631,11 +4779,15 @@ function eixoDias(pts,marcas,opts){
 // Cartão-herói: o número que a janela existe para dizer, com a distância dele até a
 // referência logo abaixo. Um por janela — é o único lugar com tipo grande, e o resto do
 // painel fica deliberadamente quieto em volta dele.
-function heroTempo(valor,n,referencia,rotuloRef){
-  const rot=`<div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor</div>`;
+// ext (opcional, só a janela do distrito usa): {tip} põe o "i" ao lado do rótulo; {nums} acrescenta a linha de
+// números (ver numerosDistritoHtml) no pé do cartão.
+function heroTempo(valor,n,referencia,rotuloRef,ext){
+  ext=ext||{};
+  const info=ext.tip?`<button type="button" class="kpi-info" data-tip="${escHtml(ext.tip)}" data-tip-t="Tempo médio no setor" aria-label="O que significam estes números?">${RS_ICO.info}</button>`:'';
+  const rot=`<div class="rs-lbl">${RS_ICO.clock} Tempo médio no setor${info}</div>`;
   if(valor==null){
     return `<div class="dsh-hero dsh-hero-vazio">${rot}<div class="dsh-big">—</div>`
-      +`<div class="dsh-sub">Nenhum despacho com tempo medido neste período</div></div>`;
+      +`<div class="dsh-sub">Nenhum despacho com tempo medido neste período</div>${ext.nums||''}</div>`;
   }
   const d=referencia!=null?valor-referencia:null;
   // O sinal é o que o conselho lê primeiro: acima da referência é âmbar e aponta para
@@ -4647,7 +4799,7 @@ function heroTempo(valor,n,referencia,rotuloRef){
   return `<div class="dsh-hero${d!=null&&!igual&&d>0?' dsh-hero-acima':''}">${rot}`
     +`<div class="dsh-big">${escHtml(fmtDias(valor).replace(' dias',''))}<span class="dsh-un">dias</span></div>`
     +delta
-    +`<div class="dsh-sub">${escHtml(`Média de ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido`)}</div></div>`;
+    +`<div class="dsh-sub">${escHtml(`Média de ${NUM.format(n)} despacho${n===1?'':'s'} com tempo medido`)}</div>${ext.nums||''}</div>`;
 }
 // Ladrilho pequeno: o terceiro e mais leve peso de superfície da janela (herói → gráfico →
 // ladrilho). Não repete o .mkpi do modal de obra para não herdar o tamanho dele aqui.
@@ -4796,110 +4948,93 @@ function baseDaMedia(f){
 // na fila hoje —, e muda com o período. Lotado no distrito que não fez nada nele não
 // aparece; quem só tem fila vem como "sem média". Os números de cada cartão (f.desp, f.fila,
 // f.tempo…) saem de aggProc() sobre os processos do distrito, portanto só contam o distrito.
-function equipeCardsHtml(procs,refMedia){
+// Cartão recolhido da janela do distrito (redesenho de 2026-10-05, pedido do usuário: "cards demais"): cabeçalho
+// com título, uma frase de resumo e o total; clicar abre o detalhe, com a explicação do que se está vendo.
+// O cabeçalho é um role="button" (não um <button>) porque leva o "i" dentro — mesmo padrão dos ladrilhos (.dsh-tile).
+// wireAdToggles liga qualquer .dd-cab pelo data-target; `tip` = {t, chip} do "i" do título.
+function ddCard(id,titulo,tip,resumoHtml,n,rotN,corpoHtml){
+  const info=`<button type="button" class="kpi-info" data-tip="${escHtml(tip.t)}" data-tip-t="${escHtml(titulo)}"`
+    +(tip.chip?` data-tip-chip="${escHtml(tip.chip)}"`:'')+` aria-label="O que é ${escHtml(titulo)}?">${RS_ICO.info}</button>`;
+  return `<section class="dd-card"><div class="dd-cab" role="button" tabindex="0" data-target="${id}" aria-expanded="false" aria-controls="${id}">`
+    +`<div class="dd-cab-t"><div class="dd-tit">${escHtml(titulo)}${info}</div><div class="dd-res">${resumoHtml}</div></div>`
+    +`<div class="dd-tot"><b>${NUM.format(n)}</b><span>${escHtml(rotN)}</span></div><span class="adToggle-car dd-car" aria-hidden="true">▾</span></div>`
+    +`<div id="${id}" class="dd-corpo" hidden>${corpoHtml}</div></section>`;
+}
+// Processo da fila como linha plana (dentro do cartão expandido do distrito, procCard() viraria cartão dentro de cartão).
+// O status é o título do grupo, então não se repete aqui. data-pid + .fichaBtn: mesma volta da ficha da obra do procCard.
+function procLinha(p){
+  const dias=p.diasNaUnidade;
+  const estado=dias==null
+    ? (/fora da unidade/.test(p.conferencia)||!p.conferencia?'tramitando até o fiscal':'com o fiscal, sem registro no SUITE')
+    : `${NUM.format(dias)} dia${dias===1?'':'s'} com o fiscal`;
+  const meta=p.dataMeta?`Meta ${fmtDateBR(p.dataMeta)}${p.metaEstourada?' · atrasado':''}`:'Sem data meta';
+  return `<div class="pl${p.metaEstourada?' atraso':''}" data-pid="${escHtml(String(p.id))}">`
+    +`<div class="pl-h"><span class="pl-n">${escHtml(p.processo)}</span>${fichaBtn(p)}<span class="pl-d">${escHtml(estado)}</span></div>`
+    +(p.objeto&&p.objeto!=='—'?`<div class="pl-o">${escHtml(p.objeto)}</div>`:'')
+    +`<div class="pl-m"><span>${escHtml(p.fiscalNome)}</span><span class="pl-meta${p.metaEstourada?' atraso':''}">${escHtml(meta)}</span></div></div>`;
+}
+// Linha de números no pé do cartão do tempo médio (substitui os quatro ladrilhos). "processos" e "fiscais" abrem o
+// cartão correspondente; despachos e obras são só leitura.
+function numerosLinhaHtml(itens){
+  return `<div class="dd-nums">`+itens.map(i=>`<span class="dd-n"${i.card?` role="button" tabindex="0" data-card="${i.card}"`:''}><b>${escHtml(i.b)}</b>${escHtml(i.rot)}</span>`).join('')+`</div>`;
+}
+// valor em reais abreviado ("R$ 123,5 mi") para caber numa linha; o valor completo mora no "i"
+function brlCompacto(v){
+  const f=(x,u)=>'R$ '+x.toFixed(1).replace('.',',').replace(/,0$/,'')+' '+u;
+  return v>=1e9?f(v/1e9,'bi'):v>=1e6?f(v/1e6,'mi'):v>=1e3?f(v/1e3,'mil'):BRL.format(v);
+}
+function numerosDistritoHtml(a,nObras){
+  const pl=(n,s,p)=>n===1?s:p;
+  return numerosLinhaHtml([{b:NUM.format(a.procs),rot:pl(a.procs,'processo','processos'),card:'ddProc'},{b:NUM.format(a.desp),rot:pl(a.desp,'despacho','despachos')},
+    {b:NUM.format(a.fiscais),rot:pl(a.fiscais,'fiscal','fiscais'),card:'ddFisc'},{b:NUM.format(nObras),rot:pl(nObras,'obra','obras')}]);
+}
+function equipeCardsHtml(procs,refMedia,perTxt){
   const {lista,semFiscal}=aggFiscais(procs);
+  const chipPer=perTxt.charAt(0).toUpperCase()+perTxt.slice(1);
+  const tip={t:'Fiscais que atuaram nos processos despachados das obras deste distrito, conforme o período escolhido.\n\nEm âmbar (▲), fiscais com média acima da média do distrito; em verde (▼), na média ou abaixo. Os dias ao lado de cada seta são a diferença para a média do distrito.',chip:chipPer};
   if(!lista.length){
-    return `<div class="statwrap" id="secFiscalizacaoDist"><div class="sec-h"><span>Fiscalização</span><span>0 fiscais</span></div>`
-      +`<div class="empty">Nenhum fiscal despachou nas obras deste distrito no período, nem tem processo em tramitação nelas.</div></div>`;
+    return ddCard('ddFisc','Fiscalização',tip,'Nenhum fiscal despachou nas obras deste distrito no período, nem tem processo em tramitação nelas.',0,'fiscais','');
   }
   const comMedia=lista.filter(f=>f.n>=AMOSTRA_MIN).sort((a,b)=>b.tempo-a.tempo);
   const sem=lista.filter(f=>f.n<AMOSTRA_MIN)
                  .sort((a,b)=>b.desp-a.desp||a.nome.localeCompare(b.nome,'pt-BR'));
-  const max=Math.max(1,...comMedia.map(f=>f.tempo));
-  // Mesma régua do ranking de fiscais do painel e do herói desta janela: âmbar = mais lento
-  // que a média do ESTADO no período. Comparar com a média da própria equipe pintaria de
-  // verde um fiscal de 100 dias num distrito lento — e ele é âmbar no ranking do painel.
+  // Régua = média do DISTRITO no período (pedido do usuário, 2026-10-05; antes era a do estado): âmbar = mais lento
+  // que o distrito, verde = na média ou mais rápido. É a mesma média do número grande da janela e da janela do fiscal
+  // aberta por cima do distrito (refDoDistrito).
   const avg=refMedia!=null?refMedia:null;
-  // Padronização (pedido do usuário, 2026-10-03): o bloco "Média de…" ocupa a MESMA altura em
-  // todos os cartões da grade — 1 linha se ninguém tem detalhe, 2 se algum tem uma razão de
-  // fora da média, 3 se algum tem duas (frase que quebra em duas linhas). Sem isto, o rodapé
-  // e o número ficavam em alturas diferentes de um cartão para outro.
-  const linhasBase=1+lista.reduce((mx,f)=>{
+  const linha=f=>{
+    const tem=f.n>=AMOSTRA_MIN, acima=avg!=null&&tem&&f.tempo>avg, abaixo=avg!=null&&tem&&!acima;
+    // diferença para a média do distrito: o sinal que permite ler a lista sem comparar os números de cabeça
+    const dif=avg!=null&&tem?f.tempo-avg:null;
+    const delta=dif==null?'':Math.abs(dif)<0.5?'na média':`${dif>0?'▲':'▼'} ${fmtDias(Math.abs(dif))}`;
+    // Sem média, a linha diz POR QUE (fiscal com despachos e nenhum número era o buraco achado em
+    // Fortaleza, 2026-09-17); com média só aparece a base quando algum despacho ficou de fora.
     const b=baseDaMedia(f);
-    return Math.max(mx,b.m?(f.prontos&&f.semTempo?2:1):0);
-  },0);
-  const card=f=>{
-    const tem=f.n>=AMOSTRA_MIN, acima=avg!=null&&f.tempo>avg;
-    const valor=tem?escHtml(fmtDias(f.tempo)):'<span class="fcard-sem">sem média</span>';
-    // Sem média, a trilha da barra fica vazia (e não some): é o que mantém todos os cartões
-    // com a mesma altura de bloco e o número no mesmo lugar.
-    const barra=tem?`<div class="rbar${acima?' amber':''}"><i style="width:${Math.max(4,f.tempo/max*100)}%"></i></div>`
-                   :`<div class="rbar"><i style="width:0"></i></div>`;
-    // Sem média, o cartão precisa dizer POR QUE — era o buraco que o usuário encontrou em
-    // Fortaleza (2026-09-17): fiscal com mais de 2 despachos e nenhum número, sem pista.
-    const b=baseDaMedia(f);
-    const aviso=`<div class="fcard-base${tem?'':' sem'}"><span>${escHtml(b.t)}</span>`
-      +(b.m?`<span class="fcard-base-m">${escHtml(b.m)}</span>`:'')+`</div>`;
-    // Rodapé em dois números rotulados (despachos no período | em tramitação hoje), no lugar
-    // da frase "13 despachos · 2 em tramitação": cada número tem seu rótulo embaixo, e a
-    // média acima não precisa repetir a contagem.
-    const rod=`<div class="fcard-rod">`
-      +`<div class="fcard-rn"><b>${NUM.format(f.desp)}</b><span>${f.desp===1?'despacho':'despachos'}</span></div>`
-      +`<div class="fcard-rn"><b>${NUM.format(f.fila)}</b><span>em tramitação</span></div></div>`;
-    return `<div class="fcard" role="button" tabindex="0" data-mat="${escHtml(f.mat)}"`
-      +` title="Ver painel de ${escHtml(f.nome)}" aria-label="Ver painel de ${escHtml(f.nome)}">`
-      +`<div class="fcard-n">${escHtml(f.nome)}</div>`
-      +`<div class="fcard-v">${valor}</div>${barra}${aviso}${rod}</div>`;
+    const sub=(tem&&!b.m)?'':[b.t,b.m].filter(Boolean).join(' · ');
+    return `<div class="frow${acima?' acima':abaixo?' abaixo':''}" role="button" tabindex="0" data-mat="${escHtml(f.mat)}" title="Ver painel de ${escHtml(f.nome)}" aria-label="Ver painel de ${escHtml(f.nome)}">`
+      +`<div class="frow-n">${escHtml(f.nome)}${sub?`<span class="frow-sub">${escHtml(sub)}</span>`:''}</div>`
+      +`<div class="frow-m${acima?' acima':''}">${tem?escHtml(fmtDias(f.tempo)):'<span class="frow-sem">sem média</span>'}${delta?`<span class="frow-d">${escHtml(delta)}</span>`:''}</div>`
+      +`<div class="frow-c">${NUM.format(f.desp)}</div><div class="frow-c">${NUM.format(f.fila)}</div></div>`;
   };
   const nota=semFiscal
     ? `<div class="foot-note">${escHtml(`${NUM.format(semFiscal)} processo${semFiscal===1?'':'s'} destas obras `
-      +`${semFiscal===1?'está':'estão'} sem matrícula de fiscal gravada e ${semFiscal===1?'fica':'ficam'} fora dos cartões.`)}</div>`
+      +`${semFiscal===1?'está':'estão'} sem matrícula de fiscal gravada e ${semFiscal===1?'fica':'ficam'} fora desta lista.`)}</div>`
     : '';
-  // Seção recolhida (pedido do usuário, 2026-10-04), no mesmo molde do cartão "Processos em
-  // tramitação": resumo sempre visível — total de fiscais, barra e contagem pela régua da média
-  // do ESTADO (a mesma que pinta as barras dos cartões), mais lento e mais rápido — e os
-  // cartões atrás do botão. id fixo: só existe um chamador (abreModalDistrito); o ladrilho
-  // "Fiscais" abre esta lista (data-target='fichaFiscaisDist').
   const acima=avg!=null?comMedia.filter(f=>f.tempo>avg).length:0;
   const dentro=avg!=null?comMedia.length-acima:0;
   const nSem=sem.length+(avg==null?comMedia.length:0);
-  const nFis=lista.length, tot=nFis;
-  const seg=(n,cls,rot)=>n?`<i class="${cls}" style="flex:${n} 1 0" title="${escHtml(`${rot}: ${NUM.format(n)}`)}"></i>`:'';
-  const pct=n=>`${NUM.format(Math.round(n/tot*100))}%`;
-  const stat=(n,cls,rot)=>n?`<div class="fila-st ${cls}"><div class="fila-sn"><i class="fila-dot"></i>${NUM.format(n)}</div>`
-    +`<div class="fila-sl">${escHtml(rot)}</div><div class="fila-sp">${pct(n)} dos fiscais</div></div>`:'';
-  // Extremos: só com 2+ fiscais com média (com um só, "mais lento" e "mais rápido" seriam a mesma pessoa).
-  const extremo=(f,rot)=>`<div class="fila-st fis-ext"><div class="fila-sn">${escHtml(fmtDias(f.tempo))}</div>`
-    +`<div class="fila-sl">${rot}</div><div class="fila-sp fis-nome" title="${escHtml(f.nome)}">${escHtml(f.nome)}</div></div>`;
-  const extremos=comMedia.length>=2?extremo(comMedia[0],'Mais lento')+extremo(comMedia[comMedia.length-1],'Mais rápido'):'';
-  const totDesp=lista.reduce((sm,f)=>sm+f.desp,0), totFila=lista.reduce((sm,f)=>sm+f.fila,0);
-  const tomam=`<div class="fila-nota">${escHtml(`Juntos: ${NUM.format(totDesp)} despacho${totDesp===1?'':'s'} no período e `
-    +`${NUM.format(totFila)} processo${totFila===1?'':'s'} em tramitação.`)}</div>`;
-  return `<div class="dsh-plot fila" id="secFiscalizacaoDist">`
-    +`<div class="fila-h"><div><div class="fila-t">Fiscalização</div>`
-    +`<div class="fila-s">Quem atuou nas obras deste distrito, do mais lento ao mais rápido</div></div>`
-    +`<div class="fila-tot"><b>${NUM.format(nFis)}</b><span>${nFis===1?'fiscal':'fiscais'}</span></div></div>`
-    +`<div class="fila-bar" role="img" aria-label="${escHtml(`${acima} acima da média dos Distritos, ${dentro} na média dos Distritos, ${nSem} sem média`)}">`
-    +`${seg(acima,'atraso','Acima da média dos Distritos')}${seg(dentro,'noprazo','Na média dos Distritos')}${seg(nSem,'semprazo','Sem média')}</div>`
-    +`<div class="fila-stats">${extremos}${stat(acima,'atraso','Acima da média dos Distritos')}${stat(dentro,'noprazo','Na média dos Distritos')}`
-    +`${stat(nSem,'semprazo','sem média')}</div>`
-    +tomam
-    +verToggle('fichaFiscaisDist',`Ver ${nFis===1?'o fiscal':'os '+NUM.format(nFis)+' fiscais'}`)
-    +`<div id="fichaFiscaisDist" hidden><div class="fcards fcards-b${linhasBase}">${comMedia.map(card).join('')}${sem.map(card).join('')}</div>${nota}</div></div>`;
+  const resumo=[acima?`<span class="atraso">${NUM.format(acima)} acima da média do distrito</span>`:'',
+    dentro?`${NUM.format(dentro)} na média ou abaixo`:'',nSem?`${NUM.format(nSem)} sem média`:''].filter(Boolean).join(' · ');
+  const corpo=`<div class="frow-h"><div>Fiscal</div><div>Tempo médio</div><div>Despachos</div><div>Em tramitação</div></div>`
+    +comMedia.map(linha).join('')+sem.map(linha).join('')+nota;
+  return ddCard('ddFisc','Fiscalização',tip,resumo,lista.length,lista.length===1?'fiscal':'fiscais',corpo);
 }
-// Cartão "Processos em tramitação" da janela do distrito. `a` é o aggProc() do distrito.
+// Cartão "Processos" da janela do distrito. `a` é o aggProc() do distrito.
 function filaDistritoHtml(a,noPrazo,semPrazo,filaDist){
   const tot=a.fila;
-  const pct=n=>`${NUM.format(Math.round(n/tot*100))}%`;
-  const seg=(n,cls,rot)=>n?`<i class="${cls}" style="flex:${n} 1 0" title="${escHtml(`${rot}: ${NUM.format(n)}`)}"></i>`:'';
-  const stat=(n,cls,sing,plur)=>n?`<div class="fila-st ${cls}"><div class="fila-sn"><i class="fila-dot"></i>${NUM.format(n)}</div>`
-    +`<div class="fila-sl">${n===1?sing:plur}</div><div class="fila-sp">${pct(n)} da fila</div></div>`:'';
-  // Quebra por status, visível sem expandir (pedido do usuário, 2026-10-04): Análise Fiscal e
-  // Reanálise Fiscal aparecem sempre, mesmo zeradas; "Outros status" só se existir. O subtítulo
-  // diz há quanto tempo está o mais antigo — o que um gestor quer saber antes de abrir a lista.
-  const stN=p=>String(p.statusTxt||'').trim().toUpperCase();
-  const psAn=filaDist.filter(p=>stN(p)==='ANÁLISE FISCAL'), psRe=filaDist.filter(p=>stN(p)==='REANÁLISE FISCAL');
-  const psOu=filaDist.filter(p=>stN(p)!=='ANÁLISE FISCAL'&&stN(p)!=='REANÁLISE FISCAL');
-  const subSt=ps=>{
-    if(!ps.length) return 'nenhum agora';
-    const v=ps.map(p=>p.diasNaUnidade).filter(x=>x!=null);
-    return v.length?`mais antigo: ${NUM.format(Math.max(...v))} dias com o fiscal`:'sem tempo registrado';
-  };
-  const statSt=(ps,rot)=>`<div class="fila-st"><div class="fila-sn"><i class="fila-dot"></i>${NUM.format(ps.length)}</div>`
-    +`<div class="fila-sl">${escHtml(rot)}</div><div class="fila-sp">${escHtml(subSt(ps))}</div></div>`;
-  const porStatus=statSt(psAn,'Análise Fiscal')+statSt(psRe,'Reanálise Fiscal')+(psOu.length?statSt(psOu,'Outros status'):'');
   // Lista por status da fila (Análise Fiscal e Reanálise Fiscal), e dentro de cada um do
-  // processo há mais tempo com o fiscal para o há menos (sem dias, no fim).
+  // processo há mais tempo com o fiscal para o há menos (sem dias, no fim). O subtítulo de cada grupo
+  // diz há quanto tempo está o mais antigo — o que um gestor quer saber antes de ler a lista.
   const grupos=new Map();
   filaDist.forEach(p=>{ const k=String(p.statusTxt||'—').trim().toUpperCase(); if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(p); });
   const ordemSt=k=>k==='ANÁLISE FISCAL'?0:k==='REANÁLISE FISCAL'?1:2;
@@ -4907,27 +5042,22 @@ function filaDistritoHtml(a,noPrazo,semPrazo,filaDist){
   const listaHtml=[...grupos.entries()].sort((x,y)=>ordemSt(x[0])-ordemSt(y[0])||x[0].localeCompare(y[0],'pt-BR')).map(([k,ps])=>{
     // atrasados primeiro (a lista corta em PROC_LISTA_MAX: sem isto os N atrasados do cabeçalho podiam ficar de fora)
     ps.sort((x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
-    const mostra=ps.slice(0,PROC_LISTA_MAX);
+    const v=ps.map(p=>p.diasNaUnidade).filter(x=>x!=null);
+    const mx=v.length?Math.max(...v):null;
+    const sub=mx!=null?`Mais antigo: ${NUM.format(mx)} dia${mx===1?'':'s'} com o fiscal`:'Sem tempo registrado';
     return `<div class="fila-g"><div class="fila-gh"><span>${escHtml(titulo(k))}</span><b>${NUM.format(ps.length)}</b></div>`
-      +`<div class="fila-gs">Do que está há mais tempo com o fiscal para o que está há menos</div>`
-      +mostra.map(procCard).join('')
-      +restoProcsHtml(ps.slice(PROC_LISTA_MAX),procCard)+`</div>`;
+      +`<div class="fila-gs">${escHtml(sub)}</div>`
+      +ps.slice(0,PROC_LISTA_MAX).map(procLinha).join('')
+      +restoProcsHtml(ps.slice(PROC_LISTA_MAX),procLinha)+`</div>`;
   }).join('');
   const gecope=a.naGecope
-    ? `<div class="fila-nota">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} destas obras `
+    ? `<div class="foot-note">${escHtml(`Outros ${NUM.format(a.naGecope)} processo${a.naGecope===1?'':'s'} destas obras `
         +`${a.naGecope===1?'está':'estão'} na GECOPE, fora das mãos do fiscal.`)}</div>`
     : '';
-  return `<div class="dsh-plot fila">`
-    +`<div class="fila-h"><div><div class="fila-t">Processos</div>`
-    +`<div class="fila-s">Com a fiscalização agora, em Análise Fiscal ou Reanálise Fiscal</div></div>`
-    +`<div class="fila-tot"><b>${NUM.format(tot)}</b><span>${tot===1?'processo':'processos'}</span></div></div>`
-    +`<div class="fila-bar" role="img" aria-label="${escHtml(`${a.metaEst} atrasados, ${noPrazo} no prazo, ${semPrazo} sem prazo`)}">`
-    +`${seg(a.metaEst,'atraso','Atrasado')}${seg(noPrazo,'noprazo','No prazo')}${seg(semPrazo,'semprazo','Sem prazo')}</div>`
-    +`<div class="fila-stats">${porStatus}${stat(a.metaEst,'atraso','atrasado','atrasados')}${stat(noPrazo,'noprazo','no prazo','no prazo')}`
-    +`${stat(semPrazo,'semprazo','sem prazo','sem prazo')}</div>`
-    +gecope
-    +verToggle('fichaFilaDist',`Ver os ${NUM.format(tot)} ${tot===1?'processo':'processos'}`)
-    +`<div id="fichaFilaDist" hidden>${listaHtml}</div></div>`;
+  const resumo=[a.metaEst?`<span class="atraso">${NUM.format(a.metaEst)} em atraso</span>`:'',
+    noPrazo?`${NUM.format(noPrazo)} no prazo`:'',semPrazo?`${NUM.format(semPrazo)} sem prazo`:''].filter(Boolean).join(' · ');
+  return ddCard('ddProc','Processos',{t:'Processos em tramitação hoje com a fiscalização (status Análise Fiscal e/ou Reanálise Fiscal).',chip:'Hoje'},
+    resumo,tot,tot===1?'processo':'processos',listaHtml+gecope);
 }
 function abreModalDistrito(gid){
   const g=grpById(gid); if(!g) return;
@@ -4959,53 +5089,29 @@ function abreModalDistrito(gid){
   // Mesma frase da dica do mapa (rpOndeGrupo()), sem o "Contado pelas": a janela precisa
   // dizer a mesma coisa que o hover já diz.
   const sub=`<div class="dsh-context">${RS_ICO.dist}<span>Obras localizadas no distrito</span></div>`;
-  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,est.media,'da média do estado (por despacho)')}`
+  // Redesenho de 2026-10-05 (pedido do usuário: janela poluída, cartões demais): o número grande e o gráfico de
+  // posição ficam; os quatro ladrilhos viraram uma linha de números dentro do cartão do tempo médio (o "i" dele explica
+  // os quatro, com o escopo de cada um: Processos é de hoje, os outros seguem o período); Processos e Fiscalização
+  // são dois cartões recolhidos (ddCard) que abrem com o detalhe e a explicação.
+  const tipHero='Média de dias que os processos despachados ficaram com a fiscalização, no período escolhido.\n\n'
+    +'Processos: em tramitação hoje com a fiscalização (Análise Fiscal e/ou Reanálise Fiscal).\n\n'
+    +'Despachos: realizados pelos fiscais no período escolhido.\n\n'
+    +'Fiscais: atuaram nos processos despachados no período escolhido.\n\n'
+    +'Obras: relacionadas aos processos despachados e aos em tramitação, no período escolhido.';
+  const topo=`<div class="dsh-topo dsh-topo-dd">${heroTempo(media,a.nTempo,est.media,'da média dos distritos',{tip:tipHero,nums:numerosDistritoHtml(a,obrasMapDist.size)})}`
     +posicaoHtml('Desempenho do Distrito Operacional',coorteDistritos(),'gid',String(gid),est.media,'Média dos Distritos Operacionais','distritos comparáveis')
     +`</div>`;
-  // E5, 2026-09-23 — "Fiscais" virou "Fiscais no período" (mesma convenção já usada em
-  // "Processos no período" no card Carga no período da janela do fiscal, abaixo): agora
-  // que a seção Fiscalização sempre lista todo o histórico do distrito, esse ladrilho e o
-  // cabeçalho dela mostram números de escopos diferentes com o mesmo nome curto — o
-  // rótulo precisa dizer sozinho qual dos dois é.
-  // A janela do fiscal já tinha uma nota explicando que "Processos" é sempre hoje,
-  // diferente dos demais ladrilhos que seguem o período — aqui os 4 ladrilhos ficavam
-  // lado a lado sem nenhuma pista de que um deles (Processos) não muda com o seletor de
-  // período em Controles, achado ao revisar os prints reais desta janela (2026-09-23).
-  // Cada ladrilho aponta para a lista correspondente mais abaixo na mesma janela (pedido
-  // do usuário, 2026-09-23): Processos/Despachos/Obras abrem uma lista escondida (mesmo
-  // mecanismo do .adToggle). Desde 2026-10-04 Fiscais também abre uma lista escondida: os
-  // cartões da seção Fiscalização ficam recolhidos atrás de um resumo, depois da fila.
-  // Pedido do usuário, 2026-10-03: o subtítulo de cada ladrilho (hoje / período) e a nota
-  // abaixo saíram; o que cada número conta mora no "i" (tooltip com título e etiqueta de
-  // escopo — "Hoje" para a fila, o período escolhido para o resto). "Fiscais no período" e
-  // "Obras atendidas" voltaram a "Fiscais" e "Obras": o escopo agora está na etiqueta.
-  const chipPer=per.charAt(0).toUpperCase()+per.slice(1);
-  const tiles=`<div class="dsh-tiles">`
-    +tile(NUM.format(a.procs),'Processos',null,{target:'fichaFilaDist',tipTitulo:'Processos',tipChip:'Hoje',
-        tip:'Quantidade de processos em tramitação hoje com a fiscalização (status Análise Fiscal e/ou Reanálise Fiscal).'})
-    +tile(NUM.format(a.desp),'Despachos',null,{tipTitulo:'Despachos',tipChip:chipPer,
-        tip:'Quantidade de despachos realizados pelos fiscais, conforme o período escolhido acima.'})
-    +tile(NUM.format(a.fiscais),'Fiscais',null,{target:'fichaFiscaisDist',tipTitulo:'Fiscais',tipChip:chipPer,
-        tip:'Quantidade de fiscais que atuaram nos processos despachados, conforme o período escolhido acima.'})
-    +tile(NUM.format(obrasMapDist.size),'Obras',null,{tipTitulo:'Obras',tipChip:chipPer,
-        tip:'Quantidade de obras relacionadas aos processos despachados e aos que estão em tramitação, conforme o período escolhido acima.'})
-    +`</div>`;
-  // Processos em tramitação (redesenhada em 2026-10-01): um cartão só, que responde em ordem às três
-  // perguntas do gestor — quantos processos estão com a fiscalização, quantos deles estão
-  // atrasados, e quais são. O total vai grande à direita; a barra e os três números logo
-  // abaixo dizem a mesma coisa de dois jeitos (proporção e contagem); a lista fica atrás de
-  // um botão. Despachados e Obras atendidas saíram desta janela (pedido do usuário,
-  // 2026-10-01): moram na janela do fiscal, só com as obras dele. procCard() (não
-  // fichaProcCard, que omite o fiscal) porque o recorte do distrito tem vários fiscais.
+  // Processos = a fila de hoje (não segue o período); cada linha da lista mostra o fiscal (procLinha) porque o
+  // recorte do distrito tem vários.
   const filaDist=procs.filter(p=>p.naFila);
   const hoje=a.fila ? filaDistritoHtml(a,noPrazo,semPrazo,filaDist) : '';
   // A régua "Fiscal × Obra" que restringia esta seção à lotação do fiscal foi removida
   // (2026-09-23): o painel considera sempre o distrito da obra, então a comparação passa a
   // ser sobre quem trabalhou nas obras deste distrito — mesmo critério do ranking lateral
   // (rpFiscaisRankingHtml, ajustado junto).
-  const equipeSecao=equipeCardsHtml(procs,est.media);
+  const equipeSecao=equipeCardsHtml(procs,media,per);
   const corpo=a.total
-    ? topo+tiles+hoje+equipeSecao
+    ? topo+hoje+equipeSecao
     : `<div class="empty">Nenhum processo de replanilhamento nas obras deste distrito.</div>`;
   _lastModalObra=null; // outra janela no #modal: repaintTheme() não pode reabrir a obra antiga por cima
   document.getElementById('modal').innerHTML=`<div class="mtop"><div class="mh">
@@ -5015,7 +5121,7 @@ function abreModalDistrito(gid){
     <div class="mbody dsh">${avisoFiltroRpHtml()}${corpo}</div>`;
   // A janela de distrito é sempre a "casa" — nunca chega por "← Voltar" de outra janela —,
   // mas grava o próprio gid no #modal (sobrevive à troca de innerHTML) para que um fiscal
-  // aberto por cima saiba pra onde voltar. Ver o listener de .fcard, acima.
+  // aberto por cima saiba pra onde voltar. Ver o listener de .frow, acima.
   document.getElementById('modal').dataset.rpDistrito=String(gid);
   document.getElementById('modal').dataset.rpJanela='d|'+gid;
   mostraJanelaGenerica();
@@ -5085,7 +5191,7 @@ function diasAteMeta(dataMeta){
   return Math.round((Date.UTC(+m[1],+m[2]-1,+m[3])-Date.UTC(y,mo-1,d))/86400000);
 }
 // `voltarGid` (gid do distrito) só vem preenchido quando a janela abriu por cima de um
-// distrito (clique num .fcard) — nesse caso o cabeçalho troca o ✕ por "← Voltar", que
+// distrito (clique numa .frow) — nesse caso o cabeçalho troca o ✕ por "← Voltar", que
 // reabre aquela janela em vez de fechar tudo. Direto do ranking lateral, voltarGid é
 // undefined e o comportamento é o de sempre: só fechar. Nunca os dois botões juntos —
 // "Voltar" já implica que dar zoom-out primeiro no distrito exige aquele clique, e o ✕
@@ -5106,98 +5212,62 @@ function abreModalFiscal(mat,voltarGid){
     +(gDist?`<div class="dsh-escopo">${RS_ICO.dist}<span>Só processos de obras do distrito ${escHtml(nomeDist)}</span></div>`
       // aberta do ranking com distritos selecionados: a janela mostra a carga do estado inteiro
       :(st.sel&&st.sel.ids.size?`<div class="dsh-escopo">${RS_ICO.dist}<span>Carga em todo o estado, não só nos distritos selecionados no painel</span></div>`:''));
-  const topo=`<div class="dsh-topo">${heroTempo(media,a.nTempo,geral.media,gDist?'da média do distrito':'da média geral')}`
+  // Redesenho de 2026-10-05 (mesmo da janela do distrito; pedido do usuário: janela poluída): fica o número grande e o
+  // gráfico de posição; saem o gráfico "Cada despacho, do mais rápido ao mais lento" e os quatro ladrilhos (viraram a
+  // linha de números do cartão do tempo médio); Processos e Despachos são dois cartões recolhidos (ddCard).
+  // O valor é exposição financeira, e não medida de desempenho (a relação com o tempo de despacho é fraca): a ressalva
+  // mora no "i" do cartão do tempo médio, e não num parágrafo solto.
+  const tipHero='Média de dias que os processos despachados por este fiscal ficaram com ele, no período escolhido.\n\n'
+    +'Processos: em tramitação hoje com o fiscal (Análise Fiscal e/ou Reanálise Fiscal).\n\n'
+    +'Despachos: realizados no período escolhido.\n\n'
+    +'Obras: obras com processo no período escolhido.\n\n'
+    +'Valor das obras: '+(f.valorObrasNoPeriodo>0?BRL.format(f.valorObrasNoPeriodo)+', soma':'soma')+' do valor das obras com processo no período — exposição financeira, não medida de desempenho: a relação com o tempo de despacho é fraca.'
+    +(f.obras>f.obrasComValor?' Valor conhecido em '+NUM.format(f.obrasComValor)+' de '+NUM.format(f.obras)+' obras.':'');
+  const pl=(n,s,p)=>n===1?s:p;
+  const nums=numerosLinhaHtml([
+    {b:NUM.format(a.procs),rot:pl(a.procs,'processo','processos'),card:'ddProcF'},
+    {b:NUM.format(a.desp),rot:pl(a.desp,'despacho','despachos'),card:'ddDesp'},
+    {b:NUM.format(f.obras),rot:pl(f.obras,'obra','obras')},
+    {b:f.valorObrasNoPeriodo>0?brlCompacto(f.valorObrasNoPeriodo):'—',rot:'em obras'}]);
+  const topo=`<div class="dsh-topo dsh-topo-dd">${heroTempo(media,a.nTempo,geral.media,gDist?'da média do distrito':'da média geral',{tip:tipHero,nums})}`
     +(gDist
       ? posicaoHtml(`Posição entre os fiscais de ${nomeDist}`,coorteFiscaisDistrito(gid),'mat',mat,geral.media,rotRef,'fiscais do distrito')
       : posicaoHtml('Onde este fiscal está',coorteFiscais(),'mat',mat,geral.media,rotRef,'fiscais comparáveis'))
     +`</div>`;
-  // A TIRA DE DESPACHOS — a explicação da média que o usuário pediu ao clicar no nome
-  // (2026-09-17). Um ponto por despacho no mesmo eixo de dias das outras comparações:
-  // com 8 ou 15 casos dá para VER se a média é o retrato do trabalho ou se dois
-  // processos parados puxaram todo o resto. Um histograma com essa amostra seria quase
-  // todo feito de caixas vazias, e a média sozinha esconde exatamente o que interessa.
-  // Só os despachos DO PERÍODO, como todo o resto da janela: a tira existe para explicar
-  // o número grande logo acima, e pontos fora do recorte dele explicariam outra coisa.
   const corte=corteDespacho(RP_PERIODO[st.rp.periodo].meses);
   const noPeriodo=p=>p.despachado && !p.naFila && (corte==null || (!!p.dataDespacho && p.dataDespacho>=corte));
-  const desps=f.todos.filter(p=>noPeriodo(p)&&p.tempoFiscal!=null)
-                     .sort((x,y)=>x.tempoFiscal-y.tempoFiscal);
-  const marcas=[];
-  if(media!=null) marcas.push({v:media,label:'Média do fiscal',cls:'med'});
-  if(geral.media!=null) marcas.push({v:geral.media,label:rotRef,cls:'ref'});
-  const lento=desps.length?desps[desps.length-1]:null;
-  const nota=desps.length>=2
-    ? `Mais demorado: ${lento.processo}, ${fmtDias(lento.tempoFiscal)}. Mais rápido: ${desps[0].processo}, ${fmtDias(desps[0].tempoFiscal)}.`
-    : '';
-  const tira=`<div class="dsh-plot"><div class="rs-lbl">${RS_ICO.clock} Cada despacho, do mais rápido ao mais lento</div>`
-    +eixoDias(desps.map(p=>({v:p.tempoFiscal,label:`${p.processo}: ${fmtDias(p.tempoFiscal)}`})),marcas,{altura:96,
-      vazio:`Nenhum despacho com tempo medido no SUITE ${perTxt} — sem casos para mostrar no eixo.`})
-    +(nota?`<div class="dsh-nota">${escHtml(nota)}</div>`:'')+`</div>`;
   // Fila de hoje: mesma ordem de leitura de ordemMeta() (atrasado primeiro).
+  // PROCESSOS usa a mesma definição do card homônimo do painel lateral (aggProc.procs):
+  // sempre a posição de hoje (fila), qualquer que seja o período. Despachos e Obras seguem o período.
   const fila=f.todos.filter(p=>p.naFila)
     .sort((x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1));
-  const atras=fila.filter(p=>p.metaEstourada===true).length;
-  const noPrazo=fila.filter(p=>p.metaEstourada===false).length;
-  const semPrazo=fila.filter(p=>p.metaEstourada==null).length;
-  // PROCESSOS usa a mesma definição do card homônimo do painel lateral (aggProc.procs):
-  // sempre a posição de hoje (fila), qualquer que seja o período — por isso não tem mais
-  // ladrilho "Em tramitação" ao lado: seria sempre o mesmo número (2026-09-21). Despachos
-  // e Obras continuam seguindo o período.
-  // Parte de baixo da janela (redesenhada em 2026-10-01): uma só seção, "Obras e processos".
-  // Quatro ladrilhos no topo (Processos de hoje, Despachos, Obras e Valor das obras — os três
-  // últimos no período) e, abaixo, uma linha por obra; clicar na obra abre os processos DELA
-  // no período. Substitui o card "Carga no período" e os grupos Análise Fiscal / Despachados:
-  // o que eles diziam agora está nos ladrilhos, no resumo da seção e dentro de cada obra.
-  // "Outros processos" fecha a conta (o que não entra nos números do período).
-  // O valor é exposição financeira, e não medida de desempenho (a relação com o tempo de
-  // despacho é fraca): a ressalva mora no "i" do ladrilho, e não num parágrafo solto.
-  const tipValor='Soma do valor das obras com processo no período — exposição financeira, não medida de desempenho: a relação com o tempo de despacho é fraca.'
-    +(f.obras>f.obrasComValor?'\n\nValor conhecido em '+NUM.format(f.obrasComValor)+' de '+NUM.format(f.obras)+' obras.':'');
-  const tiles='<div class="dsh-tiles">'
-    +tile(NUM.format(a.procs),'Processos',rpQuandoProc(),{scrollTo:'secProcessosFiscal'})
-    +tile(NUM.format(a.desp),'Despachos',perTxt,{scrollTo:'secFiscalDesp'})
-    +tile(NUM.format(f.obras),'Obras',perTxt,{scrollTo:'secProcessosFiscal'})
-    +tile(f.valorObrasNoPeriodo>0?BRL.format(f.valorObrasNoPeriodo):'—','Valor das obras',perTxt,{tip:tipValor})
-    +'</div>';
   const despPer=f.todos.filter(noPeriodo);
-  // Lista de processos do fiscal (pedido do usuário, 2026-10-01 — substituiu "Obras e
-  // processos"; redesenhada em 2026-10-04, ver abaixo): sem agrupar por obra. Em tramitação
-  // vêm separados por status (Análise Fiscal, Reanálise Fiscal), cada processo com a
-  // situação do prazo (no prazo / em atraso / sem prazo); os despachados ficam numa seção
-  // à parte, recolhida. Do que está há mais tempo com o fiscal para o que está há menos.
-  // atrasados primeiro, depois mais dias com o fiscal — a lista corta em PROC_LISTA_MAX e o cabeçalho
-  // anuncia os atrasados; ordenar só por dias desfazia a ordem de `fila` e podia esconder todos eles
+  // Lista de processos do fiscal: em tramitação separados por status (Análise Fiscal, Reanálise Fiscal), cada processo com a
+  // situação do prazo (no prazo / em atraso / sem prazo); os despachados, no outro cartão. Do que está há mais tempo com o
+  // fiscal para o que está há menos. Atrasados primeiro, depois mais dias com o fiscal — a lista corta em PROC_LISTA_MAX e o
+  // resumo anuncia os atrasados; ordenar só por dias desfazia a ordem de `fila` e podia esconder todos eles.
   const porDias=(x,y)=>ordemMeta(x)-ordemMeta(y) || (y.diasNaUnidade??-1)-(x.diasNaUnidade??-1);
   const stNorm=p=>String(p.statusTxt||'').trim().toUpperCase();
   const emAnalise=fila.filter(p=>stNorm(p)==='ANÁLISE FISCAL').sort(porDias);
   const emReanalise=fila.filter(p=>stNorm(p)==='REANÁLISE FISCAL').sort(porDias);
   const outrosSt=fila.filter(p=>stNorm(p)!=='ANÁLISE FISCAL'&&stNorm(p)!=='REANÁLISE FISCAL').sort(porDias);
   const despOrd=despPer.slice().sort((x,y)=>String(y.dataDespacho||'').localeCompare(String(x.dataDespacho||'')));
-  // Redesenho de 2026-10-04 (pedido do usuário): a janela separa o que está COM O FISCAL AGORA
-  // (fila de hoje, que não segue o período) do que ele já DESPACHOU no período. A fila mostra,
-  // por processo, dias com o fiscal, data meta e uma barra do prazo consumido; Análise Fiscal
-  // e Reanálise Fiscal aparecem sempre, mesmo zeradas, para "nenhuma reanálise" ler-se como
-  // dado e não como bloco sumido.
   const dd=n=>NUM.format(n)+' dia'+(n===1?'':'s');
   const objDesc=p=>p.objeto&&p.objeto!=='—'?'<div class="pp-desc">'+escHtml(p.objeto)+'</div>':'';
   const celula=(rot,valor,sub)=>'<div class="cf-c" data-l="'+rot+'"><b>'+valor+'</b>'+(sub?'<span>'+sub+'</span>':'')+'</div>';
   const linhaFila=p=>{
     const k=p.metaEstourada===true?'atraso':p.metaEstourada===false?'noprazo':'semprazo';
     const rest=diasAteMeta(p.dataMeta), dias=p.diasNaUnidade;
-    let txt='sem data meta', pct=null;
-    if(k==='atraso'){ pct=100; txt=rest!=null&&rest<0?dd(-rest)+' de atraso':'meta vencida'; }
-    else if(k==='noprazo'){
-      txt=rest==null?'dentro da meta':rest<=0?'vence hoje':'faltam '+dd(rest);
-      if(dias!=null&&rest!=null&&dias+Math.max(rest,0)>0) pct=Math.min(100,Math.round(dias/(dias+Math.max(rest,0))*100));
-    }
+    let txt='sem data meta';
+    if(k==='atraso') txt=rest!=null&&rest<0?dd(-rest)+' de atraso':'meta vencida';
+    else if(k==='noprazo') txt=rest==null?'dentro da meta':rest<=0?'vence hoje':'faltam '+dd(rest);
     const rotulo=k==='atraso'?'Em atraso':k==='noprazo'?'No prazo':'Sem prazo';
-    const barra=pct!=null?'<i class="cf-bar '+k+'" aria-hidden="true"><u style="width:'+pct+'%"></u></i>':'';
-    return '<div class="cf-row'+(k==='atraso'?' atraso':'')+'"><div class="pp-main"><div class="pp-n">'+escHtml(p.processo)+'</div>'+objDesc(p)+'</div>'
+    return '<div class="cf-row'+(k==='atraso'?' atraso':'')+'" data-pid="'+escHtml(String(p.id))+'"><div class="pp-main"><div class="pp-n">'+escHtml(p.processo)+fichaBtn(p)+'</div>'+objDesc(p)+'</div>'
       +celula('Com o fiscal',dias!=null?NUM.format(dias):'—',dias!=null?(dias===1?'dia':'dias'):'sem registro')
-      +celula('Meta',p.dataMeta?fmtDateBR(p.dataMeta):'—',p.dataMeta?'':'sem data')
-      +'<div class="cf-c cf-prazo" data-l="Prazo"><span class="pp-b '+k+'">'+rotulo+'</span>'+barra+'<span class="cf-pt'+(k==='atraso'?' atraso':'')+'">'+escHtml(txt)+'</span></div></div>';
+      +(ehAdmin()?'<div class="cf-c" data-l="Meta">'+metaBtnHtml(p)+'</div>':celula('Meta',p.dataMeta?fmtDateBR(p.dataMeta):'—',p.dataMeta?'':'sem data'))
+      +'<div class="cf-c cf-prazo" data-l="Prazo"><span class="pp-b '+k+'">'+rotulo+'</span><span class="cf-pt'+(k==='atraso'?' atraso':'')+'">'+escHtml(txt)+'</span></div></div>';
   };
-  const linhaDesp=p=>'<div class="cf-row desp"><div class="pp-main"><div class="pp-n">'+escHtml(p.processo)+'</div>'+objDesc(p)+'</div>'
+  const linhaDesp=p=>'<div class="cf-row desp" data-pid="'+escHtml(String(p.id))+'"><div class="pp-main"><div class="pp-n">'+escHtml(p.processo)+fichaBtn(p)+'</div>'+objDesc(p)+'</div>'
     +celula('Despachado em',p.dataDespacho?fmtDateBR(p.dataDespacho):'—',p.dataDespacho?'':'sem data')
     +celula('Tempo no setor',p.tempoFiscal!=null?escHtml(fmtDias(p.tempoFiscal)):'—',p.tempoFiscal!=null?'':'não medido')+'</div>';
   const corpoGrupo=(ps,fn)=>ps.slice(0,PROC_LISTA_MAX).map(fn).join('')+restoProcsHtml(ps.slice(PROC_LISTA_MAX),fn);
@@ -5206,41 +5276,35 @@ function abreModalFiscal(mat,voltarGid){
     return [a1?'<span class="atraso">'+NUM.format(a1)+' em atraso</span>':'',a2?NUM.format(a2)+' no prazo':'',a3?NUM.format(a3)+' sem prazo':'']
       .filter(Boolean).join(' · ');
   };
-  const grupoFila=(titulo,ps,vazio)=>'<div class="pp-grupo"><div class="pp-gh"><span>'+escHtml(titulo)+'</span>'
-    +'<span class="cf-gs">'+resumoGrupo(ps)+'</span><b>'+NUM.format(ps.length)+'</b></div>'
+  // Maior tempo de espera do grupo: o que um gestor quer saber antes de abrir a lista.
+  const maisAntigo=ps=>{ const v=ps.map(p=>p.diasNaUnidade).filter(x=>x!=null); return v.length?Math.max(...v):null; };
+  const subSt=ps=>{ const m=maisAntigo(ps); return !ps.length?'Nenhum agora':m==null?'Sem tempo registrado':'Mais antigo: '+dd(m)+' com o fiscal'; };
+  // Análise Fiscal e Reanálise Fiscal aparecem sempre, mesmo zeradas, para "nenhuma reanálise" ler-se como dado e não como bloco sumido.
+  const grupoFila=(titulo,ps,vazio)=>'<div class="fila-g"><div class="fila-gh"><span>'+escHtml(titulo)+'</span><b>'+NUM.format(ps.length)+'</b></div>'
+    +'<div class="fila-gs">'+escHtml(subSt(ps))+'</div>'
     +(ps.length
       ? '<div class="cf-cols" aria-hidden="true"><span>Processo</span><span>Com o fiscal</span><span>Meta</span><span>Prazo</span></div>'+corpoGrupo(ps,linhaFila)
       : '<div class="cf-vazio">'+escHtml(vazio)+'</div>')+'</div>';
-  // Maior tempo de espera do grupo: o que um gestor quer saber antes de abrir a lista.
-  const maisAntigo=ps=>{ const v=ps.map(p=>p.diasNaUnidade).filter(x=>x!=null); return v.length?Math.max(...v):null; };
-  const cardSt=(n,rot,sub,cls)=>'<div class="fila-st'+(cls?' '+cls:'')+'"><div class="fila-sn"><i class="fila-dot"></i>'+NUM.format(n)+'</div>'
-    +'<div class="fila-sl">'+escHtml(rot)+'</div><div class="fila-sp">'+escHtml(sub)+'</div></div>';
-  const subSt=ps=>{ const m=maisAntigo(ps); return !ps.length?'nenhum agora':m==null?'sem tempo registrado':'mais antigo: '+dd(m)+' com o fiscal'; };
-  const stats='<div class="fila-stats cf-stats">'
-    +cardSt(emAnalise.length,'Análise Fiscal',subSt(emAnalise))
-    +cardSt(emReanalise.length,'Reanálise Fiscal',subSt(emReanalise))
-    +(outrosSt.length?cardSt(outrosSt.length,'Outros status',subSt(outrosSt)):'')
-    +cardSt(atras,'Em atraso','passaram da data meta','atraso')
-    +cardSt(noPrazo,'No prazo','dentro da data meta','noprazo')
-    +(semPrazo?cardSt(semPrazo,'Sem prazo','sem data meta cadastrada'):'')
-    +'</div>';
-  const secFila='<div class="statwrap op" id="secProcessosFiscal"><div class="sec-h"><span>Com o fiscal agora</span><span>hoje</span></div>'
-    +stats
-    +'<div class="pp-grupos">'+grupoFila('Análise Fiscal',emAnalise,'Nenhum processo em Análise Fiscal agora.')
-    +grupoFila('Reanálise Fiscal',emReanalise,'Nenhum processo em Reanálise Fiscal agora.')
-    +(outrosSt.length?grupoFila('Outros status',outrosSt,''):'')+'</div></div>';
-  const secDesp='<div class="statwrap op" id="secFiscalDesp"><div class="sec-h"><span>Despachados no período</span><span>'+perTxt+'</span></div>'
-    +(despOrd.length
-      ? '<div class="pp-grupo"><div class="pp-gh"><span>Despachados</span><b>'+NUM.format(despOrd.length)+'</b></div>'
-        +verToggle('ppDespachados','Ver '+(despOrd.length===1?'o processo despachado':'os '+NUM.format(despOrd.length)+' despachados'))
-        +'<div class="pp-lista" id="ppDespachados" hidden><div class="cf-cols desp" aria-hidden="true"><span>Processo</span><span>Despachado em</span><span>Tempo no setor</span></div>'
-        +corpoGrupo(despOrd,linhaDesp)+'</div></div>'
-      : '<div class="empty">'+escHtml('Nenhum processo despachado — '+perTxt+'.')+'</div>')
-    +(gDist&&f.foraDoDistrito
-      ? '<div class="foot-note">'+escHtml('Este fiscal tem mais '+NUM.format(f.foraDoDistrito)+' processo'+(f.foraDoDistrito===1?'':'s')+' em obras de outros distritos operacionais, que não aparecem aqui.')+'</div>'
-      : '')
-    +'</div>';
-  const obrasProcessos=secFila+secDesp;
+  const cardFila=ddCard('ddProcF','Processos',{t:'Processos em tramitação hoje com este fiscal (status Análise Fiscal e/ou Reanálise Fiscal).',chip:'Hoje'},
+    resumoGrupo(fila)||'Nenhum processo com o fiscal agora',fila.length,fila.length===1?'processo':'processos',
+    grupoFila('Análise Fiscal',emAnalise,'Nenhum processo em Análise Fiscal agora.')
+      +grupoFila('Reanálise Fiscal',emReanalise,'Nenhum processo em Reanálise Fiscal agora.')
+      +(outrosSt.length?grupoFila('Outros status',outrosSt,''):''));
+  // Despachos: o que a tira de despachos explicava (mais demorado × mais rápido) virou uma linha de texto no detalhe.
+  const comTempo=despPer.filter(p=>p.tempoFiscal!=null).sort((x,y)=>x.tempoFiscal-y.tempoFiscal);
+  const extremos=comTempo.length>=2
+    ? ` Mais demorado: ${comTempo[comTempo.length-1].processo}, ${fmtDias(comTempo[comTempo.length-1].tempoFiscal)}. Mais rápido: ${comTempo[0].processo}, ${fmtDias(comTempo[0].tempoFiscal)}.`
+    : '';
+  const explDesp=extremos?'<p class="dd-expl">'+escHtml(extremos.trim())+'</p>':'';
+  const corpoDesp=despOrd.length
+    ? explDesp+'<div class="cf-cols desp" aria-hidden="true"><span>Processo</span><span>Despachado em</span><span>Tempo no setor</span></div>'+corpoGrupo(despOrd,linhaDesp)
+    : '<div class="empty">'+escHtml('Nenhum processo despachado — '+perTxt+'.')+'</div>';
+  const notaDist=gDist&&f.foraDoDistrito
+    ? '<div class="foot-note">'+escHtml('Este fiscal tem mais '+NUM.format(f.foraDoDistrito)+' processo'+(f.foraDoDistrito===1?'':'s')+' em obras de outros distritos operacionais, que não aparecem aqui.')+'</div>'
+    : '';
+  const cardDesp=ddCard('ddDesp','Despachos',{t:'Processos que este fiscal despachou, conforme o período escolhido.',chip:perTxt.charAt(0).toUpperCase()+perTxt.slice(1)},
+    media!=null?'Tempo médio no setor de '+escHtml(fmtDias(media)):'Sem tempo médio medido no período',despOrd.length,despOrd.length===1?'despacho':'despachos',corpoDesp);
+  const obrasProcessos=cardFila+cardDesp+notaDist;
   const acoes=voltarGid
     ? `<button type="button" class="m-locate" id="modalVoltar" title="Voltar para o distrito">${RS_ICO.voltar}<span>Voltar</span></button>`
     : `<button class="mx" id="modalX" aria-label="Fechar">✕</button>`;
@@ -5249,17 +5313,11 @@ function abreModalFiscal(mat,voltarGid){
       <div class="mh-titles"><div class="mt">${escHtml(ref.fiscalNome)}</div>${sub}</div>
       <div class="mh-actions">${acoes}</div>
     </div>${periodoJanelaHtml()}</div>
-    <div class="mbody dsh">${avisoFiltroRpHtml()}${topo}${tira}${tiles}${obrasProcessos}</div>`;
+    <div class="mbody dsh">${avisoFiltroRpHtml()}${topo}${obrasProcessos}</div>`;
   document.getElementById('modal').dataset.rpJanela='f|'+mat+'|'+(voltarGid||'');
   mostraJanelaGenerica();
   const v=document.getElementById('modalVoltar');
   if(v) v.onclick=()=>abreModalDistrito(voltarGid);
-}
-// Chip ".chip.abre" das linhas de distrito do ranking — checado antes de .rrow no clique e
-// no teclado, porque fica aninhado dentro dela: sem isso o mesmo clique também desceria
-// para as cidades por baixo da janela que acabou de abrir.
-function abrirJanela(el){
-  if(el.dataset.abre==='distrito') abreModalDistrito(el.dataset.gid);
 }
 
 function renderPanelReplan(scope,body){
@@ -5412,17 +5470,6 @@ function renderPanelReplan(scope,body){
       </div>
       <div class="foot-note">${escHtml(nota)}</div>
     </div>`;
-  // Ranking: a mesma métrica do mapa, em lista navegável. O cabeçalho nomeia a métrica —
-  // sem isso a coluna de números à direita fica sem unidade.
-  const r=rpRanking();
-  const ranking = r && r.ents.length ? `<div class="statwrap">
-      <div class="sec-h"><span>${r.kind==='group'?'Distritos':'Cidades'}</span>`
-      +`<span>${escHtml(RP_METRICA[st.rp.metrica].label)}</span></div>`
-      // mesma frase da legenda do mapa e da lista de irmãos da trilha: é a terceira
-      // superfície com estes números, e nenhuma delas pode dizer o recorte de um jeito
-      // diferente das outras
-      +`<div class="sec-sub">${escHtml(rpRecorteTxt(r.kind==='group'))}</div>`
-      +rpRankRowsHtml(r.ents,r.kind)+`</div>` : '';
   // Nível 3 (cidade aberta): sem ranking abaixo, a navegação terminaria num beco. A lista
   // dos processos é o detalhe que fecha o caminho macro → micro.
   let lista='';
@@ -5437,7 +5484,7 @@ function renderPanelReplan(scope,body){
   }
   // Ordem de leitura: os quatro números do recorte, o contexto deles, as pessoas (E4), as
   // áreas em lista navegável e, no fim do caminho, os processos.
-  body.innerHTML=kpis+contexto+rpFiscaisRankingHtml(procs,a)+ranking+lista+conferencia;
+  body.innerHTML=kpis+contexto+rpFiscaisRankingHtml(procs,a)+lista+conferencia;
 }
 
 function renderPanel(){
@@ -6173,9 +6220,11 @@ const FILTER_DEFS_RP=[
     {v:'atrasado',label:'Atrasado'},{v:'no_prazo',label:'No prazo'},{v:'sem_prazo',label:'Sem prazo'}],
    get:p=>p.metaEstourada===true?'atrasado':p.metaEstourada===false?'no_prazo':'sem_prazo'},
 ];
-function passFRp(p){
+// `semBusca`: ignora só o campo "Buscar fiscal" e mantém os demais filtros — é o que a lista de
+// fiscais do painel usa para destacar quem foi buscado em vez de deixá-lo sozinho (ver fiscaisRankingBlockHtml).
+function passFRp(p,semBusca){
   const f=st.rp.filtro;
-  if(f.q && !normSearch(`${p.fiscalNome||''} ${p.fiscalMat||''}`).includes(normSearch(f.q))) return false;
+  if(!semBusca && f.q && !normSearch(`${p.fiscalNome||''} ${p.fiscalMat||''}`).includes(normSearch(f.q))) return false;
   for(let i=0;i<FILTER_DEFS_RP.length;i++){
     const d=FILTER_DEFS_RP[i], set=f[d.key];
     if(set.size && !set.has(d.get(p))) return false;
@@ -6585,19 +6634,24 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && isSiblingPopoverOpen()) closeSiblingPopover(); });
 
 document.getElementById('body').addEventListener('click',e=>{
-  // E5 — chip de abrir a janela do distrito: checado ANTES de .rrow porque o chip vive
-  // aninhado dentro dela (mesmo padrão de .chip.mun.locate dentro de .obra); sem checar
-  // primeiro, o mesmo clique também dispararia goRrow() por baixo.
-  const abre=e.target.closest('.chip.abre');
-  if(abre){ abrirJanela(abre); return; }
+  // ficha da obra a partir da lista de processos da cidade (nível 3)
+  const fb=e.target.closest('.fichaBtn');
+  if(fb){ abreFichaDoProcesso(fb); return; }
   // chip de item selecionado (Ctrl+clique): clicar nele tira da seleção combinada
   const sc=e.target.closest('.chip-sel');
   if(sc){ toggleSelection(st.sel?st.sel.kind:'group',sc.dataset.selid); return; }
   // linha da lista de fiscais: a linha INTEIRA abre o painel do fiscal (usuário,
   // 2026-09-17). Antes ela só se destacava — um clique que não levava a lugar nenhum — e
   // a janela ficava atrás de um chip de 11px dentro dela.
-  const qp=e.target.closest('.qdf');
+  const qp=e.target.closest('.fq-row');
   if(qp){ abreModalFiscal(qp.dataset.mat); return; }
+  // "Ver todos os N" / "Mostrar só os extremos" / "N fiscais entre eles": alterna a lista compacta.
+  // O painel inteiro é redesenhado, então o foco é devolvido ao último botão do bloco.
+  if(e.target.closest('.fq-toggle')){
+    st.rp.fiscaisAberto=!st.rp.fiscaisAberto; renderPanel();
+    const bs=document.querySelectorAll('#body .fq-toggle'); if(bs.length) bs[bs.length-1].focus({preventScroll:true});
+    return;
+  }
   const rr=e.target.closest('.rrow');
   if(rr){ goRrow(rr); return; }
   // chip de município do card do contrato: leva direto até ele no mapa,
@@ -6607,17 +6661,11 @@ document.getElementById('body').addEventListener('click',e=>{
   const ob=e.target.closest('.obra'); if(ob){ const o=CUROBRAS[+ob.dataset.oid]; if(o) openModal(o); }
 });
 // mesmas ações acima, via teclado (Enter/Espaço) — os cards (.rrow/.obra/
-// .chip.mun.locate/.chip-sel/.chip.abre) são <div>/<span> com role="button" e tabindex,
+// .chip.mun.locate/.chip-sel) são <div>/<span> com role="button" e tabindex,
 // não elementos <button> nativos, então não recebem ativação por teclado de graça;
 // painel público de órgão estadual precisa ser navegável sem mouse.
 document.getElementById('body').addEventListener('keydown',e=>{
-  // O chip de abrir janela é checado antes do resto pelo mesmo motivo do clique: ele fica
-  // aninhado dentro de .rrow. .qdf entra na lista comum — a linha inteira só abre a janela.
-  if(e.key==='Enter'||e.key===' '){
-    const abre=e.target.closest&&e.target.closest('.chip.abre');
-    if(abre){ e.preventDefault(); abrirJanela(abre); return; }
-  }
-  activateOnKey(e,'.qdf,.rrow,.obra,.chip.mun.locate,.chip-sel');
+  activateOnKey(e,'.fq-row,.rrow,.obra,.chip.mun.locate,.chip-sel');
 });
 // O Leaflet dispara zoomend E moveend a cada passo de zoom: cada updateLabels() reescreve ~184
 // contadores e roda o declutter (layout forçado). Coalescer no quadro faz 1 passada em vez de 2.
