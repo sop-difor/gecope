@@ -5991,6 +5991,15 @@ if(_btnTheme){
   _btnTheme.addEventListener('click',()=>setTheme(!isDarkTheme()));
   syncThemeBtn();
 }
+// Embutido no index.html: o botão de tema do sistema principal avisa por postMessage.
+window.addEventListener('message',e=>{
+  if(e.origin!==location.origin || e.source!==window.parent) return;
+  const d=e.data;
+  if(!d || d.tipo!=='gecope-tema' || typeof d.dark!=='boolean' || d.dark===isDarkTheme()) return;
+  applyThemeClass(d.dark);
+  syncThemeBtn();
+  repaintTheme();
+});
 // "sensor" da configuração do SO: só age enquanto NÃO houver escolha manual salva.
 // Depois de uma escolha explícita, mudar o tema do SO não mexe mais no módulo.
 if(window.matchMedia){

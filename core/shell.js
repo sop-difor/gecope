@@ -134,6 +134,10 @@ function toggleAppTheme() {
     const isDark = document.body.classList.toggle('theme-dark');
     try { localStorage.setItem('gecope_theme', isDark ? 'dark' : 'light'); } catch (e) { /* noop */ }
     updateThemeToggleUI();
+    // Os módulos embutidos (iframes) têm tema próprio; avisa a troca para eles acompanharem.
+    document.querySelectorAll('.frame-modulo').forEach(frame => {
+        if (frame.contentWindow) frame.contentWindow.postMessage({ tipo: 'gecope-tema', dark: isDark }, window.location.origin);
+    });
     // Os gráficos Plotly do Financeiro fixam cor de fonte/grade no momento do
     // render (Plotly não lê variáveis CSS), então precisam ser redesenhados ao
     // trocar de tema, senão ficam com as cores do tema anterior até o próximo filtro.
@@ -145,6 +149,9 @@ function toggleAppTheme() {
 
 document.addEventListener('DOMContentLoaded', updateThemeToggleUI);
 
+// A tela cheia (botão ao lado do tema) vive em shared/fullscreen.js, carregado
+// em todas as páginas para sobreviver à navegação entre elas.
+
 // No painel Início, a saudação ("Olá, Nome") aparece dentro do próprio hero de fotos,
 // substituindo o título genérico do subheader (que é usado nas demais páginas).
 function setHeroContext(paneId) {
@@ -155,6 +162,64 @@ function setHeroContext(paneId) {
     if (subheader) subheader.style.display = isHome ? 'none' : 'flex';
     if (greeting) greeting.style.display = isHome ? 'block' : 'none';
     if (hero) hero.classList.toggle('has-photo', isHome);
+}
+
+// Módulos embutidos (Contratos, Atividades, Assistente): cada um é uma página própria
+// num iframe ?embed=1 (ver shared/embed.js). O iframe ocupa o que sobra da janela
+// abaixo do cabeçalho; o src só é definido na primeira abertura.
+const MODULOS_EMBUTIDOS = {
+    'pane-contratos': {
+        frame: 'frame-contratos'
+    },
+    'pane-cronograma': {
+        frame: 'frame-cronograma'
+    },
+    'pane-assistente': {
+        frame: 'frame-assistente'
+    }
+};
+
+function frameAberto() {
+    return document.querySelector('.tab-pane.active .frame-modulo');
+}
+
+function ajustarAlturaModulo() {
+    const frame = frameAberto();
+    if (!frame || !frame.offsetParent) return;
+    const topo = frame.getBoundingClientRect().top + window.scrollY;
+    frame.style.height = Math.max(480, window.innerHeight - topo - 12) + 'px';
+}
+window.addEventListener('resize', ajustarAlturaModulo);
+document.addEventListener('fullscreenchange', () => setTimeout(ajustarAlturaModulo, 100));
+
+// O mapa mostra "Base atualizada em ..." no cabeçalho dele, que fica escondido no modo
+// embutido; copia o texto (e o aviso de dados incompletos) para a barra compacta do index (#cb-base).
+function observarBaseContratos(frame) {
+    const copiar = () => {
+        try {
+            const doc = frame.contentDocument;
+            const tempo = doc && doc.getElementById('syncTime');
+            const aviso = doc && doc.getElementById('syncWarn');
+            if (!tempo) return;
+            const destino = document.getElementById('cb-base');
+            const texto = (tempo.textContent || '').trim();
+            if (destino) {
+                destino.textContent =
+                    'Base atualizada em ' + (texto || '—') + (aviso && !aviso.hidden ? ' · ⚠ dados incompletos' : '');
+            }
+        } catch (e) { /* iframe ainda não pronto */ }
+    };
+    frame.addEventListener('load', () => {
+        copiar();
+        try {
+            const doc = frame.contentDocument;
+            const obs = new MutationObserver(copiar);
+            ['syncTime', 'syncWarn'].forEach(id => {
+                const el = doc.getElementById(id);
+                if (el) obs.observe(el, { childList: true, characterData: true, subtree: true, attributes: true });
+            });
+        } catch (e) { /* noop */ }
+    });
 }
 
 function showPane(paneId) {
@@ -173,7 +238,9 @@ function showPane(paneId) {
 
     const backBtn = document.getElementById('nav-back-container');
     if (backBtn) {
-        backBtn.style.display = (paneId === 'pane-home') ? 'none' : 'flex';
+        // O "Painel Principal" agora mora na barra compacta; esta linha só sobra na Curva ABC,
+        // onde ela guarda o botão "Processos"/"Voltar" (ao lado do processo de origem).
+        backBtn.style.display = (paneId === 'pane-curva-abc') ? 'flex' : 'none';
     }
     const processosBtn = document.getElementById('nav-processos-btn');
     if (processosBtn) {
@@ -206,12 +273,17 @@ function showPane(paneId) {
         'pane-composicoes': 'Composições',
         'pane-tabelas': 'Tabelas',
         'pane-admin': 'Administração',
-        'pane-atividades': 'Atividades Recentes'
+        'pane-atividades': 'Atividades Recentes',
+        'pane-contratos': 'Contratos',
+        'pane-cronograma': 'Atividades',
+        'pane-assistente': 'Assistente de Dados'
     };
     const titleEl = document.getElementById('main-subheader-title');
     if (titleEl && titles[paneId]) {
         titleEl.textContent = titles[paneId];
     }
+    const barraTitulo = document.getElementById('cb-titulo');
+    if (barraTitulo && titles[paneId]) barraTitulo.textContent = titles[paneId];
 
     // Lógica específica de carregamento por painel
     // (orcamentos e composicoes têm cache: só carregam na primeira visita)
@@ -251,6 +323,21 @@ function showPane(paneId) {
     }
     if (paneId === 'pane-financeiro') {
         if (typeof updateFinanceiro === 'function') updateFinanceiro();
+    }
+    const modulo = MODULOS_EMBUTIDOS[paneId];
+    // Cabeçalho compacto em todos os módulos (decisão de 06/10/2026: dados e mapa com o
+    // protagonismo); só o Início mantém o cabeçalho grande com as fotos. Ver style.css (.cb-*).
+    document.body.classList.toggle('modo-compacto', paneId !== 'pane-home');
+    document.body.classList.toggle('modo-contratos', paneId === 'pane-contratos');
+    document.body.classList.toggle('modo-embutido', !!modulo);
+    if (modulo) {
+        const frame = document.getElementById(modulo.frame);
+        if (frame && !frame.getAttribute('src')) {
+            if (paneId === 'pane-contratos') observarBaseContratos(frame);
+            frame.setAttribute('src', frame.dataset.src);
+        }
+        // O painel só aparece depois da troca de aba; mede a altura já no layout final.
+        setTimeout(ajustarAlturaModulo, 0);
     }
 
     // Redimensiona gráficos Plotly após animação da aba

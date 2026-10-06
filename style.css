@@ -1713,6 +1713,178 @@
             font-size: 0.9rem;
         }
 
+        /* --- CABEÇALHO COMPACTO (body.modo-compacto, ligado em showPane) ---
+           Todos os módulos, menos o Início, usam uma barra só (~54px) no lugar de faixa do
+           portal + cabeçalho + subtítulo + linha do "Painel Principal" (~300px), para os dados
+           e o mapa ficarem com a tela. Os elementos .cb-* existem sempre no HTML, mas só
+           aparecem neste modo. body.modo-contratos acrescenta a data da base; body.modo-embutido
+           aperta o espaçamento dos módulos que são iframes. */
+        .cb-voltar,
+        .cb-meio {
+            display: none;
+        }
+
+        body.modo-compacto .top-bar,
+        body.modo-compacto .panel-subheader,
+        body.modo-compacto .sop-brand,
+        body.modo-compacto .sop-brand-text,
+        body.modo-compacto .sop-header-gecope,
+        body.modo-compacto #nav-back-container .btn-back-minimal:first-child {
+            display: none !important;
+        }
+
+        /* Contratos: "Base atualizada em ..." à direita, junto dos botões, só o ponto verde e o texto. */
+        .cb-base-info {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        body.modo-contratos .cb-base-info {
+            display: inline-flex;
+        }
+
+        body.modo-compacto .sop-header {
+            position: relative;
+            justify-content: flex-start;
+            gap: 14px;
+            padding: 8px 20px;
+            min-height: 54px;
+        }
+
+        body.modo-compacto .cb-voltar {
+            display: inline-flex;
+        }
+
+        /* Título centralizado na barra, independente da largura dos lados. */
+        body.modo-compacto .cb-meio {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Tema e tela cheia: só o ícone, discretos (o nome fica no title/aria-label). */
+        body.modo-compacto .sop-header-right .theme-toggle-btn {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            justify-content: center;
+            background: transparent;
+            border-color: transparent;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        body.modo-compacto .sop-header-right .theme-toggle-btn:hover,
+        body.modo-compacto .sop-header-right .theme-toggle-btn:focus-visible {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+        }
+
+        body.modo-compacto .sop-header-right .theme-toggle-btn span {
+            display: none;
+        }
+
+        body.modo-compacto .sop-header-right .theme-toggle-btn i {
+            font-size: 1rem;
+        }
+
+        .cb-titulo {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+        }
+
+        body.modo-compacto .sop-header-right {
+            margin-left: auto;
+        }
+
+        body.modo-compacto main.page-wrapper {
+            padding-top: 14px;
+        }
+
+        /* Curva ABC: a linha de navegação só guarda o botão "Processos"/"Voltar", à direita. */
+        body.modo-compacto #nav-back-container {
+            justify-content: flex-end !important;
+            margin-bottom: 8px !important;
+        }
+
+        body.modo-embutido main.page-wrapper {
+            padding: 10px 16px 12px;
+        }
+
+        /* Telas médias: sem o nome do usuário (e sem a data da base) para não encostar no título centralizado. */
+        @media (max-width: 1100px) {
+            body.modo-compacto #user-info-header .text-end {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 900px) {
+            body.modo-contratos .cb-base-info {
+                display: none;
+            }
+        }
+
+        @media (max-width: 1500px) {
+            body.modo-contratos #user-info-header .text-end {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body.modo-compacto .sop-header {
+                flex-direction: row;
+                flex-wrap: nowrap;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+            }
+
+            body.modo-compacto .cb-meio {
+                position: static;
+                transform: none;
+                flex: 1;
+                justify-content: center;
+            }
+
+            .cb-titulo {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            body.modo-compacto .sop-header-right {
+                gap: 6px !important;
+            }
+
+            body.modo-compacto #user-info-header {
+                border: 0 !important;
+                padding-left: 0 !important;
+            }
+        }
+
+        /* Módulos embutidos (Contratos, Atividades, Assistente); a altura exata é
+           ajustada por ajustarAlturaModulo() em core/shell.js. */
+        .frame-modulo {
+            display: block;
+            width: 100%;
+            height: 70vh;
+            min-height: 480px;
+            border: 0;
+            border-radius: 10px;
+        }
+
         @media (max-width: 576px) {
             .theme-toggle-btn span {
                 display: none;

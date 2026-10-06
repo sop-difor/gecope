@@ -444,6 +444,10 @@
   body.theme-dark .btn-theme .ic-sun{display:block}
   body.theme-dark .btn-theme .ic-moon{display:none}
   /* ---- Modo Apresentação (layout padrão fixo desta página) ---- */
+  /* Embutido no index.html (iframe ?embed=1): título, "Sair", tema e tela cheia vêm do
+     sistema principal. O cabeçalho some, mas #syncTime/#syncWarn continuam no DOM — o index
+     os lê e mostra a "Base atualizada em" na faixa de título do módulo. */
+  .embutido header.top{display:none}
   body.presentation header.top{padding:19px 30px}
   body.presentation .top h1{font-size:17px}
   body.presentation .top .sub{font-size:10.5px}

@@ -15,6 +15,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="database.js"></script>
+<script src="shared/fullscreen.js"></script>
+<script src="shared/embed.js"></script>
 <style>
   :root {
     --bg-page: #ffffff;
@@ -445,6 +447,9 @@
   }
   html[data-theme="escuro"] .btn-enviar { background: var(--accent); }
   .btn-enviar:disabled { opacity: 0.3; cursor: default; }
+
+  /* Embutido no index (iframe ?embed=1, ver shared/embed.js): título, "voltar" e tema vêm do index. */
+  .embutido .topbar { display: none; }
 </style>
 </head>
 <body>
@@ -556,6 +561,8 @@
   btnTema.addEventListener("click", () => {
     aplicarTema(document.documentElement.dataset.theme === "escuro" ? "claro" : "escuro");
   });
+  // Embutido no index: o alternador do sistema principal avisa a troca de tema.
+  window.addEventListener("gecope-tema", (e) => aplicarTema(e.detail.dark ? "escuro" : "claro"));
 
   const VARIACOES_SAUDACAO = {
     manha: ["Bom dia", "Bom dia, gestor", "Um bom dia pra você"],
@@ -649,7 +656,7 @@
       alvo.dataset.sessaoAviso = "1";
       alvo.textContent = "Entre no GECOPE para continuar";
       const p = alvo.nextElementSibling;
-      if (p) p.innerHTML = 'Abra o <a href="index.html" style="color:var(--accent)">Painel Principal</a>, faça login e volte a esta página.';
+      if (p) p.innerHTML = 'Abra o <a href="index.html" target="_top" style="color:var(--accent)">Painel Principal</a>, faça login e volte a esta página.';
     }
   }
 
@@ -673,7 +680,7 @@
       alvo.dataset.sessaoAviso = "1";
       alvo.textContent = "Acesso restrito a administradores";
       const p = alvo.nextElementSibling;
-      if (p) p.innerHTML = 'O Assistente de Dados está disponível apenas para administradores. Volte ao <a href="index.html" style="color:var(--accent)">Painel Principal</a>.';
+      if (p) p.innerHTML = 'O Assistente de Dados está disponível apenas para administradores. Volte ao <a href="index.html" target="_top" style="color:var(--accent)">Painel Principal</a>.';
     }
   }
 

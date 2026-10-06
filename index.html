@@ -278,22 +278,36 @@
         <div class="top-bar">PORTAL SOP-CE . GOVERNO DO ESTADO DO CEARÁ . SISTEMA DE ADITIVOS DE OBRAS</div>
 
         <header class="sop-header">
-            <div style="display:flex;align-items:center;gap:16px;">
+            <!-- Só aparecem no cabeçalho compacto, usado em todos os módulos menos o Início (body.modo-compacto, ver style.css) -->
+            <button type="button" class="theme-toggle-btn cb-voltar" onclick="showPane('pane-home')"
+                title="Voltar ao Painel Principal">
+                <i class="bi bi-arrow-left"></i><span>Painel Principal</span>
+            </button>
+            <div class="sop-brand" style="display:flex;align-items:center;gap:16px;">
                 <div class="sop-logo"><span>SOP-CE</span></div>
-                <div>
+                <div class="sop-brand-text">
                     <div class="sop-title-main">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
                     <div class="sop-title-sub">Governo do Estado do Ceará - Secretaria das Cidades</div>
                 </div>
             </div>
+            <div class="cb-meio">
+                <h1 class="cb-titulo" id="cb-titulo"></h1>
+            </div>
             <div class="sop-header-right d-flex align-items-center gap-3">
-                <div class="text-end d-none d-md-block">
+                <span class="cb-base-info"><span class="panel-tag-dot"></span><span id="cb-base">Base atualizada em —</span></span>
+                <div class="text-end d-none d-md-block sop-header-gecope">
                     <strong>GECOPE Gerência de Controle de Aditivos</strong>
                     <span style="font-size: 0.75rem; opacity: 0.9;">Painel Gerencial de Aditivos de Obras</span>
                 </div>
                 <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleAppTheme()"
-                    title="Alternar tema claro/escuro">
+                    title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro">
                     <i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i>
                     <span id="theme-toggle-label">Escuro</span>
+                </button>
+                <button type="button" id="fullscreen-toggle-btn" class="theme-toggle-btn" onclick="toggleFullscreen()"
+                    title="Alternar tela cheia" aria-label="Alternar tela cheia">
+                    <i class="bi bi-arrows-fullscreen" id="fullscreen-toggle-icon"></i>
+                    <span id="fullscreen-toggle-label">Tela cheia</span>
                 </button>
                 <div id="user-info-header" class="d-flex align-items-center gap-2 border-start ps-3"
                     style="display: none !important;">
@@ -317,7 +331,7 @@
                 <div class="panel-subheader-title" id="main-subheader-title">
                     Painel Gerencial Aditivos de Obras
                 </div>
-                <div class="panel-subheader-subtitle">Painel para acompanhamento de aditivo de contratos.</div>
+                <div class="panel-subheader-subtitle" id="main-subheader-subtitle">Painel para acompanhamento de aditivo de contratos.</div>
             </div>
             <div class="panel-tag"><span class="panel-tag-dot"></span><span>Dados consolidados uso interno SOP /
                     GECOPE</span></div>
@@ -362,6 +376,12 @@
                         data-bs-target="#pane-composicoes" data-bs-toggle="tab">Composições</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest,eletrica"><button class="nav-link"
                         data-bs-target="#pane-tabelas" data-bs-toggle="tab">Tabelas</button></li>
+                <li class="nav-item" data-roles="admin,gerente,fiscal,externo,eletrica"><button class="nav-link"
+                        data-bs-target="#pane-contratos" data-bs-toggle="tab">Contratos</button></li>
+                <li class="nav-item" data-roles="admin,gerente,fiscal"><button class="nav-link"
+                        data-bs-target="#pane-cronograma" data-bs-toggle="tab">Atividades</button></li>
+                <li class="nav-item" data-roles="admin" data-autorizacao="assistente_dados"><button class="nav-link"
+                        data-bs-target="#pane-assistente" data-bs-toggle="tab">Assistente de Dados</button></li>
                 <li class="nav-item" data-roles="admin"><button class="nav-link" data-bs-target="#pane-admin"
                         data-bs-toggle="tab">Administração</button></li>
                 <li class="nav-item" data-roles="admin,gerente,fiscal,externo,guest"><button class="nav-link"
@@ -429,8 +449,9 @@
                                     <p>Gerenciar Processos de Aditivos</p>
                                 </div>
                             </div>
-                            <div class="home-action-card accent-blue" data-roles="admin,gerente,fiscal"
-                                onclick="window.location.href='cronograma.html'">
+                            <div class="home-action-card accent-blue" data-pane="pane-cronograma" data-roles="admin,gerente,fiscal"
+                                onmouseenter="prefetchPagina('cronograma.html?embed=1')"
+                                onclick="showPane('pane-cronograma')">
                                 <div class="home-featured-badge">2º mais usado</div>
                                 <div class="home-action-icon bg-blue"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
                                 <div class="home-action-text">
@@ -483,16 +504,16 @@
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Contratos -->
-                            <div class="home-list-row" data-roles="admin,gerente,fiscal,externo,eletrica" onmouseenter="prefetchPagina('gecope_mapa_obras.html')"
-                                onclick="window.location.href='gecope_mapa_obras.html'"
+                            <div class="home-list-row" data-pane="pane-contratos" data-roles="admin,gerente,fiscal,externo,eletrica" onmouseenter="prefetchPagina('gecope_mapa_obras.html?embed=1')"
+                                onclick="showPane('pane-contratos')"
                                 title="Abrir o painel interativo do GECOPE">
                                 <div class="home-action-icon bg-green"><i class="bi bi-map"></i></div>
                                 <div class="home-list-row-title">Contratos</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Assistente de Dados (F8) -->
-                            <div class="home-list-row" data-roles="admin" data-autorizacao="assistente_dados" onmouseenter="prefetchPagina('assistente.html')"
-                                onclick="window.location.href='assistente.html'"
+                            <div class="home-list-row" data-pane="pane-assistente" data-roles="admin" data-autorizacao="assistente_dados" onmouseenter="prefetchPagina('assistente.html?embed=1')"
+                                onclick="showPane('pane-assistente')"
                                 title="Perguntar em linguagem natural sobre contratos, obras, processos e aditivos">
                                 <div class="home-action-icon bg-indigo"><i class="bi bi-robot"></i></div>
                                 <div class="home-list-row-title">Assistente de Dados</div>
@@ -2082,8 +2103,8 @@
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-outline-success fw-bold"
                                     style="font-size: 0.85rem; height: 40px;"
-                                    onmouseenter="prefetchPagina('cronograma.html')"
-                                    onclick="window.location.href='cronograma.html'">
+                                    onmouseenter="prefetchPagina('cronograma.html?embed=1')"
+                                    onclick="showPane('pane-cronograma')">
                                     <i class="bi bi-kanban me-1" style="display:inline-block; transform: scaleY(-1);"></i> Atividades
                                 </button>
                                 <button type="button" class="btn btn-success fw-bold shadow-sm admin-only"
@@ -2478,6 +2499,22 @@
                         </div>
                     </div>
                 </div> <!-- FIM PANE TABELAS -->
+
+                <!-- MÓDULOS EMBUTIDOS (Contratos, Atividades, Assistente): cada um é uma página própria
+                     carregada num iframe ?embed=1 (a página esconde o cabeçalho dela, ver shared/embed.js).
+                     O src só é definido na 1ª abertura do módulo (showPane, core/shell.js). -->
+                <div class="tab-pane fade" id="pane-contratos">
+                    <iframe id="frame-contratos" class="frame-modulo" title="Contratos — Mapa de Obras"
+                        allow="fullscreen" data-src="gecope_mapa_obras.html?embed=1"></iframe>
+                </div>
+                <div class="tab-pane fade" id="pane-cronograma">
+                    <iframe id="frame-cronograma" class="frame-modulo" title="Atividades — Painel de Distribuição de Tarefas"
+                        data-src="cronograma.html?embed=1"></iframe>
+                </div>
+                <div class="tab-pane fade" id="pane-assistente">
+                    <iframe id="frame-assistente" class="frame-modulo" title="Assistente de Dados"
+                        data-src="assistente.html?embed=1"></iframe>
+                </div>
 
                 <!-- PAINEL DE ATIVIDADES -->
                 <div class="tab-pane fade" id="pane-atividades">
@@ -4845,6 +4882,7 @@
                                                                     <script src="utils.js"></script>
                                                                     <script src="core/auth.js"></script>
                                                                     <script src="core/shell.js"></script>
+                                                                    <script src="shared/fullscreen.js"></script>
 
                                                                     <!-- Módulos e utilitários de negócio (load order matters) -->
                                                                     <script src="whatsapp.js"></script>

@@ -16,6 +16,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="database.js"></script>
+<script src="shared/fullscreen.js"></script>
+<script src="shared/embed.js"></script>
 <!-- Sanitiza o HTML rico do campo "Observações" da tarefa (#t-obs, contenteditable com
      negrito/itálico/alinhamento) antes de salvar/exibir — mesmo padrão já usado para o
      comentário rich-text da Curva ABC (utils.js/sanitizeRichHTML). -->
@@ -136,6 +138,13 @@ main {
     radial-gradient(ellipse at bottom right, rgba(0,114,51,.03) 0%, transparent 50%);
   min-height: calc(100vh - 120px);
 }
+
+/* ── EMBUTIDO NO INDEX ── (iframe ?embed=1, ver shared/embed.js): o index já traz
+   cabeçalho, título e "Painel Principal"; aqui só sobra o conteúdo do módulo. */
+.embutido .gecope-hero,
+.embutido .nav-wrapper .btn-back-minimal { display: none; }
+.embutido main { padding: 0 0 24px; min-height: 0; }
+.embutido body { min-height: 0; }
 
 /* ── RESUMO ── (cards de KPI no padrão do Processos: fundo branco, borda
    esquerda de destaque, ícone em chip sólido) */
@@ -1504,6 +1513,11 @@ body.theme-dark .tarefa-conc-meta {
       <i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i>
       <span id="theme-toggle-label">Escuro</span>
     </button>
+    <button type="button" id="fullscreen-toggle-btn" class="theme-toggle-btn" onclick="toggleFullscreen()"
+      title="Alternar tela cheia">
+      <i class="bi bi-arrows-fullscreen" id="fullscreen-toggle-icon"></i>
+      <span id="fullscreen-toggle-label">Tela cheia</span>
+    </button>
   </div>
 </header>
 
@@ -1530,7 +1544,7 @@ body.theme-dark .tarefa-conc-meta {
     <button onclick="mostrarAba('concluidas',this)" id="btn-aba-concluidas"><i class="bi bi-check2-circle"></i> Concluídas</button>
     <button onclick="mostrarAba('relatorio',this)"><i class="bi bi-calendar3"></i> Cronograma</button>
     <button class="ativo" onclick="mostrarAba('painel',this)"><i class="bi bi-clipboard-data"></i> Painel Geral</button>
-    <button onmouseenter="prefetchPagina('index.html')" onclick="window.location.href='index.html?pane=pane-reuniao'"><i class="bi bi-file-earmark-text"></i> Processos</button>
+    <button onmouseenter="prefetchPagina('index.html')" onclick="if (window.GECOPE_EMBUTIDO) gecopeAbrirPane('pane-reuniao'); else window.location.href='index.html?pane=pane-reuniao'"><i class="bi bi-file-earmark-text"></i> Processos</button>
     <button onclick="mostrarAba('rotinas',this)"><i class="bi bi-arrow-repeat"></i> Rotinas</button>
   </nav>
 </div>
@@ -2079,6 +2093,11 @@ function toggleAppTheme() {
   updateThemeToggleUI();
 }
 updateThemeToggleUI();
+// Embutido no index: o alternador do sistema principal avisa a troca de tema.
+window.addEventListener('gecope-tema', (e) => {
+  document.body.classList.toggle('theme-dark', e.detail.dark);
+  updateThemeToggleUI();
+});
 
 // ══════════════════════════════════════════════════════════
 // ABAS

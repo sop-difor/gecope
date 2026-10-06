@@ -38,13 +38,21 @@
     dark = pref ? (pref!=='light')
                 : !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
   }catch(e){ dark=true; }
+  /* Embutido como módulo do index.html (iframe ?embed=1): o tema segue o do sistema
+     principal, e "Tema"/"Tela cheia" ficam por conta do cabeçalho dele (ver .embutido no CSS). */
+  var embutido=false;
+  try{ embutido = window.parent!==window && /[?&]embed=1\b/.test(location.search); }catch(e){}
+  if(embutido){
+    document.documentElement.classList.add('embutido');
+    try{ dark = window.parent.document.body.classList.contains('theme-dark'); }catch(e){}
+  }
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);
 })();
 </script>
 <header class="top">
   <button class="btn-voltar" id="btnVoltar" onmouseenter="prefetchPagina('index.html')"
-      onclick="window.location.href='index.html'" title="Sair do módulo de Contratos e voltar ao Painel Principal">
+      onclick="if(document.documentElement.classList.contains('embutido')) window.parent.showPane('pane-home'); else window.location.href='index.html'" title="Sair do módulo de Contratos e voltar ao Painel Principal">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
     Sair
@@ -217,7 +225,7 @@
          ser só texto (showDataError usa textContent); sem sessão, esta é a única
          saída da tela, então precisa ser um link de verdade. Escondido por
          padrão; showLoginRequired() troca qual dos dois botões aparece. -->
-    <a id="dataErrorLink" class="btn-error" href="index.html" style="display:none">Voltar ao Painel Principal</a>
+    <a id="dataErrorLink" class="btn-error" href="index.html" target="_top" style="display:none">Voltar ao Painel Principal</a>
   </div>
 </div>
 
@@ -227,6 +235,7 @@
      agora — precisa do mesmo cliente Supabase autenticado do resto do app. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
 <script src="database.js"></script>
+<script src="shared/fullscreen.js"></script>
 <script src="assets/js/mapa-obras.js" defer></script>
 </body>
 </html>
