@@ -26,8 +26,27 @@ const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL_MS || '2000', 10);
 // nenhuma pra mandar).
 const POLL_INTERVAL_MAX = parseInt(process.env.POLL_INTERVAL_MAX_MS || '20000', 10);
 const STALE_PROCESSING_MS = parseInt(process.env.STALE_PROCESSING_MS || '300000', 10); // 5 min
+const FORTALEZA_TIME_ZONE = 'America/Fortaleza';
+const WEEKEND_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+function isWeekendInFortaleza(date = new Date()) {
+    const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone: FORTALEZA_TIME_ZONE,
+        weekday: 'short'
+    }).format(date);
+    return weekday === 'Sat' || weekday === 'Sun';
+}
 
 let shuttingDown = false;
+
+// Dorme em fatias de 1s para que SIGTERM/SIGINT encerrem o worker na hora, em vez de
+// esperar o intervalo inteiro (a pausa de fim de semana dorme 5min por vez).
+async function sleepUnlessShuttingDown(ms) {
+    const fim = Date.now() + ms;
+    while (!shuttingDown && Date.now() < fim) {
+        await new Promise(r => setTimeout(r, Math.min(1000, fim - Date.now())));
+    }
+}
 process.on('SIGTERM', () => { shuttingDown = true; });
 process.on('SIGINT', () => { shuttingDown = true; });
 
@@ -282,7 +301,23 @@ async function mainLoop() {
     // job). Egress, 18/09/2026 — docs/auditoria-egress-2026-09.md, itens 2 e 3 do bloco
     // "Serviços da VM".
     let consecutiveErrors = 0;
+    let weekendPauseAnnounced = false;
     while (!shuttingDown) {
+        // A fila de WhatsApp não opera aos fins de semana. Além de manter mensagens
+        // pendentes para segunda-feira, isto interrompe por completo as consultas
+        // automáticas ao Supabase nesses dias, independentemente do fuso da VM.
+        if (isWeekendInFortaleza()) {
+            if (!weekendPauseAnnounced) {
+                weekendPauseAnnounced = true;
+                console.log('[worker] pausado no fim de semana (America/Fortaleza); retoma na segunda-feira.');
+            }
+            await sleepUnlessShuttingDown(WEEKEND_CHECK_INTERVAL_MS);
+            continue;
+        }
+        if (weekendPauseAnnounced) {
+            weekendPauseAnnounced = false;
+            console.log('[worker] fim de semana encerrado; retomando a fila.');
+        }
         try {
             // reclaimStaleJobs (como reclaimOrphanLogs) faz varredura sem índice dedicado, e
             // STALE_PROCESSING_MS/ORPHAN_LOG_STALE_MS já dão 5min/90s de tolerância — rodar a

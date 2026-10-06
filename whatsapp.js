@@ -360,6 +360,7 @@
                                                                                 NOME_FISCAL: 'João Fiscal',
                                                                                 NUP_PROCESSO: '12345.6789/2026-00',
                                                                                 NOME_OBRA: 'Construção da Escola Nova',
+                                                                                DATA_META: '15/10/2026',
                                                                                 NOVO_STATUS: 'Em Análise',
                                                                                 ANALISTA: 'Walace',
                                                                                 REF_ORCAMENTO: 'ORC-2026/001',
@@ -499,6 +500,9 @@
                                                                                     linhas.push(` 🚨*Prazo Final:* Excedido!!!`);
                                                                                 } else if (evento === 'analista_designado') {
                                                                                     linhas.push(` 📊*Status:* Em Análise`);
+                                                                                    if (dados.DATA_META) {
+                                                                                        linhas.push(` 🎯*Meta:* ${dados.DATA_META}`);
+                                                                                    }
                                                                                 }
 
                                                                                 const avisoSuite = evento === 'novas_metas_processo' ? "\n\n*OBSERVAÇÃO:* Caso você já tenha despachado o processo no sistema *SUITE*, por favor desconsidere este aviso." : "";

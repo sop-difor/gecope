@@ -1562,40 +1562,41 @@ async function enviarParaPlanilha() {
         msg.className = 'alert alert-success mt-3';
         msg.innerHTML = ' Salvo com sucesso no Banco de Dados!';
 
-        // Após inserir, calcular a meta a partir do created_at (ou data_devolucao_correcoes para reanálises)
-        (async () => {
-            try {
-                const { data: pData, error: errP } = await sbClient.from('processos').select('id, data_devolucao_correcoes, created_at, status').eq('processo', numProcesso).maybeSingle();
-                if (errP) throw errP;
-                if (pData && pData.id) {
-                    const st = (pData.status || '').toString().toUpperCase();
-                    const isReanalise = st.includes('REANÁLISE') || st.includes('REANALISE') || st.includes('DEVOLVIDO');
-                    const dias = isReanalise ? 10 : 20;
-                    const baseStr = (isReanalise && pData.data_devolucao_correcoes) ? pData.data_devolucao_correcoes : pData.created_at;
-                    const baseDate = baseStr ? isoParaDate(baseStr) : new Date();
-                    const metaDate = calcularDataMeta(baseDate, dias);
-                    if (metaDate) {
-                        const iso = metaDate.toISOString().substring(0, 10);
-                        // Atualiza processo com a meta correta calculada a partir do created_at
-                        const { error: errUp } = await sbClient.from('processos').update({ data_compromisso_fiscal: iso }).eq('id', pData.id);
-                        if (errUp) console.error('[ERRO] Falha ao atualizar processo com meta calculada:', errUp.message);
+        // Calcula a meta antes de notificar o fiscal. Antes isto rodava em paralelo e o
+        // WhatsApp recebia a data digitada (normalmente vazia), não a meta calculada.
+        let metaInicialIso = payload.data_compromisso_fiscal || null;
+        try {
+            const { data: pData, error: errP } = await sbClient.from('processos').select('id, data_devolucao_correcoes, created_at, status').eq('processo', numProcesso).maybeSingle();
+            if (errP) throw errP;
+            if (pData && pData.id) {
+                const st = (pData.status || '').toString().toUpperCase();
+                const isReanalise = st.includes('REANÁLISE') || st.includes('REANALISE') || st.includes('DEVOLVIDO');
+                const dias = isReanalise ? 10 : 20;
+                const baseStr = (isReanalise && pData.data_devolucao_correcoes) ? pData.data_devolucao_correcoes : pData.created_at;
+                const baseDate = baseStr ? isoParaDate(baseStr) : new Date();
+                const metaDate = calcularDataMeta(baseDate, dias);
+                if (metaDate) {
+                    const iso = metaDate.toISOString().substring(0, 10);
+                    // Atualiza processo com a meta correta calculada a partir do created_at
+                    const { error: errUp } = await sbClient.from('processos').update({ data_compromisso_fiscal: iso }).eq('id', pData.id);
+                    if (errUp) console.error('[ERRO] Falha ao atualizar processo com meta calculada:', errUp.message);
+                    else metaInicialIso = iso;
 
-                        // Inserir histórico de metas registrando o 'registro' (data da base) e dias
-                        const est = baseDate.toISOString().substring(0, 10);
-                        const { error: errHist } = await sbClient.from('historico_metas').upsert([{
-                            processo_id: pData.id,
-                            registros: est,
-                            dias_estipulados: dias,
-                            meta: iso,
-                            autor: 'Sistema'
-                        }], { onConflict: 'processo_id,registros,meta,dias_estipulados,autor', ignoreDuplicates: true });
-                        if (errHist) console.error('[ERRO] Falha ao registrar log de meta inicial:', errHist.message);
-                    }
+                    // Inserir histórico de metas registrando o 'registro' (data da base) e dias
+                    const est = baseDate.toISOString().substring(0, 10);
+                    const { error: errHist } = await sbClient.from('historico_metas').upsert([{
+                        processo_id: pData.id,
+                        registros: est,
+                        dias_estipulados: dias,
+                        meta: iso,
+                        autor: 'Sistema'
+                    }], { onConflict: 'processo_id,registros,meta,dias_estipulados,autor', ignoreDuplicates: true });
+                    if (errHist) console.error('[ERRO] Falha ao registrar log de meta inicial:', errHist.message);
                 }
-            } catch (e) {
-                console.error('[ERRO] Ao calcular/gravar meta pós-inserção:', e);
             }
-        })();
+        } catch (e) {
+            console.error('[ERRO] Ao calcular/gravar meta pós-inserção:', e);
+        }
 
         // Log de Atividade
         registrarAtividade('PROCESSO', `cadastrou o processo Nº ${numProcesso}`, numProcesso, formData.get("DESCRIÇÃO"), fiscalCad.nome);
@@ -1616,8 +1617,8 @@ async function enviarParaPlanilha() {
             console.error('[ERRO] Ao localizar processo recém-criado:', e);
         }
 
+        const metaFormatada = metaInicialIso ? metaInicialIso.split('-').reverse().join('/') : 'Não definida';
         if (statusInicial === 'ANÁLISE FISCAL') {
-            const metaFormatada = payload.data_compromisso_fiscal ? payload.data_compromisso_fiscal.split('-').reverse().join('/') : 'Não definida';
             processarNotificacao('novo_processo', {
                 NOME_FISCAL: fiscalCad.nome || 'Fiscal',
                 NUP_PROCESSO: numProcesso,
@@ -1649,7 +1650,8 @@ async function enviarParaPlanilha() {
                     ANALISTA: analistaNome,
                     NUP_PROCESSO: numProcesso,
                     NOME_OBRA: formData.get("DESCRIÇÃO") || 'Obra não informada',
-                    NOVO_STATUS: 'Em Análise'
+                    NOVO_STATUS: 'Em Análise',
+                    DATA_META: metaFormatada
                 });
             }
         }
@@ -2350,11 +2352,13 @@ async function executarAcaoDetalhes(actionType) {
             // Notificação WhatsApp (Apenas para Devolução para Reanálise)
             const statusAlvo = ['DEVOLVIDO P/ REANÁLISE FISCAL'];
             if (updates.status && updates.status !== registroOriginal.status && statusAlvo.includes(updates.status)) {
+                const metaFormatada = dataLimiteNova ? String(dataLimiteNova).split('-').reverse().join('/') : 'Não definida';
                 processarNotificacao('mudanca_status_processo', {
                     NUP_PROCESSO: processoNome,
                     NOME_OBRA: registroOriginal.descricao,
                     NOVO_STATUS: updates.status,
-                    NOME_FISCAL: registroOriginal.fiscal || 'Fiscal'
+                    NOME_FISCAL: registroOriginal.fiscal || 'Fiscal',
+                    DATA_META: metaFormatada
                 });
             }
 
@@ -2385,11 +2389,13 @@ async function executarAcaoDetalhes(actionType) {
                 const ehAutoAtribuicao = usuarioAtual && (analistaAtual.includes(usuarioAtual) || usuarioAtual.includes(analistaAtual));
 
                 if (!ehAutoAtribuicao) {
+                    const metaFormatada = dataLimiteNova ? String(dataLimiteNova).split('-').reverse().join('/') : 'Não definida';
                     processarNotificacao('analista_designado', {
                         ANALISTA: analistaAtual,
                         NUP_PROCESSO: processoNome,
                         NOME_OBRA: registroOriginal.descricao,
-                        NOVO_STATUS: 'Em Análise'
+                        NOVO_STATUS: 'Em Análise',
+                        DATA_META: metaFormatada
                     });
                 }
             }

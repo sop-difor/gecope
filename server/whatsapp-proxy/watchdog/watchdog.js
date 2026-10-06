@@ -34,6 +34,18 @@ const RESTART_COOLDOWN_MS = parseInt(process.env.WATCHDOG_RESTART_COOLDOWN_MS ||
 const MANUAL_RESTART_COOLDOWN_MS = parseInt(process.env.WATCHDOG_MANUAL_RESTART_COOLDOWN_MS || '30000', 10);
 const FAILURE_WINDOW_MS = parseInt(process.env.WATCHDOG_FAILURE_WINDOW_MS || '600000', 10);
 const FAILURE_THRESHOLD = parseInt(process.env.WATCHDOG_FAILURE_THRESHOLD || '2', 10);
+const FORTALEZA_TIME_ZONE = 'America/Fortaleza';
+// No fim de semana o watchdog só atende pedido MANUAL de restart (uma leitura mínima de
+// whatsapp_control por ciclo). Verificação de saúde e restart automático ficam pausados.
+const WEEKEND_CHECK_INTERVAL_MS = parseInt(process.env.WATCHDOG_WEEKEND_POLL_INTERVAL_MS || '60000', 10);
+
+function isWeekendInFortaleza(date = new Date()) {
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    timeZone: FORTALEZA_TIME_ZONE,
+    weekday: 'short'
+  }).format(date);
+  return weekday === 'Sat' || weekday === 'Sun';
+}
 
 // Fala com o Docker Engine local via socket Unix — sem biblioteca externa (dockerode),
 // só http nativo do Node, para não precisar mexer no package-lock.json. O watchdog NUNCA
@@ -116,30 +128,35 @@ let lastManualRestartAt = 0;
 // saber "desde quando" — evita uma corrida boba de leitura/escrita no mesmo ciclo.
 let degradedSinceMemory = null;
 
-async function tick() {
+// manualOnly (fim de semana): ignora estado da Evolution e falhas recentes — só um pedido
+// manual de restart pode reiniciar o container.
+async function tick({ manualOnly = false } = {}) {
   const control = await getControlRow();
-  const state = await getEvolutionState();
-  // hasRecentConnectionFailures() é sinal COMPLEMENTAR pro caso em que a Evolution API
-  // mente dizendo "open" (ver comentário na função) — se state já não é "open", isBad já
-  // fica true de qualquer jeito, então pular a consulta aqui economiza uma leitura de
-  // whatsapp_jobs sem limite a cada 30s. Egress, 18/09/2026 — item 4 do bloco "Serviços
-  // da VM" da auditoria.
-  const recentFailures = (state === 'open') ? await hasRecentConnectionFailures() : false;
-  const isBad = state !== 'open' || recentFailures;
 
-  if (isBad && !degradedSinceMemory) {
-    degradedSinceMemory = new Date().toISOString();
-    await updateControlRow({ degraded_since: degradedSinceMemory });
-    console.log(`[watchdog] Degradado detectado (state=${state}, falhas_recentes=${recentFailures}).`);
-  } else if (!isBad && degradedSinceMemory) {
-    degradedSinceMemory = null;
-    await updateControlRow({ degraded_since: null });
-    console.log('[watchdog] Conexão normalizada.');
+  if (!manualOnly) {
+    const state = await getEvolutionState();
+    // hasRecentConnectionFailures() é sinal COMPLEMENTAR pro caso em que a Evolution API
+    // mente dizendo "open" (ver comentário na função) — se state já não é "open", isBad já
+    // fica true de qualquer jeito, então pular a consulta aqui economiza uma leitura de
+    // whatsapp_jobs sem limite a cada 30s. Egress, 18/09/2026 — item 4 do bloco "Serviços
+    // da VM" da auditoria.
+    const recentFailures = (state === 'open') ? await hasRecentConnectionFailures() : false;
+    const isBad = state !== 'open' || recentFailures;
+
+    if (isBad && !degradedSinceMemory) {
+      degradedSinceMemory = new Date().toISOString();
+      await updateControlRow({ degraded_since: degradedSinceMemory });
+      console.log(`[watchdog] Degradado detectado (state=${state}, falhas_recentes=${recentFailures}).`);
+    } else if (!isBad && degradedSinceMemory) {
+      degradedSinceMemory = null;
+      await updateControlRow({ degraded_since: null });
+      console.log('[watchdog] Conexão normalizada.');
+    }
   }
 
   const manualRequest = !!control?.restart_requested_at &&
     (!control.last_restarted_at || new Date(control.restart_requested_at) > new Date(control.last_restarted_at));
-  const sustainedBad = !!degradedSinceMemory &&
+  const sustainedBad = !manualOnly && !!degradedSinceMemory &&
     (Date.now() - new Date(degradedSinceMemory).getTime() >= DEGRADED_GRACE_MS);
 
   // Cooldowns independentes: um pedido manual só é barrado por cliques manuais recentes
@@ -177,13 +194,25 @@ async function tick() {
 
 async function mainLoop() {
   console.log(`[watchdog] iniciado — verificando a cada ${POLL_INTERVAL_MS}ms.`);
+  let weekendPauseAnnounced = false;
   while (true) {
+    // Não há operação de WhatsApp no fim de semana: sem checagem de saúde nem restart
+    // automático. Só o pedido manual de "Reiniciar Conexão" continua sendo atendido,
+    // senão ele ficaria parado e dispararia sozinho na segunda-feira.
+    const weekend = isWeekendInFortaleza();
+    if (weekend && !weekendPauseAnnounced) {
+      weekendPauseAnnounced = true;
+      console.log('[watchdog] fim de semana (America/Fortaleza): só pedidos manuais de restart; verificações automáticas retomam na segunda-feira.');
+    } else if (!weekend && weekendPauseAnnounced) {
+      weekendPauseAnnounced = false;
+      console.log('[watchdog] fim de semana encerrado; retomando verificações.');
+    }
     try {
-      await tick();
+      await tick({ manualOnly: weekend });
     } catch (err) {
       console.error('[watchdog] erro no ciclo:', err.message);
     }
-    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    await new Promise(r => setTimeout(r, weekend ? WEEKEND_CHECK_INTERVAL_MS : POLL_INTERVAL_MS));
   }
 }
 
