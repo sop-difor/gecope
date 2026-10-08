@@ -324,7 +324,7 @@ function renderizarOrcamentos() {
                 const temPendenteReal = historicoParaStatus.some(c => c.decisao === 'pendente');
 
                 if (temPendenteReal) {
-                    badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
+                    badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.75rem">Em Revisão</span>`;
                 } else if (obra.status === 'Atualizado' || parseInt(obra.versao_atual?.replace(/[^0-9]/g, '')) > 1) {
                     // Badge Azul solicitado
                     badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
@@ -425,7 +425,7 @@ function renderizarOrcamentos() {
                             <div>
                                 <div class="d-flex align-items-center flex-wrap">
                                     <span class="fw-bold text-dark" style="font-size:0.95rem;">${escapeHTML(obra.nome_obra)}</span>
-                                    <span class="badge bg-secondary ms-2" style="font-size:0.7rem;">${obra.versao_atual}</span>
+                                    <span class="badge bg-secondary ms-2" style="font-size:0.75rem;">${obra.versao_atual}</span>
                                     ${badgeStatus}
                                 </div>
                                 <div class="text-muted mt-1" style="font-size:0.75rem;">Criado em: ${dataFormatada}</div>
@@ -597,7 +597,7 @@ async function prepararComentario(id) {
         const comentarios = data.comentarios_revisao || [];
         chatContainer.innerHTML = comentarios.length ? comentarios.map(c => `
                             <div class="mb-2 border-bottom pb-1">
-                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.7rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
+                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.75rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
                                 <div style="font-size:0.8rem">${escapeHTML(c.mensagem)}</div>
                                 ${c.arquivo ? `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
                             </div>`).join('') : '<em class="text-muted">Sem mensagens.</em>';

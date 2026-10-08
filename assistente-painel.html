@@ -6,7 +6,8 @@
 <title>Painel do Assistente · GECOPE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
 <!-- F7: painel de uso/falhas do Assistente de Dados. Mesmo login do GECOPE de
      assistente.html (config.js/database.js); sem checagem de cargo por
      decisão do usuário (05/09/2026) — revisitar na F8. -->
@@ -17,13 +18,13 @@
 <style>
   :root {
     --bg-page: #ffffff;
-    --bg-card-usuario: #f2f2f0;
-    --border-soft: #e8e8e5;
-    --text-primary: #262624;
-    --text-secondary: #6b6b68;
-    --text-tertiary: #9c9c98;
-    --accent: #4f46e5;
-    --accent-soft: #eef0fd;
+    --bg-card-usuario: var(--gc-slate-100);
+    --border-soft: var(--gc-slate-200);
+    --text-primary: var(--gc-slate-900);
+    --text-secondary: var(--gc-slate-600);
+    --text-tertiary: var(--gc-slate-500);
+    --accent: var(--gc-acao);
+    --accent-soft: var(--gc-acao-suave);
     --erro-texto: #b3261e;
     --erro-fundo: #fdf2f2;
     --erro-borda: #f5c2c2;
@@ -67,7 +68,7 @@
     min-height: 100%;
     background: var(--bg-page);
     color: var(--text-primary);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
   .topbar { border-bottom: 1px solid var(--border-soft); }

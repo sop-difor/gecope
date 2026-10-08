@@ -482,7 +482,7 @@ async function salvarChecklistAditivo() {
 
     const btn = document.getElementById('btn-finalizar-checklist');
     btn.disabled = true;
-    btn.innerHTML = 'SALVANDO...';
+    btn.innerHTML = 'Salvando...';
 
     const { error } = await sbClient.from('checklist_documentacao_aditivo').insert([payload]);
 

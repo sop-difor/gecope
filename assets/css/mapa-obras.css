@@ -105,7 +105,7 @@
   :root:not(.theme-dark){
     /* acento verde institucional — moderado, não neon. Variantes "de texto"
        (--ng-light/--ng-mid) mais escuras para legibilidade (AA). */
-    --ng:#0C8A5C; --ng-light:#0A6E49; --ng-mid:#0A6E49; --ng-deep:#0A5C40; --ng-rgb:12,138,92;
+    --ng:#007233; --ng-light:#005A29; --ng-mid:#005A29; --ng-deep:#004A22; --ng-rgb:0,114,51; /* verde único (B1/B4): mesmo --gc-acao de shared/tokens.css */
 
     --amber:#C0791A; --amber-text:#87540F; --amber-text-2:#87540F; --amber-deep:#8A3D12; --amber-rgb:192,121,26;
 
@@ -161,7 +161,7 @@
     --text-base:#26382F; --text-bright:#16261F; --text-brightest:#0C1912; --text-value:#20342B;
     --text-muted:#3F5A4E; --text-label:#42604F; --text-dim:#48604F; --text-dimmer:#4F6558;
     --text-formal:#4F6558; --text-body2:#32453C; --text-input:#1E322A; --text-data:#1B2E26;
-    --text-obj:#2B3E36; --text-chip:#32453C; --text-state-label:#2C4139; --badge-text:#0A6E49;
+    --text-obj:#2B3E36; --text-chip:#32453C; --text-state-label:#2C4139; --badge-text:#005A29;
     --lbl-count:var(--text-bright);
   }
 
@@ -201,20 +201,20 @@
      ≥ WCAG AA em toda a faixa do coroplético e ≥ 3:1 nos estados hover/seleção
      (revisor Design/UX — Etapa A). O maior destaque de nome/seleção fica
      reservado para uma etapa posterior (JS). */
-  :root:not(.theme-dark) .grp-label .lbl-name{font-weight:400;color:var(--text-bright);
+  :root:not(.theme-dark) .grp-label .lbl-name{font-weight:600;color:var(--text-brightest);
         text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink)}
-  :root:not(.theme-dark) .grp-label .lbl-count{font-weight:600;font-size:calc(var(--grpfs,10px)*.87);color:var(--lbl-count);
+  :root:not(.theme-dark) .grp-label .lbl-count{font-weight:600;font-size:max(12px,calc(var(--grpfs,12px)*.87));color:var(--lbl-count);
         text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink)}
   :root:not(.theme-dark) .mun-label .lbl-name{font-weight:500;color:var(--text-bright);
         text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
-  :root:not(.theme-dark) .mun-label .lbl-count{font-weight:600;font-size:calc(var(--munfs,9px)*.87);color:var(--lbl-count);
+  :root:not(.theme-dark) .mun-label .lbl-count{font-weight:600;font-size:max(12px,calc(var(--munfs,12px)*.87));color:var(--lbl-count);
         text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
 
   /* botão "Limpar busca e filtros": ação secundária clara — não é campo, não some.
      Ícone de redefinir (↺), não um "x" (que leria como fechar). */
   :root:not(.theme-dark) .clearf{width:auto;display:inline-flex;align-items:center;gap:7px;
         background:transparent;border:1px solid rgba(var(--raise-rgb),.18);color:var(--text-muted);
-        font-weight:600;font-size:11px;padding:6px 12px 6px 10px;border-radius:8px;margin-top:10px;transition:.15s}
+        font-weight:600;font-size:12px;padding:6px 12px 6px 10px;border-radius:8px;margin-top:10px;transition:.15s}
   :root:not(.theme-dark) .clearf::before{content:"\21BA";font-size:13px;line-height:1;opacity:.75}
   :root:not(.theme-dark) .clearf:hover{border-color:rgba(var(--ng-rgb),.45);color:var(--ng-mid);background:rgba(var(--ng-rgb),.06)}
 
@@ -222,7 +222,7 @@
      Menos "caixa dentro de caixa": títulos discretos, campos brancos com hairline,
      segmentados sem a calha cinza, mais ar entre os grupos. */
   :root:not(.theme-dark) .ctrl-head span{color:var(--text-dim)}
-  :root:not(.theme-dark) .ctrl .lbl{font-size:9.5px;letter-spacing:.5px;color:var(--text-dim);margin:2px 0 6px}
+  :root:not(.theme-dark) .ctrl .lbl{font-size:12px;letter-spacing:.5px;color:var(--text-dim);margin:2px 0 6px}
   :root:not(.theme-dark) .ctrl .fsel,
   :root:not(.theme-dark) .ctrl .msel-btn{background:#FFFFFF;border-color:rgba(var(--raise-rgb),.14)}
   :root:not(.theme-dark) .ctrl .seg{background:transparent;padding:0;gap:8px;margin-bottom:16px}
@@ -336,7 +336,7 @@
         background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));border:1px solid var(--card-border)}
   .statleg.cards .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
   .statleg.cards .sit-l{color:var(--text-muted);font-weight:600}
-  .statleg.cards .sit-v{flex-basis:100%;margin-top:4px;color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:600}
+  .statleg.cards .sit-v{flex-basis:100%;margin-top:4px;color:var(--text-bright);font-family:'Montserrat',sans-serif;font-weight:600}
   .statleg.cards .sit-p{color:var(--text-dim);font-weight:600;font-family:Montserrat,sans-serif}
   /* "Situação das obras" (#statLeg): rótulo, número e % numa linha só (pedido do
      usuário) — diferente da "Conferência da carga" (mesmas classes .statleg.cards, ver
@@ -352,9 +352,9 @@
         box-shadow:0 1px 2px rgba(0,0,0,.2),0 5px 14px rgba(0,0,0,.14)}
   /* nota metodológica de rodapé de bloco: contexto que precisa estar disponível, mas
      nunca competindo com os números acima. */
-  .foot-note{margin-top:9px;font-size:10.5px;line-height:1.45;color:var(--text-dim);font-weight:600}
+  .foot-note{margin-top:9px;font-size:12px;line-height:1.45;color:var(--text-dim);font-weight:600}
   /* "Ver os outros N" das listas de processos cortadas em 15 (restoProcsHtml) */
-  .ver-resto>summary{margin-top:9px;cursor:pointer;font-size:11px;font-weight:700;color:var(--badge-text);list-style:none}
+  .ver-resto>summary{margin-top:9px;cursor:pointer;font-size:12px;font-weight:700;color:var(--badge-text);list-style:none}
   .ver-resto>summary::-webkit-details-marker{display:none}
   .ver-resto>summary::before{content:'▸ '}
   .ver-resto[open]>summary::before{content:'▾ '}
@@ -370,9 +370,9 @@
      está certo lá. Aqui o valor é a manchete, então segue a proporção que os .kpi já
      usam na mesma tela (rótulo pequeno em caixa alta, valor grande em Space Grotesk) —
      sem isso a linha sai 12/12/12 e nada indica qual número é o principal. */
-  .statleg.cards.metricas .sit-l{font-size:10.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
+  .statleg.cards.metricas .sit-l{font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
   .statleg.cards.metricas .sit-v{font-size:17px;line-height:1.1;margin-top:5px}
-  .statleg.cards.metricas .sit-p{font-size:11px;font-weight:600}
+  .statleg.cards.metricas .sit-p{font-size:12px;font-weight:600}
 
   /* Nível 3 — ranking "Distritos Operacionais" / "Cidades": cartão compacto e discreto,
      mesma linguagem dos KPIs (superfície levemente elevada), porém menor — é área
@@ -418,16 +418,16 @@
   .mark img{height:44px;width:auto;object-fit:contain;
         filter:drop-shadow(0 3px 8px rgba(var(--shadow-rgb),.45)) drop-shadow(0 0 16px rgba(76,193,124,.3))}
   .top h1{font-family:Montserrat,sans-serif;font-size:15.5px;font-weight:800;margin:0;letter-spacing:.15px;color:var(--text-bright)}
-  .top .sub{font-family:Montserrat,sans-serif;font-size:10px;color:var(--text-dim);font-weight:700;margin-top:3px;letter-spacing:1.3px;text-transform:uppercase}
+  .top .sub{font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-dim);font-weight:700;margin-top:3px;letter-spacing:1.3px;text-transform:uppercase}
   .top .sub .formal{color:var(--text-formal);font-weight:600;text-transform:none;letter-spacing:.2px}
   .top .sub .sep{margin:0 6px;opacity:.5}
   .top-meta{margin-left:auto;display:flex;align-items:center;gap:10px}
   .synctime{display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-family:Montserrat,sans-serif}
-  .synctime .l{font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dimmer)}
-  .synctime .v{font-size:11px;font-weight:700;color:var(--text-value);font-variant-numeric:tabular-nums}
-  .synctime .warn{font-size:10px;font-weight:700;color:var(--amber-text);cursor:help}
+  .synctime .l{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dimmer)}
+  .synctime .v{font-size:12px;font-weight:700;color:var(--text-value);font-variant-numeric:tabular-nums}
+  .synctime .warn{font-size:12px;font-weight:700;color:var(--amber-text);cursor:help}
   .btn-voltar,.btn-present{display:flex;align-items:center;gap:7px;background:rgba(var(--raise-rgb),.05);border:1px solid rgba(var(--raise-rgb),.14);
-        color:var(--text-base);border-radius:10px;padding:8px 13px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;
+        color:var(--text-base);border-radius:10px;padding:8px 13px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;
         cursor:pointer;flex:none;transition:.15s}
   .btn-voltar:hover,.btn-present:hover{border-color:rgba(var(--ng-rgb),.4);color:var(--text-brightest);background:rgba(var(--ng-rgb),.08)}
   .btn-present.on{border-color:rgba(var(--ng-rgb),.5);color:var(--ng-light);background:rgba(var(--ng-rgb),.14)}
@@ -450,7 +450,7 @@
   .embutido header.top{display:none}
   body.presentation header.top{padding:19px 30px}
   body.presentation .top h1{font-size:17px}
-  body.presentation .top .sub{font-size:10.5px}
+  body.presentation .top .sub{font-size:12px}
   body.presentation .crumb{font-size:13.5px;padding:9px 18px}
   body.presentation .obra .ob{font-size:13px}
   /* tamanho dos valores de KPI em modo apresentação (sempre ativo nesta página)
@@ -492,11 +492,11 @@
   .ctrl-toggle svg line,.ctrl-toggle svg rect,.aside-toggle svg line,.aside-toggle svg rect{stroke:var(--ng-light)}
   .aside-toggle{right:14px}
   .aside-head{display:flex;align-items:center;justify-content:space-between;margin:-2px 0 12px}
-  .aside-head span{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-label)}
+  .aside-head span{font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-label)}
   .leaflet-container{background:var(--map-field);font-family:inherit}
   .leaflet-tooltip{background:var(--bg-panel);border:1px solid rgba(var(--ng-rgb),.3);color:var(--text-bright);box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
   .leaflet-tooltip:before{border-top-color:rgba(var(--ng-rgb),.3)}
-  .leaflet-tooltip .tip-sub{display:block;margin-top:3px;font-size:11px;font-weight:600;color:var(--text-dim)}
+  .leaflet-tooltip .tip-sub{display:block;margin-top:3px;font-size:12px;font-weight:600;color:var(--text-dim)}
   /* Legenda da escala do modo Replanilhamentos. Reproduz a pintura do polígono em vez de
      inventar cor: a cor-base do mapa na opacidade de piso e de teto da coroplética
      (--choro-floor/--choro-span, os mesmos que o JS lê), sobre o campo do mapa. */
@@ -507,16 +507,16 @@
         background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);border:1px solid rgba(var(--raise-rgb),.12);
         border-radius:11px;padding:10px 12px 11px;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);color:var(--text-base)}
   .rp-legenda[hidden]{display:none}
-  .rp-leg-t{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-label);line-height:1.35}
-  .rp-leg-s{font-size:10px;font-weight:600;color:var(--text-dim);margin:2px 0 8px}
+  .rp-leg-t{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-label);line-height:1.35}
+  .rp-leg-s{font-size:12px;font-weight:600;color:var(--text-dim);margin:2px 0 8px}
   .rp-leg-bar{height:10px;border-radius:5px;background-color:var(--map-field);
         background-image:linear-gradient(90deg,
           color-mix(in srgb,var(--map-base) calc(var(--choro-floor)*100%),transparent),
           color-mix(in srgb,var(--map-base) calc((var(--choro-floor) + var(--choro-span))*100%),transparent));
         box-shadow:inset 0 0 0 1px rgba(var(--raise-rgb),.12)}
-  .rp-leg-esc{display:flex;justify-content:space-between;margin-top:4px;font-family:'Space Grotesk',sans-serif;
-        font-size:10.5px;font-weight:600;color:var(--text-dim)}
-  .rp-leg-item{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  .rp-leg-esc{display:flex;justify-content:space-between;margin-top:4px;font-family:'Montserrat',sans-serif;
+        font-size:12px;font-weight:600;color:var(--text-dim)}
+  .rp-leg-item{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;font-weight:600;color:var(--text-dim)}
   /* a amostra da legenda repete o polígono: tracejado + cinza, não só cinza */
   .rp-leg-sw{width:16px;height:10px;border-radius:3px;flex:none;border:1px dashed var(--amostra-border);
         background:color-mix(in srgb,var(--amostra-fill) calc(var(--amostra-opacity)*100%),var(--map-field))}
@@ -538,11 +538,11 @@
   .ctrl.show{display:block}
   .ctrl-toggle{left:14px}
   .ctrl-head{display:flex;align-items:center;justify-content:space-between;margin:-2px 0 12px}
-  .ctrl-head span{font-size:10.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label)}
+  .ctrl-head span{font-size:12px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label)}
   .ctrl-close{border:1px solid rgba(var(--raise-rgb),.14);background:rgba(var(--raise-rgb),.05);color:var(--text-base);border-radius:8px;
         width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1;display:grid;place-items:center;padding:0}
   .ctrl-close:hover{border-color:rgba(var(--ng-rgb),.4);color:var(--text-brightest)}
-  .lbl{font-size:10.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label);margin:3px 0 8px}
+  .lbl{font-size:12px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label);margin:3px 0 8px}
   /* "Filtros" + botão "+" (recolhe/expande as ~14 multi-seleções) */
   .lbl-filtros{display:flex;align-items:center;gap:8px}
   .filt-toggle{flex:none;width:18px;height:18px;line-height:1;padding:0;display:grid;place-items:center;
@@ -560,7 +560,7 @@
   .seg[hidden]{display:none}
   /* aviso do seletor de modo — âmbar, contido, nunca modal. [hidden] explícito pelo
      mesmo motivo do .seg acima. */
-  .modo-aviso{margin:0 0 14px;padding:8px 10px;border-radius:8px;font-size:11px;line-height:1.5;
+  .modo-aviso{margin:0 0 14px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;
         font-weight:600;color:var(--amber-text);background:rgba(var(--amber-rgb),.10);
         border:1px solid rgba(var(--amber-rgb),.28)}
   .modo-aviso[hidden]{display:none}
@@ -572,8 +572,8 @@
   .seg button:disabled{cursor:not-allowed;opacity:.5}
   /* 3–4 botões por linha num painel de 296px: sem isto "Tempo médio" quebra em duas
      linhas no tema claro (gap maior) e o segmento fica com alturas desiguais. */
-  #ctrlReplan .seg button{white-space:nowrap;padding-left:2px;padding-right:2px;font-size:11.5px}
-  .ctrl-nota{margin:-6px 0 14px;font-size:10.5px;line-height:1.45;font-weight:600;color:var(--text-dim)}
+  #ctrlReplan .seg button{white-space:nowrap;padding-left:2px;padding-right:2px;font-size:12px}
+  .ctrl-nota{margin:-6px 0 14px;font-size:12px;line-height:1.45;font-weight:600;color:var(--text-dim)}
   .ctrl-nota:empty{display:none}
   .seg button{flex:1;border:0;background:transparent;font-family:inherit;font-size:12px;font-weight:600;color:var(--text-muted);
               padding:8px 4px;border-radius:7px;cursor:pointer;transition:.15s}
@@ -582,26 +582,26 @@
         border-radius:8px;padding:8px 9px;font-family:inherit;font-size:12.5px;margin-bottom:8px}
   .fsel option{color:var(--text-on-light)}
   .clearf{border:1px solid rgba(var(--ng-rgb),.25);background:rgba(var(--ng-rgb),.10);color:var(--ng-light);font-family:inherit;
-          font-weight:600;font-size:11.5px;padding:7px 10px;border-radius:8px;cursor:pointer;width:100%}
+          font-weight:600;font-size:12px;padding:7px 10px;border-radius:8px;cursor:pointer;width:100%}
 
   .msel{position:relative;margin-bottom:8px}
   .msel-btn{width:100%;text-align:left;background:rgba(var(--raise-rgb),.05);border:1px solid rgba(var(--raise-rgb),.1);color:var(--text-input);
         border-radius:8px;padding:8px 26px 8px 9px;font-family:inherit;font-size:12.5px;cursor:pointer;position:relative}
-  .msel-btn:after{content:'▾';position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--text-label);font-size:10px}
+  .msel-btn:after{content:'▾';position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--text-label);font-size:12px}
   .msel.on .msel-btn{border-color:rgba(var(--ng-rgb),.4)}
   .msel-btn .cnt{color:var(--ng-light);font-weight:700}
   .msel-panel{display:none;position:absolute;z-index:20;top:calc(100% + 4px);left:0;width:100%;max-height:200px;overflow:auto;
         background:var(--bg-modal);border:1px solid rgba(var(--ng-rgb),.25);border-radius:9px;box-shadow:0 14px 34px rgba(var(--shadow-rgb),.5);padding:6px}
   .msel.on .msel-panel{display:block}
-  .msel-opt{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:11.5px;color:var(--text-input)}
+  .msel-opt{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text-input)}
   .msel-opt:hover{background:rgba(var(--ng-rgb),.10)}
   .msel-opt input{accent-color:var(--ng);margin:0}
   .msel-opt.hide{display:none}
-  .msel-empty{font-size:11px;color:var(--text-dim);padding:5px 6px}
-  .msel-query{display:none;font-size:10px;font-weight:700;color:var(--ng-light);padding:1px 6px 7px;margin-bottom:5px;
+  .msel-empty{font-size:12px;color:var(--text-dim);padding:5px 6px}
+  .msel-query{display:none;font-size:12px;font-weight:700;color:var(--ng-light);padding:1px 6px 7px;margin-bottom:5px;
         border-bottom:1px dashed rgba(var(--raise-rgb),.12)}
   .msel-query.show{display:block}
-  .msel-noresult{display:none;font-size:11px;color:var(--text-dim);padding:5px 6px}
+  .msel-noresult{display:none;font-size:12px;color:var(--text-dim);padding:5px 6px}
   .msel-noresult.show{display:block}
   /* Etapa C: campo cujo domínio está vazio no recorte atual — desabilitado, não some.
      .55 mantém o nome do campo legível; o estado desabilitado + cursor comunicam a inação
@@ -621,8 +621,8 @@
     color:var(--ng-light);background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.35);transition:.15s}
   .fchip:hover{background:rgba(var(--status-stop-rgb),.16);border-color:rgba(var(--status-stop-rgb),.5);color:var(--status-stop-text)}
   .fchip:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
-  .fchip .x{font-size:11px;line-height:1;padding:2px 2px;margin:-2px -3px -2px 0}
-  .fchip-clear{border:0;background:none;color:var(--text-dim);font-family:inherit;font-size:10.5px;font-weight:700;
+  .fchip .x{font-size:12px;line-height:1;padding:2px 2px;margin:-2px -3px -2px 0}
+  .fchip-clear{border:0;background:none;color:var(--text-dim);font-family:inherit;font-size:12px;font-weight:700;
     text-decoration:underline;cursor:pointer;padding:4px 4px}
   .fchip-clear:hover{color:var(--ng-light)}
   .ctrl-toggle.has-filters::after{content:'';position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;
@@ -645,7 +645,7 @@
      é clicável além de informativo */
   .crumb a.sib{display:inline-flex;align-items:center;gap:3px;min-width:0}
   .crumb a.sib .sib-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-  .crumb a.sib .sib-caret{font-size:9px;opacity:.55;transform:translateY(1px);flex:none}
+  .crumb a.sib .sib-caret{font-size:12px;opacity:.55;transform:translateY(1px);flex:none}
   .crumb a.sib:hover .sib-caret{opacity:1}
   /* pedido do usuário: lista maior pra ver mais irmãos sem precisar rolar tanto —
      era 260x280 (min com 60vh); largura/altura em assets/js/mapa-obras.js
@@ -683,7 +683,7 @@
   .crumb-pop .sec-h{flex:none;margin:0;padding:10px 10px 8px;cursor:move;user-select:none}
   .crumb-pop .pop-body{flex:1;min-height:0;overflow:auto;padding:0 10px 10px}
   /* de qual recorte saíram os números da lista (só no modo Replanilhamentos) */
-  .crumb-pop .pop-sub{padding:0 10px 8px;margin-top:-8px;font-size:10px}
+  .crumb-pop .pop-sub{padding:0 10px 8px;margin-top:-8px;font-size:12px}
   .crumb-pop .resize-grip{position:absolute;right:1px;bottom:1px;width:18px;height:18px;
         cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end;
         padding:2px;opacity:.5;transition:opacity .15s}
@@ -701,12 +701,12 @@
      E11 (2026-09-21) — nome do DISTRITO (grp-label) pediu peso normal (400), não 500:
      usuário ainda lia como negrito. Nome do MUNICÍPIO (mun-label, rótulo bem menor, 9px)
      segue em 500 — não foi pedido e um corpo tão pequeno em 400 perderia peso demais. */
-  .mun-label .lbl-name{font-size:var(--munfs,9px);font-weight:500;color:var(--text-brightest);text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink),0 1px 2px var(--shadow-ink)}
-  .mun-label .lbl-count{font-size:calc(var(--munfs,9px)*.82);font-weight:600;color:var(--lbl-count);letter-spacing:0;font-variant-numeric:tabular-nums;
+  .mun-label .lbl-name{font-size:max(12px,var(--munfs,12px));font-weight:500;color:var(--text-brightest);text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink),0 1px 2px var(--shadow-ink)}
+  .mun-label .lbl-count{font-size:max(12px,calc(var(--munfs,12px)*.82));font-weight:600;color:var(--lbl-count);letter-spacing:0;font-variant-numeric:tabular-nums;
                   text-shadow:0 0 2px var(--shadow-ink),0 0 2px var(--shadow-ink)}
-  .grp-label .lbl-name{font-size:var(--grpfs,10px);font-weight:400;letter-spacing:0;color:var(--text-brightest);text-transform:none;
+  .grp-label .lbl-name{font-size:max(12px,var(--grpfs,12px));font-weight:600;letter-spacing:0;color:var(--text-brightest);text-transform:none;
                   text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink);text-align:center;line-height:1.15}
-  .grp-label .lbl-count{font-size:calc(var(--grpfs,10px)*.8);font-weight:600;letter-spacing:0;color:var(--lbl-count);text-transform:none;font-variant-numeric:tabular-nums;
+  .grp-label .lbl-count{font-size:max(12px,calc(var(--grpfs,12px)*.8));font-weight:600;letter-spacing:0;color:var(--lbl-count);text-transform:none;font-variant-numeric:tabular-nums;
                   text-shadow:0 0 3px var(--shadow-ink),0 0 3px var(--shadow-ink)}
   aside b,.modal b{font-weight:600}
   /* E8 — o botão Carteira ativa/Histórico completo só troca o conjunto de OBRAS; nenhuma
@@ -718,7 +718,7 @@
      escala de peso a default dos dois modos (ver --ng em :root e .mun-label/.grp-label
      acima); E11 (2026-09-21) tirou a rampa âmbar do mapa — ver --map-warm em :root. O que
      sobra aqui é só a Legenda, elemento que só existe no modo Replanilhamentos. */
-  body.modo-rp .rp-leg-t{font-weight:600;font-size:11.5px;letter-spacing:0;text-transform:none}
+  body.modo-rp .rp-leg-t{font-weight:600;font-size:12px;letter-spacing:0;text-transform:none}
   body.modo-rp .rp-leg-bar{height:8px;border-radius:4px}
   body.modo-rp .rp-leg-esc{font-weight:500}
 
@@ -732,7 +732,7 @@
   aside::-webkit-scrollbar{width:8px}
   aside::-webkit-scrollbar-thumb{background:rgba(var(--ng-rgb),.2);border-radius:8px}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
-  .live{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-label);margin-bottom:18px}
+  .live{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--text-label);margin-bottom:18px}
   .live .d{width:7px;height:7px;border-radius:50%;background:var(--ng);box-shadow:0 0 10px var(--ng);animation:pulse 1.6s infinite}
   .kpis{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   /* `display` de autor vence o [hidden] da folha do navegador por ORIGEM, não
@@ -751,14 +751,14 @@
        column-gap:12px;align-items:start;
        background:linear-gradient(180deg,var(--card-bg),var(--card-bg-2));border:1px solid var(--card-border);
        transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
-  .kpi .k{grid-area:k;font-size:10.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
+  .kpi .k{grid-area:k;font-size:12px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--text-label)}
   /* o ícone fica centralizado (alinhado ao valor); nos cards compactos o rótulo é um
      pouco menor para caber numa linha ao lado do espaço do ícone */
-  .kpi.k-par .k,.kpi.k-medio .k,.kpi.k-mun .k,.kpi.k-adit .k{font-size:9.5px;letter-spacing:.1px}
-  .kpi .v{grid-area:v;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:var(--text-brightest);margin-top:8px;line-height:1}
+  .kpi.k-par .k,.kpi.k-medio .k,.kpi.k-mun .k,.kpi.k-adit .k{font-size:12px;letter-spacing:.1px}
+  .kpi .v{grid-area:v;font-family:'Montserrat',sans-serif;font-size:19px;font-weight:600;color:var(--text-brightest);margin-top:8px;line-height:1}
   /* KPIs "nível 1" (.k-obras/.k-valor) e o número em vermelho de Paralisadas (.k-par)
      ficam no bloco da Rodada 3.2/Parte B, mais acima. */
-  body.presentation .kpi .k{font-size:11px}
+  body.presentation .kpi .k{font-size:12px}
   /* KPIs do modo Replanilhamentos: mesmo cartão dos KPIs de Obras, sem ícone e com uma
      terceira linha de contexto — a média nunca aparece sem o tamanho da amostra ao lado,
      e as contagens nunca sem o período. O grid próprio evita mexer no dos KPIs de Obras,
@@ -774,7 +774,7 @@
   .kpi-rp::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
         background:linear-gradient(var(--ng),var(--ng-deep))}
   .kpi-rp .v{font-size:21px;margin-top:7px;text-shadow:0 0 16px rgba(var(--ng-rgb),.22)}
-  .kpi-rp .ks{grid-area:s;margin-top:6px;font-family:Montserrat,sans-serif;font-size:10.5px;
+  .kpi-rp .ks{grid-area:s;margin-top:6px;font-family:Montserrat,sans-serif;font-size:12px;
         line-height:1.35;font-weight:600;color:var(--text-dim)}
   /* botão "i" ao lado do rótulo: abre a explicação do número (mostraRpTip). Discreto de
      propósito — é apoio ao número, não pode competir com ele. Ícone SVG (RS_ICO.info,
@@ -792,9 +792,9 @@
      de apoio, em corpo menor que o total; status zerado recua para não competir. */
   .statleg.cards .sit-gec .sit-v{font-size:17px}
   .gec-lista{flex-basis:100%;margin-top:9px;padding-top:6px;border-top:1px solid var(--card-border)}
-  .gec-st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0;font-size:11px}
+  .gec-st{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0;font-size:12px}
   .gec-st span{color:var(--text-muted);font-weight:600;letter-spacing:.2px}
-  .gec-st b{color:var(--text-bright);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12.5px}
+  .gec-st b{color:var(--text-bright);font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px}
   .gec-st.zero span,.gec-st.zero b{color:var(--text-dim);font-weight:500}
   /* "GECOPE × Fiscalização": os dois lados da fila, lado a lado a partir de ~420px de
      largura do painel; empilhados abaixo disso (mesmo breakpoint do restante do painel). */
@@ -823,11 +823,11 @@
         box-shadow:inset 0 0 0 999px rgba(var(--ng-rgb),.10),
                    0 0 0 1px rgba(var(--ng-rgb),.32),
                    0 3px 8px rgba(0,0,0,.32),0 14px 32px rgba(0,0,0,.26)}
-  .gxf-h{display:flex;align-items:baseline;gap:7px;font-size:11px;font-weight:700;
+  .gxf-h{display:flex;align-items:baseline;gap:7px;font-size:12px;font-weight:700;
         letter-spacing:.2px;text-transform:uppercase;color:var(--text-label)}
-  .gxf-h b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  .gxf-h b{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:700;
         text-transform:none;letter-spacing:0;color:var(--text-brightest);margin-left:auto}
-  .gxf-pct{font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;
+  .gxf-pct{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;
         text-transform:none;letter-spacing:0;color:var(--text-dim)}
   .gxf-grp .gec-lista{margin-top:8px;padding-top:7px}
   /* Sempre empilhado (anel em cima, legenda embaixo) — não em linha: mesmo com o aside
@@ -845,22 +845,22 @@
   .donut-seg.atraso{stroke:var(--amber)}
   .donut-seg.noprazo{stroke:var(--ng)}
   .donut-seg.semprazo{stroke:rgba(var(--raise-rgb),.55)}
-  .donut-ctr{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;fill:var(--text-brightest)}
+  .donut-ctr{font-family:'Montserrat',sans-serif;font-size:19px;font-weight:700;fill:var(--text-brightest)}
   .donut-leg{display:flex;flex-direction:column;gap:6px;width:100%;min-width:0}
-  .donut-leg-i{display:flex;align-items:center;gap:7px;font-size:11px}
+  .donut-leg-i{display:flex;align-items:center;gap:7px;font-size:12px}
   .donut-dot{width:9px;height:9px;border-radius:50%;flex:none}
   .donut-dot.atraso{background:var(--amber)}
   .donut-dot.noprazo{background:var(--ng)}
   .donut-dot.semprazo{background:rgba(var(--raise-rgb),.55)}
   .donut-leg-l{color:var(--text-muted);font-weight:600;flex:1;min-width:0}
-  .donut-leg-v{font-family:'Space Grotesk',sans-serif;font-weight:600;color:var(--text-bright);white-space:nowrap}
-  .donut-leg-p{font-family:Montserrat,sans-serif;font-weight:600;color:var(--text-dim);font-size:10px}
+  .donut-leg-v{font-family:'Montserrat',sans-serif;font-weight:600;color:var(--text-bright);white-space:nowrap}
+  .donut-leg-p{font-family:Montserrat,sans-serif;font-weight:600;color:var(--text-dim);font-size:12px}
   @media (max-width:420px){
     .gxf{grid-template-columns:1fr}
   }
   .kpi-tip{position:fixed;z-index:3000;max-width:260px;padding:9px 11px;border-radius:9px;
         background:var(--bg-panel);border:1px solid rgba(var(--ng-rgb),.3);color:var(--text-bright);
-        font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.45;font-weight:500;
+        font-family:Montserrat,sans-serif;font-size:12px;line-height:1.45;font-weight:500;
         text-align:justify;pointer-events:none;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
   .kpi-tip p{margin:0 0 7px}
   .kpi-tip p:last-child{margin-bottom:0}
@@ -870,7 +870,7 @@
   .kpi-tip-h{display:flex;align-items:center;justify-content:space-between;gap:10px;
         margin:0 0 7px;padding-bottom:7px;border-bottom:1px solid var(--card-border)}
   .kpi-tip-h b{font-size:12px;font-weight:700;color:var(--text-brightest);line-height:1.3;text-align:left}
-  .kpi-tip-chip{flex:none;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;
+  .kpi-tip-chip{flex:none;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;
         letter-spacing:.2px;white-space:nowrap;color:var(--ng-light);background:rgba(var(--ng-rgb),.14)}
   :root:not(.theme-dark) .kpi-tip-chip{color:var(--badge-text)}
   /* Tooltip da bolinha do eixoDias() (mostraEdTip): mesma casca do .kpi-tip, texto curto
@@ -879,7 +879,7 @@
   /* linha de recorte sob um .sec-h: de onde vêm os números da seção (período, régua,
      ordem). Encosta no cabeçalho, em corpo menor que o conteúdo que anuncia. */
   .sec-sub,.crumb-pop .pop-sub{line-height:1.4;font-weight:600;color:var(--text-dim)}
-  .sec-sub{margin:-6px 0 11px;font-size:10.5px}
+  .sec-sub{margin:-6px 0 11px;font-size:12px}
   /* Fiscais · tempo médio em "pirulitos" (2026-10-05, no lugar das barras do E4): nome | haste e
      ponto | tempo. As linhas encostam umas nas outras (sem margem) de propósito — cada uma desenha
      o seu trecho de .fq-media e, juntos, formam UMA linha vertical de média atravessando a lista.
@@ -891,8 +891,8 @@
   .fq-row:hover{background:rgba(var(--ng-rgb),.07)}
   .fq-row:focus-visible{outline:2px solid var(--ng);outline-offset:-2px}
   .fq-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-        font-size:11.5px;font-weight:600;color:var(--text-bright)}
-  .fq-v{text-align:right;white-space:nowrap;font-family:'Space Grotesk',sans-serif;
+        font-size:12px;font-weight:600;color:var(--text-bright)}
+  .fq-v{text-align:right;white-space:nowrap;font-family:'Montserrat',sans-serif;
         font-size:12.5px;font-weight:600;color:var(--text-brightest)}
   .fq-row.amber .fq-v{color:var(--amber-text)}
   /* margin-right = raio do maior ponto (7px): a posição 100% não deixa o ponto vazar da coluna */
@@ -908,7 +908,7 @@
   .fq-cab{height:19px}
   .fq-cab .fq-media{top:16px}
   .fq-media-r{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;
-        font-size:10px;font-weight:700;color:var(--text-dim);pointer-events:none}
+        font-size:12px;font-weight:700;color:var(--text-dim);pointer-events:none}
   .fq-media-r.ini{transform:translateX(-3px)}
   .fq-media-r.fim{transform:translateX(calc(-100% + 3px))}
   /* busca de fiscal: quem casa fica em destaque, o resto do grupo esmaece (mas continua lá,
@@ -917,20 +917,20 @@
   .fq-row.dim .fq-nome,.fq-row.dim .fq-haste,.fq-row.dim .fq-ponto,.fq-row.dim .fq-v{opacity:.3}
   /* resumo: as duas contagens são também a legenda de cor dos pontos */
   .fq-resumo{display:flex;flex-wrap:wrap;gap:4px 16px;margin:0 0 6px}
-  .fq-chave{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--text-muted)}
+  .fq-chave{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-muted)}
   .fq-chave i{width:8px;height:8px;border-radius:50%;background:var(--ng)}
   .fq-chave.amber i{background:var(--amber)}
-  .fq-chave b{font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--text-brightest)}
+  .fq-chave b{font-family:'Montserrat',sans-serif;font-size:13px;color:var(--text-brightest)}
   .fq-sep{height:1px;margin:4px 8px;background:var(--card-border)}
   /* "N fiscais entre eles": tracejado dos dois lados diz que a lista continua, e é o próprio botão */
   .fq-toggle{font:inherit;cursor:pointer;color:var(--text-dim);transition:color .14s ease,background .14s ease,border-color .14s ease}
   .fq-toggle:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
   .fq-gap{display:flex;align-items:center;gap:10px;width:100%;height:26px;padding:0 8px;
-        background:none;border:0;font-size:10.5px;font-weight:600}
+        background:none;border:0;font-size:12px;font-weight:600}
   .fq-gap::before,.fq-gap::after{content:'';flex:1;border-top:1px dashed rgba(var(--raise-rgb),.28)}
   .fq-gap:hover{color:var(--text-brightest)}
   .fq-fim{display:block;width:100%;height:30px;margin-top:8px;border:1px solid var(--card-border);
-        border-radius:8px;background:none;font-size:11px;font-weight:700;color:var(--ng-light)}
+        border-radius:8px;background:none;font-size:12px;font-weight:700;color:var(--ng-light)}
   .fq-fim:hover{background:rgba(var(--ng-rgb),.07);border-color:rgba(var(--ng-rgb),.3);color:var(--text-brightest)}
   @media (max-width:480px){ .fq-lista{--fq-nome:104px;--fq-val:68px} }
   /* Lista de processos (nível da cidade). Não é navegável — a janela do processo é de
@@ -940,13 +940,14 @@
   :root:not(.theme-dark) .proc{box-shadow:0 1px 3px rgba(var(--shadow-rgb),.10)}
   .proc.meta{border-color:rgba(var(--amber-rgb),.38)}
   .proc-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-  .proc-n{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--text-bright)}
+  .proc-n{font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:700;color:var(--text-bright)}
   .proc-id{display:inline-flex;align-items:center;gap:6px;min-width:0}
   /* botão "ficha da obra" ao lado do número do processo — só ícone, discreto até o foco/passar o mouse */
   .fichaBtn{flex:none;display:inline-grid;place-items:center;width:24px;height:24px;margin:-4px 0;padding:0;
         border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text-label);cursor:pointer;
         transition:color .15s,border-color .15s,background .15s}
   .fichaBtn svg{width:15px;height:15px}
+  a.fichaBtn{text-decoration:none}
   .fichaBtn:hover{color:var(--ng-light);border-color:rgba(var(--ng-rgb),.4);background:rgba(var(--ng-rgb),.08)}
   .fichaBtn:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
   .fichaBtn[aria-disabled="true"]{opacity:.38;cursor:not-allowed}
@@ -955,14 +956,14 @@
   @keyframes procVolta{from{box-shadow:0 0 0 2px rgba(var(--ng-rgb),.75);background-color:rgba(var(--ng-rgb),.16)}
         to{box-shadow:0 0 0 2px rgba(var(--ng-rgb),0);background-color:rgba(var(--ng-rgb),0)}}
   .proc-volta{animation:procVolta 2.4s ease-out}
-  .proc-s{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-label);
+  .proc-s{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-label);
         white-space:nowrap;flex:none}
-  .proc-o{font-family:Montserrat,sans-serif;font-size:11.5px;line-height:1.4;color:var(--text-obj);margin-top:5px;
+  .proc-o{font-family:Montserrat,sans-serif;font-size:12px;line-height:1.4;color:var(--text-obj);margin-top:5px;
         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .proc-m{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:10.5px;font-weight:600;
+  .proc-m{display:flex;justify-content:space-between;gap:10px;margin-top:7px;font-size:12px;font-weight:600;
         color:var(--text-dim);font-family:Montserrat,sans-serif}
   .proc-m span:last-child{text-align:right;flex:none}
-  .proc-meta{margin-top:7px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--amber-text)}
+  .proc-meta{margin-top:7px;font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--amber-text)}
   .scope{font-size:12.5px;color:var(--text-label);margin:22px 0 12px;font-weight:600;letter-spacing:.3px}
   .scope b{color:var(--text-brightest)}
 
@@ -976,8 +977,8 @@
   .statleg{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px}
   .statleg .sit{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted);font-weight:600}
   .statleg .sit .dot{width:8px;height:8px;border-radius:50%;flex:none}
-  .statleg .sit b{color:var(--text-brightest);font-family:'Space Grotesk',sans-serif;font-weight:700}
-  .sec-h{font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);margin:26px 0 12px;display:flex;justify-content:space-between}
+  .statleg .sit b{color:var(--text-brightest);font-family:'Montserrat',sans-serif;font-weight:700}
+  .sec-h{font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--text-dim);margin:26px 0 12px;display:flex;justify-content:space-between}
   /* "Contratos por ano de assinatura" — barras em HTML/flex (não mais SVG esticado):
      texto sem distorção, valor acima de cada barra, trilho de fundo, ano de pico
      em destaque. Cores vêm dos tokens, então acompanha os dois temas. Selector geral
@@ -987,11 +988,11 @@
      barra nenhuma, achado do usuário em 25/09/2026). */
   .ychart{position:relative;display:flex;align-items:flex-end;gap:6px;height:96px;padding-top:14px}
   .ycol{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
-  .ycol .yval{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;color:var(--text-dim);line-height:1;min-height:11px}
+  .ycol .yval{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;color:var(--text-dim);line-height:1;min-height:11px}
   .ycol .ytrack{flex:1;width:100%;max-width:32px;display:flex;align-items:flex-end;
         background:rgba(var(--raise-rgb),.06);border-radius:5px 5px 0 0;overflow:hidden}
   .ycol .ybar{width:100%;background:linear-gradient(180deg,var(--ng),var(--ng-deep));border-radius:5px 5px 0 0;transition:filter .15s}
-  .ycol .ylab{font-size:9px;font-weight:600;color:var(--text-dimmer);letter-spacing:.2px;line-height:1}
+  .ycol .ylab{font-size:12px;font-weight:600;color:var(--text-dimmer);letter-spacing:.2px;line-height:1}
   .ycol.peak .yval{color:var(--ng)}
   .ycol:hover .ybar{filter:brightness(1.08)}
   .ycol:hover .yval{color:var(--text-brightest)}
@@ -1003,7 +1004,7 @@
   /* sem background própria (evitaria adivinhar a cor do card por trás — .ychart aparece
      tanto no painel principal quanto dentro do modal, cada um com seu fundo): o texto
      pequeno e o azul de --status-exec já se distinguem das barras verdes por baixo. */
-  .ymedia-lbl{position:absolute;right:0;top:-13px;font-family:'Space Grotesk',sans-serif;font-size:8.5px;font-weight:700;
+  .ymedia-lbl{position:absolute;right:0;top:-13px;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;
         color:var(--status-exec);white-space:nowrap}
 
   /* skeleton: placeholder neutro nos KPIs/gráficos enquanto a 1ª carga de dados ainda
@@ -1041,8 +1042,8 @@
   .rrow:hover{border-color:rgba(var(--ng-rgb),.35);box-shadow:0 0 0 1px rgba(var(--ng-rgb),.15)}
   .rrow .t{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px}
   .rrow .nm{color:var(--text-bright);font-weight:500}
-  .rrow .sub2{color:var(--text-dim);font-size:11.5px;font-weight:600}
-  .rrow .vv{font-family:'Space Grotesk',sans-serif;color:var(--ng-light);font-weight:600}
+  .rrow .sub2{color:var(--text-dim);font-size:12px;font-weight:600}
+  .rrow .vv{font-family:'Montserrat',sans-serif;color:var(--ng-light);font-weight:600}
   .rrow.warm .vv{color:var(--amber-text)}
   .rbar{position:relative;height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.07);margin-top:9px;overflow:hidden}
   .rbar>i{display:block;height:100%;background:linear-gradient(90deg,var(--ng),var(--ng-deep))}
@@ -1077,8 +1078,8 @@
         appearance:none;-webkit-appearance:none;font:inherit;text-align:left;width:100%;color:inherit}
   .eri-txt{display:flex;flex-direction:column;gap:6px;min-width:0}
   .ele-resumo-i .l{display:inline-flex;align-items:center;gap:7px;font-family:Montserrat,sans-serif;
-        font-size:10px;font-weight:700;color:var(--text-label);text-transform:uppercase;letter-spacing:.4px}
-  .ele-resumo-i .v{font-family:'Space Grotesk',sans-serif;font-size:25px;font-weight:700;color:var(--text-brightest);
+        font-size:12px;font-weight:700;color:var(--text-label);text-transform:uppercase;letter-spacing:.4px}
+  .ele-resumo-i .v{font-family:'Montserrat',sans-serif;font-size:25px;font-weight:700;color:var(--text-brightest);
         line-height:1;text-shadow:0 0 16px rgba(var(--acc-rgb),.18)}
   .ele-resumo-i.ok .v{color:var(--ng-light)}
   .ele-resumo-i.warn .v{color:var(--amber-text)}
@@ -1127,7 +1128,7 @@
   .eng-row.unk .eng-nome{color:var(--text-dim);font-style:italic;font-weight:600}
   .eng-stats{flex:none;display:flex;gap:12px}
   .eng-stat{font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-dim);white-space:nowrap}
-  .eng-stat b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text-bright);margin-right:3px}
+  .eng-stat b{font-family:'Montserrat',sans-serif;font-size:17px;font-weight:700;color:var(--text-bright);margin-right:3px}
   /* "a vistoriar" (pendências por distrito) — mesmo âmbar do card "A vistoriar" do
      resumo (.ele-resumo-i.warn .v), pra ligar visualmente os dois números. */
   .eng-stat-warn b{color:var(--amber-text)}
@@ -1138,7 +1139,7 @@
   .rbar.amber>i{background:linear-gradient(90deg,var(--amber),var(--amber-deep))}
   /* aviso âmbar de "esta seção não existe neste recorte" (régua/nível) — mesmo tom do
      .modo-aviso do seletor de modo, contido dentro do .statwrap em vez de solto no topo. */
-  .qd-aviso{margin:0;padding:8px 10px;border-radius:8px;font-size:11px;line-height:1.5;
+  .qd-aviso{margin:0;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;
         font-weight:600;color:var(--amber-text);background:rgba(var(--amber-rgb),.10);
         border:1px solid rgba(var(--amber-rgb),.28)}
 
@@ -1157,11 +1158,11 @@
                    0 8px 20px rgba(var(--shadow-rgb),.28)}
   .obra .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .obra .ct{font-size:12px;font-weight:700;color:var(--ng-mid);letter-spacing:.3px}
-  .obra .vl{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--text-brightest)}
+  .obra .vl{font-family:'Montserrat',sans-serif;font-size:15px;font-weight:700;color:var(--text-brightest)}
   .obra .ob{font-size:13.5px;color:var(--text-body2);margin-top:5px;line-height:1.45}
   .obra .ob.just{text-align:justify}
   .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
-  .chip{font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid rgba(var(--raise-rgb),.12);color:var(--text-chip)}
+  .chip{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid rgba(var(--raise-rgb),.12);color:var(--text-chip)}
   .chip.tram{color:var(--amber-text-2);background:rgba(var(--amber-rgb),.12);border-color:rgba(var(--amber-rgb),.3)}
   .chip.mun{color:var(--ng-light);background:rgba(var(--ng-rgb),.10);border-color:rgba(var(--ng-rgb),.28)}
   .chip.mun.locate{cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:.15s}
@@ -1173,15 +1174,22 @@
     color:var(--ng-light);background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.35);transition:.15s}
   .chip-sel:hover{background:rgba(var(--status-stop-rgb),.16);border-color:rgba(var(--status-stop-rgb),.5);color:var(--status-stop-text)}
   .obra .info{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-top:13px;padding-top:13px;border-top:1px dashed rgba(var(--raise-rgb),.12)}
-  .obra .info .l{font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)}
+  .obra .info .l{font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)}
   .obra .info .d{font-size:13px;color:var(--text-data);font-weight:600;margin-top:3px}
   .obra .info .fis{grid-column:1/-1}
-  .obra .more{margin-top:11px;font-size:11px;font-weight:700;color:var(--ng-light);display:flex;align-items:center;gap:5px}
+  .obra .more{margin-top:11px;font-size:12px;font-weight:700;color:var(--ng-light);display:flex;align-items:center;gap:5px}
   /* modal */
   .modal-bg{position:fixed;inset:0;z-index:2000;background:rgba(3,10,7,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:24px}
   .modal-bg.show{display:flex}
   .modal{width:min(1180px,96vw);max-height:94vh;overflow:auto;background:linear-gradient(180deg,var(--bg-modal),var(--bg-modal-2));
          border:1px solid rgba(var(--ng-rgb),.25);border-radius:16px;box-shadow:0 24px 70px rgba(var(--shadow-rgb),.6);padding:0}
+  /* janela de distrito (usuário, 2026-10-07): um pouco maior nos dois sentidos que as demais */
+  .modal[data-rp-janela^="d|"]{width:min(1320px,97vw);max-height:calc(100vh - 32px)}
+  /* Replanilhamentos (usuário, 2026-10-08): janelas do distrito, do fiscal e a ficha da obra aberta a partir delas
+     ficam mais altas que o padrão — teto de 88% da tela e um piso de 78% (até 820px), para não encolherem quando o
+     conteúdo é curto. O cronograma da elétrica mantém o piso próprio (regra mais específica, mais abaixo). */
+  body.modo-rp .modal-bg{padding:24px}
+  body.modo-rp .modal{max-height:88vh;min-height:min(78vh,820px)}
   .modal::-webkit-scrollbar{width:8px}.modal::-webkit-scrollbar-thumb{background:rgba(var(--ng-rgb),.2);border-radius:8px}
   .modal .mh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
          background:linear-gradient(180deg,var(--bg-modal),var(--bg-modal) 80%,transparent);padding:22px 26px 14px;border-bottom:1px solid rgba(var(--raise-rgb),.08)}
@@ -1189,13 +1197,13 @@
   .modal .mt{font-family:Montserrat,sans-serif;font-size:19px;font-weight:600;color:var(--ng-mid)}
   /* subtítulo "Resumo executivo do contrato" — só na aba Resumo (o .mtop carrega data-tab) */
   .modal .msub{display:flex;align-items:center;gap:6px;margin-top:4px;
-        font-family:Montserrat,sans-serif;font-size:11px;font-weight:700;letter-spacing:.4px;
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;letter-spacing:.4px;
         text-transform:uppercase;color:var(--text-dim)}
   .modal .msub svg{width:13px;height:13px;flex:none;stroke:currentColor}
   .modal .mtop:not([data-tab="resumo"]) .msub{display:none}
   
   /* aviso de escopo (obra × contrato) dentro dos painéis de aditivo/medição */
-  .modal .adv-scope-note{font-family:Montserrat,sans-serif;font-size:10.5px;line-height:1.45;color:var(--text-dim);
+  .modal .adv-scope-note{font-family:Montserrat,sans-serif;font-size:12px;line-height:1.45;color:var(--text-dim);
         background:rgba(var(--ng-rgb),.06);border:1px solid rgba(var(--ng-rgb),.14);border-radius:9px;padding:9px 12px;margin-bottom:12px}
   /* E6: mesmo motivo, no aviso de filtro ignorado das janelas de distrito/fiscal —
      .mbody.dsh também já tem gap:16px, então a margin-bottom própria duplicava o
@@ -1206,7 +1214,7 @@
   .modal .mh-actions{display:flex;align-items:center;gap:8px;flex:none}
   .modal .m-locate{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;cursor:pointer;
         border:1px solid rgba(var(--raise-rgb),.14);background:rgba(var(--raise-rgb),.05);color:var(--text-base);
-        border-radius:8px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.2px;transition:.15s;white-space:nowrap}
+        border-radius:8px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;letter-spacing:.2px;transition:.15s;white-space:nowrap}
   .modal .m-locate svg{width:12px;height:12px;flex:none}
   .modal .m-locate:hover{border-color:rgba(var(--ng-rgb),.4);color:var(--ng-light);background:rgba(var(--ng-rgb),.06)}
   .modal .m-locate:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
@@ -1215,14 +1223,14 @@
   @media (max-width:520px){ .modal .m-locate span{display:none} .modal .m-locate{padding:0 10px} }
   .modal .mbody{padding:18px 26px 26px;font-family:Montserrat,sans-serif}
   .modal .mobj{font-size:14px;color:var(--text-obj);margin:0 0 4px;text-align:justify;line-height:1.55;font-family:Montserrat,sans-serif}
-  .modal .msec{font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label);margin:18px 0 10px;font-family:Montserrat,sans-serif;
+  .modal .msec{font-size:12px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-label);margin:18px 0 10px;font-family:Montserrat,sans-serif;
         border-top:1px solid rgba(var(--raise-rgb),.08);padding-top:14px}
   .modal .msec:first-of-type{border-top:0;padding-top:0}
   .modal .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 20px}
   @media (max-width:640px){ .modal .mgrid{grid-template-columns:1fr 1fr} }
-  .modal .mgrid .l{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);font-family:Montserrat,sans-serif}
+  .modal .mgrid .l{font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);font-family:Montserrat,sans-serif}
   .modal .mgrid .d{font-size:14px;color:var(--text-data);font-weight:600;margin-top:3px;word-break:break-word;font-family:Montserrat,sans-serif}
-  .modal .mupd{font-size:10px;color:var(--text-dimmer);margin-top:18px;padding-top:12px;border-top:1px solid rgba(var(--raise-rgb),.08);font-family:Montserrat,sans-serif}
+  .modal .mupd{font-size:12px;color:var(--text-dimmer);margin-top:18px;padding-top:12px;border-top:1px solid rgba(var(--raise-rgb),.08);font-family:Montserrat,sans-serif}
   /* abas do modal (Dados Gerais/Aditivos/Medições) — cabeçalho+trilha de abas ficam
      juntos num wrapper sticky (em vez de só .mh) pra não precisar cravar um top:Npx
      fixo pra .mtabs; o fade da .mh original continua servindo de transição visual
@@ -1238,7 +1246,7 @@
   .modal .mtop .mh:has(+ .dsh-per){padding-bottom:12px}
   /* Janela do fiscal aberta por um distrito: diz, no cabeçalho, que o recorte é só dele. */
   .modal .dsh-escopo{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 11px;border-radius:999px;
-        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-bright);
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-bright);
         background:rgba(var(--ng-rgb),.12);border:1px solid rgba(var(--ng-rgb),.28)}
   .modal .dsh-escopo svg{width:12px;height:12px;flex:none;stroke:currentColor}
   .modal .dsh-per{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;padding:0 26px 14px;
@@ -1252,11 +1260,11 @@
   .modal .dsh-per-seg button.on{background:rgba(var(--ng-rgb),.18);color:var(--text-brightest);
         box-shadow:inset 0 0 0 1px rgba(var(--ng-rgb),.4)}
   .modal .dsh-per-seg button:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
-  .modal .dsh-per-d{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:500;color:var(--text-dim)}
+  .modal .dsh-per-d{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-dim)}
   @media (max-width:520px){ .modal .dsh-per{padding:0 16px 12px} .modal .dsh-per-d{flex-basis:100%} }
   .modal .mtabs{display:flex;gap:6px;padding:0 26px 14px;overflow-x:auto;border-bottom:1px solid rgba(var(--raise-rgb),.08)}
   .modal .mtab{flex:none;white-space:nowrap;cursor:pointer;border:1px solid var(--card-border);background:var(--card-bg-2);color:var(--text-muted);
-        border-radius:999px;padding:7px 16px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.3px;transition:.15s}
+        border-radius:999px;padding:7px 16px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;letter-spacing:.3px;transition:.15s}
   .modal .mtab:hover{border-color:rgba(var(--ng-rgb),.35);color:var(--text-bright)}
   .modal .mtab.on{background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.45);color:var(--ng-light)}
   .modal .mtab:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
@@ -1265,8 +1273,8 @@
      largura igualmente, sem herdar o grid-template-columns:1fr 1fr fixo de .kpis) */
   .modal .mkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:4px 0 6px}
   .modal .mkpi{border:1px solid var(--card-border);background:var(--card-bg-2);border-radius:12px;padding:13px 14px}
-  .modal .mkpi .l{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-label)}
-  .modal .mkpi .v{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest);margin-top:6px;line-height:1.15;word-break:break-word}
+  .modal .mkpi .l{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-label)}
+  .modal .mkpi .v{font-family:'Montserrat',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest);margin-top:6px;line-height:1.15;word-break:break-word}
   /* link de ação em texto (ex.: "ver aba →" no cartão de identificação do Resumo) */
   .modal .mlink{background:none;border:0;padding:0;cursor:pointer;color:var(--ng-light);
         font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;letter-spacing:.2px}
@@ -1286,18 +1294,18 @@
   .modal #mPaneFicha:not([hidden]){display:block;padding-top:2px}
   .modal .fc-ctr{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;margin-top:3px;
         font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:500;color:var(--text-muted)}
-  .modal .fc-ctr b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--text-brightest);letter-spacing:.2px}
+  .modal .fc-ctr b{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:600;color:var(--text-brightest);letter-spacing:.2px}
   .modal .fc-ctr-obra{font-weight:600;color:var(--text-dim);padding-left:8px;border-left:1px solid rgba(var(--raise-rgb),.2)}
   .modal .fc-obras{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
   .modal .fc-obra{cursor:pointer;border:1px solid var(--card-border);background:var(--card-bg-2);color:var(--text-muted);
-        border-radius:8px;padding:5px 11px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;transition:.15s}
+        border-radius:8px;padding:5px 11px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;transition:.15s}
   .modal .fc-obra:hover{border-color:rgba(var(--ng-rgb),.35);color:var(--text-bright)}
   .modal .fc-obra.on{background:rgba(var(--ng-rgb),.14);border-color:rgba(var(--ng-rgb),.5);color:var(--ng-light)}
   .modal .fc-obra:focus-visible,.modal .fc-obra-sel:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
   .modal .fc-obra-selw{display:inline-flex;align-items:center;gap:8px}
   .modal .fc-obra-sel{border:1px solid var(--card-border);background:var(--card-bg-2);color:var(--text-bright);border-radius:8px;
         padding:5px 10px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;max-width:min(420px,70vw)}
-  .modal .fc-obras-nota{flex-basis:100%;font-family:Montserrat,sans-serif;font-size:11px;color:var(--text-dim)}
+  .modal .fc-obras-nota{flex-basis:100%;font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-dim)}
   .modal .mbody[data-tab="ficha"] .mobj{font-size:14.5px;font-weight:600;color:var(--text-bright);margin:0 0 14px;text-align:left}
   .modal .fc-att{display:flex;flex-direction:column;gap:7px;padding:11px 15px;margin:0 0 6px;border-left:3px solid var(--amber);
         border-radius:0 8px 8px 0;background:rgba(var(--raise-rgb),.05)}
@@ -1312,10 +1320,10 @@
         background:rgba(var(--raise-rgb),.055);font-family:Montserrat,sans-serif;font-size:13px;font-weight:700;letter-spacing:.1px;color:var(--text-bright)}
   .modal .fc-h svg{flex:none;width:16px;height:16px;color:var(--ng)}
   .modal .fc-body{padding:16px 18px 18px}
-  .modal .fc-hnote{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:500;color:var(--text-dim)}
-  .modal .fc-l{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:500;color:var(--text-label)}
+  .modal .fc-hnote{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-dim)}
+  .modal .fc-l{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-label)}
   .modal .fc-v{margin-top:3px;font-family:Montserrat,sans-serif;font-size:13.5px;font-weight:600;line-height:1.35;color:var(--text-data);word-break:break-word}
-  .modal .fc-cnpj{display:block;margin-top:1px;font-size:11.5px;font-weight:500;color:var(--text-dim);font-variant-numeric:tabular-nums}
+  .modal .fc-cnpj{display:block;margin-top:1px;font-size:12px;font-weight:500;color:var(--text-dim);font-variant-numeric:tabular-nums}
   /* três colunas independentes (identificação | partes | vigência), cada uma empilhando as suas
      células: o CNPJ de Contratada/Contratante só estica a coluna do meio, não as linhas vizinhas */
   .modal .fc-contrato{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:0 24px;align-items:start}
@@ -1333,9 +1341,9 @@
   .modal .fc-r{display:flex;justify-content:space-between;align-items:baseline;gap:14px}
   .modal .fc-r dt{font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;color:var(--text-label)}
   .modal .fc-r dd{margin:0;text-align:right;font-family:Montserrat,sans-serif;font-size:13px;font-weight:600;color:var(--text-data);font-variant-numeric:tabular-nums;word-break:break-word}
-  .modal .fc-sub{display:block;margin-top:1px;font-size:10.5px;font-weight:400}
+  .modal .fc-sub{display:block;margin-top:1px;font-size:12px;font-weight:400}
   .modal .fc-r dt .kpi-info{margin-left:6px;vertical-align:middle}
-  .modal .fc-ledger dd{font-family:'Space Grotesk',sans-serif;font-size:14px}
+  .modal .fc-ledger dd{font-family:'Montserrat',sans-serif;font-size:14px}
   .modal .fc-ledger .fc-r.tot{margin-top:2px;padding-top:12px;border-top:1px solid rgba(var(--raise-rgb),.28)}
   .modal .fc-ledger .fc-r.tot dt{font-weight:700;color:var(--text-bright)}
   .modal .fc-ledger .fc-r.tot dd{font-size:21px;font-weight:600;color:var(--text-brightest)}
@@ -1357,28 +1365,28 @@
   .modal .fc-adv{--cols:72px minmax(150px,1.3fr) 96px repeat(3,minmax(120px,1fr));min-width:760px}
   .modal .fc-adp{--cols:72px minmax(150px,1.4fr) 96px minmax(150px,1fr) minmax(130px,1fr);min-width:680px}
   .modal .fc-tr .fc-num{font-weight:700;color:var(--ng-light);font-variant-numeric:tabular-nums}
-  .modal .fc-tr .fc-pc{display:block;margin-top:1px;font-size:11px;font-weight:500;color:var(--text-dim)}
+  .modal .fc-tr .fc-pc{display:block;margin-top:1px;font-size:12px;font-weight:500;color:var(--text-dim)}
   .modal .fc-tr .fc-neg{color:var(--status-stop-text)}
   .modal .fc-tr .fc-zero{color:var(--text-dim)}
   .modal .fc-tr .fc-tl{grid-column:1 / 4;font-weight:600;color:var(--text-label)}
   .modal .fc-tr.t{border-bottom:0;border-top:1px solid rgba(var(--raise-rgb),.28);font-weight:700;color:var(--text-brightest)}
   .modal .fc-tr.t .fc-tl{font-weight:700;color:var(--text-bright)}
-  .modal .fc-tr .fc-obs{grid-column:2 / -1;margin-top:3px;font-size:11.5px;line-height:1.4;color:var(--text-dim)}
+  .modal .fc-tr .fc-obs{grid-column:2 / -1;margin-top:3px;font-size:12px;line-height:1.4;color:var(--text-dim)}
   .modal .fc-lim{margin:12px 6px 0;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;line-height:1.45;color:var(--text-label)}
   .modal .fc-tab{overflow-x:auto}
   .modal .fc-tg{display:grid;min-width:560px}
   .modal .fc-tr{display:grid;grid-template-columns:var(--cols);gap:0 16px;align-items:baseline;padding:9px 6px;
         border-bottom:1px solid rgba(var(--raise-rgb),.08);font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-data)}
-  .modal .fc-tr.h{padding-top:2px;font-size:11.5px;font-weight:600;color:var(--text-label);border-bottom-color:rgba(var(--raise-rgb),.22)}
+  .modal .fc-tr.h{padding-top:2px;font-size:12px;font-weight:600;color:var(--text-label);border-bottom-color:rgba(var(--raise-rgb),.22)}
   .modal .fc-tr .r{text-align:right;font-variant-numeric:tabular-nums}
   .modal .fc-tr .fc-n{font-variant-numeric:tabular-nums}
   .modal .fc-tr .fc-b{font-weight:700;color:var(--text-brightest)}
   .modal .fc-com{--cols:150px 130px minmax(0,1fr)}
   .modal .fc-med{--cols:42px 58px minmax(120px,1.3fr) minmax(150px,1.5fr) minmax(100px,1fr) minmax(90px,.9fr) minmax(100px,1fr);min-width:760px}
-  .modal .fc-stm{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11.5px;font-weight:700;color:var(--ng-light);
+  .modal .fc-stm{display:inline-block;padding:1px 8px;border-radius:6px;font-size:12px;font-weight:700;color:var(--ng-light);
         background:rgba(var(--ng-rgb),.12)}
   .modal .fc-foot{display:flex;flex-wrap:wrap;gap:12px 36px;padding:16px 6px 0}
-  .modal .fc-fv{margin-top:2px;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--text-brightest);font-variant-numeric:tabular-nums}
+  .modal .fc-fv{margin-top:2px;font-family:'Montserrat',sans-serif;font-size:16px;font-weight:600;color:var(--text-brightest);font-variant-numeric:tabular-nums}
   .modal .fc-leg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 18px;margin-top:12px;
         font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-body2)}
   .modal .fc-leg[hidden]{display:none}
@@ -1391,7 +1399,7 @@
   }
   @media (max-width:520px){ .modal .fc-contrato{grid-template-columns:minmax(0,1fr)} }
   
-  .modal .rs-lbl{font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.5px;
+  .modal .rs-lbl{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;letter-spacing:.5px;
         text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:5px}
   .modal .rs-lbl svg{width:12px;height:12px;flex:none}
 
@@ -1412,9 +1420,9 @@
         box-shadow:0 2px 4px rgba(var(--shadow-rgb),.08),0 10px 24px rgba(var(--shadow-rgb),.07)}
 
   .modal .rs-card{display:flex;flex-direction:column;gap:6px;min-width:0;overflow:hidden}
-  .modal .rs-num{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--text-brightest);line-height:1.15;white-space:nowrap}
+  .modal .rs-num{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:700;color:var(--text-brightest);line-height:1.15;white-space:nowrap}
   .modal .rs-num.big{font-size:18px}
-  .modal .rs-card-sub{font-family:Montserrat,sans-serif;font-size:10.5px;color:var(--text-dim)}
+  .modal .rs-card-sub{font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-dim)}
 
   .modal .rs-bar{height:6px;border-radius:4px;background:rgba(var(--raise-rgb),.12);overflow:hidden;margin-top:2px}
   .modal .rs-bar i{display:block;height:100%;border-radius:4px;background:var(--ng)}
@@ -1426,16 +1434,16 @@
      é a mesma do SVG (200px), alinhados às linhas de grade */
   .modal .rs-lc-wrap{display:flex;align-items:stretch;gap:6px}
   .modal .rs-lc-y{position:relative;flex:none;width:34px;height:200px}
-  .modal .rs-lc-y span{position:absolute;right:0;transform:translateY(-50%);font-family:'Space Grotesk',sans-serif;
-        font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-dim);white-space:nowrap}
+  .modal .rs-lc-y span{position:absolute;right:0;transform:translateY(-50%);font-family:'Montserrat',sans-serif;
+        font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text-dim);white-space:nowrap}
   .modal .rs-lc{flex:1;min-width:0;width:auto;height:200px;display:block}
   .modal .rs-lc-axis{stroke:rgba(var(--raise-rgb),.38);stroke-width:1;vector-effect:non-scaling-stroke}
   .modal .rs-lc-grid{stroke:rgba(var(--raise-rgb),.10);stroke-width:1}
   .modal .rs-lc-area{fill:rgba(var(--ng-rgb),.13);stroke:none}
   .modal .rs-lc-line{fill:none;stroke:var(--ng);stroke-width:2}
   .modal .rs-lc circle{fill:var(--ng)}
-  .modal .rs-lc-lab{fill:var(--text-dim);font-size:9px;font-family:Montserrat,sans-serif}
-  .modal .rs-lc-val{fill:var(--text-brightest);font-size:11px;font-weight:700;font-family:'Space Grotesk',sans-serif}
+  .modal .rs-lc-lab{fill:var(--text-dim);font-size:12px;font-family:Montserrat,sans-serif}
+  .modal .rs-lc-val{fill:var(--text-brightest);font-size:12px;font-weight:700;font-family:'Montserrat',sans-serif}
 
   /* Aba "Elétrica" (Fase 1) — âmbar é a cor de sinalização elétrica já usada no
      sistema (badge "demo"); fica reservada só a esta aba, nunca vazando pro resto
@@ -1471,7 +1479,7 @@
      sempre visível) — resp/link encolhem com reticências antes de quebrar; a data de
      envio (criado_em) não some, só muda de lugar: vira o title do .elerow inteiro. */
   .modal .elerow-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Montserrat,sans-serif}
-  .modal .elerow-ver{flex:none;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--amber-text);
+  .modal .elerow-ver{flex:none;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;color:var(--amber-text);
         border:1px solid rgba(var(--amber-rgb),.35);border-radius:6px;padding:1px 6px}
   .modal .elerow-data{flex:none;color:var(--text-bright);font-weight:700}
   /* o responsável nunca trunca (é o dado que mais importa identificar de relance,
@@ -1480,7 +1488,7 @@
      com reticências, e a linha quebra pro nome do responsável se não sobrar espaço. */
   .modal .elerow-resp{flex:none;white-space:nowrap;color:var(--text-dim)}
   .modal .elerow-link{flex:1 1 auto;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;color:var(--amber-text);text-decoration:none}
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--amber-text);text-decoration:none}
   .modal .elerow-link:hover{text-decoration:underline}
   .modal .elerow-link.off{color:var(--text-dim);font-weight:600}
   .modal .elerow-excluir{flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;
@@ -1491,7 +1499,7 @@
   /* NUP do processo SUITE (pedido do usuário, 29/09/2026), ao lado do relatório —
      texto monoespaçado (Space Grotesk, mesma família dos números do app) pra não
      confundir com o nome do responsável/arquivo em texto corrido. */
-  .modal .elerow-nup{flex:none;white-space:nowrap;font-family:'Space Grotesk',sans-serif;font-size:11px;
+  .modal .elerow-nup{flex:none;white-space:nowrap;font-family:'Montserrat',sans-serif;font-size:12px;
         font-weight:600;color:var(--text-dim)}
   /* botão "Abrir no SUITE" (botaoAbrirSuite): mesma mecânica/tamanho de .eng-baixar,
      reaproveitado na aba Elétrica (.elerow-line) e no modal do engenheiro (.eng-ver-row) —
@@ -1551,9 +1559,9 @@
   .modal .adToggle.eng-grp-h:hover,.modal .adToggle.eng-grp-h:focus-visible{background:rgba(var(--ng-rgb),.07);color:inherit}
   .modal .adToggle.eng-grp-h[aria-expanded="true"]{border-color:rgba(var(--ng-rgb),.35);background:rgba(var(--ng-rgb),.06)}
   .modal .eng-grp-nome{font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;color:var(--text-bright)}
-  .modal .eng-grp-meta{flex:none;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--text-dim)}
-  .modal .eng-grp-meta b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--text-bright)}
-  .modal .eng-grp-h .adToggle-car{font-size:9px;color:var(--text-dimmer)}
+  .modal .eng-grp-meta{flex:none;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-dim)}
+  .modal .eng-grp-meta b{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;color:var(--text-bright)}
+  .modal .eng-grp-h .adToggle-car{font-size:12px;color:var(--text-dimmer)}
   .modal .eng-grp-h[aria-expanded="true"] .adToggle-car{color:var(--ng)}
   .modal .eng-grp .elelist{margin-top:6px}
   /* TODA obra é o mesmo cabeçalho-acordeão (mesmo com 1 vistoria só — achado do usuário,
@@ -1580,12 +1588,12 @@
         border-radius:8px;display:flex;flex-direction:column;gap:4px;text-align:left;font:inherit}
   .modal .adToggle.eng-obra-cab:hover,.modal .adToggle.eng-obra-cab:focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
   .modal .adToggle.eng-obra-cab:hover .eng-obra-nome,.modal .adToggle.eng-obra-cab:focus-visible .eng-obra-nome{color:var(--ng-light)}
-  .modal .eng-obra-count{font-size:11px;color:var(--text-dim);font-weight:600}
-  .modal .eng-obra-meta .adToggle-car{font-size:9px;color:var(--text-dimmer)}
+  .modal .eng-obra-count{font-size:12px;color:var(--text-dim);font-weight:600}
+  .modal .eng-obra-meta .adToggle-car{font-size:12px;color:var(--text-dimmer)}
   .modal .adToggle.eng-obra-cab[aria-expanded="true"] .adToggle-car{color:var(--ng)}
   .modal .eng-ver-lista{margin:2px -6px 4px 18px;padding:2px 0 2px 10px;border-left:2px solid rgba(var(--raise-rgb),.1)}
   .modal .eng-ver-row:hover,.modal .eng-ver-row:focus-visible{background:rgba(var(--ng-rgb),.08);outline:none}
-  .modal .eng-ver-label{flex:1 1 auto;min-width:100px;font-size:11.5px;color:var(--text-dim);font-weight:600;
+  .modal .eng-ver-label{flex:1 1 auto;min-width:100px;font-size:12px;color:var(--text-dim);font-weight:600;
         letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .modal .eng-ver-v{color:var(--amber-text);font-weight:700}
   /* linha "a vistoriar" (linhasFaltamPorObra): sem RELATÓRIO/data pra mostrar, o objeto
@@ -1599,7 +1607,7 @@
   .modal .eng-ver-row-obra .eng-ver-label{white-space:normal;text-overflow:clip;color:var(--text-bright);
         font-size:12.5px;line-height:1.4;font-weight:400;letter-spacing:normal;
         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .modal .eng-ver-sub{font-size:10.5px;color:var(--text-dim);font-weight:600}
+  .modal .eng-ver-sub{font-size:12px;color:var(--text-dim);font-weight:600}
   /* botão de baixar (pedido do usuário, 25/09/2026): setinha simples, mesmo tamanho/
      mecânica do "excluir relatório" da aba Elétrica (.elerow-excluir), cor neutra em
      repouso e verde no hover — não é uma ação destrutiva, não pede o tom de aviso. */
@@ -1651,11 +1659,11 @@
   .modal .crono-nav-btn:focus-visible,.modal .crono-hoje:focus-visible,.modal .crono-chip:focus-visible,
   .modal .crono-d.tem:focus-visible,.modal .crono-limpar:focus-visible{outline:2px solid var(--crono-info);outline-offset:2px}
   .modal .crono-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
-  .modal .crono-dow span{text-align:center;font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-dow span{text-align:center;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim)}
   .modal .crono-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
   .modal .crono-d{height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
         border:1px solid transparent;border-radius:9px;background:transparent;padding:0;margin:0;
-        font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;color:var(--text-dim)}
+        font-family:'Montserrat',sans-serif;font-size:13px;font-weight:500;color:var(--text-dim)}
   .modal .crono-d.vazio{visibility:hidden}
   .modal .crono-d.tem{cursor:pointer;color:var(--text-bright);font-weight:700;background:rgba(var(--raise-rgb),.06);transition:background-color .12s,border-color .12s}
   .modal .crono-d.tem:hover{background:rgba(var(--ng-rgb),.12);border-color:rgba(var(--ng-rgb),.35)}
@@ -1672,7 +1680,7 @@
         background:rgba(var(--c-rgb),.15);color:var(--c-text)}
   .modal .crono-chip-ic svg{width:14px;height:14px;display:block}
   .modal .crono-chip-rot{flex:1 1 auto;font-size:12.5px;font-weight:600;color:var(--text-bright)}
-  .modal .crono-chip-n{flex:none;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest)}
+  .modal .crono-chip-n{flex:none;font-family:'Montserrat',sans-serif;font-size:17px;font-weight:700;color:var(--text-brightest)}
   /* Filtro de engenheiro: TODOS + um por pessoa, cada um com caixa de seleção e a contagem do
      mês à direita. O <input> nativo fica no label (invisível, mas focável e lido por leitor de
      tela); a caixa desenhada segue o estado dele (:checked / :indeterminate). */
@@ -1692,19 +1700,19 @@
   .modal .crono-eng input:indeterminate+.crono-eng-box .ck{display:none}
   .modal .crono-eng input:indeterminate+.crono-eng-box .dash{display:block}
   .modal .crono-eng input:focus-visible+.crono-eng-box{outline:2px solid var(--crono-info);outline-offset:2px}
-  .modal .crono-eng-nome{flex:1 1 auto;min-width:0;font-size:11.5px;font-weight:600;letter-spacing:.2px;line-height:1.3;
+  .modal .crono-eng-nome{flex:1 1 auto;min-width:0;font-size:12px;font-weight:600;letter-spacing:.2px;line-height:1.3;
         text-transform:uppercase;color:var(--text-bright)}
   .modal .crono-eng.todos .crono-eng-nome{font-weight:700;letter-spacing:.4px}
-  .modal .crono-eng-n{flex:none;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-eng-n{flex:none;font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:600;color:var(--text-dim)}
   .modal .crono-agenda{position:relative;max-height:calc(94vh - 200px);overflow:auto;padding-right:8px}
   @media (max-width:760px){ .modal .crono-agenda{max-height:56vh} }
   .modal .crono-dia{display:grid;grid-template-columns:64px minmax(0,1fr);gap:16px;padding:14px 0;
         border-top:1px solid rgba(var(--raise-rgb),.1)}
   .modal .crono-dia:first-child{border-top:0;padding-top:0}
   .modal .crono-dia-data{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
-  .modal .crono-dia-data .num{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1;color:var(--text-brightest)}
-  .modal .crono-dia-data .sem{font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-dim)}
-  .modal .crono-hoje-tag{display:inline-flex;align-items:center;gap:5px;font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:700;color:var(--crono-info)}
+  .modal .crono-dia-data .num{font-family:'Montserrat',sans-serif;font-size:28px;font-weight:700;line-height:1;color:var(--text-brightest)}
+  .modal .crono-dia-data .sem{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim)}
+  .modal .crono-hoje-tag{display:inline-flex;align-items:center;gap:5px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;color:var(--crono-info)}
   .modal .crono-hoje-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--crono-info)}
   @media (prefers-reduced-motion:no-preference){
     .modal .crono-dia.flash{animation:cronoFlash 1.2s ease-out}
@@ -1730,13 +1738,13 @@
   .modal .crono-obra{font-size:13px;font-weight:400;line-height:1.35;color:var(--text-bright);display:-webkit-box;-webkit-box-orient:vertical;
         -webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;text-align:justify;text-justify:inter-word;transition:color .12s}
   .modal .crono-row:not(.nc):hover .crono-obra{color:var(--ng-light)}
-  .modal .crono-resp{font-size:11.5px;font-weight:600;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .modal .crono-resp{font-size:12px;font-weight:600;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* centralizado (não mais à esquerda) — coluna de largura fixa, pedido do usuário. */
   .modal .crono-dir{flex:0 0 112px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
   .modal .crono-fim{align-self:center;flex:0 0 28px;display:flex;align-items:center;justify-content:flex-end}
-  .modal .crono-st{font-size:11.5px;font-weight:700;color:var(--c-text)}
-  .modal .crono-dist{font-size:11px;color:var(--text-dim)}
-  .modal .crono-obra-st{flex:0 1 auto;align-self:flex-start;margin-top:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;font-weight:600;color:var(--text-dim);border:1px dashed var(--card-border);
+  .modal .crono-st{font-size:12px;font-weight:700;color:var(--c-text)}
+  .modal .crono-dist{font-size:12px;color:var(--text-dim)}
+  .modal .crono-obra-st{flex:0 1 auto;align-self:flex-start;margin-top:3px;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--text-dim);border:1px dashed var(--card-border);
         border-radius:999px;padding:2px 8px;white-space:nowrap}
   .modal .crono-vazio{padding:44px 12px;text-align:center;font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-dim);
         display:flex;flex-direction:column;align-items:center;gap:12px}
@@ -1766,7 +1774,7 @@
   .modal .ele-agenda-info.danger{--c-rgb:var(--danger-rgb)}
   .modal .ele-agenda-info.teal{--c-rgb:var(--teal-rgb)}
   .modal .ele-agenda-cancelar-btn{border:0;background:transparent;padding:0;color:var(--text-dim);
-        font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:700;text-decoration:underline;cursor:pointer}
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;text-decoration:underline;cursor:pointer}
   .modal .ele-agenda-cancelar-btn:hover{color:var(--status-stop)}
   .modal .ele-agenda-cancelar-btn:disabled{opacity:.5;cursor:not-allowed}
   /* confirmação "Vistoria realizada" (grill de 29/09/2026) + "Cancelar agendamento",
@@ -1808,11 +1816,11 @@
   .modal .edrop-icon{width:28px;height:28px;color:var(--amber-deep)}
   .modal .edrop-txt{margin:10px 0 0;font-family:Montserrat,sans-serif;font-size:12.5px;color:var(--text-dim)}
   .modal .edrop-fmt{margin-top:10px;display:inline-flex;gap:6px}
-  .modal .edrop-fmt span{border:1px solid var(--card-border);border-radius:6px;padding:2px 8px;font-size:10.5px;color:var(--text-dim);font-weight:600}
+  .modal .edrop-fmt span{border:1px solid var(--card-border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--text-dim);font-weight:600}
   .modal .edrop-nome{margin-top:10px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;color:var(--amber-text)}
   .modal .elefields{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
   @media (max-width:480px){ .modal .elefields{grid-template-columns:1fr} }
-  .modal .elefields label{display:flex;flex-direction:column;gap:4px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-label)}
+  .modal .elefields label{display:flex;flex-direction:column;gap:4px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-label)}
   .modal .elefields label.span2{grid-column:1/-1}
   .modal .elefields input,.modal .elefields textarea{font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-bright);
         background:var(--card-bg-2);border:1px solid var(--card-border);border-radius:8px;padding:8px 10px;resize:vertical}
@@ -1833,10 +1841,10 @@
   .modal .pie-dot{width:10px;height:10px;border-radius:50%;flex:none}
   .modal .pie-dot.neutral{background:rgba(var(--raise-rgb),.18)}
   .modal .pie-l{min-width:84px}
-  .modal .pie-v{color:var(--text-brightest);font-family:'Space Grotesk',sans-serif;font-weight:700}
+  .modal .pie-v{color:var(--text-brightest);font-family:'Montserrat',sans-serif;font-weight:700}
   .modal .donut-track{stroke:rgba(var(--raise-rgb),.09)}
   .modal .donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-        font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--text-brightest)}
+        font-family:'Montserrat',sans-serif;font-size:19px;font-weight:700;color:var(--text-brightest)}
   /* barras DIVERGENTES Acréscimo/Supressão/Repercussão (aba Aditivos, aditivos de
      valor) — eixo zero ao centro (.divbar-mid): Acréscimo cresce pra direita,
      Supressão pra esquerda (sinal invertido só no cálculo da barra, o rótulo mostra
@@ -1845,14 +1853,14 @@
   .modal .divbars{margin:14px 0 4px;display:flex;flex-direction:column;gap:14px}
   .modal .divbar-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px}
   .modal .divbar-l{color:var(--text-muted);font-weight:600}
-  .modal .divbar-v{font-family:'Space Grotesk',sans-serif;font-weight:700}
+  .modal .divbar-v{font-family:'Montserrat',sans-serif;font-weight:700}
   .modal .divbar-track{position:relative;height:8px;border-radius:5px;background:rgba(var(--raise-rgb),.07);margin-top:8px;overflow:visible}
   .modal .divbar-mid{position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;background:rgba(var(--raise-rgb),.3);transform:translateX(-1px)}
   .modal .divbar-fill{position:absolute;top:0;bottom:0;border-radius:5px}
   /* botão discreto que expande a lista de cards de aditivo (valor/prazo) — mesmo
      visual do botão "Comissão completa" de Dados Gerais */
   .modal .adToggle{margin-top:14px;border:1px solid var(--card-border);background:var(--card-bg-2);color:var(--text-label);
-        border-radius:999px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:Montserrat,sans-serif;transition:.15s}
+        border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:Montserrat,sans-serif;transition:.15s}
   .modal .adToggle:hover{border-color:rgba(var(--ng-rgb),.35);color:var(--text-bright)}
   /* prazo (aditivos de prazo) — início→fim com marcação de "já passado" e dias
      restantes/vencidos; datas vêm de contratos_edificacao (já refletem os aditivos
@@ -1860,23 +1868,23 @@
   .modal .tl-wrap{margin:14px 0 4px;display:flex;flex-direction:column;gap:16px}
   .modal .tl-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px}
   .modal .tl-l{color:var(--text-muted);font-weight:600}
-  .modal .tl-days{font-family:'Space Grotesk',sans-serif;font-weight:700}
+  .modal .tl-days{font-family:'Montserrat',sans-serif;font-weight:700}
   .modal .tl-track{height:8px;border-radius:5px;background:rgba(var(--raise-rgb),.07);margin-top:6px;overflow:hidden}
   .modal .tl-track>i{display:block;height:100%;border-radius:5px}
-  .modal .tl-dates{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-dimmer);margin-top:5px}
+  .modal .tl-dates{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dimmer);margin-top:5px}
   /* lista de aditivos */
   .modal .adlist{margin-top:8px}
   .modal .adrow{border:1px solid var(--card-border);background:var(--card-bg-2);border-radius:12px;padding:12px 14px;margin-bottom:10px}
   .modal .adrow-h{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}
-  .modal .adnum{font-weight:700;color:var(--text-bright);font-family:'Space Grotesk',sans-serif}
-  .modal .addate{margin-left:auto;font-size:11px;color:var(--text-dim);font-weight:600}
-  .modal .adproto{font-size:11px;color:var(--text-dim);margin-top:5px}
-  .modal .adobs{font-family:Montserrat,sans-serif;font-size:11px;color:var(--text-dim);margin-top:5px;line-height:1.4}
+  .modal .adnum{font-weight:700;color:var(--text-bright);font-family:'Montserrat',sans-serif}
+  .modal .addate{margin-left:auto;font-size:12px;color:var(--text-dim);font-weight:600}
+  .modal .adproto{font-size:12px;color:var(--text-dim);margin-top:5px}
+  .modal .adobs{font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-dim);margin-top:5px;line-height:1.4}
   @media (max-width:640px){ .modal .mkpis{grid-template-columns:1fr 1fr} }
   @media (max-width:420px){ .modal .mkpis{grid-template-columns:1fr} }
 
-  .rev{margin-top:11px;font-size:11.5px;color:var(--text-body2);line-height:1.5}
-  .rev b{color:var(--ng-light);font-family:'Space Grotesk',sans-serif}
+  .rev{margin-top:11px;font-size:12px;color:var(--text-body2);line-height:1.5}
+  .rev b{color:var(--ng-light);font-family:'Montserrat',sans-serif}
   /* ============================================================================
      E5 — painéis de distrito e de fiscal (janelas do modo Replanilhamentos).
      Redesenhados em 2026-09-17 a pedido do usuário: as janelas eram quatro cartões
@@ -1918,7 +1926,7 @@
   .modal .dsh-hero-acima::before{background:linear-gradient(var(--amber),var(--amber-deep))}
 
   /* O único tipo grande dos dois painéis: é o que se lê do fundo de uma sala de reunião. */
-  .modal .dsh-big{font-family:'Space Grotesk',sans-serif;font-size:48px;font-weight:600;line-height:1;
+  .modal .dsh-big{font-family:'Montserrat',sans-serif;font-size:48px;font-weight:600;line-height:1;
         color:var(--text-brightest);display:flex;align-items:baseline;gap:8px;margin-top:2px}
   .modal .dsh-un{font-family:Montserrat,sans-serif;font-size:13px;font-weight:600;color:var(--text-muted)}
   /* Diferença para a referência: uma pílula, com o sinal em cor (âmbar = mais lento). */
@@ -1928,12 +1936,12 @@
   .modal .dsh-delta.acima{color:var(--amber-text);background:rgba(var(--amber-rgb),.15)}
   .modal .dsh-delta.abaixo{color:var(--ng-light);background:rgba(var(--ng-rgb),.14)}
   :root:not(.theme-dark) .modal .dsh-delta.abaixo{color:var(--badge-text)}
-  .modal .dsh-seta{font-size:10px;flex:none}
-  .modal .dsh-sub{font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-dim);line-height:1.4}
+  .modal .dsh-seta{font-size:12px;flex:none}
+  .modal .dsh-sub{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim);line-height:1.4}
   /* (2) superfície de gráfico */
   .modal .dsh-plot{padding:14px 16px;display:flex;flex-direction:column;gap:9px;min-width:0}
-  .modal .dsh-pos{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--text-brightest)}
-  .modal .dsh-nota{font-family:Montserrat,sans-serif;font-size:11px;line-height:1.45;color:var(--text-dim);font-weight:600}
+  .modal .dsh-pos{font-family:'Montserrat',sans-serif;font-size:15px;font-weight:600;color:var(--text-brightest)}
+  .modal .dsh-nota{font-family:Montserrat,sans-serif;font-size:12px;line-height:1.45;color:var(--text-dim);font-weight:600}
   /* (3) ladrilhos — mínimo de coluna 110px (era 130px): achado rev-design, 2026-09-22,
      rodada 5 — pré-existente, sem relação com o teto/variante abaixo (a fileira de 4
      ladrilhos de abreModalDistrito, nunca tocada nesta iniciativa, já quebrava em duas
@@ -1963,19 +1971,19 @@
   .modal .dsh-tile-clic{cursor:pointer;transition:.15s}
   .modal .dsh-tile-clic:hover{background:rgba(var(--ng-rgb),.09)}
   .modal .dsh-tile-clic:focus-visible{outline:2px solid var(--ng);outline-offset:-2px}
-  .modal .dsh-tv{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;color:var(--text-brightest);line-height:1.1}
+  .modal .dsh-tv{font-family:'Montserrat',sans-serif;font-size:24px;font-weight:600;color:var(--text-brightest);line-height:1.1}
   .modal .dsh-tl{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;
         color:var(--text-bright)}
   /* títulos de seção das duas janelas: frase normal, e não caixa-alta espaçada */
   .modal .mbody.dsh .sec-h{font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--text-brightest);margin:10px 0 8px}
-  .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
+  .modal .dsh-ts{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim)}
 
   /* ---- eixo de dias: a régua compartilhada ---- */
   .modal .ed-wrap{display:flex;flex-direction:column;gap:8px;min-width:0}
   .modal .ed{width:100%;height:auto;display:block;overflow:visible}
   .modal .ed-base{stroke:rgba(var(--raise-rgb),.22);stroke-width:1}
   .modal .ed-tick{stroke:rgba(var(--raise-rgb),.09);stroke-width:1}
-  .modal .ed-tlab{fill:var(--text-dim);font-size:9px;font-family:Montserrat,sans-serif;font-weight:600}
+  .modal .ed-tlab{fill:var(--text-dim);font-size:12px;font-family:Montserrat,sans-serif;font-weight:600}
   /* Um ponto = um caso real. Semitransparente de propósito: dois despachos com tempos
      próximos escurecem um ao outro em vez de um sumir atrás do outro — a sobreposição
      vira densidade, que é informação, e não perda de dado. */
@@ -1997,9 +2005,9 @@
   .modal .ed-mark.ref{stroke:var(--text-brightest);stroke-width:2.5;stroke-dasharray:5 4}
   .modal .ed-flag{fill:var(--text-brightest)}
   .modal .ed-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;
-        font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;color:var(--text-dim)}
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim)}
   .modal .ed-leg-i{display:inline-flex;align-items:center;gap:6px}
-  .modal .ed-leg-i b{font-family:'Space Grotesk',sans-serif;color:var(--text-bright);font-weight:700}
+  .modal .ed-leg-i b{font-family:'Montserrat',sans-serif;color:var(--text-bright);font-weight:700}
   .modal .ed-key{width:12px;height:0;border-top:2px solid var(--ng);flex:none}
   .modal .ed-key.ref{border-top-style:dashed;border-top-width:2.5px;border-top-color:var(--text-brightest)}
 
@@ -2007,10 +2015,10 @@
      Um bloco por status com os processos em colunas: NUP + descrição | dias com o fiscal | data meta |
      prazo (selo e texto). Os despachados seguem a mesma grade, só sem a coluna de prazo. */
   .modal .cf-vazio{padding:14px 16px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:400;color:var(--text-dim)}
-  .modal .cf-cols,.modal .cf-row{display:grid;grid-template-columns:minmax(0,1fr) 78px 98px 122px;align-items:center;column-gap:14px;padding:0 16px}
+  .modal .cf-cols,.modal .cf-row{display:grid;grid-template-columns:minmax(0,1fr) 112px 132px;align-items:center;column-gap:14px;padding:0 16px}
   .modal .cf-cols.desp,.modal .cf-row.desp{grid-template-columns:minmax(0,1fr) 96px 96px}
   .modal .cf-cols{padding-top:8px;padding-bottom:8px;border-bottom:1px solid var(--card-border);
-        font-family:Montserrat,sans-serif;font-size:9.5px;font-weight:500;letter-spacing:.03em;text-transform:uppercase;color:var(--text-dimmer)}
+        font-family:Montserrat,sans-serif;font-size:12px;font-weight:400;letter-spacing:.03em;text-transform:uppercase;color:var(--text-dimmer)}
   .modal .cf-cols:not(.desp) span:nth-child(2),.modal .cf-cols:not(.desp) span:nth-child(3),
   .modal .cf-cols.desp span:nth-child(2),.modal .cf-cols.desp span:nth-child(3){text-align:center}
   .modal .cf-row{padding-top:12px;padding-bottom:12px;border-left:3px solid transparent;padding-left:13px}
@@ -2018,20 +2026,20 @@
   .modal .cf-row.atraso{border-left-color:var(--amber);background:rgba(var(--amber-rgb),.05)}
   .modal .cf-cols{padding-left:16px}
   .modal .pp-main{min-width:0;display:flex;flex-direction:column;gap:3px}
-  .modal .pp-n{display:flex;align-items:center;gap:8px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest)}
+  .modal .pp-n{display:flex;align-items:center;gap:8px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest)}
   .modal .pp-desc{font-family:Montserrat,sans-serif;font-size:12px;font-weight:400;color:var(--text-bright);line-height:1.4;
         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .modal .cf-c{display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;min-width:0}
-  .modal .cf-c::before{content:attr(data-l);display:none;font-family:Montserrat,sans-serif;font-size:10px;font-weight:500;
+  .modal .cf-c::before{content:attr(data-l);display:none;font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;
         letter-spacing:.04em;text-transform:uppercase;color:var(--text-dimmer)}
-  .modal .cf-c b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:400;line-height:1.2;color:var(--text-brightest)}
-  .modal .cf-c span{font-family:Montserrat,sans-serif;font-size:10px;font-weight:400;color:var(--text-dim)}
+  .modal .cf-c b{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:400;line-height:1.2;color:var(--text-brightest)}
+  .modal .cf-c span{font-family:Montserrat,sans-serif;font-size:12px;font-weight:400;color:var(--text-dim)}
   .modal .cf-row:not(.desp) .cf-c:nth-child(2) b{font-size:15px}
   /* meta editável (só administrador): a data vira um botão discreto com lápis; sem meta, "Definir meta" */
   .modal .metaBtn{display:inline-flex;align-items:center;justify-content:center;gap:4px;max-width:100%;padding:2px 5px;margin:-2px -5px;
         border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text-brightest);cursor:pointer;transition:border-color .15s,background .15s,color .15s}
-  .modal .metaBtn b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:400;line-height:1.2;color:inherit;white-space:nowrap}
-  .modal .metaBtn span{font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;color:var(--text-dim)}
+  .modal .metaBtn b{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:400;line-height:1.2;color:inherit;white-space:nowrap}
+  .modal .metaBtn span{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim)}
   .modal .metaBtn svg{flex:none;width:11px;height:11px;color:var(--text-dimmer);transition:color .15s}
   .modal .metaBtn:hover{border-color:rgba(var(--ng-rgb),.4);background:rgba(var(--ng-rgb),.08)}
   .modal .metaBtn:hover svg,.modal .metaBtn:hover span{color:var(--ng-light)}
@@ -2040,13 +2048,13 @@
   /* janelinha de edição da meta: fica no body (fixed), acima do modal */
   .metaPop{position:fixed;z-index:2150;width:272px;padding:14px 16px 12px;border-radius:12px;border:1px solid var(--card-border);
         background:var(--bg-modal);color:var(--text-base);font-family:Montserrat,sans-serif;box-shadow:0 14px 40px rgba(0,0,0,.35)}
-  .metaPop-t{font-size:11px;font-weight:600;color:var(--text-label)}
-  .metaPop-n{margin-top:2px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest);word-break:break-all}
-  .metaPop-l{display:block;margin:12px 0 5px;font-size:11.5px;font-weight:600;color:var(--text-bright)}
+  .metaPop-t{font-size:12px;font-weight:600;color:var(--text-label)}
+  .metaPop-n{margin-top:2px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;color:var(--text-brightest);word-break:break-all}
+  .metaPop-l{display:block;margin:12px 0 5px;font-size:12px;font-weight:600;color:var(--text-bright)}
   .metaPop input[type="date"]{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid var(--card-border);
         background:var(--card-bg-2);color:var(--text-brightest);font-family:Montserrat,sans-serif;font-size:13px;color-scheme:light dark}
   .metaPop input[type="date"]:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
-  .metaPop-e{margin-top:8px;font-size:11.5px;font-weight:600;line-height:1.4;color:var(--status-stop-text)}
+  .metaPop-e{margin-top:8px;font-size:12px;font-weight:600;line-height:1.4;color:var(--status-stop-text)}
   .metaPop-e[hidden]{display:none}
   .metaPop-a{display:flex;align-items:center;gap:8px;margin-top:14px}
   .metaPop-sp{flex:1}
@@ -2061,12 +2069,12 @@
   .metaPop-a button:disabled,.metaPop input:disabled{opacity:.55;cursor:wait}
   .modal .cf-prazo{gap:6px;align-items:flex-start}
   .modal .cf-prazo::before{display:none}
-  .modal .pp-b{padding:2px 9px;border-radius:999px;font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:500;
+  .modal .pp-b{padding:2px 9px;border-radius:999px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;
         color:var(--text-muted);background:rgba(var(--raise-rgb),.1);white-space:nowrap}
   .modal .pp-b.atraso{color:var(--amber-text);background:rgba(var(--amber-rgb),.17)}
   .modal .pp-b.noprazo{color:var(--ng-light);background:rgba(var(--ng-rgb),.15)}
   :root:not(.theme-dark) .modal .pp-b.noprazo{color:var(--badge-text)}
-  .modal .cf-pt{font-family:Montserrat,sans-serif;font-size:10px;font-weight:400;color:var(--text-dim)}
+  .modal .cf-pt{font-family:Montserrat,sans-serif;font-size:12px;font-weight:400;color:var(--text-dim)}
   .modal .cf-pt.atraso{color:var(--amber-text)}
   @media (max-width:760px){
     .modal .cf-cols{display:none}
@@ -2080,12 +2088,18 @@
   /* grupos por status dentro da lista (Análise Fiscal / Reanálise Fiscal) */
   .modal .fila-g{display:flex;flex-direction:column;gap:10px}
   .modal .fila-g+.fila-g{border-top:1px dashed var(--card-border);padding-top:14px;margin-top:4px}
-  .modal .fila-gh{display:flex;justify-content:space-between;align-items:baseline;font-family:Montserrat,sans-serif;
-        font-size:13px;font-weight:700;color:var(--text-bright)}
-  .modal .fila-gh b{font-family:'Space Grotesk',sans-serif;font-size:15px;color:var(--text-brightest)}
-  .modal .fila-gs{font-family:Montserrat,sans-serif;font-size:11px;font-weight:500;color:var(--text-dim);margin-top:-6px}
+  .modal .fila-gh{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 14px;border-radius:8px;
+        border-left:4px solid var(--card-border);background:rgba(var(--raise-rgb),.06);
+        font-family:Montserrat,sans-serif;font-size:15px;font-weight:500;letter-spacing:.01em;color:var(--text-brightest)}
+  .modal .fila-gh b{font-family:'Montserrat',sans-serif;font-size:17px;font-weight:500;color:var(--text-brightest)}
+  /* Análise Fiscal em verde, Reanálise Fiscal em azul: cores distintas entre si e do âmbar, que é só de atraso */
+  .modal .fila-g.st-analise .fila-gh{border-left-color:var(--ng);background:rgba(var(--ng-rgb),.14)}
+  .modal .fila-g.st-reanalise .fila-gh{border-left-color:var(--crono-info);background:rgba(var(--crono-info-rgb),.16)}
+  .modal .foot-nups{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
+  .modal .foot-nup{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--text-brightest)}
+  .modal .fila-gs{font-family:Montserrat,sans-serif;font-size:12px;font-weight:400;color:var(--text-dim);margin-top:-6px}
   /* meta do processo: data neutra no prazo, âmbar quando atrasado */
-  .proc-meta.ok{color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:600;font-size:11px}
+  .proc-meta.ok{color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:600;font-size:12px}
 
   /* ---- janela do distrito (redesenho de 2026-10-05): linha de números + dois cartões recolhidos ----
      Menos caixas: o que antes eram 4 ladrilhos, 12 mini-cartões e uma grade de cartões de fiscal virou uma linha
@@ -2096,7 +2110,7 @@
   .modal .dd-n{display:inline-flex;align-items:baseline;gap:5px;padding:0 11px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted)}
   .modal .dd-n:first-child{padding-left:0}
   .modal .dd-n+.dd-n{border-left:1px solid rgba(var(--raise-rgb),.2)}
-  .modal .dd-n b{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;color:var(--text-brightest)}
+  .modal .dd-n b{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:600;color:var(--text-brightest)}
   .modal .dd-n[role="button"]{cursor:pointer;transition:color .15s}
   .modal .dd-n[role="button"]:hover{color:var(--ng-light)}
   .modal .dd-n[role="button"]:focus-visible{outline:2px solid var(--ng);outline-offset:3px;border-radius:4px}
@@ -2109,37 +2123,38 @@
   .modal .dd-cab-t{flex:1;min-width:0}
   .modal .dd-tit{display:flex;align-items:center;gap:6px;font-family:Montserrat,sans-serif;font-size:15px;font-weight:700;color:var(--text-brightest)}
   .modal .dd-res{margin-top:4px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:500;line-height:1.4;color:var(--text-muted)}
-  .modal .dd-res .atraso{color:var(--amber-text);font-weight:700}
+  .modal .dd-res .atraso{color:var(--amber-text);font-weight:400}
   .modal .dd-tot{display:flex;align-items:baseline;gap:6px;flex:none}
-  .modal .dd-tot b{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--text-brightest)}
+  .modal .dd-tot b{font-family:'Montserrat',sans-serif;font-size:30px;font-weight:600;line-height:1;color:var(--text-brightest)}
   .modal .dd-tot span{font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-muted)}
-  .modal .dd-car{flex:none;font-size:10px;color:var(--text-dimmer)}
+  .modal .dd-car{flex:none;font-size:12px;color:var(--text-dimmer)}
   .modal .dd-cab[aria-expanded="true"] .dd-car{color:var(--ng)}
   .modal .dd-corpo{padding:16px 20px 20px;display:flex;flex-direction:column;gap:12px}
   .modal .dd-corpo[hidden]{display:none}
-  .modal .dd-expl{margin:0;max-width:72ch;font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;line-height:1.55;color:var(--text-dim)}
   .modal .dd-corpo .cf-cols{padding:8px 8px 8px 10px}
   .modal .dd-corpo .cf-row{padding-left:7px;padding-right:8px}
   .modal .dd-corpo .cf-vazio{padding:12px 10px}
   .modal .dd-corpo .fila-g{gap:0}
   .modal .dd-corpo .fila-g+.fila-g{border-top:0;padding-top:0;margin-top:10px}
-  .modal .dd-corpo .fila-gh{padding-bottom:2px}
+  .modal .dd-corpo .fila-gh{margin-bottom:6px}
   .modal .dd-corpo .fila-gs{margin-top:0;padding-bottom:8px;border-bottom:1px solid rgba(var(--raise-rgb),.22)}
   .modal .dd-corpo .fila-gs:has(+ .cf-cols){border-bottom:0}
   /* processo da fila: linha plana, sem caixa — o grupo (status) é o título, o atraso é a faixa âmbar à esquerda */
   .modal .pl{padding:11px 8px 11px 10px;border-left:3px solid transparent;border-bottom:1px solid rgba(var(--raise-rgb),.08);font-family:Montserrat,sans-serif}
   .modal .pl.atraso{border-left-color:var(--amber);background:rgba(var(--amber-rgb),.05)}
   .modal .pl-h{display:flex;align-items:center;gap:8px}
-  .modal .pl-n{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:700;color:var(--text-brightest)}
-  .modal .pl-d{margin-left:auto;font-size:12px;font-weight:600;color:var(--text-muted);text-align:right}
+  .modal .pl-n{font-family:'Montserrat',sans-serif;font-size:13.5px;font-weight:700;color:var(--text-brightest)}
+  .modal .pl-d{margin-left:auto;font-size:12px;font-weight:400;color:var(--text-muted);text-align:right}
+  .modal .pl-d.atraso{color:var(--amber-text)}
   .modal .pl-o{margin-top:4px;font-size:12px;line-height:1.4;color:var(--text-obj);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .modal .pl-m{display:flex;justify-content:space-between;gap:12px;margin-top:5px;font-size:11px;font-weight:600;color:var(--text-dim)}
-  .modal .pl-meta{flex:none;text-align:right;font-weight:600}
-  .modal .pl-meta.atraso{color:var(--amber-text);font-weight:700}
+  .modal .pl-m{display:flex;justify-content:space-between;gap:12px;margin-top:5px;font-size:12px;font-weight:400;color:var(--text-dim)}
+  .modal .pl-meta{flex:none;text-align:right;font-weight:400}
+  .modal .pl-meta.atraso{color:var(--amber-text);font-weight:400}
+  .modal .pl-meta .kpi-info,.modal .cf-cols .kpi-info{margin-left:6px;vertical-align:middle}
   .modal .dd-corpo details.ver-resto>summary{padding:10px 10px}
   /* fiscais: tabela plana, do mais lento ao mais rápido; a linha inteira abre o painel do fiscal */
   .modal .frow-h,.modal .frow{display:grid;grid-template-columns:minmax(0,1fr) 110px 84px 104px;column-gap:16px;align-items:center;padding:10px 8px}
-  .modal .frow-h{padding-top:0;padding-bottom:8px;font-family:Montserrat,sans-serif;font-size:11.5px;font-weight:600;color:var(--text-label);
+  .modal .frow-h{padding-top:0;padding-bottom:8px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-label);
         border-bottom:1px solid rgba(var(--raise-rgb),.22)}
   .modal .frow-h>div:not(:first-child),.modal .frow-m,.modal .frow-c{text-align:right}
   .modal .frow{cursor:pointer;padding-left:5px;border-left:3px solid transparent;border-bottom:1px solid rgba(var(--raise-rgb),.08);font-family:Montserrat,sans-serif;font-size:13px;
@@ -2148,13 +2163,13 @@
   .modal .frow:hover{background:rgba(var(--ng-rgb),.07)}
   .modal .frow:focus-visible{outline:2px solid var(--ng);outline-offset:-2px}
   .modal .frow-n{min-width:0;font-weight:600;color:var(--text-bright)}
-  .modal .frow-sub{display:block;margin-top:2px;font-size:11px;font-weight:500;color:var(--text-dim)}
-  .modal .frow-m{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--text-brightest)}
+  .modal .frow-sub{display:block;margin-top:2px;font-size:12px;font-weight:500;color:var(--text-dim)}
+  .modal .frow-m{font-family:'Montserrat',sans-serif;font-size:15px;font-weight:600;color:var(--text-brightest)}
   .modal .frow-m.acima{color:var(--amber-text)}
   .modal .frow.acima{border-left-color:var(--amber);background:rgba(var(--amber-rgb),.05)}
   .modal .frow.abaixo{border-left-color:var(--ng)}
   .modal .frow.acima:hover{background:rgba(var(--amber-rgb),.1)}
-  .modal .frow-d{display:block;margin-top:1px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;color:var(--text-dim)}
+  .modal .frow-d{display:block;margin-top:1px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-dim)}
   .modal .frow.acima .frow-d{color:var(--amber-text)}
   .modal .frow.abaixo .frow-d{color:var(--ng-light)}
   :root:not(.theme-dark) .modal .frow.abaixo .frow-d{color:var(--badge-text)}
@@ -2166,8 +2181,58 @@
     .modal .dd-corpo{padding:14px 14px 16px}
   }
 
+  /* ---- janelas de distrito e de fiscal, em Replanilhamentos (usuário, 2026-10-08) ----
+     A janela ficou alta, mas os cartões continuaram do tamanho antigo e sobrava um vazio embaixo. Aqui a escala sobe
+     junto: o corpo ocupa a altura toda da janela, o par número + gráfico cresce com o espaço que sobra (com teto, para
+     não esticar à toa), o número do herói e os totais ganham tipo maior, e os cartões recolhidos ficam mais
+     espaçosos. Só de 761px para cima; no celular valem as medidas de sempre. Só tamanho: nenhuma cor muda. */
+  @media (min-width:761px){
+    body.modo-rp .modal:has(.mbody.dsh){display:flex;flex-direction:column}
+    body.modo-rp .modal:has(.mbody.dsh)>*{flex:none}
+    body.modo-rp .modal:has(.mbody.dsh)>.mbody.dsh{flex:1 0 auto;padding:20px 26px 26px;gap:16px}
+    body.modo-rp .modal .dsh-topo{flex:1 0 auto;min-height:215px;max-height:330px;gap:14px}
+    /* herói: rótulo no alto, número no meio, linha de números no pé (as margens automáticas dividem a sobra) */
+    body.modo-rp .modal .dsh-hero{padding:18px 20px;gap:8px;border-radius:12px}
+    body.modo-rp .modal .dsh-hero .rs-lbl,body.modo-rp .modal .dsh-plot .rs-lbl{font-size:12px}
+    body.modo-rp .modal .dsh-big{font-size:56px;gap:9px;margin-top:auto}
+    body.modo-rp .modal .dsh-un{font-size:14px}
+    body.modo-rp .modal .dsh-delta{font-size:12.5px;padding:5px 11px}
+    body.modo-rp .modal .dsh-sub{font-size:12.5px}
+    body.modo-rp .modal .dd-nums{margin-top:auto;padding-top:14px}
+    body.modo-rp .modal .dd-n{font-size:12.5px;gap:6px;padding:0 13px}
+    body.modo-rp .modal .dd-n:first-child{padding-left:0}
+    body.modo-rp .modal .dd-n b{font-size:20px}
+    /* gráfico de posição: título maior e o eixo centrado na altura do cartão */
+    body.modo-rp .modal .dsh-plot{padding:18px 20px;gap:10px;border-radius:12px}
+    body.modo-rp .modal .dsh-pos{font-size:16.5px}
+    body.modo-rp .modal .ed-wrap{margin:auto 0;gap:10px}
+    body.modo-rp .modal .ed-leg{font-size:12.5px}
+    /* cartões Processos / Fiscalização (ou Despachos) */
+    body.modo-rp .modal .dd-card{border-radius:12px}
+    body.modo-rp .modal .dd-cab{padding:16px 22px;gap:18px}
+    body.modo-rp .modal .dd-tit{font-size:16px;gap:6px}
+    body.modo-rp .modal .dd-res{margin-top:4px;font-size:13px}
+    body.modo-rp .modal .dd-tot{gap:7px}
+    body.modo-rp .modal .dd-tot b{font-size:32px}
+    body.modo-rp .modal .dd-tot span{font-size:12.5px}
+    body.modo-rp .modal .dd-car{font-size:13px}
+    body.modo-rp .modal .dd-corpo{padding:16px 22px 22px;gap:12px}
+    /* o que aparece quando o cartão abre acompanha o tamanho novo */
+    body.modo-rp .modal .fila-gh{font-size:15px;padding:10px 15px}
+    body.modo-rp .modal .fila-gh b{font-size:18px}
+    body.modo-rp .modal .fila-gs{font-size:12.5px}
+    body.modo-rp .modal .pl{padding:12px 9px 12px 11px}
+    body.modo-rp .modal .pl-n,body.modo-rp .modal .pp-n{font-size:14px}
+    body.modo-rp .modal .pl-o,body.modo-rp .modal .pl-m{font-size:12.5px}
+    body.modo-rp .modal .frow-h,body.modo-rp .modal .frow{padding-top:12px;padding-bottom:12px}
+    body.modo-rp .modal .frow-h{padding-top:0;font-size:12.5px}
+    body.modo-rp .modal .frow{font-size:13.5px}
+    body.modo-rp .modal .frow-m{font-size:16px}
+    body.modo-rp .modal .frow-sub,body.modo-rp .modal .frow-d{font-size:12.5px}
+  }
+
   .empty{color:var(--text-dim);font-size:12.5px;padding:10px 0}
-  .foot{font-size:10.5px;color:var(--text-dimmer);margin-top:20px;line-height:1.55;border-top:1px solid rgba(var(--raise-rgb),.08);padding-top:12px}
+  .foot{font-size:12px;color:var(--text-dimmer);margin-top:20px;line-height:1.55;border-top:1px solid rgba(var(--raise-rgb),.08);padding-top:12px}
   .foot b{color:var(--badge-text)}
   @media (max-width:860px){main{grid-template-columns:1fr;grid-template-rows:56vh 1fr}aside{border-left:0;border-top:1px solid rgba(var(--ng-rgb),.16)}.crumb{max-width:min(60%,calc(100% - 220px))}}
 

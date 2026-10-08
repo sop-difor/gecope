@@ -245,7 +245,7 @@
                     <td><div class="small fw-bold text-secondary">${escapeHTML(u.telefone_whatsapp) || '-'}</div></td>
                     <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(u.matricula) || '-'}</span></td>
                     <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(u.gedop) || '-'}</span></td>
-                    <td><span class="badge rounded-pill ${roleClass} px-3" style="font-size: 0.72rem; min-width: 80px;">${u.role.toUpperCase()}</span></td>
+                    <td><span class="badge rounded-pill ${roleClass} px-3" style="font-size: 0.75rem; min-width: 80px;">${u.role.toUpperCase()}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
                             <button class="btn-action-icon" data-email="${escapeHTML(u.email)}" onclick="abrirModalEdicaoUsuario(this.dataset.email)" title="Editar Usuário">
@@ -430,6 +430,21 @@
     }
 
     async function excluirUsuario(email) {
+        // Excluir um fiscal que ainda tem processos zerava processos.fiscal_matricula (FK ON DELETE SET NULL) e tirava
+        // os processos dele do Mapa de Obras sem aviso — caso do Edilson, 07/10/2026 (12 processos). Barra antes de perguntar.
+        try {
+            const { data: alvo } = await sbClient.from('app_users').select('matricula').eq('email', email).maybeSingle();
+            if (alvo && alvo.matricula) {
+                const { count } = await sbClient.from('processos').select('id', { count: 'exact', head: true })
+                    .eq('fiscal_matricula', alvo.matricula).is('excluido_por', null);
+                if (count > 0) {
+                    return alert(`Não é possível excluir ${email}: ele é o fiscal de ${count} processo${count === 1 ? '' : 's'}.
+
+` +
+                        'Passe esses processos para outro fiscal antes de excluir. Para mudar o papel do usuário, use a edição em vez de excluir.');
+                }
+            }
+        } catch (e) { console.warn('[ADMIN] Não foi possível conferir os processos do usuário antes de excluir:', e.message); }
         if (!confirm(`Remover definitivamente o usuário ${email}?`)) return;
         try {
             const { error } = await sbClient.from('app_users').delete().eq('email', email);

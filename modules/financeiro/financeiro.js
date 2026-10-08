@@ -224,7 +224,7 @@
     function finChartTheme() {
         const dark = document.body.classList.contains("theme-dark");
         return {
-            font: { family: "Montserrat, Segoe UI, system-ui, -apple-system, Roboto, sans-serif", color: dark ? "rgba(255,255,255,0.75)" : "#475569", size: 11 },
+            font: { family: "Montserrat, Segoe UI, system-ui, -apple-system, Roboto, sans-serif", color: dark ? "rgba(255,255,255,0.75)" : "#475569", size: 12 },
             gridColor: dark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.07)",
             lineColor: dark ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.14)"
         };

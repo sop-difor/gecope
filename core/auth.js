@@ -262,6 +262,12 @@ function setupLockedModuleCard(el, locked) {
             el.dataset.onclickOriginalSet = '1';
         }
         el.onclick = e => { e.preventDefault(); avisarModuloSemAcesso(el); };
+        // O motivo do bloqueio substitui a descrição do tile (guardada para destravar depois).
+        const desc = el.querySelector('.home-list-row-desc') || el.querySelector('.home-action-text p');
+        if (desc) {
+            if (desc.dataset.descOriginal === undefined) desc.dataset.descOriginal = desc.textContent;
+            desc.textContent = motivoModuloBloqueado(el);
+        }
         if (!el.querySelector('.locked-module-badge')) {
             const badge = document.createElement('span');
             badge.className = 'locked-module-badge';
@@ -276,7 +282,18 @@ function setupLockedModuleCard(el, locked) {
         if (el.dataset.onclickOriginalSet) el.onclick = el._onclickOriginal || null;
         const badge = el.querySelector('.locked-module-badge');
         if (badge) badge.remove();
+        const desc = el.querySelector('.home-list-row-desc') || el.querySelector('.home-action-text p');
+        if (desc && desc.dataset.descOriginal !== undefined) desc.textContent = desc.dataset.descOriginal;
     }
+}
+
+// Por que o tile está bloqueado, em uma frase curta (vai no lugar da descrição):
+// módulo que o administrador libera por pessoa (data-autorizacao), módulo só de admin,
+// ou módulo que depende do perfil.
+function motivoModuloBloqueado(el) {
+    if (el.getAttribute('data-autorizacao')) return 'Liberado pelo administrador';
+    if ((el.getAttribute('data-roles') || '') === 'admin') return 'Só para administradores';
+    return 'Indisponível para o seu perfil';
 }
 
 // nome de exibição do módulo pro texto do aviso — lido do próprio título visível do
@@ -416,6 +433,8 @@ function applyRoleToUI(rawRole) {
             el.style.cursor = 'default';
             el.removeAttribute('title');
             el.onclick = null;
+            // O atalho "Por fiscal" da faixa de Processos não tem número para mostrar sem a quebra: some.
+            if (el.classList.contains('proc-strip-dist')) el.style.display = 'none';
         });
     }
 

@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="shared/tokens.css">
 <link rel="stylesheet" href="style.css">
 <!-- Supabase: mesmo cliente/sessão do restante do GECOPE (config.js define a URL/chave,
      database.js inicializa window.sbClient reaproveitando a sessão já autenticada) -->
@@ -185,7 +186,7 @@ main {
 }
 .card-resumo .cr-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .card-resumo .num   { font-size: 1.6rem; font-weight: 800; line-height: 1; color: var(--slate-900); }
-.card-resumo .label { font-size: .7rem; color: var(--slate-500); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.card-resumo .label { font-size: .75rem; color: var(--slate-500); font-weight: 700; white-space: nowrap; }
 
 .card-resumo.ativa      { border-left-color: var(--verde); }
 .card-resumo.ativa .ico-bg      { background: var(--verde); box-shadow: 0 4px 10px -2px var(--verde); }
@@ -320,13 +321,13 @@ main {
   flex-wrap: wrap;
 }
 .analista-sub-inline {
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 500;
   opacity: .72;
   white-space: nowrap;
 }
 .badges { display: flex; gap: 4px; flex-wrap: wrap; }
-.badge { font-size: .72rem; padding: 4px 10px; border-radius: 99px; font-weight: 700; }
+.badge { font-size: .75rem; padding: 4px 10px; border-radius: 99px; font-weight: 700; }
 .badge.ativa      { background: rgba(220,252,231,.9); color: #15803d; }
 .badge.fila       { background: rgba(254,243,199,.9); color: #b45309; }
 .badge.bloqueada  { background: rgba(219,234,254,.9); color: #1d4ed8; }
@@ -357,7 +358,7 @@ main {
 
 .tarefa-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
 .tarefa-titulo { font-size: .85rem; font-weight: 700; line-height: 1.5; flex: 1; text-align: justify; text-justify: inter-word; }
-.tarefa-status { font-size: .72rem; padding: 4px 10px; border-radius: 99px; font-weight: 800; white-space: nowrap; letter-spacing: .3px; }
+.tarefa-status { font-size: .75rem; padding: 4px 10px; border-radius: 99px; font-weight: 800; white-space: nowrap; letter-spacing: .3px; }
 .tarefa-status.ativa      { background: var(--ativa-bg);      color: #166534; }
 .tarefa-status.fila       { background: var(--fila-bg);       color: #92400e; }
 .tarefa-status.bloqueada  { background: var(--bloqueada-bg);  color: #1d4ed8; }
@@ -383,7 +384,7 @@ main {
   border-radius: 50%;
   background: var(--verde);
   color: white;
-  font-size: .68rem;
+  font-size: .75rem;
   font-weight: 900;
   flex-shrink: 0;
   box-shadow: 0 2px 6px rgba(0,100,50,.4);
@@ -403,7 +404,7 @@ main {
   background: #f9fafb;
   color: #374151;
   cursor: pointer;
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 700;
   line-height: 1;
   transition: background .12s, border-color .12s;
@@ -415,7 +416,7 @@ main {
 .vazio { color: #9ca3af; font-size: .88rem; padding: 22px 16px; text-align: center; font-weight: 500; }
 
 /* ── ROTINAS ── */
-.rotina-freq { font-size: .72rem; font-weight: 800; padding: 4px 11px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; letter-spacing: .3px; }
+.rotina-freq { font-size: .75rem; font-weight: 800; padding: 4px 11px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; letter-spacing: .3px; }
 .rotina-freq.diaria   { background: #dbeafe; color: var(--rotina-diaria); }
 .rotina-freq.semanal  { background: #ede9fe; color: var(--rotina-semanal); }
 .rotina-freq.mensal   { background: #cffafe; color: var(--rotina-mensal); }
@@ -453,7 +454,7 @@ main {
   flex: 1;
 }
 .toggle-chip {
-  font-size: .68rem;
+  font-size: .75rem;
   font-weight: 800;
   padding: 2px 8px;
   border-radius: 99px;
@@ -464,7 +465,7 @@ main {
 .toggle-chip.paralisada { background: var(--paralisada-bg);   color: #991b1b; }
 .toggle-chip.concluida  { background: var(--concluida-bg);    color: #4b5563; }
 .toggle-arrow {
-  font-size: .7rem;
+  font-size: .75rem;
   transition: transform .2s ease;
   color: #9ca3af;
   flex-shrink: 0;
@@ -520,7 +521,7 @@ main {
 }
 .cron-modal-header h2 { font-size: 1rem; font-weight: 800; color: #fff; }
 .campo { margin-bottom: 14px; }
-.campo label { display: block; font-size: .75rem; font-weight: 700; margin-bottom: 5px; color: #374151; text-transform: uppercase; letter-spacing: .4px; }
+.campo label { display: block; font-size: .75rem; font-weight: 700; margin-bottom: 5px; color: #374151; }
 .campo input, .campo select, .campo textarea {
   width: 100%;
   border: 1px solid var(--borda);
@@ -612,7 +613,7 @@ main {
   background: #e5e7eb;
   color: #6b7280;
   border: none;
-  font-size: .65rem;
+  font-size: .75rem;
   font-weight: 800;
   cursor: pointer;
   margin-left: 5px;
@@ -653,7 +654,7 @@ main {
   gap: 10px;
 }
 .mh-titulo-wrap { flex: 1; }
-.mh-label { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; opacity: .75; margin-bottom: 3px; }
+.mh-label { font-size: .75rem; font-weight: 700; opacity: .75; margin-bottom: 3px; }
 .mh-titulo { font-size: .88rem; font-weight: 700; line-height: 1.35; }
 .mh-fechar {
   background: rgba(255,255,255,.15);
@@ -690,10 +691,8 @@ main {
 .mh-resumo-item:nth-child(even) { border-right: none; }
 .mh-resumo-item:nth-last-child(-n+2) { border-bottom: none; }
 .mh-ri-label {
-  font-size: .63rem;
+  font-size: .75rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .6px;
   color: #9ca3af;
   margin-bottom: 3px;
 }
@@ -744,8 +743,8 @@ main {
   padding-right: 12px;
   padding-top: 3px;
 }
-.mh-lt-dia { font-size: .72rem; font-weight: 700; color: #374151; line-height: 1.3; }
-.mh-lt-hora { font-size: .67rem; color: #9ca3af; font-weight: 600; }
+.mh-lt-dia { font-size: .75rem; font-weight: 700; color: #374151; line-height: 1.3; }
+.mh-lt-hora { font-size: .75rem; color: #9ca3af; font-weight: 600; }
 .mh-lt-bolinha {
   width: 14px;
   height: 14px;
@@ -850,7 +849,7 @@ main {
 .conc-card-header h3 { font-size: .95rem; font-weight: 800; position: relative; }
 .conc-card-header .conc-count {
   background: rgba(255,255,255,.18);
-  font-size: .72rem;
+  font-size: .75rem;
   font-weight: 800;
   padding: 4px 10px;
   border-radius: 99px;
@@ -869,7 +868,7 @@ main {
 .tarefa-conc:hover { opacity: 1; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
 .tarefa-conc-titulo { font-size: .88rem; font-weight: 700; color: #374151; line-height: 1.4; }
 .tarefa-conc-meta { font-size: .76rem; color: #9ca3af; margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap; }
-.tarefa-conc-data { font-size: .7rem; color: #6b7280; margin-top: 4px; font-style: italic; }
+.tarefa-conc-data { font-size: .75rem; color: #6b7280; margin-top: 4px; font-style: italic; }
 .tarefa-conc-acoes { margin-top: 8px; display: flex; gap: 5px; }
 .conc-barra {
   background: white;
@@ -915,7 +914,7 @@ main {
 }
 .cal-nav-btn:hover { background: var(--verde); color: white; }
 .cal-mes-titulo { font-size: 1.15rem; font-weight: 800; color: var(--verde-escuro); text-transform: capitalize; letter-spacing: .3px; }
-.cal-filtro-label { font-size: .72rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+.cal-filtro-label { font-size: .75rem; font-weight: 700; color: #6b7280; white-space: nowrap; }
 .cal-periodo-btn {
   padding: 5px 12px;
   border: 1.5px solid #d1d5db;
@@ -968,7 +967,7 @@ main {
 }
 .cal-dow {
   text-align: center;
-  font-size: .65rem;
+  font-size: .75rem;
   font-weight: 800;
   color: #9ca3af;
   text-transform: uppercase;
@@ -982,7 +981,7 @@ main {
   opacity: .85;
 }
 .cal-feriado-nome {
-  font-size: .58rem;
+  font-size: .75rem;
   color: #b45309;
   font-weight: 700;
   margin-top: 2px;
@@ -1023,7 +1022,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: .7rem;
+  font-size: .75rem;
   font-weight: 800;
   flex-shrink: 0;
 }
@@ -1038,14 +1037,14 @@ main {
   border-left: 3px solid transparent;
 }
 .cal-evento-nome {
-  font-size: .71rem;
+  font-size: .75rem;
   font-weight: 700;
   display: block;
   margin-bottom: 2px;
   line-height: 1.35;
 }
 .cal-evento-obs {
-  font-size: .65rem;
+  font-size: .75rem;
   font-weight: 500;
   display: block;
   margin: 2px 0 3px;
@@ -1054,7 +1053,7 @@ main {
   font-style: italic;
 }
 .cal-evento-meta {
-  font-size: .65rem;
+  font-size: .75rem;
   font-weight: 600;
   opacity: .85;
   display: block;
@@ -1072,7 +1071,7 @@ main {
 .cal-evento.fim:hover      { box-shadow: 0 6px 14px rgba(225,29,72,.18),  0 2px 4px rgba(225,29,72,.1); }
 .cal-evento-badge {
   display: inline-block;
-  font-size: .58rem;
+  font-size: .75rem;
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -1099,7 +1098,7 @@ main {
 .rel-card-resumo.aguard  { border-left-color: var(--fila); }
 .rel-card-resumo.par     { border-left-color: var(--paralisada); }
 .rel-card-resumo .rc-num { font-size: 2rem; font-weight: 900; line-height: 1; }
-.rel-card-resumo .rc-label { font-size: .7rem; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-top: 3px; }
+.rel-card-resumo .rc-label { font-size: .75rem; color: #6b7280; font-weight: 700; margin-top: 3px; }
 .rel-analista-bloco { margin-bottom: 28px; }
 .rel-analista-header {
   background: linear-gradient(135deg, var(--verde-escuro), var(--verde));
@@ -1113,7 +1112,7 @@ main {
 .rel-analista-header strong { font-size: .95rem; font-weight: 800; }
 .rel-analista-header .rel-badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .rel-badge {
-  font-size: .68rem;
+  font-size: .75rem;
   font-weight: 800;
   padding: 3px 9px;
   border-radius: 99px;
@@ -1131,14 +1130,14 @@ table {
   margin-bottom: 20px;
 }
 thead { background: linear-gradient(135deg, var(--verde-escuro), var(--verde)); color: white; }
-thead th { padding: 11px 15px; text-align: left; font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .4px; }
+thead th { padding: 11px 15px; text-align: left; font-weight: 700; font-size: .75rem; }
 tbody tr { border-bottom: 1px solid #f0f0f0; }
 tbody tr:hover { background: #f5fdf8; }
 tbody td { padding: 10px 15px; vertical-align: top; }
 
 .status-pill {
   display: inline-block; padding: 3px 10px;
-  border-radius: 99px; font-size: .68rem; font-weight: 800;
+  border-radius: 99px; font-size: .75rem; font-weight: 800;
 }
 .status-pill.ativa      { background: var(--ativa-bg);      color: #166534; }
 .status-pill.fila       { background: var(--fila-bg);       color: #92400e; }
@@ -1563,9 +1562,9 @@ body.theme-dark .tarefa-conc-meta {
       <i class="bi bi-funnel-fill" aria-hidden="true"></i>
       <select id="filtro-status" onchange="renderPainel()">
         <option value="">Todos os status</option>
-        <option value="ativa">EM EXECUÇÃO</option>
-        <option value="fila">EM FILA</option>
-        <option value="bloqueada">DEVOLVIDA</option>
+        <option value="ativa">Em execução</option>
+        <option value="fila">Em fila</option>
+        <option value="bloqueada">Devolvida</option>
         <option value="paralisada">PARALISADA</option>
         <option value="concluida">CONCLUÍDA</option>
       </select>
@@ -1646,9 +1645,9 @@ body.theme-dark .tarefa-conc-meta {
   <input type="hidden" id="rel-data-fim">
   <select id="rel-filtro-status" style="display:none">
     <option value="">Todos os status</option>
-    <option value="ativa">EM EXECUÇÃO</option>
-    <option value="fila">EM FILA</option>
-    <option value="bloqueada">DEVOLVIDA</option>
+    <option value="ativa">Em execução</option>
+    <option value="fila">Em fila</option>
+    <option value="bloqueada">Devolvida</option>
   </select>
 
   <!-- Vista Lista (oculta, mantida para compatibilidade) -->
@@ -1681,16 +1680,16 @@ body.theme-dark .tarefa-conc-meta {
     </div>
     <!-- Barra de filtro de período -->
     <div id="cal-filtro-periodo" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;background:#f8f9fb;border-bottom:1px solid #e5e7eb;border-top:1px solid #e5e7eb;">
-      <span style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap"><i class="bi bi-calendar3"></i> Período</span>
+      <span style="font-size:.75rem;font-weight:700;color:#6b7280;white-space:nowrap"><i class="bi bi-calendar3"></i> Período</span>
       <button class="cal-periodo-btn" onclick="calPeriodoPreset('semana')">Esta semana</button>
       <button class="cal-periodo-btn" onclick="calPeriodoPreset('proxima')">Próx. semana</button>
       <button class="cal-periodo-btn" onclick="calPeriodoPreset('15d')">Próx. 15 dias</button>
       <button class="cal-periodo-btn" onclick="calPeriodoPreset('mes')">Mês completo</button>
       <div style="width:1px;height:22px;background:#d1d5db;margin:0 4px"></div>
       <div style="display:flex;align-items:center;gap:6px">
-        <label style="font-size:.72rem;font-weight:600;color:#6b7280;white-space:nowrap">De</label>
+        <label style="font-size:.75rem;font-weight:600;color:#6b7280;white-space:nowrap">De</label>
         <input type="date" id="cal-p-ini" class="cal-periodo-input" oninput="calPeriodoCustom()">
-        <label style="font-size:.72rem;font-weight:600;color:#6b7280;white-space:nowrap">até</label>
+        <label style="font-size:.75rem;font-weight:600;color:#6b7280;white-space:nowrap">até</label>
         <input type="date" id="cal-p-fim" class="cal-periodo-input" oninput="calPeriodoCustom()">
       </div>
       <button class="cal-periodo-btn cal-periodo-limpar" onclick="calPeriodoLimpar()" id="cal-limpar-btn" style="display:none"><i class="bi bi-x-lg"></i> Limpar filtro</button>
@@ -1754,14 +1753,14 @@ body.theme-dark .tarefa-conc-meta {
     <!-- Campo de justificativa de aditamento de prazo (visível só ao alterar prazo em edição) -->
     <div class="campo" id="campo-aditamento" style="display:none">
       <div class="campo-justificativa-box" style="border-color:#93c5fd;background:#eff6ff">
-        <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#1e40af;text-transform:uppercase;letter-spacing:.4px">
+        <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#1e40af;">
           <i class="bi bi-calendar3"></i> Motivo do Aditamento de Prazo *
         </label>
         <textarea id="t-aditamento"
                   placeholder="Descreva o motivo da alteração do prazo. Ex.: Aguardando documentação complementar do contratado."
                   style="width:100%;border:1px solid #93c5fd;border-radius:8px;padding:9px 12px;font-size:.84rem;font-family:'Montserrat',sans-serif;background:white;resize:vertical;min-height:60px;transition:border-color .15s"
         ></textarea>
-        <div style="font-size:.72rem;color:#1e40af;margin-top:4px;font-weight:600"><i class="bi bi-exclamation-triangle-fill"></i> A justificativa do aditamento será registrada no histórico com data e hora.</div>
+        <div style="font-size:.75rem;color:#1e40af;margin-top:4px;font-weight:600"><i class="bi bi-exclamation-triangle-fill"></i> A justificativa do aditamento será registrada no histórico com data e hora.</div>
       </div>
     </div>
     <div class="campo">
@@ -1788,10 +1787,10 @@ body.theme-dark .tarefa-conc-meta {
         <button type="button" class="fmt-btn" id="fmt-bold"    onclick="fmtObs('bold')"          title="Negrito"><b>N</b></button>
         <button type="button" class="fmt-btn" id="fmt-italic"  onclick="fmtObs('italic')"        title="Itálico"><i style="font-style:italic">I</i></button>
         <div class="fmt-sep"></div>
-        <button type="button" class="fmt-btn" id="fmt-left"    onclick="fmtObs('justifyLeft')"   title="Esquerda"   style="font-size:.7rem;width:36px">Esq</button>
-        <button type="button" class="fmt-btn" id="fmt-center"  onclick="fmtObs('justifyCenter')" title="Centralizar" style="font-size:.7rem;width:36px">Cen</button>
-        <button type="button" class="fmt-btn" id="fmt-right"   onclick="fmtObs('justifyRight')"  title="Direita"    style="font-size:.7rem;width:36px">Dir</button>
-        <button type="button" class="fmt-btn" id="fmt-justify" onclick="fmtObs('justifyFull')"   title="Justificar" style="font-size:.7rem;width:36px">Just</button>
+        <button type="button" class="fmt-btn" id="fmt-left"    onclick="fmtObs('justifyLeft')"   title="Esquerda"   style="font-size:.75rem;width:36px">Esq</button>
+        <button type="button" class="fmt-btn" id="fmt-center"  onclick="fmtObs('justifyCenter')" title="Centralizar" style="font-size:.75rem;width:36px">Cen</button>
+        <button type="button" class="fmt-btn" id="fmt-right"   onclick="fmtObs('justifyRight')"  title="Direita"    style="font-size:.75rem;width:36px">Dir</button>
+        <button type="button" class="fmt-btn" id="fmt-justify" onclick="fmtObs('justifyFull')"   title="Justificar" style="font-size:.75rem;width:36px">Just</button>
       </div>
       <div id="t-obs"
            class="campo-rich"
@@ -1806,14 +1805,14 @@ body.theme-dark .tarefa-conc-meta {
     <!-- Campo separado: justificativa de paralisação (visível só quando paralisada) -->
     <div class="campo" id="campo-justificativa" style="display:none">
       <div class="campo-justificativa-box">
-        <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#991b1b;text-transform:uppercase;letter-spacing:.4px">
+        <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#991b1b;">
           <i class="bi bi-pause-fill"></i> Justificativa da Paralisação *
         </label>
         <textarea id="t-justificativa"
                   placeholder="Descreva o motivo da paralisação. Ex.: Analista requisitado pela DIFOR para levantamento de quantitativos até 18/07/2026."
                   style="width:100%;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;font-size:.84rem;font-family:'Montserrat',sans-serif;background:white;resize:vertical;min-height:70px;transition:border-color .15s"
         ></textarea>
-        <div style="font-size:.72rem;color:#991b1b;margin-top:4px;font-weight:600"><i class="bi bi-exclamation-triangle-fill"></i> Esta justificativa será registrada no histórico da tarefa com data e hora.</div>
+        <div style="font-size:.75rem;color:#991b1b;margin-top:4px;font-weight:600"><i class="bi bi-exclamation-triangle-fill"></i> Esta justificativa será registrada no histórico da tarefa com data e hora.</div>
       </div>
     </div>
     <div class="modal-rodape">
@@ -1848,17 +1847,17 @@ body.theme-dark .tarefa-conc-meta {
         <div class="campo">
           <label>Início</label>
           <input type="date" id="rev-inicio">
-          <div id="rev-aviso-inicio" style="font-size:.72rem;margin-top:3px;color:#dc2626;display:none"><i class="bi bi-exclamation-triangle-fill"></i> Data já passou</div>
+          <div id="rev-aviso-inicio" style="font-size:.75rem;margin-top:3px;color:#dc2626;display:none"><i class="bi bi-exclamation-triangle-fill"></i> Data já passou</div>
         </div>
         <div class="campo">
           <label>Prazo / Fim *</label>
           <input type="date" id="rev-prazo">
-          <div id="rev-aviso-prazo" style="font-size:.72rem;margin-top:3px;color:#dc2626;display:none"><i class="bi bi-exclamation-triangle-fill"></i> Data já passou</div>
+          <div id="rev-aviso-prazo" style="font-size:.75rem;margin-top:3px;color:#dc2626;display:none"><i class="bi bi-exclamation-triangle-fill"></i> Data já passou</div>
         </div>
       </div>
       <div class="campo" id="rev-campo-motivo" style="display:none">
         <div class="campo-justificativa-box" style="border-color:#93c5fd;background:#eff6ff">
-          <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#1e40af;text-transform:uppercase;letter-spacing:.4px">
+          <label style="display:block;font-size:.75rem;font-weight:700;margin-bottom:5px;color:#1e40af;">
             <i class="bi bi-calendar3"></i> Motivo do Novo Prazo *
           </label>
           <textarea id="rev-motivo" placeholder="Ex.: Atraso em outras atividades prioritárias atrasou o início desta."
@@ -2553,23 +2552,23 @@ function renderResumo() {
     </div>
     <div class="card-resumo ativa">
       <i class="bi bi-play-circle-fill ico-bg" aria-hidden="true"></i>
-      <div class="cr-texto"><div class="num">${a}</div><div class="label">EM EXECUÇÃO</div></div>
+      <div class="cr-texto"><div class="num">${a}</div><div class="label">Em execução</div></div>
     </div>
     <div class="card-resumo standby">
       <i class="bi bi-hourglass-split ico-bg" aria-hidden="true"></i>
-      <div class="cr-texto"><div class="num">${s}</div><div class="label">EM FILA</div></div>
+      <div class="cr-texto"><div class="num">${s}</div><div class="label">Em fila</div></div>
     </div>
     <div class="card-resumo bloqueada">
       <i class="bi bi-pause-circle-fill ico-bg" aria-hidden="true"></i>
-      <div class="cr-texto"><div class="num">${b}</div><div class="label">DEVOLVIDA</div></div>
+      <div class="cr-texto"><div class="num">${b}</div><div class="label">Devolvida</div></div>
     </div>
     <div class="card-resumo paralisada">
       <i class="bi bi-slash-circle ico-bg" aria-hidden="true"></i>
-      <div class="cr-texto"><div class="num">${p}</div><div class="label">PARALISADAS</div></div>
+      <div class="cr-texto"><div class="num">${p}</div><div class="label">Paralisadas</div></div>
     </div>
     <div class="card-resumo concluida">
       <i class="bi bi-check2-circle ico-bg" aria-hidden="true"></i>
-      <div class="cr-texto"><div class="num">${c}</div><div class="label">CONCLUÍDAS</div></div>
+      <div class="cr-texto"><div class="num">${c}</div><div class="label">Concluídas</div></div>
     </div>`;
 }
 
@@ -3379,15 +3378,15 @@ function renderRelatorio() {
     </div>
     <div class="rel-card-resumo exec">
       <i class="bi bi-play-circle-fill" style="font-size:1.6rem"></i>
-      <div><div class="rc-num" style="color:var(--ativa)">${totExec}</div><div class="rc-label">EM EXECUÇÃO</div></div>
+      <div><div class="rc-num" style="color:var(--ativa)">${totExec}</div><div class="rc-label">Em execução</div></div>
     </div>
     <div class="rel-card-resumo aguard">
       <i class="bi bi-hourglass-split" style="font-size:1.6rem"></i>
-      <div><div class="rc-num" style="color:var(--fila)">${totAguard}</div><div class="rc-label">EM FILA</div></div>
+      <div><div class="rc-num" style="color:var(--fila)">${totAguard}</div><div class="rc-label">Em fila</div></div>
     </div>
     <div class="rel-card-resumo par">
       <i class="bi bi-slash-circle" style="font-size:1.6rem"></i>
-      <div><div class="rc-num" style="color:var(--paralisada)">${totPar}</div><div class="rc-label">PARALISADAS</div></div>
+      <div><div class="rc-num" style="color:var(--paralisada)">${totPar}</div><div class="rc-label">Paralisadas</div></div>
     </div>`;
 
   let html = '';
@@ -3515,8 +3514,8 @@ function renderConcluidas() {
             </div>
             <div class="tarefa-conc-data"><i class="bi bi-check2-circle"></i> Concluída em ${dataConc}</div>
             <div class="tarefa-conc-acoes">
-              <button class="btn btn-pequeno" style="background:#dcfce7;color:#166534;font-size:.74rem" onclick="reabrirTarefa('${t.id}')"><i class="bi bi-arrow-counterclockwise"></i> Reabrir</button>
-              <button class="btn btn-vermelho btn-pequeno" style="font-size:.74rem" onclick="excluirTarefa('${t.id}')"><i class="bi bi-trash-fill"></i></button>
+              <button class="btn btn-pequeno" style="background:#dcfce7;color:#166534;font-size:.75rem" onclick="reabrirTarefa('${t.id}')"><i class="bi bi-arrow-counterclockwise"></i> Reabrir</button>
+              <button class="btn btn-vermelho btn-pequeno" style="font-size:.75rem" onclick="excluirTarefa('${t.id}')"><i class="bi bi-trash-fill"></i></button>
             </div>
           </div>`;
         }).join('')}

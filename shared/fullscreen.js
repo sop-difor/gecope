@@ -45,7 +45,7 @@
         var fs = ativa();
         var icon = document.getElementById('fullscreen-toggle-icon');
         var label = document.getElementById('fullscreen-toggle-label');
-        if (icon) icon.className = fs ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen';
+        if (icon) icon.className = fs ? 'bi bi-fullscreen-exit' : 'bi bi-fullscreen';
         if (label) label.textContent = fs ? 'Restaurar' : 'Tela cheia';
     }
 
