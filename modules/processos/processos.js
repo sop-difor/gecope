@@ -266,10 +266,10 @@ function montarHistoricoAlertaRetornoHTML(lista) {
             <div class="mb-2 pb-2 border-bottom border-light">
                 <div class="d-flex justify-content-between">
                     <span class="fw-bold text-dark">${escapeHTML(reg.sigla)}</span>
-                    <span class="text-muted" style="font-size: 0.7rem;">${dt}</span>
+                    <span class="text-muted" style="font-size: 0.75rem;">${dt}</span>
                 </div>
                 <div>${escapeHTML(reg.comentario)}</div>
-                <div class="text-muted" style="font-size: 0.7rem;">${escapeHTML(reg.autor_nome || '')}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">${escapeHTML(reg.autor_nome || '')}</div>
             </div>
         `;
     }).join('');
@@ -335,7 +335,7 @@ async function salvarAlertaRetornoComentario() {
     const btn = document.getElementById('btn-salvar-alerta-retorno');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = 'SALVANDO...';
+        btn.innerHTML = 'Salvando...';
     }
 
     // Sem o try/catch, uma falha de rede deixava o botão preso em "SALVANDO..." e
@@ -1492,7 +1492,7 @@ async function enviarParaPlanilha() {
         return;
     }
 
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> SALVANDO...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
 
     const safeVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
 
@@ -1544,7 +1544,7 @@ async function enviarParaPlanilha() {
         msg.className = 'alert alert-danger mt-3';
         msg.innerHTML = `Erro ao salvar: ${escapeHTML(e && e.message ? e.message : String(e))}`;
         btn.disabled = false;
-        btn.innerHTML = 'SALVAR';
+        btn.innerHTML = 'Salvar';
         return;
     }
 
@@ -1556,7 +1556,7 @@ async function enviarParaPlanilha() {
         // escapada antes de entrar como HTML. — 22/09/2026
         msg.innerHTML = `Erro ao salvar: ${escapeHTML(error.message)}`;
         btn.disabled = false;
-        btn.innerHTML = 'SALVAR';
+        btn.innerHTML = 'Salvar';
     } else {
         msg.style.display = 'block';
         msg.className = 'alert alert-success mt-3';
@@ -1662,7 +1662,7 @@ async function enviarParaPlanilha() {
             form.reset();
             msg.style.display = 'none';
             btn.disabled = false;
-            btn.innerHTML = 'SALVAR';
+            btn.innerHTML = 'Salvar';
             const elObraStatus = document.getElementById('cad_obra_status');
             if (elObraStatus) elObraStatus.textContent = '';
             const elComissaoWrap = document.getElementById('cad_comissao_wrap');
@@ -1875,7 +1875,7 @@ async function abrirDetalhes(processoStr) {
     // controle passou para cá — mesmo padrão do botão EXCLUIR logo abaixo.
     const btnSalvarModal = document.getElementById('btn-atualizar');
     if (btnSalvarModal) {
-        btnSalvarModal.innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+        btnSalvarModal.innerHTML = '<i class="bi bi-check-lg"></i> Salvar alterações';
         btnSalvarModal.disabled = !podeEditar;
         btnSalvarModal.style.display = podeEditar ? '' : 'none';
     }
@@ -1889,7 +1889,7 @@ async function abrirDetalhes(processoStr) {
     const btnExcluirModal = document.getElementById('btn-excluir');
     if (btnExcluirModal) {
         const podeExcluir = podeExcluirProcesso();
-        btnExcluirModal.innerHTML = '<i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO';
+        btnExcluirModal.innerHTML = '<i class="bi bi-trash-fill"></i> Excluir processo';
         btnExcluirModal.disabled = !podeExcluir;
         btnExcluirModal.style.display = podeExcluir ? '' : 'none';
     }
@@ -1953,7 +1953,7 @@ async function carregarHistoricoPrioridades(processoStr) {
                     <div class="d-flex align-items-center mb-1">
                         ${icon} <span class="fw-bold text-dark">${escapeHTML(registro.usuario)}</span>
                     </div>
-                    <div class="ps-3 text-muted" style="font-size: 0.65rem;">
+                    <div class="ps-3 text-muted" style="font-size: 0.75rem;">
                         ${actionText} em ${dt}
                     </div>
                 </div>
@@ -2290,7 +2290,7 @@ async function executarAcaoDetalhes(actionType) {
 
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES';
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Salvar alterações';
         }
 
         if (error) {
@@ -2747,7 +2747,7 @@ window.changeSort = changeSort;
 function getSortIcon(columnKey) {
     const sort = currentSort.find(s => s.col === columnKey);
     const sortIndex = currentSort.findIndex(s => s.col === columnKey);
-    const indexBadge = currentSort.length > 1 && sortIndex !== -1 ? `<span class="badge bg-success ms-1" style="font-size: 0.6rem; padding: 2px 4px;">${sortIndex + 1}</span>` : '';
+    const indexBadge = currentSort.length > 1 && sortIndex !== -1 ? `<span class="badge bg-success ms-1" style="font-size: 0.75rem; padding: 2px 4px;">${sortIndex + 1}</span>` : '';
 
     if (!sort) { return '<i class="bi bi-arrow-down-up text-secondary ms-1" style="font-size: 1rem; opacity: 0.4;"></i>'; }
     return (sort.dir === 'asc' ? '<i class="bi bi-sort-up text-success ms-1" style="font-size: 1.1rem;"></i>' : '<i class="bi bi-sort-down-alt text-success ms-1" style="font-size: 1.1rem;"></i>') + indexBadge;
@@ -2808,7 +2808,7 @@ function _roscaBreakdownSVG(entradas, total, isDark) {
         <svg width="180" height="180" viewBox="0 0 180 180">${arcosSVG}</svg>
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
             <div style="font-size:1.6rem;font-weight:800;color:var(--text-heading);line-height:1;">${total}</div>
-            <div style="font-size:0.68rem;color:var(--text-muted);">processo${total === 1 ? '' : 's'}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">processo${total === 1 ? '' : 's'}</div>
         </div>
     </div>`;
 }
@@ -2854,7 +2854,7 @@ function _secaoDistritoComFiscais(linhas, porDistrito, total, isDark, infoDireit
             </div>`;
         }).join('');
         // Percentual do subitem é relativo ao distrito — o cabeçalho abaixo deixa isso explícito.
-        const cabecalhoFiscais = `<div class="py-1" style="padding-left:1.9rem;font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Fiscais neste distrito <span style="text-transform:none;letter-spacing:0;">(% relativo ao distrito)</span></div>`;
+        const cabecalhoFiscais = `<div class="py-1" style="padding-left:1.9rem;font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.03em;">Fiscais neste distrito <span style="text-transform:none;letter-spacing:0;">(% relativo ao distrito)</span></div>`;
 
         const panelId = `kpiBreakdownDistrito-${i}`;
         return `<div class="kpi-distrito-row">
@@ -2862,7 +2862,7 @@ function _secaoDistritoComFiscais(linhas, porDistrito, total, isDark, infoDireit
                 aria-expanded="false" aria-controls="${panelId}"
                 onclick="_toggleDistritoBreakdown(this,'${panelId}')">
                 <span class="d-flex align-items-center flex-wrap gap-2" style="min-width:0;flex:1;">
-                    <i class="bi bi-chevron-right" aria-hidden="true" style="font-size:0.72rem;color:var(--text-muted);flex:none;transition:transform .15s;"></i>
+                    <i class="bi bi-chevron-right" aria-hidden="true" style="font-size:0.75rem;color:var(--text-muted);flex:none;transition:transform .15s;"></i>
                     <span style="width:10px;height:10px;border-radius:2px;background:${cor};flex:none;"></span>
                     <span style="color:var(--text-heading);font-weight:600;word-break:break-word;">${escapeHTML(distrito)}</span>
                     <span style="color:var(--text-muted);font-size:0.76rem;white-space:nowrap;">${rotuloFiscais}</span>
@@ -2882,7 +2882,7 @@ function _secaoDistritoComFiscais(linhas, porDistrito, total, isDark, infoDireit
             ${_roscaBreakdownSVG(porDistrito, total, isDark)}
             <div style="flex:1;min-width:0;width:100%;font-size:0.8rem;color:var(--text-muted);padding-top:0.4rem;">
                 <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Clique num distrito para ver os fiscais com processos naquele distrito.
-                <div class="mt-1" style="font-size:0.74rem;">Distrito e fiscal aqui seguem quem respondeu pelo processo (troca de fiscal) — podem diferir do que aparece na linha desse processo na lista abaixo.</div>
+                <div class="mt-1" style="font-size:0.75rem;">Distrito e fiscal aqui seguem quem respondeu pelo processo (troca de fiscal) — podem diferir do que aparece na linha desse processo na lista abaixo.</div>
             </div>
         </div>
         <div style="overflow-x:hidden;">${linhasHTML}</div>`;
@@ -3170,28 +3170,6 @@ function _updateReuniaoInterno() {
     }
     let rows = mtBase.slice();
 
-    // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
-    if (!window.currentProcessesTab) window.currentProcessesTab = 'ativos';
-
-    // Com busca textual ativa, ignora a paginação por aba e busca em todas as páginas
-    const isGlobalSearch = mt.search.value.trim().length > 0;
-
-    if (!isGlobalSearch) {
-        rows = rows.filter(d => {
-            const st = (d.status || "").toUpperCase().trim();
-            const isAprovado = st.includes("APROVADO") || st === "SEDUC";
-            const isArquivado = st.includes("ARQUIVADO");
-
-            if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
-            if (window.currentProcessesTab === 'aprovados') {
-                if (window.filtroSomenteAlertaDiligencia) return isAprovado && !!d.alerta_pre_diligencia;
-                return isAprovado;
-            }
-            if (window.currentProcessesTab === 'arquivados') return isArquivado;
-            return true;
-        });
-    }
-
     // Fase 5: Fiscal com a autorização especial "processos_ver_todos" concedida
     // pelo Admin pula o recorte por vínculo — vê todos os processos e o filtro
     // por fiscal aparece pra ele, igual admin/gerente/externo (cai no `else`).
@@ -3258,13 +3236,37 @@ function _updateReuniaoInterno() {
             console.warn(`[permissões] ${comAviso} processo(s) vinculados a você pelo nome, não pela matrícula. `
                 + `Veja o aviso ⚠ ao lado do nome do fiscal em cada linha.`);
         }
-        if (mt.fiscal && mt.fiscal.closest('.col-12.col-md-2')) {
-            mt.fiscal.closest('.col-12.col-md-2').style.display = 'none';
+        if (mt.fiscal && mt.fiscal.closest('.proc-toolbar-field')) {
+            mt.fiscal.closest('.proc-toolbar-field').hidden = true;
         }
     } else {
-        if (mt.fiscal && mt.fiscal.closest('.col-12.col-md-2')) {
-            mt.fiscal.closest('.col-12.col-md-2').style.display = '';
+        if (mt.fiscal && mt.fiscal.closest('.proc-toolbar-field')) {
+            mt.fiscal.closest('.proc-toolbar-field').hidden = false;
         }
+    }
+
+    // Contagem das abas (com o recorte de perfil, sem os demais filtros) e filtro da aba.
+    contarAbasProcessos(rows);
+    // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
+    if (!window.currentProcessesTab) window.currentProcessesTab = 'ativos';
+
+    // Com busca textual ativa, ignora a paginação por aba e busca em todas as páginas
+    const isGlobalSearch = mt.search.value.trim().length > 0;
+
+    if (!isGlobalSearch) {
+        rows = rows.filter(d => {
+            const st = (d.status || "").toUpperCase().trim();
+            const isAprovado = st.includes("APROVADO") || st === "SEDUC";
+            const isArquivado = st.includes("ARQUIVADO");
+
+            if (window.currentProcessesTab === 'ativos') return !isAprovado && !isArquivado;
+            if (window.currentProcessesTab === 'aprovados') {
+                if (window.filtroSomenteAlertaDiligencia) return isAprovado && !!d.alerta_pre_diligencia;
+                return isAprovado;
+            }
+            if (window.currentProcessesTab === 'arquivados') return isArquivado;
+            return true;
+        });
     }
 
     const f = getSelectedValues(mt.fiscal);
@@ -3284,60 +3286,71 @@ function _updateReuniaoInterno() {
     const allM = mt.meta.querySelectorAll('option:checked').length === totalM;
     const allP = mt.prioritario.querySelectorAll('option:checked').length === totalP;
 
-    if (f.length > 0 && !allF) {
-        rows = rows.filter(d => f.includes(d.fiscal || "Não informado"));
-    }
-    if (s.length > 0 && !allS) {
-        rows = rows.filter(d => s.includes(d.status || "Não informado"));
-    }
-    if (m.length > 0 && !allM) {
-        rows = rows.filter(d => m.includes(getMetaSt(d)));
-    }
-    if (priorFilt.length > 0 && !allP) {
-        rows = rows.filter(d => priorFilt.includes(isPrioritario(d) ? "Sim" : "Não"));
-    }
+    // Aplica os filtros do painel. `comStatus=false` ignora o filtro de status: a faixa de
+    // números (Todos / Com o fiscal / ...) precisa contar sem ele, senão filtrar por uma
+    // situação zeraria as outras.
+    const aplicarFiltros = (base, comStatus) => {
+        let rows = base;
+        if (f.length > 0 && !allF) {
+            rows = rows.filter(d => f.includes(d.fiscal || "Não informado"));
+        }
+        if (comStatus && s.length > 0 && !allS) {
+            rows = rows.filter(d => s.includes(d.status || "Não informado"));
+        }
+        if (m.length > 0 && !allM) {
+            rows = rows.filter(d => m.includes(getMetaSt(d)));
+        }
+        if (priorFilt.length > 0 && !allP) {
+            rows = rows.filter(d => priorFilt.includes(isPrioritario(d) ? "Sim" : "Não"));
+        }
 
-    if (qRaw) {
-        const normalizeText = (text) => (text || "").normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const qNormalized = normalizeText(qRaw);
-        const terms = qNormalized.split(/\s+/).filter(t => t.length > 0);
-        const escapeRE = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (qRaw) {
+            const normalizeText = (text) => (text || "").normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            const qNormalized = normalizeText(qRaw);
+            const terms = qNormalized.split(/\s+/).filter(t => t.length > 0);
+            const escapeRE = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-        // Otimização: Compila os Regex UMA vez fora do loop
-        const compiledTerms = terms.map(term => ({
-            term: term,
-            regex: new RegExp(`\\b${escapeRE(term)}`, 'i')
-        }));
+            // Otimização: Compila os Regex UMA vez fora do loop
+            const compiledTerms = terms.map(term => ({
+                term: term,
+                regex: new RegExp(`\\b${escapeRE(term)}`, 'i')
+            }));
 
-        rows = rows.filter(d => {
-            const proc = (d.processo || "").toLowerCase();
-            const contrat = normalizeText(d.contratante);
-            const desc = normalizeText(d.descricao);
-            const analistaNome = normalizeText(d.nomeAnalista);
-            const fiscal = normalizeText(d.fiscal);
-            const status = normalizeText(d.status);
-            const contratada = normalizeText(d.contratada);
+            rows = rows.filter(d => {
+                const proc = (d.processo || "").toLowerCase();
+                const contrat = normalizeText(d.contratante);
+                const desc = normalizeText(d.descricao);
+                const analistaNome = normalizeText(d.nomeAnalista);
+                const fiscal = normalizeText(d.fiscal);
+                const status = normalizeText(d.status);
+                const contratada = normalizeText(d.contratada);
 
-            return compiledTerms.every(({ term, regex }) => {
-                return proc.includes(term) ||
-                    regex.test(contratada) ||
-                    regex.test(contrat) ||
-                    regex.test(desc) ||
-                    regex.test(analistaNome) ||
-                    regex.test(fiscal) ||
-                    regex.test(status);
+                return compiledTerms.every(({ term, regex }) => {
+                    return proc.includes(term) ||
+                        regex.test(contratada) ||
+                        regex.test(contrat) ||
+                        regex.test(desc) ||
+                        regex.test(analistaNome) ||
+                        regex.test(fiscal) ||
+                        regex.test(status);
+                });
             });
-        });
-    }
+        }
+        return rows;
+    };
+    const rowsAntesDosFiltros = rows;
+    rows = aplicarFiltros(rowsAntesDosFiltros, true);
+    const rowsParaContagem = aplicarFiltros(rowsAntesDosFiltros, false);
     document.getElementById("meetingFooterNote").textContent = `Exibindo ${rows.length} processos`;
-    document.getElementById("card_proc_total").textContent = rows.length;
-    // Card "Processos Fiscalização": consolida ANÁLISE FISCAL + REANÁLISE FISCAL.
-    document.getElementById("card_proc_andamento").textContent = rows.filter(d => {
-        const s = (d.status || "").toUpperCase();
-        return s === "ANÁLISE FISCAL" || s === "DEVOLVIDO P/ REANÁLISE FISCAL";
-    }).length;
-    document.getElementById("card_proc_aprovados").textContent = rows.filter(d => (d.status || "").toUpperCase() === "ANÁLISE FISCAL").length;
-    document.getElementById("card_proc_dias").textContent = rows.filter(d => (d.status || "").toUpperCase() === "DEVOLVIDO P/ REANÁLISE FISCAL").length;
+    // Faixa de números (clicável): conta sem o filtro de status, para os números não sumirem
+    // ao filtrar por uma das situações.
+    const STATUS_FISCAL = ["ANÁLISE FISCAL", "DEVOLVIDO P/ REANÁLISE FISCAL"];
+    const stDe = d => (d.status || "").toUpperCase();
+    document.getElementById("card_proc_total").textContent = rowsParaContagem.length;
+    document.getElementById("card_proc_andamento").textContent = rowsParaContagem.filter(d => STATUS_FISCAL.includes(stDe(d))).length;
+    document.getElementById("card_proc_aprovados").textContent = rowsParaContagem.filter(d => stDe(d) === "ANÁLISE FISCAL").length;
+    document.getElementById("card_proc_dias").textContent = rowsParaContagem.filter(d => stDe(d) === "DEVOLVIDO P/ REANÁLISE FISCAL").length;
+    atualizarEstadoFiltrosProcessos();
 
     const btnExport = document.getElementById("btn-reuniao-export");
     if (btnExport) {
@@ -3504,7 +3517,7 @@ function _updateReuniaoInterno() {
                 <span class="d-inline-flex align-items-center" style="gap: 7px;">
                     <span style="width: 7px; height: 7px; border-radius: 50%; background: ${accentColor}; flex-shrink: 0;"></span>
                     <span class="text-uppercase" style="font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; color: var(--text-heading);">${escapeHTML(statusGroupLabel)}</span>
-                    <span class="text-muted" style="font-size: 0.74rem; font-weight: 500;">${statusGroupCounts[statusGroupLabel]} processo${statusGroupCounts[statusGroupLabel] === 1 ? '' : 's'}</span>
+                    <span class="text-muted" style="font-size: 0.75rem; font-weight: 500;">${statusGroupCounts[statusGroupLabel]} processo${statusGroupCounts[statusGroupLabel] === 1 ? '' : 's'}</span>
                 </span>
             </td>
         </tr>`);
@@ -3565,25 +3578,25 @@ function _updateReuniaoInterno() {
             <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
             <td class="text-center">
                 <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
-                <div style="font-size: 0.74rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
+                <div style="font-size: 0.75rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
                     <i class="bi bi-calendar-event me-1"></i>${mIso ? mIso.split('-').reverse().join('/') : "Definir"}
                 </div>
             </td>
             <td class="text-center">
                 <div style="white-space: nowrap;"><span class="badge rounded-pill ${stCls} badge-custom-size">${escapeHTML(formatStatusDisplay(d.status))}</span><span class="alerta-icone" style="${temAlertaDiligencia ? '' : 'display:none;'}">${alertaIconeHTML}</span></div>
-                <div class=\"mt-1 text-muted px-1\" style=\"font-size: 0.7rem; font-weight: 500; height: 1.1rem;\"></div>
+                <div class=\"mt-1 text-muted px-1\" style=\"font-size: 0.75rem; font-weight: 500; height: 1.1rem;\"></div>
             </td>
             <td class="suite-cell text-center">
                 <div class="suite-badge-container"><span class="badge rounded-pill bg-light text-dark border badge-custom-size"><i class="spinner-border spinner-border-sm me-1" style="width: 0.7rem; height: 0.7rem;"></i>Consultando</span></div>
-                <div class="mt-1 text-muted px-1 suite-time-container" style="font-size: 0.74rem; font-weight: 500; display: none;"><i class="bi bi-clock-history me-1"></i><span class="suite-time-text"></span></div>
+                <div class="mt-1 text-muted px-1 suite-time-container" style="font-size: 0.75rem; font-weight: 500; display: none;"><i class="bi bi-clock-history me-1"></i><span class="suite-time-text"></span></div>
             </td>
             <td class="text-center"><div class="proc-avatar" title="${escapeHTML(d.analista || "Não atribuído")}">${analistaIniciais}</div></td>
             <td class="text-center">
                 <div style="font-weight: 400; font-size: 0.85rem; color: var(--text-heading);">${abert}</div>
-                <div class="mt-1 text-muted" style="font-size: 0.74rem; font-weight: 500;"><i class="bi bi-calendar3 me-1"></i>${dias} dias</div>
+                <div class="mt-1 text-muted" style="font-size: 0.75rem; font-weight: 500;"><i class="bi bi-calendar3 me-1"></i>${dias} dias</div>
             </td>
             <td style="max-width: 200px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4;">${escapeHTML(d.contratada)}</td>
-            <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: justify;">${escapeHTML(d.descricao)}</td>
+            <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: left;">${escapeHTML(d.descricao)}</td>
         </tr>`);
     });
     mt.body.innerHTML = groupedHTML.join("");
@@ -3931,3 +3944,143 @@ try { window.hideAdminPendings = hideAdminPendings; } catch (e) { /* ignore */ }
 
 // --- FIM DA LGICA ADMINISTRATIVA ---
 
+
+// ---- Cabeçalho da aba Processos: contagem das abas, faixa de números, chips de filtro ----
+// (revisão de design de 07/10/2026; ver docs/revisao-design-tema-claro)
+
+// Contagem das três abas, com o recorte de perfil mas sem os demais filtros — o número
+// de cada aba não muda quando se filtra, só quando os dados mudam. Mesma regra de
+// aprovado/arquivado do filtro da aba em updateReuniao().
+function contarAbasProcessos(rows) {
+    let ativos = 0, aprovados = 0, arquivados = 0;
+    (rows || []).forEach(d => {
+        const st = (d.status || "").toUpperCase().trim();
+        const aprovado = st.includes("APROVADO") || st === "SEDUC";
+        const arquivado = st.includes("ARQUIVADO");
+        if (aprovado) aprovados++;
+        if (arquivado) arquivados++;
+        if (!aprovado && !arquivado) ativos++;
+    });
+    [['n-tab-ativos', ativos], ['n-tab-aprovados', aprovados], ['n-tab-arquivados', arquivados]].forEach(([id, n]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = n;
+    });
+}
+
+// Atalhos da faixa de números: cada um é um recorte por situação (status exato do banco).
+const PROC_ATALHOS_STATUS = {
+    todos: null,
+    fiscal: ["ANÁLISE FISCAL", "DEVOLVIDO P/ REANÁLISE FISCAL"],
+    analise: ["ANÁLISE FISCAL"],
+    reanalise: ["DEVOLVIDO P/ REANÁLISE FISCAL"]
+};
+const PROC_ATALHOS_TITULO = {
+    todos: ['Processos', 'bi-pin-angle-fill'],
+    fiscal: ['Processos com o fiscal (análise fiscal + reanálise fiscal)', 'bi-clipboard-check'],
+    analise: ['Análise fiscal', 'bi-check2-circle'],
+    reanalise: ['Reanálise fiscal', 'bi-calendar-event']
+};
+
+function filtrarProcessosPorStatus(chave) {
+    const alvo = PROC_ATALHOS_STATUS[chave];
+    const sel = document.getElementById('meetingStatusSelect');
+    if (!sel) return;
+    Array.from(sel.options).forEach(o => {
+        if (!o.value) return;
+        o.selected = !alvo || alvo.includes(o.value.toUpperCase().trim());
+    });
+    if (typeof renderMultiSelectUI === 'function') renderMultiSelectUI(sel);
+    updateReuniao();
+}
+
+// "Por fiscal": distribuição do recorte ativo na faixa (só admin e gerente; ver core/auth.js).
+function abrirDistribuicaoFiscalAtual() {
+    const chave = document.querySelector('.proc-strip-item.active')?.dataset.atalho || 'todos';
+    const [titulo, icone] = PROC_ATALHOS_TITULO[chave] || PROC_ATALHOS_TITULO.todos;
+    abrirBreakdownFiscal(PROC_ATALHOS_STATUS[chave], titulo, icone);
+}
+
+function _selecaoMultiProcessos(sel) {
+    const opcoes = Array.from(sel?.options || []).filter(o => o.value);
+    const marcadas = opcoes.filter(o => o.selected);
+    return { opcoes, marcadas, todas: opcoes.length > 0 && marcadas.length === opcoes.length };
+}
+
+function _rotuloMulti(marcadas) {
+    const nomes = marcadas.map(o => o.text);
+    if (nomes.length === 0) return 'nenhum';
+    return nomes.length <= 2 ? nomes.join(', ') : `${nomes.length} selecionados`;
+}
+
+// Chips dos filtros ativos, estado da faixa de números e do botão "Mais filtros".
+function atualizarEstadoFiltrosProcessos() {
+    const el = id => document.getElementById(id);
+    const status = _selecaoMultiProcessos(el('meetingStatusSelect'));
+    const fiscal = _selecaoMultiProcessos(el('meetingFiscalSelect'));
+    const meta = el('meetingMetaSelect');
+    const prior = el('meetingPrioritarioSelect');
+    const busca = (el('meetingSearch')?.value || '').trim();
+    const fiscalVisivel = !el('meetingFiscalSelect')?.closest('.proc-toolbar-field')?.hidden;
+
+    // 1) Faixa de números: destaca o atalho que corresponde ao status selecionado.
+    let ativo = null;
+    if (status.todas || status.opcoes.length === 0) ativo = 'todos';
+    else {
+        const marcados = status.marcadas.map(o => o.value.toUpperCase().trim()).sort().join('|');
+        Object.entries(PROC_ATALHOS_STATUS).forEach(([k, v]) => {
+            if (v && [...v].sort().join('|') === marcados) ativo = k;
+        });
+    }
+    document.querySelectorAll('.proc-strip-item').forEach(b => {
+        const on = b.dataset.atalho === ativo;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+
+    // 2) Chips.
+    const chips = [];
+    if (!status.todas && status.opcoes.length) chips.push(['status', `Status: ${_rotuloMulti(status.marcadas)}`]);
+    if (fiscalVisivel && !fiscal.todas && fiscal.opcoes.length) chips.push(['fiscal', `Fiscal: ${_rotuloMulti(fiscal.marcadas)}`]);
+    if (meta && meta.value) chips.push(['meta', `Meta: ${meta.options[meta.selectedIndex]?.text || meta.value}`]);
+    if (prior && prior.value) chips.push(['prior', `Prioritário: ${prior.options[prior.selectedIndex]?.text || prior.value}`]);
+    if (busca) chips.push(['busca', `Busca: “${busca.length > 28 ? busca.slice(0, 28) + '…' : busca}”`]);
+    const caixa = el('proc-chips');
+    if (caixa) {
+        caixa.hidden = chips.length === 0;
+        const esc = window.escapeHTML || (t => String(t));
+        caixa.innerHTML = chips.map(([k, t]) =>
+            `<span class="proc-chip">${esc(t)}<button type="button" class="proc-chip-x" aria-label="Remover filtro: ${esc(t)}" onclick="removerFiltroProcessos('${k}')"><i class="bi bi-x-lg"></i></button></span>`
+        ).join('') + (chips.length ? '<button type="button" class="proc-chips-limpar" onclick="document.getElementById(\'btn-reuniao-clear\').click()">Limpar filtros</button>' : '');
+    }
+
+    // 3) "Mais filtros" mostra quantos dos filtros guardados nele estão ativos.
+    const nMais = (meta && meta.value ? 1 : 0) + (prior && prior.value ? 1 : 0);
+    const badge = el('mais-filtros-contagem');
+    if (badge) { badge.textContent = nMais; badge.hidden = nMais === 0; }
+
+    ajustarAlturaBarraProcessos();
+}
+
+function removerFiltroProcessos(chave) {
+    const sel = id => document.getElementById(id);
+    const marcarTodas = s => {
+        if (!s) return;
+        Array.from(s.options).forEach(o => { if (o.value) o.selected = true; });
+        if (typeof renderMultiSelectUI === 'function') renderMultiSelectUI(s);
+    };
+    if (chave === 'status') marcarTodas(sel('meetingStatusSelect'));
+    else if (chave === 'fiscal') marcarTodas(sel('meetingFiscalSelect'));
+    else if (chave === 'meta') sel('meetingMetaSelect').value = '';
+    else if (chave === 'prior') sel('meetingPrioritarioSelect').value = '';
+    else if (chave === 'busca') sel('meetingSearch').value = '';
+    updateReuniao();
+}
+
+// A barra de filtros fica fixa ao rolar; o cabeçalho da tabela (também fixo) precisa
+// saber a altura dela para não ficar escondido por baixo.
+function ajustarAlturaBarraProcessos() {
+    const barra = document.querySelector('#pane-reuniao .proc-toolbar');
+    const pane = document.getElementById('pane-reuniao');
+    if (barra && pane && barra.offsetHeight) pane.style.setProperty('--proc-toolbar-h', barra.offsetHeight + 'px');
+}
+window.addEventListener('resize', () => ajustarAlturaBarraProcessos());

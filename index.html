@@ -15,6 +15,9 @@
     <!-- Preload da imagem de fundo (foto da sede da SOP-CE) -->
     <link rel="preload" as="image" href="assets/fachada.jpg" type="image/jpeg">
 
+    <!-- Tokens de design (cores, raios, sombras): carregar antes do style.css -->
+    <link rel="stylesheet" href="shared/tokens.css">
+
     <!-- NOSSO NOVO ARQUIVO DE ESTILOS MODULARIZADO (A Mágica acontece aqui!) -->
     <link rel="stylesheet" href="style.css">
 
@@ -111,7 +114,7 @@
                             <div class="mb-3">
                                 <input id="reg-telefone" type="tel" placeholder="WhatsApp (DDD+Núm)"
                                     class="form-control landing-input" maxlength="15" />
-                                <div class="form-text mt-1" style="font-size: 0.70rem; line-height: 1; color: #94a3b8;">
+                                <div class="form-text mt-1" style="font-size: 0.75rem; line-height: 1; color: #94a3b8;">
                                     Apenas
                                     números. Opcional.</div>
                             </div>
@@ -269,51 +272,34 @@
         </div>
 
         <div class="gecope-hero">
-            <div class="gecope-hero-bg" style="background-image:url('assets/hero-ita.jpg')"></div>
-            <div class="gecope-hero-bg" style="background-image:url('assets/hero-huce.jpg')"></div>
-            <div class="gecope-hero-bg" style="background-image:url('assets/hero-obra.jpg')"></div>
-            <div class="gecope-hero-overlay"></div>
             <div class="gecope-hero-content">
         <div class="gecope-hero-top">
-        <div class="top-bar">PORTAL SOP-CE . GOVERNO DO ESTADO DO CEARÁ . SISTEMA DE ADITIVOS DE OBRAS</div>
-
         <header class="sop-header">
-            <!-- Só aparecem no cabeçalho compacto, usado em todos os módulos menos o Início (body.modo-compacto, ver style.css) -->
-            <button type="button" class="theme-toggle-btn cb-voltar" onclick="showPane('pane-home')"
-                title="Voltar ao Painel Principal">
-                <i class="bi bi-arrow-left"></i><span>Painel Principal</span>
-            </button>
-            <div class="sop-brand" style="display:flex;align-items:center;gap:16px;">
-                <div class="sop-logo"><span>SOP-CE</span></div>
+            <div class="sop-brand">
+                <img class="sop-brasao" src="assets/brasao.png" alt="Brasão do Estado do Ceará" width="31" height="42">
+                <img class="sop-wordmark" src="assets/sop-branco.png" alt="SOP-CE, Superintendência de Obras Públicas" width="272" height="30">
                 <div class="sop-brand-text">
-                    <div class="sop-title-main">SUPERINTENDÊNCIA DE OBRAS PÚBLICAS</div>
-                    <div class="sop-title-sub">Governo do Estado do Ceará - Secretaria das Cidades</div>
+                    <span class="sop-title-main">GECOPE</span>
+                    <span class="sop-title-sep" aria-hidden="true">·</span>
+                    <span class="sop-title-sub">Gerência de Controle e Análise de Aditivos</span>
                 </div>
-            </div>
-            <div class="cb-meio">
-                <h1 class="cb-titulo" id="cb-titulo"></h1>
             </div>
             <div class="sop-header-right d-flex align-items-center gap-3">
-                <span class="cb-base-info"><span class="panel-tag-dot"></span><span id="cb-base">Base atualizada em —</span></span>
-                <div class="text-end d-none d-md-block sop-header-gecope">
-                    <strong>GECOPE Gerência de Controle de Aditivos</strong>
-                    <span style="font-size: 0.75rem; opacity: 0.9;">Painel Gerencial de Aditivos de Obras</span>
-                </div>
                 <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleAppTheme()"
                     title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro">
-                    <i class="bi bi-moon-stars-fill" id="theme-toggle-icon"></i>
+                    <i class="bi bi-moon" id="theme-toggle-icon"></i>
                     <span id="theme-toggle-label">Escuro</span>
                 </button>
                 <button type="button" id="fullscreen-toggle-btn" class="theme-toggle-btn" onclick="toggleFullscreen()"
                     title="Alternar tela cheia" aria-label="Alternar tela cheia">
-                    <i class="bi bi-arrows-fullscreen" id="fullscreen-toggle-icon"></i>
+                    <i class="bi bi-fullscreen" id="fullscreen-toggle-icon"></i>
                     <span id="fullscreen-toggle-label">Tela cheia</span>
                 </button>
                 <div id="user-info-header" class="d-flex align-items-center gap-2 border-start ps-3"
                     style="display: none !important;">
                     <div class="text-end">
                         <div class="fw-bold small lh-1" id="header-user-name">Usuário</div>
-                        <div class="text-white-50" style="font-size: 0.7rem; text-transform: uppercase;"
+                        <div class="text-white-50" style="font-size: 0.75rem; text-transform: uppercase;"
                             id="header-user-role">
                             Perfil</div>
                     </div>
@@ -337,16 +323,21 @@
                     GECOPE</span></div>
         </section>
 
-        <section class="hero-home-greeting" id="hero-home-greeting" style="display:none;">
-            <h1 class="home-welcome-title">Olá, <span id="home-user-name">usuário</span>.</h1>
-            <div class="home-welcome-subtitle">Bem-vindo ao GECOPE. Hoje é <span
-                    id="home-current-date">Sexta-feira,
-                    27 de Fevereiro de 2026</span>.</div>
-        </section>
             </div>
         </div>
 
         <main class="page-wrapper">
+            <!-- Trilha dos módulos (só aparece fora do Início, ver style.css): único botão de voltar, nome do módulo e, no Contratos, a data da base -->
+            <nav class="gc-trilha" aria-label="Você está em">
+                <button type="button" class="gc-trilha-voltar" onclick="showPane('pane-home')" title="Voltar ao Painel Principal">
+                    <i class="bi bi-arrow-left"></i><span>Painel principal</span>
+                </button>
+                <span class="gc-trilha-sep" aria-hidden="true">/</span>
+                <h1 class="gc-trilha-atual" id="cb-titulo"></h1>
+                <span class="cb-base-info"><span class="panel-tag-dot"></span><span id="cb-base">Base atualizada em —</span></span>
+            </nav>
+
+
 
             <div id="load-error" style="display:none; margin-bottom:15px;">
                 <div
@@ -403,60 +394,44 @@
             <div class="tab-content">
                 <!-- PAINEL INICIAL (HOME) -->
                 <div class="tab-pane fade" id="pane-home">
-                    <!-- Stats Cards Row -->
-                    <div class="home-section-eyebrow">Panorama Geral</div>
-                    <div class="home-stats-grid">
-                        <div class="home-stat-card accent-green">
-                            <i class="bi bi-graph-up-arrow home-stat-watermark"></i>
-                            <div class="home-stat-icon bg-green"><i class="bi bi-graph-up-arrow"></i></div>
-                            <div class="home-stat-info">
-                                <span class="home-stat-label">Processos em Andamento</span>
-                                <div class="home-stat-value" id="stat-proc-andamento">0</div>
-                                <div class="home-stat-sub">Total ativo no sistema</div>
-                            </div>
-                        </div>
-
-                        <div class="home-stat-card accent-blue">
-                            <i class="bi bi-search home-stat-watermark"></i>
-                            <div class="home-stat-icon bg-blue"><i class="bi bi-search"></i></div>
-                            <div class="home-stat-info">
-                                <span class="home-stat-label">Processos Em Análise</span>
-                                <div class="home-stat-value" id="stat-proc-analise">0</div>
-                                <div class="home-stat-sub"></div>
-                            </div>
-                        </div>
-                        <div class="home-stat-card accent-orange">
-                            <i class="bi bi-check2-circle home-stat-watermark"></i>
-                            <div class="home-stat-icon bg-orange"><i class="bi bi-check2-circle"></i></div>
-                            <div class="home-stat-info">
-                                <span class="home-stat-label">Aditivos Aprovados no Mês</span>
-                                <div class="home-stat-value" id="stat-proc-aprovados">0</div>
-                                <div class="home-stat-sub">Referente ao mês corrente</div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Saudação (setHeroContext, core/shell.js, a mostra só no Início) -->
+        <section class="hero-home-greeting" id="hero-home-greeting" style="display:none;">
+            <h1 class="home-welcome-title">Olá, <span id="home-user-name">usuário</span>.</h1>
+            <div class="home-welcome-subtitle">Bem-vindo ao GECOPE. Hoje é <span
+                    id="home-current-date">Sexta-feira,
+                    27 de Fevereiro de 2026</span>.</div>
+        </section>
 
                     <!-- Hub de Navegação (Tiles) -->
-                    <div class="home-section-eyebrow">Módulos do Sistema</div>
                     <div class="home-quick-actions-grid">
                         <!-- Módulos mais usados (destaque) -->
                         <div class="home-featured-grid">
                             <div class="home-action-card accent-green" data-pane="pane-reuniao" data-roles="admin,gerente,fiscal,externo" onclick="showPane('pane-reuniao')">
-                                <div class="home-featured-badge">Mais usado</div>
                                 <div class="home-action-icon bg-green"><i class="bi bi-file-earmark-text"></i></div>
                                 <div class="home-action-text">
                                     <h3>Processos</h3>
-                                    <p>Gerenciar Processos de Aditivos</p>
+                                    <p>Gerenciar processos de aditivos</p>
+                                </div>
+                                <div class="home-card-stats" role="group" aria-label="Atalhos para a lista de processos">
+                                    <button type="button" class="home-card-stat" onclick="event.stopPropagation(); abrirProcessosDaInicio('andamento')">
+                                        <b id="stat-proc-andamento">0</b><span>em andamento</span>
+                                    </button>
+                                    <button type="button" class="home-card-stat" onclick="event.stopPropagation(); abrirProcessosDaInicio('analise')">
+                                        <b id="stat-proc-analise">0</b><span>em análise</span>
+                                    </button>
+                                    <button type="button" class="home-card-stat" onclick="event.stopPropagation(); abrirProcessosDaInicio('aprovados')">
+                                        <b id="stat-proc-aprovados">0</b><span id="stat-proc-aprovados-rotulo">aprovados no mês</span>
+                                    </button>
                                 </div>
                             </div>
-                            <div class="home-action-card accent-blue" data-pane="pane-cronograma" data-roles="admin,gerente,fiscal"
-                                onmouseenter="prefetchPagina('cronograma.html?embed=1')"
-                                onclick="showPane('pane-cronograma')">
-                                <div class="home-featured-badge">2º mais usado</div>
-                                <div class="home-action-icon bg-blue"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
+                            <div class="home-action-card accent-blue" data-pane="pane-contratos" data-roles="admin,gerente,fiscal,externo,eletrica"
+                                onmouseenter="prefetchPagina('gecope_mapa_obras.html?embed=1')"
+                                onclick="showPane('pane-contratos')"
+                                title="Abrir o painel interativo do GECOPE">
+                                <div class="home-action-icon bg-blue"><i class="bi bi-map"></i></div>
                                 <div class="home-action-text">
-                                    <h3>Atividades</h3>
-                                    <p>Painel de Distribuição de Tarefas da Equipe</p>
+                                    <h3>Contratos</h3>
+                                    <p>Mapa de obras e contratos</p>
                                 </div>
                             </div>
                         </div>
@@ -469,46 +444,7 @@
                                 <div class="home-list-row-title">Administração<span id="badge-alerta-whatsapp"
                                         class="badge-alerta-aba" style="display:none;" title=""><i
                                             class="bi bi-exclamation-triangle-fill"></i> WhatsApp</span></div>
-                                <i class="bi bi-chevron-right"></i>
-                            </div>
-                            <!-- Composições -->
-                            <div class="home-list-row" data-pane="pane-composicoes" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-composicoes')">
-                                <div class="home-action-icon bg-blue"><i class="bi bi-journal-text"></i></div>
-                                <div class="home-list-row-title">Composições</div>
-                                <i class="bi bi-chevron-right"></i>
-                            </div>
-                            <!-- Curva ABC -->
-                            <div class="home-list-row" data-pane="pane-curva-abc" data-roles="admin,gerente,fiscal,externo,eletrica"
-                                onclick="showPane('pane-curva-abc')">
-                                <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
-                                <div class="home-list-row-title">Curva ABC</div>
-                                <i class="bi bi-chevron-right"></i>
-                            </div>
-                            <!-- Painel Financeiro -->
-                            <div class="home-list-row" data-pane="pane-financeiro" data-roles="admin" data-autorizacao="financeiro"
-                                onclick="showPane('pane-financeiro')">
-                                <div class="home-action-icon bg-teal"><i class="bi bi-currency-dollar"></i></div>
-                                <div class="home-list-row-title">Financeiro</div>
-                                <i class="bi bi-chevron-right"></i>
-                            </div>
-                            <!-- Orçamentos -->
-                            <div class="home-list-row" data-pane="pane-orcamentos" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-orcamentos')">
-                                <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
-                                <div class="home-list-row-title">Orçamentos</div>
-                                <i class="bi bi-chevron-right"></i>
-                            </div>
-                            <!-- Tabelas -->
-                            <div class="home-list-row" data-pane="pane-tabelas" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-tabelas')">
-                                <div class="home-action-icon bg-slate"><i class="bi bi-search"></i></div>
-                                <div class="home-list-row-title">Tabelas</div>
-                                <i class="bi bi-chevron-right"></i>
-                            </div>
-                            <!-- Contratos -->
-                            <div class="home-list-row" data-pane="pane-contratos" data-roles="admin,gerente,fiscal,externo,eletrica" onmouseenter="prefetchPagina('gecope_mapa_obras.html?embed=1')"
-                                onclick="showPane('pane-contratos')"
-                                title="Abrir o painel interativo do GECOPE">
-                                <div class="home-action-icon bg-green"><i class="bi bi-map"></i></div>
-                                <div class="home-list-row-title">Contratos</div>
+                                <div class="home-list-row-desc">Usuários, permissões e avisos</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                             <!-- Assistente de Dados (F8) -->
@@ -517,6 +453,54 @@
                                 title="Perguntar em linguagem natural sobre contratos, obras, processos e aditivos">
                                 <div class="home-action-icon bg-indigo"><i class="bi bi-robot"></i></div>
                                 <div class="home-list-row-title">Assistente de Dados</div>
+                                <div class="home-list-row-desc">Pergunte em linguagem natural</div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                            <!-- Atividades -->
+                            <div class="home-list-row" data-pane="pane-cronograma" data-roles="admin,gerente,fiscal"
+                                onmouseenter="prefetchPagina('cronograma.html?embed=1')"
+                                onclick="showPane('pane-cronograma')"
+                                title="Distribuição das tarefas da equipe: o que está em execução, na fila, devolvido ou paralisado">
+                                <div class="home-action-icon bg-blue"><i class="bi bi-kanban" style="display:inline-block; transform: scaleY(-1);"></i></div>
+                                <div class="home-list-row-title">Atividades</div>
+                                <div class="home-list-row-desc">Distribuição das tarefas da equipe</div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                            <!-- Composições -->
+                            <div class="home-list-row" data-pane="pane-composicoes" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-composicoes')">
+                                <div class="home-action-icon bg-blue"><i class="bi bi-journal-text"></i></div>
+                                <div class="home-list-row-title">Composições</div>
+                                <div class="home-list-row-desc">Banco de composições de preço</div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                            <!-- Curva ABC -->
+                            <div class="home-list-row" data-pane="pane-curva-abc" data-roles="admin,gerente,fiscal,externo,eletrica"
+                                onclick="showPane('pane-curva-abc')">
+                                <div class="home-action-icon bg-purple"><i class="bi bi-pie-chart"></i></div>
+                                <div class="home-list-row-title">Curva ABC</div>
+                                <div class="home-list-row-desc">Análise de replanilhamento</div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                            <!-- Painel Financeiro -->
+                            <div class="home-list-row" data-pane="pane-financeiro" data-roles="admin" data-autorizacao="financeiro"
+                                onclick="showPane('pane-financeiro')">
+                                <div class="home-action-icon bg-teal"><i class="bi bi-currency-dollar"></i></div>
+                                <div class="home-list-row-title">Financeiro</div>
+                                <div class="home-list-row-desc">Valores dos aditivos analisados</div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                            <!-- Orçamentos -->
+                            <div class="home-list-row" data-pane="pane-orcamentos" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-orcamentos')">
+                                <div class="home-action-icon bg-orange"><i class="bi bi-folder-check"></i></div>
+                                <div class="home-list-row-title">Orçamentos</div>
+                                <div class="home-list-row-desc">Biblioteca de orçamentos</div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                            <!-- Tabelas -->
+                            <div class="home-list-row" data-pane="pane-tabelas" data-roles="admin,gerente,fiscal,externo,guest,eletrica" onclick="showPane('pane-tabelas')">
+                                <div class="home-action-icon bg-slate"><i class="bi bi-search"></i></div>
+                                <div class="home-list-row-title">Tabelas</div>
+                                <div class="home-list-row-desc">SEINFRA, SINAPI e ORSE</div>
                                 <i class="bi bi-chevron-right"></i>
                             </div>
                         </div>
@@ -525,8 +509,8 @@
                     <!-- Latest Activities Panel -->
                     <div class="home-activities-panel" data-roles="admin,gerente,fiscal,externo,guest" style="cursor: pointer;" onclick="showPane('pane-atividades')">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3 class="m-0"><i class="bi bi-clock-history"></i>Atividades Realizadas</h3>
-                            <span class="text-primary small fw-bold">Ver Tudo <i class="bi bi-chevron-right"></i></span>
+                            <h3 class="m-0"><i class="bi bi-clock-history"></i>Atividades realizadas</h3>
+                            <span class="home-activities-link">Ver tudo <i class="bi bi-chevron-right"></i></span>
                         </div>
                         <div class="activities-list-container" id="home-activities-list">
                             <div class="text-center py-3 w-100 text-muted">
@@ -540,11 +524,8 @@
                 <div class="tab-pane fade" id="pane-admin">
                     <div class="page-wrapper pt-0">
 
-                        <div class="mb-3">
-                            <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px;">
-                                Painel de Administração</div>
-                            <div style="color:var(--text-muted);font-size:0.98rem;">Gerencie usuários, permissões de
-                                acesso e notificações do sistema.</div>
+                        <div class="gc-page-head">
+                            <p class="gc-page-head-desc">Gerencie usuários, permissões de acesso e notificações do sistema.</p>
                         </div>
 
                         <!-- Dashboard Indicators -->
@@ -552,7 +533,7 @@
                             <div class="proc-kpi-card accent-green">
                                 <div class="proc-kpi-icon bg-green"><i class="bi bi-people"></i></div>
                                 <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Total de Usuários</span>
+                                    <span class="proc-kpi-label">Total de usuários</span>
                                     <div class="proc-kpi-value" id="admin-stat-total">0</div>
                                 </div>
                             </div>
@@ -574,7 +555,7 @@
                             <div class="proc-kpi-card accent-blue">
                                 <div class="proc-kpi-icon bg-blue"><i class="bi bi-person-badge"></i></div>
                                 <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Analistas / Fiscais</span>
+                                    <span class="proc-kpi-label">Analistas / fiscais</span>
                                     <div class="proc-kpi-value" id="admin-stat-others">0</div>
                                 </div>
                             </div>
@@ -789,8 +770,8 @@
                                 </div>
                                 <div class="d-flex gap-2 align-items-center">
                                     <button type="button" class="btn btn-sm btn-light py-0 fw-bold border"
-                                        style="font-size: 0.7rem;" onclick="testarConexaoWhatsApp(event)">
-                                        <i class="bi bi-broadcast me-1"></i> TESTAR API
+                                        style="font-size: 0.75rem;" onclick="testarConexaoWhatsApp(event)">
+                                        <i class="bi bi-broadcast me-1"></i> Testar API
                                     </button>
                                     <i class="bi bi-chevron-down text-muted"></i>
                                 </div>
@@ -851,12 +832,12 @@
                                                             registrados</span>
                                                         <div class="d-flex gap-1">
                                                             <button class="btn btn-xs btn-outline-danger p-1 px-2"
-                                                                style="font-size: 0.70rem;"
+                                                                style="font-size: 0.75rem;"
                                                                 onclick="excluirTodosLogsFalhaWhatsApp()">
                                                                 <i class="bi bi-trash3"></i> Limpar Falhas
                                                             </button>
                                                             <button class="btn btn-xs btn-primary p-1 px-2"
-                                                                style="font-size: 0.70rem;"
+                                                                style="font-size: 0.75rem;"
                                                                 onclick="carregarLogsWhatsApp()">
                                                                 <i class="bi bi-arrow-clockwise"></i> Atualizar Logs
                                                             </button>
@@ -908,12 +889,12 @@
                                                     <div class="row g-3">
                                                         <div class="col-md-12">
                                                             <label
-                                                                class="form-label small fw-bold">DESTINATÁRIOS</label>
+                                                                class="form-label small fw-bold">Destinatários</label>
                                                             <select id="direct-msg-recipients" class="form-select"
                                                                 multiple></select>
                                                         </div>
                                                         <div class="col-md-12">
-                                                            <label class="form-label small fw-bold">MENSAGEM</label>
+                                                            <label class="form-label small fw-bold">Mensagem</label>
                                                             <textarea id="direct-msg-text" class="form-control" rows="6"
                                                                 placeholder="Escreva sua mensagem..."></textarea>
                                                         </div>
@@ -1271,13 +1252,8 @@
                 </div> <!-- FIM PANE ADMIN -->
 
                 <div class="tab-pane fade" id="pane-financeiro">
-                    <div class="fin-page-header">
-                        <div class="fin-page-header-icon"><i class="bi bi-cash-coin"></i></div>
-                        <div>
-                            <h2 class="fin-page-title">Financeiro</h2>
-                            <p class="fin-page-subtitle">Consolidado dos valores financeiros dos processos analisados
-                                pelos analistas da GECOPE</p>
-                        </div>
+                    <div class="gc-page-head">
+                        <p class="gc-page-head-desc">Consolidado dos valores financeiros dos processos analisados pelos analistas da GECOPE</p>
                     </div>
 
                     <section class="filters-card">
@@ -1330,7 +1306,7 @@
                                         <div class="kpi-icon"
                                             style="background:rgba(0,143,61,0.16);color:var(--sop-green-dark);"><i
                                                 class="bi bi-graph-up-arrow"></i></div>
-                                        <div class="kpi-label">Acréscimo Fiscalização</div>
+                                        <div class="kpi-label">Acréscimo fiscalização</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-acresc-fiscal">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
@@ -1345,7 +1321,7 @@
                                         <div class="kpi-icon"
                                             style="background:rgba(242,140,0,0.18);color:var(--sop-orange);"><i
                                                 class="bi bi-graph-down-arrow"></i></div>
-                                        <div class="kpi-label">Supressão Fiscalização</div>
+                                        <div class="kpi-label">Supressão fiscalização</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-supress-fiscal">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
@@ -1360,7 +1336,7 @@
                                         <div class="kpi-icon"
                                             style="background:rgba(1,138,189,0.14);color:var(--sop-blue);"><i
                                                 class="bi bi-cash-stack"></i></div>
-                                        <div class="kpi-label">Repercussão Fiscalização</div>
+                                        <div class="kpi-label">Repercussão fiscalização</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-reperc-fiscal">R$ 0,00</div>
                                     <div class="d-flex justify-content-between">
@@ -1446,7 +1422,7 @@
                                     <div class="kpi-header">
                                         <div class="kpi-icon" style="background:rgba(142,68,173,0.18);color:#8e44ad;"><i
                                                 class="bi bi-arrow-left-right"></i></div>
-                                        <div class="kpi-label">Diferença Total</div>
+                                        <div class="kpi-label">Diferença total</div>
                                     </div>
                                     <div class="kpi-value" id="kpi-diff-abs">R$ 0,00</div>
                                     <div class="d-flex justify-content-between align-items-center">
@@ -1465,7 +1441,7 @@
                                     <div class="kpi-header">
                                         <div class="kpi-icon" style="background:rgba(192,57,43,0.18);color:#c0392b;"><i
                                                 class="bi bi-percent"></i></div>
-                                        <div class="kpi-label">Variação Média por Processo</div>
+                                        <div class="kpi-label">Variação média por processo</div>
                                         <a href="#fin-nota-analise-aprofundada" class="fin-info-icon"
                                             title="Considera só processos com análise aprofundada — ver nota abaixo da tabela de processos"><i
                                                 class="bi bi-info-circle"></i></a>
@@ -1482,7 +1458,7 @@
                                     <div class="kpi-header">
                                         <div class="kpi-icon" style="background:rgba(1,138,189,0.16);color:var(--sop-blue);"><i
                                                 class="bi bi-pencil-square"></i></div>
-                                        <div class="kpi-label">Taxa de Revisão</div>
+                                        <div class="kpi-label">Taxa de revisão</div>
                                         <a href="#fin-nota-analise-aprofundada" class="fin-info-icon"
                                             title="Considera só processos com análise aprofundada — ver nota abaixo da tabela de processos"><i
                                                 class="bi bi-info-circle"></i></a>
@@ -1598,7 +1574,7 @@
                         #pane-curva-abc {
                             --cv-bg: #eef2ef; --cv-bg2: #ffffff; --cv-bg3: #f4f7f4; --cv-bg4: #e8eee9;
                             --cv-border: #cfdad2; --cv-border-soft: #e0e8e2;
-                            --cv-text: #0e2117; --cv-text2: #2f4a3a; --cv-muted: #5c7566;
+                            --cv-text: #0e2117; --cv-text2: #2f4a3a; --cv-muted: #4a6153;
                             --cv-green: #22a155; --cv-green-hi: #2bbd66; --cv-green-soft: rgba(34, 161, 85, .12);
                             --cv-amber: #f0a83c; --cv-blue: #2f7fe4; --cv-slate: #64798c; --cv-red: #e1274a;
                             --cv-cA: #22a155; --cv-cB: #2f7fe4; --cv-cC: #64798c;
@@ -1621,7 +1597,7 @@
 
                         #pane-curva-abc * { box-sizing: border-box }
                         #pane-curva-abc { color: var(--cv-text); font-size: 14px; line-height: 1.45 }
-                        #pane-curva-abc .cv-eyebrow { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--cv-muted); font-weight: 600 }
+                        #pane-curva-abc .cv-eyebrow { font-size: 12px; color: var(--cv-muted); font-weight: 600 }
 
                         #pane-curva-abc .cv-card { background: var(--cv-bg2); border: 1px solid var(--cv-border); border-radius: var(--cv-r); box-shadow: var(--cv-shadow) }
                         #pane-curva-abc .cv-card+.cv-card { margin-top: 20px }
@@ -1634,7 +1610,7 @@
                         #pane-curva-abc #cv-drop h2 { margin: 12px 0 6px; font-size: 17px; font-weight: 700; color: var(--cv-text) }
                         #pane-curva-abc #cv-drop p { margin: 0; color: var(--cv-muted); font-size: 13px }
                         #pane-curva-abc #cv-drop .cv-fmt { margin-top: 12px; display: inline-flex; gap: 8px }
-                        #pane-curva-abc #cv-drop .cv-fmt span { border: 1px solid var(--cv-border); border-radius: 6px; padding: 3px 10px; font-size: 11px; color: var(--cv-muted); font-weight: 600; letter-spacing: .04em }
+                        #pane-curva-abc #cv-drop .cv-fmt span { border: 1px solid var(--cv-border); border-radius: 6px; padding: 3px 10px; font-size: 12px; color: var(--cv-muted); font-weight: 600; letter-spacing: .04em }
                         #pane-curva-abc .cv-upicon { width: 38px; height: 38px; color: var(--cv-green) }
 
                         #pane-curva-abc .cv-kpis { display: none; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; margin-bottom: 20px }
@@ -1653,7 +1629,7 @@
                         #pane-curva-abc .cv-meta .f .v.mono { font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); font-weight: 600 }
                         #pane-curva-abc .cv-params { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end }
                         #pane-curva-abc .cv-ctl { display: flex; flex-direction: column; gap: 6px }
-                        #pane-curva-abc .cv-ctl label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--cv-muted); font-weight: 600 }
+                        #pane-curva-abc .cv-ctl label { font-size: 12px; color: var(--cv-muted); font-weight: 600 }
                         #pane-curva-abc select, #pane-curva-abc input[type=text], #pane-curva-abc input[type=number] { font-family: var(--cv-sans); font-size: 13px; padding: 9px 11px; border: 1px solid var(--cv-border); border-radius: 8px; background: var(--cv-bg3); color: var(--cv-text); min-width: 150px }
                         #pane-curva-abc select { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--cv-muted) 50%), linear-gradient(135deg, var(--cv-muted) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat }
                         #pane-curva-abc select:focus, #pane-curva-abc input:focus, #pane-curva-abc button:focus-visible, #pane-curva-abc #cv-drop:focus-visible { outline: 2px solid var(--cv-green-hi); outline-offset: 2px }
@@ -1696,7 +1672,7 @@
                            só a página, e o cabeçalho gruda de verdade no topo da tela. */
                         #pane-curva-abc .cv-tbl-scroll { overflow: visible }
                         #pane-curva-abc table { width: 100%; border-collapse: collapse; font-size: 12px }
-                        #pane-curva-abc thead th { position: sticky; top: 0; z-index: 2; background: var(--cv-bg3); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--cv-muted); font-weight: 700; text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--cv-border); white-space: nowrap }
+                        #pane-curva-abc thead th { position: sticky; top: 0; z-index: 2; background: var(--cv-bg3); font-size: 12px; color: var(--cv-muted); font-weight: 700; text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--cv-border); white-space: nowrap }
                         body.theme-dark #pane-curva-abc thead th { color: var(--cv-text) }
                         #pane-curva-abc .cv-acum-col { width: 84px; min-width: 84px; max-width: 84px }
                         #pane-curva-abc tbody td { padding: 8px 12px; border-bottom: 1px solid var(--cv-border-soft); vertical-align: middle; color: var(--cv-text2) }
@@ -1706,7 +1682,7 @@
                         #pane-curva-abc .cv-conta { font-family: var(--cv-mono); font-feature-settings: var(--cv-tnum); white-space: nowrap; color: var(--cv-text); text-align: center }
                         #pane-curva-abc .cv-desc { min-width: 300px; max-width: 620px }
                         #pane-curva-abc .cv-center { text-align: center }
-                        #pane-curva-abc .cv-chip { display: inline-block; min-width: 26px; text-align: center; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #fff }
+                        #pane-curva-abc .cv-chip { display: inline-block; min-width: 26px; text-align: center; border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #fff }
                         #pane-curva-abc .cv-chip.A { background: var(--cv-cA) }
                         #pane-curva-abc .cv-chip.B { background: var(--cv-cB) }
                         #pane-curva-abc .cv-chip.C { background: var(--cv-cC) }
@@ -1716,9 +1692,9 @@
                         #pane-curva-abc .cv-acum .fill.B { background: rgba(47, 127, 228, .20) }
                         #pane-curva-abc .cv-acum .fill.C { background: rgba(100, 121, 140, .22) }
                         #pane-curva-abc .cv-acum span.v { position: relative; z-index: 1 }
-                        #pane-curva-abc tr.cv-cut td { background: var(--cv-bg3); color: var(--cv-amber); border-top: 1px solid var(--cv-amber); border-bottom: 1px solid var(--cv-amber); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; padding: 7px 12px }
+                        #pane-curva-abc tr.cv-cut td { background: var(--cv-bg3); color: var(--cv-amber); border-top: 1px solid var(--cv-amber); border-bottom: 1px solid var(--cv-amber); font-size: 12px; font-weight: 700; padding: 7px 12px }
                         #pane-curva-abc .cv-foot { padding: 14px 20px; border-top: 1px solid var(--cv-border-soft); color: var(--cv-muted); font-size: 12px }
-                        #pane-curva-abc .cv-foot code { font-family: var(--cv-mono); font-weight: 600; font-size: 11.5px; background: var(--cv-bg3); border: 1px solid var(--cv-border-soft); border-radius: 4px; padding: 1px 5px; color: var(--cv-text2) }
+                        #pane-curva-abc .cv-foot code { font-family: var(--cv-mono); font-weight: 600; font-size: 12px; background: var(--cv-bg3); border: 1px solid var(--cv-border-soft); border-radius: 4px; padding: 1px 5px; color: var(--cv-text2) }
                         #pane-curva-abc .cv-err { display: none; margin-bottom: 20px; border: 1px solid var(--cv-red); border-left-width: 4px; border-radius: var(--cv-r); background: rgba(225, 39, 74, .09); padding: 14px 18px; font-size: 13px; color: var(--cv-text) }
                         #pane-curva-abc .cv-err.on { display: block }
 
@@ -1737,7 +1713,7 @@
                         #pane-curva-abc.tem-vinculo .cv-col-analise { display: table-cell }
                         #pane-curva-abc.tem-vinculo .cv-vinc-only { display: inline-flex !important }
                         #pane-curva-abc .cv-status-btns { display: inline-flex; gap: 4px }
-                        #pane-curva-abc .cv-status-btns button { padding: 4px 9px; font-size: 11.5px; border-radius: 6px; background: var(--cv-bg3); color: var(--cv-muted); border: 1px solid var(--cv-border) }
+                        #pane-curva-abc .cv-status-btns button { padding: 4px 9px; font-size: 12px; border-radius: 6px; background: var(--cv-bg3); color: var(--cv-muted); border: 1px solid var(--cv-border) }
                         #pane-curva-abc .cv-status-btns button.cv-status-ok.on { background: var(--cv-green); color: #fff; border-color: var(--cv-green) }
                         #pane-curva-abc .cv-status-btns button.cv-status-inc.on { background: var(--cv-red); color: #fff; border-color: var(--cv-red) }
                         #pane-curva-abc .cv-btn-comentario { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: var(--cv-bg3); color: var(--cv-muted); border: 1px solid var(--cv-border); font-size: 14px }
@@ -1751,7 +1727,7 @@
                             body.theme-dark #pane-curva-abc {
                                 --cv-bg: #eef2ef; --cv-bg2: #ffffff; --cv-bg3: #f4f7f4; --cv-bg4: #e8eee9;
                                 --cv-border: #cfdad2; --cv-border-soft: #e0e8e2;
-                                --cv-text: #0e2117; --cv-text2: #2f4a3a; --cv-muted: #5c7566;
+                                --cv-text: #0e2117; --cv-text2: #2f4a3a; --cv-muted: #4a6153;
                                 --cv-green-soft: rgba(34, 161, 85, .12);
                                 --cv-shadow: 0 1px 2px rgba(16, 40, 26, .06), 0 6px 18px rgba(16, 40, 26, .07);
                             }
@@ -1798,17 +1774,17 @@
                             }
                             #pane-curva-abc .cv-kpi .ic  { width: 34px !important; height: 34px !important }
                             #pane-curva-abc .cv-kpi .big { font-size: 17px !important; line-height: 1.2 !important }
-                            #pane-curva-abc .cv-kpi .cv-eyebrow { font-size: 8.5px !important }
-                            #pane-curva-abc .cv-kpi .cap { font-size: 7.5px !important; line-height: 1.35 !important; white-space: normal !important; }
+                            #pane-curva-abc .cv-kpi .cv-eyebrow { font-size: 12px !important }
+                            #pane-curva-abc .cv-kpi .cap { font-size: 12px !important; line-height: 1.35 !important; white-space: normal !important; }
                             
                             /* ---- FAIXA DE METADADOS (Arquivo / Coluna / Emissão) ---- */
                             #pane-curva-abc #cv-params .cv-meta .v {
                                 white-space: normal !important;
                                 overflow: visible !important;
                                 text-overflow: clip !important;
-                                font-size: 9px !important;
+                                font-size: 12px !important;
                             }
-                            #pane-curva-abc #cv-params .cv-meta .cv-eyebrow { font-size: 7.5px !important }
+                            #pane-curva-abc #cv-params .cv-meta .cv-eyebrow { font-size: 12px !important }
 
                             /* >>> GRÁFICO SVG mais alto → aproveita o resto da pág. 1 <<< */
                             #pane-curva-abc #cv-chart svg {
@@ -1825,7 +1801,7 @@
                             #pane-curva-abc thead { display: table-header-group }
                             /* afasta a tabela do topo em TODA página onde ela continua */
                             #pane-curva-abc #cv-tbl thead th { padding-top: 8mm !important }
-                            #pane-curva-abc #cv-tbl { font-size: 9px }
+                            #pane-curva-abc #cv-tbl { font-size: 12px }
                             #pane-curva-abc #cv-tbl th,
                             #pane-curva-abc #cv-tbl td { padding: 2px 4px }
 
@@ -2038,7 +2014,7 @@
                     <div class="modal-dialog modal-dialog-centered modal-lg">
                         <div class="modal-content">
                             <div class="modal-header bg-warning-subtle">
-                                <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>COMENTÁRIO DO ITEM</h5>
+                                <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>Comentário do item</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
@@ -2092,147 +2068,120 @@
                 <!-- PAINEL DE PROCESSOS -->
                 <div class="tab-pane fade" id="pane-reuniao" role="tabpanel">
 
-                    <div class="pt-3 pb-4">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px;">
-                                    Painel de Processos</div>
-                                <div style="color:var(--text-muted);font-size:0.98rem;">Gerencie a pauta, visualize
-                                    prazos e edite informações.</div>
+                    <div class="pt-0 pb-4">
+                        <div class="gc-page-head">
+                            <div class="proc-tabs-row">
+                                <div class="proc-tabs" id="process-tab-nav">
+                                    <button type="button" class="proc-tab active" id="btn-tab-ativos"
+                                        onclick="switchProcessTab('ativos')">Em tramitação <span class="proc-tab-n" id="n-tab-ativos">0</span></button>
+                                    <button type="button" class="proc-tab" id="btn-tab-aprovados"
+                                        onclick="switchProcessTab('aprovados')">Aprovados <span class="proc-tab-n" id="n-tab-aprovados">0</span><span
+                                            id="badge-alerta-aprovados" class="badge-alerta-aba" style="display:none;"
+                                            title=""><i class="bi bi-exclamation-triangle-fill"></i> <span></span></span>
+                                    </button>
+                                    <button type="button" class="proc-tab" id="btn-tab-arquivados"
+                                        onclick="switchProcessTab('arquivados')">Arquivados <span class="proc-tab-n" id="n-tab-arquivados">0</span></button>
+                                </div>
+
+                                <button type="button" id="btn-filtro-alerta-diligencia" class="btn-filtro-alerta"
+                                    style="display:none;" onclick="toggleFiltroAlertaDiligencia()">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Somente com alerta de retorno
+                                    (<span id="contador-filtro-alerta">0</span>)
+                                </button>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="gc-page-head-actions">
                                 <button type="button" class="btn btn-outline-success fw-bold"
                                     style="font-size: 0.85rem; height: 40px;"
                                     onmouseenter="prefetchPagina('cronograma.html?embed=1')"
                                     onclick="showPane('pane-cronograma')">
                                     <i class="bi bi-kanban me-1" style="display:inline-block; transform: scaleY(-1);"></i> Atividades
                                 </button>
-                                <button type="button" class="btn btn-success fw-bold shadow-sm admin-only"
-                                    style="background-color: var(--sop-green); border: none; font-size: 0.85rem; height: 40px;"
+                                <button type="button" class="btn btn-success fw-bold admin-only"
+                                    style="font-size: 0.85rem; height: 40px;"
                                     data-bs-toggle="modal" data-bs-target="#modalCadastro">
                                     <i class="bi bi-plus-lg me-1"></i> Novo Processo
                                 </button>
                             </div>
                         </div>
 
-                        <div class="proc-kpi-grid mb-2">
-                            <div class="proc-kpi-card accent-green fiscal-no-breakdown" style="cursor:pointer;" title="Ver distribuição por fiscal"
-                                onclick="abrirBreakdownFiscal(null, 'Processos', 'bi-pin-angle-fill')">
-                                <div class="proc-kpi-icon bg-green"><i class="bi bi-pin-angle-fill"></i></div>
-                                <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Processos</span>
-                                    <div class="proc-kpi-value" id="card_proc_total">0</div>
-                                    <div class="proc-kpi-sub">Filtrado na tela</div>
-                                </div>
-                            </div>
-                            <div class="proc-kpi-card accent-orange fiscal-no-breakdown" style="cursor:pointer;" title="Ver distribuição por fiscal"
-                                onclick="abrirBreakdownFiscal(['ANÁLISE FISCAL','DEVOLVIDO P/ REANÁLISE FISCAL'], 'Processos com Fiscal(Status = ANÁLISE FISCAL + REANÁLISE FISCAL)', 'bi-clipboard-check')">
-                                <div class="proc-kpi-icon bg-orange"><i class="bi bi-clipboard-check"></i></div>
-                                <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Processos com Fiscal</span>
-                                    <div class="proc-kpi-value" id="card_proc_andamento">0</div>
-                                    <div class="proc-kpi-sub">Status = ANÁLISE FISCAL + REANÁLISE FISCAL</div>
-                                </div>
-                            </div>
-                            <div class="proc-kpi-card accent-green fiscal-no-breakdown" style="cursor:pointer;" title="Ver distribuição por fiscal"
-                                onclick="abrirBreakdownFiscal('ANÁLISE FISCAL', 'Análise Fiscal', 'bi-check2-circle')">
-                                <div class="proc-kpi-icon bg-green"><i class="bi bi-check2-circle"></i></div>
-                                <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Análise Fiscal</span>
-                                    <div class="proc-kpi-value" id="card_proc_aprovados">0</div>
-                                    <div class="proc-kpi-sub">Status = ANÁLISE FISCAL</div>
-                                </div>
-                            </div>
-                            <div class="proc-kpi-card accent-purple fiscal-no-breakdown" style="cursor:pointer;" title="Ver distribuição por fiscal"
-                                onclick="abrirBreakdownFiscal('DEVOLVIDO P/ REANÁLISE FISCAL', 'Reanálise Fiscal', 'bi-calendar-event')">
-                                <div class="proc-kpi-icon bg-purple"><i class="bi bi-calendar-event"></i></div>
-                                <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Reanálise Fiscal</span>
-                                    <div class="proc-kpi-value" id="card_proc_dias">0</div>
-                                    <div class="proc-kpi-sub">Status = REANÁLISE FISCAL</div>
-                                </div>
-                            </div>
-                            <!-- Card 'NOVO NO SUITE' removido -->
-                        </div>
-
-                        <!-- NAVEGAÇÃO POR ABAS (3 PÁGINAS) — pill segmentado -->
-                        <div class="proc-tabs-row">
-                            <div class="proc-tabs" id="process-tab-nav">
-                                <button type="button" class="proc-tab active" id="btn-tab-ativos"
-                                    onclick="switchProcessTab('ativos')">Em Tramitação</button>
-                                <button type="button" class="proc-tab" id="btn-tab-aprovados"
-                                    onclick="switchProcessTab('aprovados')">Aprovados<span
-                                        id="badge-alerta-aprovados" class="badge-alerta-aba" style="display:none;"
-                                        title=""><i class="bi bi-exclamation-triangle-fill"></i> <span></span></span>
-                                </button>
-                                <button type="button" class="proc-tab" id="btn-tab-arquivados"
-                                    onclick="switchProcessTab('arquivados')">Arquivados</button>
-                            </div>
-
-                            <button type="button" id="btn-filtro-alerta-diligencia" class="btn-filtro-alerta"
-                                style="display:none;" onclick="toggleFiltroAlertaDiligencia()">
-                                <i class="bi bi-exclamation-triangle-fill"></i> Somente com alerta de retorno
-                                (<span id="contador-filtro-alerta">0</span>)
+                        <div class="proc-strip" role="group" aria-label="Resumo por situação">
+                            <button type="button" class="proc-strip-item active" data-atalho="todos" aria-pressed="true" onclick="filtrarProcessosPorStatus('todos')">
+                                <b id="card_proc_total">0</b><span>Todos</span>
+                            </button>
+                            <button type="button" class="proc-strip-item" data-atalho="fiscal" aria-pressed="false" onclick="filtrarProcessosPorStatus('fiscal')">
+                                <b id="card_proc_andamento">0</b><span>Com o fiscal</span>
+                            </button>
+                            <button type="button" class="proc-strip-item" data-atalho="analise" aria-pressed="false" onclick="filtrarProcessosPorStatus('analise')">
+                                <b id="card_proc_aprovados">0</b><span>Em análise fiscal</span>
+                            </button>
+                            <button type="button" class="proc-strip-item" data-atalho="reanalise" aria-pressed="false" onclick="filtrarProcessosPorStatus('reanalise')">
+                                <b id="card_proc_dias">0</b><span>Em reanálise fiscal</span>
+                            </button>
+                            <button type="button" class="proc-strip-dist fiscal-no-breakdown" title="Ver a distribuição por fiscal do recorte escolhido" onclick="abrirDistribuicaoFiscalAtual()">
+                                <i class="bi bi-bar-chart-line"></i> Por fiscal
                             </button>
                         </div>
 
-                        <section class="filters-card mb-2">
-                            <div class="filters-title">Filtros de Pesquisa</div>
-                            <div class="proc-filter-row">
-                                <div class="proc-filter-col">
-                                    <label class="form-label small text-muted fw-bold text-uppercase mb-1">Metas</label>
-                                    <select class="form-select form-select-sm border-secondary-subtle"
-                                        id="meetingMetaSelect">
-                                        <option value="">Todos</option>
-                                        <option value="Cumprido">Cumprido</option>
-                                        <option value="No prazo">No prazo</option>
-                                        <option value="Atrasado">Atrasado</option>
-                                        <option value="Sem meta">Sem meta</option>
-                                    </select>
+                        <!-- NAVEGAÇÃO POR ABAS (3 PÁGINAS) — pill segmentado -->
+
+                        <section class="proc-toolbar" aria-label="Filtros de processos">
+                            <div class="proc-toolbar-row">
+                                <div class="proc-toolbar-search">
+                                    <i class="bi bi-search proc-toolbar-search-icon" aria-hidden="true"></i>
+                                    <input type="text" class="form-control" id="meetingSearch" aria-label="Buscar processos"
+                                        placeholder="Buscar por processo, descrição, analista, fiscal ou status">
                                 </div>
-                                <div class="proc-filter-col">
-                                    <label
-                                        class="form-label small text-muted fw-bold text-uppercase mb-1">Prioritário</label>
-                                    <select class="form-select form-select-sm border-secondary-subtle"
-                                        id="meetingPrioritarioSelect">
-                                        <option value="">Todos</option>
-                                        <option value="Sim">Prioritário</option>
-                                        <option value="Não">Não Prioritário</option>
-                                    </select>
+                                <div class="proc-toolbar-field">
+                                    <label class="proc-toolbar-label" for="meetingStatusSelect">Status</label>
+                                    <select class="form-select" id="meetingStatusSelect"></select>
                                 </div>
-                                <div class="proc-filter-col">
-                                    <label
-                                        class="form-label small text-muted fw-bold text-uppercase mb-1">Fiscal</label>
-                                    <select
-                                        class="form-select form-select-sm border-secondary-subtle fw-bold text-primary"
-                                        id="meetingFiscalSelect"></select>
+                                <div class="proc-toolbar-field">
+                                    <label class="proc-toolbar-label" for="meetingFiscalSelect">Fiscal</label>
+                                    <select class="form-select" id="meetingFiscalSelect"></select>
                                 </div>
-                                <div class="proc-filter-col">
-                                    <label
-                                        class="form-label small text-muted fw-bold text-uppercase mb-1">Status</label>
-                                    <select class="form-select form-select-sm border-secondary-subtle"
-                                        id="meetingStatusSelect"></select>
-                                </div>
-                                <div class="proc-filter-col-search">
-                                    <label class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
-                                    <div class="proc-search-wrap">
-                                        <input type="text" class="form-control form-control-sm border-secondary-subtle"
-                                            id="meetingSearch"
-                                            placeholder="Processo, Descrição, Analista, Fiscal, Status...">
-                                        <i class="bi bi-search proc-search-icon"></i>
+                                <div class="dropdown proc-toolbar-more">
+                                    <button type="button" class="btn proc-toolbar-btn dropdown-toggle" id="btn-mais-filtros"
+                                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                        <i class="bi bi-sliders2"></i> Mais filtros
+                                        <span class="proc-toolbar-count" id="mais-filtros-contagem" hidden>0</span>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end proc-more-menu">
+                                        <label class="proc-toolbar-label" for="meetingMetaSelect">Metas</label>
+                                        <select class="form-select" id="meetingMetaSelect">
+                                            <option value="">Todos</option>
+                                            <option value="Cumprido">Cumprido</option>
+                                            <option value="No prazo">No prazo</option>
+                                            <option value="Atrasado">Atrasado</option>
+                                            <option value="Sem meta">Sem meta</option>
+                                        </select>
+                                        <label class="proc-toolbar-label" for="meetingPrioritarioSelect">Prioritário</label>
+                                        <select class="form-select" id="meetingPrioritarioSelect">
+                                            <option value="">Todos</option>
+                                            <option value="Sim">Prioritário</option>
+                                            <option value="Não">Não prioritário</option>
+                                        </select>
                                     </div>
                                 </div>
-                                <div class="proc-filter-actions">
-                                    <button class="btn btn-success fw-bold" id="btn-reuniao-clear">Limpar</button>
-                                    <button class="btn btn-outline-success fw-bold" id="btn-reuniao-export"
-                                        onclick="exportarProcessos()" title="Exportar resultado filtrado para Excel">
-                                        <i class="bi bi-file-earmark-excel"></i> Excel
+                                <div class="dropdown proc-toolbar-export">
+                                    <button type="button" class="btn proc-toolbar-btn dropdown-toggle" id="btn-exportar-processos"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-download"></i> Exportar
                                     </button>
-                                    <button class="btn fw-bold proc-btn-pdf" id="btn-reuniao-pdf"
-                                        onclick="exportarProcessosPDF()" title="Exportar resultado filtrado para PDF">
-                                        <i class="bi bi-file-earmark-pdf"></i> PDF
-                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        <button type="button" class="dropdown-item" id="btn-reuniao-export" onclick="exportarProcessos()"
+                                            title="Exportar o resultado filtrado para Excel">
+                                            <i class="bi bi-file-earmark-excel me-2"></i>Excel
+                                        </button>
+                                        <button type="button" class="dropdown-item" id="btn-reuniao-pdf" onclick="exportarProcessosPDF()"
+                                            title="Exportar o resultado filtrado para PDF">
+                                            <i class="bi bi-file-earmark-pdf me-2"></i>PDF
+                                        </button>
+                                    </div>
                                 </div>
+                            </div>
+                            <div class="proc-chips-row">
+                                <div class="proc-chips" id="proc-chips" hidden></div>
+                                <button type="button" id="btn-reuniao-clear" class="visually-hidden" tabindex="-1" aria-hidden="true">Limpar</button>
                             </div>
                         </section>
 
@@ -2256,18 +2205,15 @@
                 <div class="tab-pane fade" id="pane-orcamentos">
                     <div class="page-wrapper pt-0">
 
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <div style="font-weight:700;color:var(--text-heading);font-size:1.45rem;margin-bottom:4px;">
-                                    Painel de Orçamentos</div>
-                                <div style="color:var(--text-muted);font-size:0.98rem;">Biblioteca de orçamentos por
-                                    categoria, com histórico de revisões e versões.</div>
+                        <div class="gc-page-head">
+                            <p class="gc-page-head-desc">Biblioteca de orçamentos por categoria, com histórico de revisões e versões.</p>
+                            <div class="gc-page-head-actions">
+                                <button class="btn btn-success fw-bold admin-gerente-only"
+                                    style="font-size: 0.85rem; height: 40px;" data-bs-toggle="modal"
+                                    data-bs-target="#modalNovoOrcamento">
+                                    <i class="bi bi-plus-lg me-1"></i> Novo Orçamento
+                                </button>
                             </div>
-                            <button class="btn btn-success fw-bold shadow-sm admin-gerente-only"
-                                style="font-size: 0.85rem; height: 40px;" data-bs-toggle="modal"
-                                data-bs-target="#modalNovoOrcamento">
-                                <i class="bi bi-plus-lg me-1"></i> Novo Orçamento
-                            </button>
                         </div>
 
                         <div class="proc-kpi-grid mb-2">
@@ -2290,7 +2236,7 @@
                             <div class="proc-kpi-card accent-orange">
                                 <div class="proc-kpi-icon bg-orange"><i class="bi bi-chat-left-text-fill"></i></div>
                                 <div class="proc-kpi-text">
-                                    <span class="proc-kpi-label">Em Revisão</span>
+                                    <span class="proc-kpi-label">Em revisão</span>
                                     <div class="proc-kpi-value" id="orc-kpi-revisao">0</div>
                                     <div class="proc-kpi-sub">Com solicitação pendente</div>
                                 </div>
@@ -2306,10 +2252,10 @@
                         </div>
 
                         <section class="filters-card mb-2">
-                            <div class="filters-title">FILTROS DE CONSULTA (ORÇAMENTOS)</div>
+                            <div class="filters-title">Filtros de consulta (Orçamentos)</div>
                             <div class="proc-filter-row">
                                 <div class="proc-filter-col-search">
-                                    <label class="form-label small text-muted fw-bold text-uppercase mb-1">Buscar</label>
+                                    <label class="form-label small text-muted fw-bold mb-1">Buscar</label>
                                     <div class="proc-search-wrap">
                                         <input type="text" class="form-control form-control-sm border-secondary-subtle"
                                             id="orcamento-search"
@@ -2318,7 +2264,7 @@
                                     </div>
                                 </div>
                                 <div class="proc-filter-actions">
-                                    <button class="btn btn-success fw-bold" id="btn-orc-clear">Limpar</button>
+                                    <button class="btn btn-limpar" id="btn-orc-clear">Limpar</button>
                                 </div>
                             </div>
                         </section>
@@ -2338,27 +2284,22 @@
                 <div class="tab-pane fade" id="pane-composicoes">
                     <div class="page-wrapper pt-0">
 
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <h5 class="fw-bold mb-0 text-uppercase"
-                                        style="color: var(--sop-gray-dark); font-size: 1.0rem;">Banco de Composições
-                                    </h5>
-                                </div>
+                        <div class="gc-page-head">
+                            <p class="gc-page-head-desc">Banco de composições de preço, organizado por categoria.</p>
+                            <div class="gc-page-head-actions">
+                                <button class="btn btn-sm btn-outline-success fw-bold admin-only" data-bs-toggle="modal"
+                                    data-bs-target="#modalCadastrarComposicao">
+                                    <i class="bi bi-cloud-plus me-1"></i> Upload de composição
+                                </button>
+                                <button id="btn-nova-comp-analitica" class="btn btn-sm btn-primary fw-bold"
+                                    style="display: none;" onclick="abrirCriadorComposicao()">
+                                    <i class="bi bi-calculator me-1"></i> Nova composição analítica
+                                </button>
                             </div>
-                            <button class="btn btn-sm btn-success fw-bold shadow-sm admin-only" data-bs-toggle="modal"
-                                data-bs-target="#modalCadastrarComposicao">
-                                <i class="bi bi-cloud-plus me-1"></i> UPLOAD COMPOSIÇÃO
-                            </button>
-                            <!-- NOVO BOTO: CRIAR COMPOSIÇÃO ANALÍTICA -->
-                            <button id="btn-nova-comp-analitica" class="btn btn-sm btn-primary fw-bold shadow-sm ms-2"
-                                style="display: none;" onclick="abrirCriadorComposicao()">
-                                <i class="bi bi-calculator me-1"></i> NOVA COMPOSIÇÃO ANALÍTICA
-                            </button>
                         </div>
 
                         <section class="filters-card">
-                            <div class="filters-title">FILTROS DE CONSULTA (COMPOSIÇÕES)</div>
+                            <div class="filters-title">Filtros de consulta (Composições)</div>
                             <div class="row g-2">
                                 <div class="col">
                                     <div class="input-group input-group-sm">
@@ -2392,17 +2333,14 @@
                 <div class="tab-pane fade" id="pane-tabelas">
                     <div class="page-wrapper pt-0">
 
-                        <div class="mb-3 text-center" style="margin-top: -15px;">
-                            <h4 class="fw-bold mb-0" style="color: var(--sop-green-dark);">PESQUISA DE PREÇOS DE
-                                REFERÊNCIA
-                            </h4>
-                            <p class="text-muted small">Consulte bases oficiais (SEINFRA, SINAPI, ORSE) atualizadas.</p>
+                        <div class="gc-page-head">
+                            <p class="gc-page-head-desc">Consulte bases oficiais (SEINFRA, SINAPI, ORSE) atualizadas.</p>
                         </div>
 
                         <div class="budget-hero-card mx-auto" style="max-width: 2000px;">
                             <div class="row g-2">
                                 <div class="col-md-2">
-                                    <label class="form-label small fw-bold text-success">FONTE</label>
+                                    <label class="form-label small fw-bold text-success">Fonte</label>
                                     <select class="form-select form-select-sm fw-bold" id="busca-fonte"
                                         onchange="atualizarSelectVersao()">
                                         <option value="SEINFRA">SEINFRA (CE)</option>
@@ -2412,14 +2350,14 @@
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="form-label small fw-bold text-success">VERSÃO</label>
+                                    <label class="form-label small fw-bold text-success">Versão</label>
                                     <select class="form-select form-select-sm" id="busca-versao">
                                         <option value="027.1">Tabela 027.1</option>
                                     </select>
                                 </div>
 
                                 <div class="col-md-2">
-                                    <label class="form-label small fw-bold text-success">REFERÊNCIA</label>
+                                    <label class="form-label small fw-bold text-success">Referência</label>
                                     <select class="form-select form-select-sm" id="busca-ref">
                                         <option value="desonerada" selected>Desonerada</option>
                                         <option value="onerada">Onerada</option>
@@ -2431,14 +2369,13 @@
                                     <div class="row g-1">
                                         <div class="col-6">
                                             <label class="form-label small fw-bold text-muted"
-                                                style="font-size: 0.65rem;">DESC.
-                                                (%)</label>
+                                                style="font-size: 0.75rem;">Desc. (%)</label>
                                             <input type="number" class="form-control form-control-sm text-end"
                                                 id="busca-desc" placeholder="0,00" step="0.01" min="0" max="100">
                                         </div>
                                         <div class="col-6">
                                             <label class="form-label small fw-bold text-muted"
-                                                style="font-size: 0.65rem;">BDI
+                                                style="font-size: 0.75rem;">BDI
                                                 (%)</label>
                                             <input type="number" class="form-control form-control-sm text-end"
                                                 id="busca-bdi" placeholder="0,00" step="0.01" min="0">
@@ -2447,7 +2384,7 @@
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="form-label small fw-bold text-success">CÓDIGO OU DESCRIÇÃO</label>
+                                    <label class="form-label small fw-bold text-success">Código ou descrição</label>
                                     <div class="input-group input-group-sm">
                                         <input type="text" class="form-control" id="busca-input-termo"
                                             placeholder="Composição, Insumo, Descrição..."
@@ -2460,7 +2397,7 @@
                                 </div>
 
                                 <div class="col-md-1">
-                                    <label class="form-label small text-muted fw-bold text-uppercase mb-1"
+                                    <label class="form-label small text-muted fw-bold mb-1"
                                         style="visibility:hidden;">.</label>
                                     <button class="btn btn-sm btn-grid-clear w-100" type="button"
                                         onclick="limparBuscaTabela()" title="Limpar filtros e resultados"
@@ -2473,7 +2410,7 @@
 
                         <div id="area-resultados-tabela" style="display:none;">
                             <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-                                <h6 class="fw-bold text-secondary mb-0">RESULTADOS ENCONTRADOS</h6>
+                                <h6 class="fw-bold text-secondary mb-0">Resultados encontrados</h6>
                                 <span class="badge bg-light text-dark border" id="contador-resultados">0 itens</span>
                             </div>
 
@@ -2560,14 +2497,14 @@
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-cloud-plus me-2"></i>CADASTRAR ORÇAMENTO
+                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-cloud-plus me-2"></i>Cadastrar orçamento
                             </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <form id="formNovoOrcamento">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">1. CATEGORIA (PRINCIPAL) *</label>
+                                    <label class="form-label small fw-bold">1. Categoria (principal) *</label>
                                     <input type="text" class="form-control" name="CATEGORIA" list="listaCategorias"
                                         required placeholder="Ex: ESCOLAS">
                                     <datalist id="listaCategorias">
@@ -2579,24 +2516,24 @@
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">2. SUBCATEGORIA *</label>
+                                    <label class="form-label small fw-bold">2. Subcategoria *</label>
                                     <input type="text" class="form-control" name="SUBCATEGORIA"
-                                        list="listaSubcategorias" required placeholder="Ex: ESCOLAS DE ENSINO MDIO">
+                                        list="listaSubcategorias" required placeholder="Ex: ESCOLAS DE ENSINO MÉDIO">
                                     <datalist id="listaSubcategorias">
-                                        <option value="ESCOLAS DE ENSINO MDIO">
+                                        <option value="ESCOLAS DE ENSINO MÉDIO">
                                         <option value="ESCOLAS PROFISSIONALIZANTES">
                                         <option value="QUADRAS POLIESPORTIVAS">
                                     </datalist>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">3. NOME DA OBRA / ITEM *</label>
+                                    <label class="form-label small fw-bold">3. Nome da obra / item *</label>
                                     <input type="text" class="form-control" name="OBRA" required
                                         placeholder="Ex: E.E.M. - 8 SALAS">
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">ARQUIVO DO ORÇAMENTO *</label>
+                                    <label class="form-label small fw-bold">Arquivo do orçamento *</label>
                                     <input type="file" class="form-control" id="inputArquivoUpload" required
                                         accept=".xlsx,.xls,.pdf">
                                     <div class="form-text">O sistema fará o upload e gerará o link automaticamente.
@@ -2610,7 +2547,7 @@
                                             required>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label small fw-bold">STATUS</label>
+                                        <label class="form-label small fw-bold">Status</label>
                                         <select class="form-select" name="STATUS">
                                             <option value="Disponível" selected>Disponível</option>
                                             <option value="Em Revisão">Em Revisão</option>
@@ -2634,27 +2571,24 @@
                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header bg-warning-subtle">
-                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>SOLICITAR
-                                REVISÃO
-                                /
-                                COMENTAR</h5>
+                            <h5 class="modal-title fs-6 fw-bold"><i class="bi bi-chat-left-text me-2"></i>Solicitar revisão / comentar</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <form id="formComentarioOrcamento">
                                 <input type="hidden" id="coment-id-orcamento" name="ID">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">ORÇAMENTO</label>
+                                    <label class="form-label small fw-bold">Orçamento</label>
                                     <input type="text" class="form-control form-control-sm bg-light"
                                         id="coment-nome-obra" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">SEU NOME (FISCAL)</label>
+                                    <label class="form-label small fw-bold">Seu nome (fiscal)</label>
                                     <select class="form-select form-select-sm" id="coment-fiscal" required>
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold">MENSAGEM / SOLICITAÇÃO</label>
+                                    <label class="form-label small fw-bold">Mensagem / solicitação</label>
                                     <textarea class="form-control" name="MENSAGEM" rows="30" style="min-height: 200px;"
                                         required
                                         placeholder="Descreva o motivo da revisão ou seu comentário..."></textarea>
@@ -2670,7 +2604,7 @@
                             </form>
 
                             <div class="mt-3 pt-3 border-top">
-                                <label class="small text-muted fw-bold mb-2">HISTÓRICO</label>
+                                <label class="small text-muted fw-bold mb-2">Histórico</label>
                                 <div id="historico-comentarios" class="bg-light p-2 rounded"
                                     style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;">
                                     <em class="text-muted">Nenhum comentário ainda.</em>
@@ -2691,7 +2625,7 @@
                 <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
                     <div class="modal-content">
                         <div class="modal-header bg-dark text-white">
-                            <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>GERENCIAR PROCESSO</h5>
+                            <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Gerenciar processo</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-4 bg-light-subtle">
@@ -2776,14 +2710,14 @@
                                         <div class="card border-0 shadow-sm mb-4 gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-people me-2 text-info"></i>RESPONSÁVEIS</h6>
+                                                        class="bi bi-people me-2 text-info"></i>Responsáveis</h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="row g-3">
                                                     <div class="col-md-3">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Fiscal Responsável <span
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Fiscal Responsável <span
                                                                 class="text-danger">*</span></label>
                                                         <select class="form-select bg-light border-0 shadow-none gp-plain-field"
                                                             name="FISCAL" id="det_fiscal" style="font-size: 0.9rem;">
@@ -2792,8 +2726,8 @@
                                                     </div>
                                                     <div class="col-md-3">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Contratante <span
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Contratante <span
                                                                 class="text-danger">*</span></label>
                                                         <input type="text" class="form-control bg-light border-0 shadow-none gp-plain-field"
                                                             name="CONTRATANTE" id="det_contratante"
@@ -2801,8 +2735,8 @@
                                                     </div>
                                                     <div class="col-md-3">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Contratada <span
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Contratada <span
                                                                 class="text-danger">*</span></label>
                                                         <input type="text" class="form-control bg-light border-0 shadow-none gp-plain-field"
                                                             name="CONTRATADA" id="det_contratada"
@@ -2810,8 +2744,8 @@
                                                     </div>
                                                     <div class="col-md-3">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Analista Designado</label>
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Analista Designado</label>
                                                         <select class="form-select bg-light border-0 shadow-none gp-plain-field" name="ANALISTA"
                                                             id="det_analista" style="font-size: 0.9rem;">
                                                             <option value="">Selecione...</option>
@@ -2827,24 +2761,24 @@
                                                 <div class="row g-3 align-items-end mt-1">
                                                     <div class="col-md-4">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Código da Obra (SIGSOP)</label>
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Código da Obra (SIGSOP)</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
                                                             id="det_codigo_obra" placeholder="Ex.: 05872025SEDUC01">
                                                     </div>
                                                     <div class="col-md-3">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Distrito Operacional</label>
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Distrito Operacional</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
                                                             id="det_distrito">
                                                     </div>
                                                     <div class="col-md-3">
                                                         <label
-                                                            class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.7rem;">Município</label>
+                                                            class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Município</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
                                                             id="det_municipio">
@@ -2867,12 +2801,12 @@
                                         <div class="card border-0 shadow-sm mb-4 gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-file-text me-2 text-primary"></i>DESCRIÇÃO DO
-                                                    OBJETO</h6>
+                                                        class="bi bi-file-text me-2 text-primary"></i>Descrição do
+                                                    objeto</h6>
                                             </div>
                                             <div class="card-body">
-                                                <label class="form-label small fw-bold text-muted text-uppercase"
-                                                    style="font-size: 0.7rem;">Descrição <span
+                                                <label class="form-label small fw-bold text-muted"
+                                                    style="font-size: 0.75rem;">Descrição <span
                                                         class="text-danger">*</span></label>
                                                 <textarea class="form-control" name="DESCRIÇÃO" id="det_descricao"
                                                     rows="7"
@@ -2883,8 +2817,8 @@
                                         <div class="card border-0 shadow-sm mb-4 gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-cash-stack me-2 text-success"></i>ANÁLISE
-                                                    FINANCEIRA</h6>
+                                                        class="bi bi-cash-stack me-2 text-success"></i>Análise
+                                                    financeira</h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="row g-4">
@@ -2893,7 +2827,7 @@
                                                         <div class="d-flex align-items-center mb-3">
                                                             <span
                                                                 class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill"
-                                                                style="font-size: 0.65rem;">FISCALIZAÇÃO</span>
+                                                                style="font-size: 0.75rem;">FISCALIZAÇÃO</span>
                                                         </div>
                                                         <div class="mb-3">
                                                             <label class="form-label small text-muted">Acréscimo</label>
@@ -2912,8 +2846,8 @@
                                                         </div>
                                                         <div class="bg-light p-3 rounded-3 gp-repercussao-box">
                                                             <label
-                                                                class="form-label small fw-bold text-muted mb-1 text-uppercase"
-                                                                style="font-size: 0.6rem;">REPERCUSSÃO</label>
+                                                                class="form-label small fw-bold text-muted mb-1"
+                                                                style="font-size: 0.75rem;">Repercussão</label>
                                                             <input type="text"
                                                                 class="form-control form-control-lg fw-bold bg-transparent border-0 p-0 text-dark"
                                                                 id="det_reperc_f" name="det_reperc_f" readonly
@@ -2925,7 +2859,7 @@
                                                         <div class="d-flex align-items-center mb-3">
                                                             <span
                                                                 class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill"
-                                                                style="font-size: 0.65rem;">GECOPE</span>
+                                                                style="font-size: 0.75rem;">GECOPE</span>
                                                         </div>
                                                         <div class="mb-3">
                                                             <label class="form-label small text-muted">Acréscimo</label>
@@ -2945,8 +2879,8 @@
                                                         <div
                                                             class="bg-light p-3 rounded-3 gp-repercussao-box">
                                                             <label
-                                                                class="form-label small fw-bold text-success mb-1 text-uppercase"
-                                                                style="font-size: 0.6rem;">REPERCUSSÃO</label>
+                                                                class="form-label small fw-bold text-success mb-1"
+                                                                style="font-size: 0.75rem;">Repercussão</label>
                                                             <input type="text"
                                                                 class="form-control form-control-lg fw-bold bg-transparent border-0 p-0 text-success"
                                                                 id="det_reperc_g" name="REPERCUSSÃO GECOPE" readonly
@@ -2960,15 +2894,15 @@
                                         <div class="card border-0 shadow-sm gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA E
-                                                    METAS
+                                                        class="bi bi-calendar-check me-2 text-warning"></i>Cronograma e
+                                                    metas
                                                 </h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="row g-3 row-cols-2 row-cols-md-5">
                                                     <div class="col">
                                                         <label class="form-label small text-muted mb-1"
-                                                            style="font-size: 0.7rem;">Data Abertura</label>
+                                                            style="font-size: 0.75rem;">Data Abertura</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm mask-date"
                                                             name="DATA DE ABERTURA" id="det_data_abertura"
@@ -2976,7 +2910,7 @@
                                                     </div>
                                                     <div class="col">
                                                         <label class="form-label small text-muted mb-1"
-                                                            style="font-size: 0.7rem;">Recebimento</label>
+                                                            style="font-size: 0.75rem;">Recebimento</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm mask-date"
                                                             name="DATA RECEBIMENTO" id="det_data_recebimento"
@@ -2984,7 +2918,7 @@
                                                     </div>
                                                     <div class="col">
                                                         <label class="form-label small text-muted mb-1"
-                                                            style="font-size: 0.7rem;">Meta Fiscal</label>
+                                                            style="font-size: 0.75rem;">Meta Fiscal</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm mask-date border-warning-subtle"
                                                             name="DATA COMPROMISSO FISCAL" id="det_data_compromisso"
@@ -2992,7 +2926,7 @@
                                                     </div>
                                                     <div class="col">
                                                         <label class="form-label small text-muted mb-1"
-                                                            style="font-size: 0.7rem;">Aprovação GECOPE</label>
+                                                            style="font-size: 0.75rem;">Aprovação GECOPE</label>
                                                         <input type="text"
                                                             class="form-control form-control-sm mask-date border-success-subtle"
                                                             name="DATA APROVAÇÃO GECOPE" id="det_data_aprovacao"
@@ -3000,7 +2934,7 @@
                                                     </div>
                                                     <div class="col">
                                                         <label class="form-label small text-muted mb-1"
-                                                            style="font-size: 0.7rem;">Devolução p/ Correções</label>
+                                                            style="font-size: 0.75rem;">Devolução p/ Correções</label>
                                                         <div class="position-relative">
                                                             <input type="text"
                                                                 class="form-control form-control-sm mask-date"
@@ -3024,8 +2958,7 @@
                                             <div
                                                 class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-clipboard-check me-2 text-danger"></i>CHECKLIST DE
-                                                    DOCUMENTAÇÃO</h6>
+                                                        class="bi bi-clipboard-check me-2 text-danger"></i>Checklist de documentação</h6>
                                                 <div class="d-flex gap-2">
                                                     <button type="button"
                                                         class="btn btn-sm btn-outline-primary admin-only"
@@ -3087,28 +3020,27 @@
                                         <div class="card border-0 shadow-sm gp-section-card">
                                             <div class="card-header bg-white py-3">
                                                 <h6 class="mb-0 fw-bold text-dark"><i
-                                                        class="bi bi-clock-history me-2 text-secondary"></i>HISTÓRICO
-                                                    DO REGISTRO</h6>
+                                                        class="bi bi-clock-history me-2 text-secondary"></i>Histórico do registro</h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="row g-4">
                                                     <div class="col-md-3">
-                                                        <label class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.65rem;">Criado por</label>
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Criado por</label>
                                                         <div id="det_criador" class="bg-light rounded p-2 text-secondary"
                                                             style="font-size: 0.8rem; line-height: 1.4; word-break: break-word;">
                                                         </div>
                                                     </div>
                                                     <div class="col-md-3">
-                                                        <label class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.65rem;">Última atualização</label>
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Última atualização</label>
                                                         <div id="det_atualizacao" class="bg-light rounded p-2 text-secondary"
                                                             style="font-size: 0.8rem; line-height: 1.4; word-break: break-word;">
                                                         </div>
                                                     </div>
                                                     <div class="col-md-6">
-                                                        <label class="form-label small fw-bold text-muted text-uppercase"
-                                                            style="font-size: 0.65rem;">Histórico de prioridade</label>
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            style="font-size: 0.75rem;">Histórico de prioridade</label>
                                                         <div id="det_historico_prioridade"
                                                             class="bg-light rounded p-2"
                                                             style="max-height: 140px; overflow-y: auto; font-size: 0.75rem;">
@@ -3134,7 +3066,7 @@
                                  todos, anulando o `.admin-only` daqui. -->
                             <button type="button" class="btn btn-outline-danger btn-sm" id="btn-excluir"
                                 onclick="executarAcaoDetalhes('delete')">
-                                <i class="bi bi-trash-fill"></i> EXCLUIR PROCESSO
+                                <i class="bi bi-trash-fill"></i> Excluir processo
                             </button>
 
                             <div>
@@ -3148,7 +3080,7 @@
                                      `abrirDetalhes()`. -->
                                 <button type="button" class="btn btn-primary px-4" id="btn-atualizar"
                                     onclick="executarAcaoDetalhes('update')">
-                                    <i class="bi bi-check-lg"></i> SALVAR ALTERAÇÕES
+                                    <i class="bi bi-check-lg"></i> Salvar alterações
                                 </button>
                             </div>
                         </div>
@@ -3159,8 +3091,7 @@
                             <div class="modal-content">
                                 <div class="modal-header bg-primary text-white">
                                     <h5 class="modal-title fs-6 fw-bold"><i
-                                            class="bi bi-cloud-arrow-up me-2"></i>ATUALIZAR
-                                        ARQUIVO</h5>
+                                            class="bi bi-cloud-arrow-up me-2"></i>Atualizar arquivo</h5>
                                     <button type="button" class="btn-close btn-close-white"
                                         data-bs-dismiss="modal"></button>
                                 </div>
@@ -3169,13 +3100,13 @@
                                         <input type="hidden" id="update-id-orcamento">
 
                                         <div class="mb-3">
-                                            <label class="form-label small fw-bold">NOVO ARQUIVO (PDF/XLS)</label>
+                                            <label class="form-label small fw-bold">Novo arquivo (pdf/xls)</label>
                                             <input type="file" class="form-control" id="inputArquivoUpdate" required
                                                 accept=".xlsx,.xls,.pdf">
                                         </div>
 
                                         <div class="mb-3">
-                                            <label class="form-label small fw-bold">DESCRIÇÃO DAS ALTERAÇÕES</label>
+                                            <label class="form-label small fw-bold">Descrição das alterações</label>
                                             <textarea class="form-control" id="inputDescricaoUpdate" rows="3"
                                                 placeholder="Ex: Corrigido o quantitativo do item 5.2 e atualizado valor unitário do item 8."></textarea>
                                             <div class="form-text">Essa informação ficará gravada no histórico da obra.
@@ -3192,7 +3123,7 @@
                                 <div class="modal-footer justify-content-center">
                                     <button type="button" class="btn btn-primary w-100 fw-bold"
                                         onclick="enviarNovaVersao()">
-                                        <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
+                                        <i class="bi bi-send-check me-1"></i> Salvar nova versão
                                     </button>
                                 </div>
                             </div>
@@ -3213,7 +3144,7 @@
                                 <!-- CABEALHO DA COMPOSIÇÃO -->
                                 <div class="card mb-3 shadow-sm">
                                     <div class="card-body">
-                                        <h6 class="card-title text-muted mb-3 text-uppercase fw-bold"
+                                        <h6 class="card-title text-muted mb-3 fw-bold"
                                             style="font-size: 0.8rem;">Dados Gerais</h6>
                                         <form id="formComposicaoAnalitica">
                                             <input type="hidden" id="edit-id-composicao" name="id">
@@ -3297,34 +3228,34 @@
                                     <div
                                         class="card-footer bg-light d-flex flex-wrap justify-content-around align-items-center">
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">MATERIAL</small>
+                                            <small class="text-muted d-block" style="font-size:0.75rem">Material</small>
                                             <span class="fw-bold text-secondary" id="total-material">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">MÃO DE
+                                            <small class="text-muted d-block" style="font-size:0.75rem">MÃO DE
                                                 OBRA</small>
                                             <span class="fw-bold text-secondary" id="total-mao-de-obra">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
                                             <small class="text-muted d-block"
-                                                style="font-size:0.7rem">EQUIPAMENTOS</small>
+                                                style="font-size:0.75rem">Equipamentos</small>
                                             <span class="fw-bold text-secondary" id="total-equipamentos">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">SERVIÇOS</small>
+                                            <small class="text-muted d-block" style="font-size:0.75rem">Serviços</small>
                                             <span class="fw-bold text-secondary" id="total-servico">R$ 0,00</span>
                                         </div>
                                         <div class="border-start ps-3 text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">TOTAL BDI</small>
+                                            <small class="text-muted d-block" style="font-size:0.75rem">Total BDI</small>
                                             <span class="fw-bold text-primary" id="total-bdi">R$ 0,00</span>
                                         </div>
                                         <div class="text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">TOTAL
+                                            <small class="text-muted d-block" style="font-size:0.75rem">TOTAL
                                                 DESC.</small>
                                             <span class="fw-bold text-danger" id="total-desconto">R$ 0,00</span>
                                         </div>
                                         <div class="border-start ps-3 text-center">
-                                            <small class="text-muted d-block" style="font-size:0.7rem">CUSTO TOTAL
+                                            <small class="text-muted d-block" style="font-size:0.75rem">CUSTO TOTAL
                                                 UNIT.</small>
                                             <span class="fw-bold text-success fs-5" id="total-geral">R$ 0,00</span>
                                         </div>
@@ -3335,7 +3266,7 @@
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                                 <button type="button" class="btn btn-success fw-bold" id="btn-salvar-comp-analitica"
                                     onclick="salvarComposicaoAnalitica()">
-                                    <i class="bi bi-check-lg me-1"></i> SALVAR COMPOSIÇÃO
+                                    <i class="bi bi-check-lg me-1"></i> Salvar composição
                                 </button>
                             </div>
                         </div>
@@ -3352,7 +3283,7 @@
                         <div class="modal-body text-center">
                             <p class="small text-muted mb-3">Escolha o formato do arquivo:</p>
                             <div class="d-grid gap-2">
-                                <button class="btn btn-outline-danger py-2" onclick="exportarComposicao('PDF')">
+                                <button class="btn btn-outline-success py-2" onclick="exportarComposicao('PDF')">
                                     <i class="bi bi-file-earmark-pdf fs-5"></i><br>
                                     <span class="fw-bold">PDF</span>
                                 </button>
@@ -3457,7 +3388,7 @@
                                                             Coletadas)</span>
                                                         <button type="button" class="btn btn-xs btn-primary py-0"
                                                             onclick="adicionarLinhaFornecedor()"
-                                                            style="font-size: 0.7rem;">
+                                                            style="font-size: 0.75rem;">
                                                             <i class="bi bi-plus-lg"></i> Adicionar Fornecedor
                                                         </button>
                                                     </div>
@@ -3703,8 +3634,7 @@
                                 <div class="modal-dialog modal-lg modal-dialog-scrollable">
                                     <div class="modal-content">
                                         <div class="modal-header bg-dark text-white">
-                                            <h5 class="modal-title"><i class="bi bi-clipboard-check me-2"></i>CHECKLIST
-                                                — DOCUMENTAÇÃO MÍNIMA PARA ADITIVO
+                                            <h5 class="modal-title"><i class="bi bi-clipboard-check me-2"></i>Checklist — documentação mínima para aditivo
                                                 <span id="chk_processo_label" class="ms-2 badge bg-primary"></span>
                                             </h5>
                                             <button type="button" class="btn-close btn-close-white"
@@ -4075,8 +4005,7 @@
                                     <div class="modal-content">
                                         <div class="modal-header bg-dark text-white">
                                             <h5 class="modal-title"><i
-                                                    class="bi bi-exclamation-triangle me-2"></i>ALERTA DE RETORNO —
-                                                JUSTIFICATIVA
+                                                    class="bi bi-exclamation-triangle me-2"></i>Alerta de retorno — justificativa
                                                 <span id="alerta_processo_label" class="ms-2 badge bg-primary"></span>
                                             </h5>
                                             <button type="button" class="btn-close btn-close-white"
@@ -4090,8 +4019,8 @@
                                                 <span id="alerta_sigla_atual" class="fw-bold text-dark"></span>
                                             </div>
 
-                                            <label class="form-label small fw-bold text-uppercase"
-                                                style="font-size: 0.7rem;">Histórico de Comentários</label>
+                                            <label class="form-label small fw-bold"
+                                                style="font-size: 0.75rem;">Histórico de Comentários</label>
                                             <div id="alerta_historico" class="bg-light rounded p-2 mb-3"
                                                 style="max-height: 220px; overflow-y: auto; font-size: 0.8rem;">
                                                 <em class="text-muted">Carregando histórico...</em>
@@ -4124,7 +4053,7 @@
                                 <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
                                     <div class="modal-content">
                                         <div class="modal-header bg-dark text-white">
-                                            <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>NOVO PROCESSO</h5>
+                                            <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Novo processo</h5>
                                             <button type="button" class="btn-close btn-close-white"
                                                 data-bs-dismiss="modal"></button>
                                         </div>
@@ -4134,8 +4063,8 @@
                                                     <div class="card-body py-2 px-3">
                                                         <div class="d-flex align-items-center gap-3 flex-wrap">
                                                             <label
-                                                                class="form-label small fw-bold text-muted text-uppercase mb-0 flex-shrink-0"
-                                                                style="font-size: 0.7rem;"
+                                                                class="form-label small fw-bold text-muted mb-0 flex-shrink-0"
+                                                                style="font-size: 0.75rem;"
                                                                 title="Preenche automaticamente Descrição, Fiscal, Contratante, Contratada, Distrito e Município."><i
                                                                     class="bi bi-magic me-1 text-primary"></i>Vincular
                                                                 pela Obra (SIGSOP)</label>
@@ -4159,15 +4088,14 @@
                                                 <div class="card border-0 shadow-sm mb-4">
                                                     <div class="card-header bg-white py-3">
                                                         <h6 class="mb-0 fw-bold text-dark"><i
-                                                                class="bi bi-info-circle me-2 text-primary"></i>INFORMAÇÕES
-                                                            GERAIS</h6>
+                                                                class="bi bi-info-circle me-2 text-primary"></i>Informações gerais</h6>
                                                     </div>
                                                     <div class="card-body">
                                                         <div class="row g-3">
                                                             <div class="col-md-4">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Número do
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Número do
                                                                     Processo</label>
                                                                 <input name="PROCESSO N." type="text"
                                                                     class="form-control bg-light border-0 fw-bold text-primary"
@@ -4177,8 +4105,8 @@
                                                             </div>
                                                             <div class="col-md-4">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Status
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Status
                                                                     Inicial</label>
                                                                 <select name="STATUS" id="cad_status"
                                                                     class="form-select border-primary-subtle text-primary fw-bold"
@@ -4210,15 +4138,15 @@
                                                             </div>
                                                             <div class="col-md-4">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Tipologia</label>
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Tipologia</label>
                                                                 <input name="TIPO" type="text"
                                                                     class="form-control" id="cad_tipo" required>
                                                             </div>
                                                             <div class="col-12">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Descrição do
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Descrição do
                                                                     Objeto</label>
                                                                 <textarea name="DESCRIÇÃO" id="cad_descricao"
                                                                     class="form-control" rows="4"
@@ -4240,15 +4168,14 @@
                                                 <div class="card border-0 shadow-sm mb-4">
                                                     <div class="card-header bg-white py-3">
                                                         <h6 class="mb-0 fw-bold text-dark"><i
-                                                                class="bi bi-people me-2 text-info"></i>AGENTES
-                                                            DO CONTRATO</h6>
+                                                                class="bi bi-people me-2 text-info"></i>Agentes do contrato</h6>
                                                     </div>
                                                     <div class="card-body">
                                                         <div class="row g-3">
                                                             <div class="col-md-3">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Fiscal
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Fiscal
                                                                     Responsável</label>
                                                                 <select name="FISCAL" id="cad-fiscal"
                                                                     class="form-select" required>
@@ -4257,22 +4184,22 @@
                                                             </div>
                                                             <div class="col-md-3">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Contratante</label>
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Contratante</label>
                                                                 <input name="CONTRATANTE" id="cad_contratante"
                                                                     class="form-control">
                                                             </div>
                                                             <div class="col-md-3">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Contratada</label>
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Contratada</label>
                                                                 <input name="CONTRATADA" id="cad_contratada"
                                                                     class="form-control">
                                                             </div>
                                                             <div class="col-md-3">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Analista
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Analista
                                                                     Designado</label>
                                                                 <select name="ANALISTA" id="cad_analista"
                                                                     class="form-select">
@@ -4287,15 +4214,15 @@
                                                             </div>
                                                             <div class="col-md-6">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Distrito
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Distrito
                                                                     Operacional</label>
                                                                 <input id="cad_distrito" class="form-control">
                                                             </div>
                                                             <div class="col-md-6">
                                                                 <label
-                                                                    class="form-label small fw-bold text-muted text-uppercase"
-                                                                    style="font-size: 0.7rem;">Município</label>
+                                                                    class="form-label small fw-bold text-muted"
+                                                                    style="font-size: 0.75rem;">Município</label>
                                                                 <input id="cad_municipio" class="form-control">
                                                             </div>
                                                         </div>
@@ -4305,8 +4232,7 @@
                                                 <div class="card border-0 shadow-sm mb-4">
                                                     <div class="card-header bg-white py-3">
                                                         <h6 class="mb-0 fw-bold text-dark"><i
-                                                                class="bi bi-calendar-check me-2 text-warning"></i>CRONOGRAMA
-                                                            E METAS</h6>
+                                                                class="bi bi-calendar-check me-2 text-warning"></i>Cronograma e metas</h6>
                                                     </div>
                                                     <div class="card-body">
                                                         <div class="row g-3">
@@ -4339,7 +4265,7 @@
                                                 data-bs-dismiss="modal">Fechar</button>
                                             <button type="button" class="btn btn-success px-4" id="btn-salvar"
                                                 onclick="enviarParaPlanilha()"><i class="bi bi-check-lg"></i>
-                                                SALVAR</button>
+                                                Salvar</button>
                                         </div>
                                     </div>
                                 </div>
@@ -4373,8 +4299,7 @@
                                     <div class="modal-content">
                                         <div class="modal-header bg-success text-white">
                                             <h5 class="modal-title fs-6 fw-bold"><i
-                                                    class="bi bi-check-circle-fill me-2"></i>ATENDER
-                                                SOLICITAO</h5>
+                                                    class="bi bi-check-circle-fill me-2"></i>Atender solicitação</h5>
                                             <button type="button" class="btn-close btn-close-white"
                                                 data-bs-dismiss="modal"></button>
                                         </div>
@@ -4396,8 +4321,7 @@
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label small fw-bold">RESPOSTA / OBSERVAO
-                                                        (OPCIONAL)</label>
+                                                    <label class="form-label small fw-bold">Resposta / observação (opcional)</label>
                                                     <textarea class="form-control" id="textoAtender" rows="3"
                                                         placeholder="Ex: A correção será feita na próxima revisão..."></textarea>
                                                 </div>
@@ -4420,9 +4344,7 @@
                                     <div class="modal-content">
                                         <div class="modal-header bg-danger text-white">
                                             <h5 class="modal-title fs-6 fw-bold"><i
-                                                    class="bi bi-x-circle-fill me-2"></i>NO
-                                                ACATAR
-                                                SOLICITAO</h5>
+                                                    class="bi bi-x-circle-fill me-2"></i>Não acatar solicitação</h5>
                                             <button type="button" class="btn-close btn-close-white"
                                                 data-bs-dismiss="modal"></button>
                                         </div>
@@ -4438,8 +4360,7 @@
                                                 </div>
 
                                                 <div class="mb-3">
-                                                    <label class="form-label small fw-bold">JUSTIFICATIVA
-                                                        (OPCIONAL)</label>
+                                                    <label class="form-label small fw-bold">Justificativa (opcional)</label>
                                                     <textarea class="form-control" id="textoRecusar" rows="3"
                                                         placeholder="Se desejar, explique o motivo..."></textarea>
                                                 </div>
@@ -4467,8 +4388,7 @@
                                             <div class="modal-content">
                                                 <div class="modal-header bg-success text-white">
                                                     <h5 class="modal-title fs-6 fw-bold"><i
-                                                            class="bi bi-cloud-plus me-2"></i>CADASTRAR
-                                                        COMPOSIÇÃO</h5>
+                                                            class="bi bi-cloud-plus me-2"></i>Cadastrar composição</h5>
                                                     <button type="button" class="btn-close btn-close-white"
                                                         data-bs-dismiss="modal"></button>
                                                 </div>
@@ -4494,26 +4414,22 @@
                                                                 *</label>
                                                             <input type="text" class="form-control" name="SUBCATEGORIA"
                                                                 list="listaSubcategoriasComp" required
-                                                                placeholder="Ex: ESCOLAS DE ENSINO MDIO">
+                                                                placeholder="Ex: ESCOLAS DE ENSINO MÉDIO">
                                                             <datalist id="listaSubcategoriasComp">
-                                                                <option value="ESCOLAS DE ENSINO MDIO">
+                                                                <option value="ESCOLAS DE ENSINO MÉDIO">
                                                                 <option value="ESCOLAS PROFISSIONALIZANTES">
                                                                 <option value="QUADRAS POLIESPORTIVAS">
                                                             </datalist>
                                                         </div>
 
                                                         <div class="mb-3">
-                                                            <label class="form-label small fw-bold">3. NOME DA
-                                                                COMPOSIÇÃO /
-                                                                ITEM *</label>
+                                                            <label class="form-label small fw-bold">3. Nome da composição / item *</label>
                                                             <input type="text" class="form-control" name="OBRA" required
                                                                 placeholder="Ex: E.E.M. - COMPOSIÇÃO ANALÍTICA">
                                                         </div>
 
                                                         <div class="mb-3">
-                                                            <label class="form-label small fw-bold">ARQUIVO DA
-                                                                COMPOSIÇÃO
-                                                                *</label>
+                                                            <label class="form-label small fw-bold">Arquivo da composição *</label>
                                                             <input type="file" class="form-control"
                                                                 id="inputArquivoUploadComp" required
                                                                 accept=".xlsx,.xls,.pdf">
@@ -4530,7 +4446,7 @@
                                                                     id="input-data-hoje-comp" required>
                                                             </div>
                                                             <div class="col-md-6 mb-3">
-                                                                <label class="form-label small fw-bold">STATUS</label>
+                                                                <label class="form-label small fw-bold">Status</label>
                                                                 <select class="form-select" name="STATUS">
                                                                     <option value="Disponível" selected>Disponível
                                                                     </option>
@@ -4556,9 +4472,7 @@
                                                 <div class="modal-content">
                                                     <div class="modal-header bg-warning-subtle">
                                                         <h5 class="modal-title fs-6 fw-bold"><i
-                                                                class="bi bi-chat-left-text me-2"></i>SOLICITAR
-                                                            REVISÃO /
-                                                            COMENTAR</h5>
+                                                                class="bi bi-chat-left-text me-2"></i>Solicitar revisão / comentar</h5>
                                                         <button type="button" class="btn-close"
                                                             data-bs-dismiss="modal"></button>
                                                     </div>
@@ -4567,21 +4481,19 @@
                                                             <input type="hidden" id="coment-id-composicao" name="ID">
                                                             <div class="mb-3">
                                                                 <label
-                                                                    class="form-label small fw-bold">COMPOSIÇÃO</label>
+                                                                    class="form-label small fw-bold">Composição</label>
                                                                 <input type="text"
                                                                     class="form-control form-control-sm bg-light"
                                                                     id="coment-nome-composicao" readonly>
                                                             </div>
                                                             <div class="mb-3">
-                                                                <label class="form-label small fw-bold">SEU NOME
-                                                                    (FISCAL)</label>
+                                                                <label class="form-label small fw-bold">Seu nome (fiscal)</label>
                                                                 <select class="form-select form-select-sm"
                                                                     id="coment-fiscal-comp" required>
                                                                 </select>
                                                             </div>
                                                             <div class="mb-3">
-                                                                <label class="form-label small fw-bold">MENSAGEM /
-                                                                    SOLICITAO</label>
+                                                                <label class="form-label small fw-bold">Mensagem / solicitação</label>
                                                                 <textarea class="form-control" name="MENSAGEM" rows="30"
                                                                     style="min-height: 200px;" required
                                                                     placeholder="Descreva o motivo da revisão ou seu comentário..."></textarea>
@@ -4600,7 +4512,7 @@
 
                                                         <div class="mt-3 pt-3 border-top">
                                                             <label
-                                                                class="small text-muted fw-bold mb-2">HISTÓRICO</label>
+                                                                class="small text-muted fw-bold mb-2">Histórico</label>
                                                             <div id="historico-comentarios-comp"
                                                                 class="bg-light p-2 rounded"
                                                                 style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;">
@@ -4625,8 +4537,7 @@
                                                     <div class="modal-content">
                                                         <div class="modal-header bg-success text-white">
                                                             <h5 class="modal-title fs-6 fw-bold"><i
-                                                                    class="bi bi-cloud-arrow-up me-2"></i>ATUALIZAR
-                                                                ARQUIVO (COMPOSIÇÃO)</h5>
+                                                                    class="bi bi-cloud-arrow-up me-2"></i>Atualizar arquivo (composição)</h5>
                                                             <button type="button" class="btn-close btn-close-white"
                                                                 data-bs-dismiss="modal"></button>
                                                         </div>
@@ -4635,17 +4546,14 @@
                                                                 <input type="hidden" id="update-id-composicao">
 
                                                                 <div class="mb-3">
-                                                                    <label class="form-label small fw-bold">NOVO ARQUIVO
-                                                                        (PDF/XLS)</label>
+                                                                    <label class="form-label small fw-bold">Novo arquivo (PDF/XLS)</label>
                                                                     <input type="file" class="form-control"
                                                                         id="inputArquivoUpdateComp" required
                                                                         accept=".xlsx,.xls,.pdf">
                                                                 </div>
 
                                                                 <div class="mb-3">
-                                                                    <label class="form-label small fw-bold">DESCRIÇÃO
-                                                                        DAS
-                                                                        ALTERAÇÕES</label>
+                                                                    <label class="form-label small fw-bold">Descrição das alterações</label>
                                                                     <textarea class="form-control"
                                                                         id="inputDescricaoUpdateComp" rows="3"
                                                                         placeholder="Ex: Atualizado insumos e coeficientes conforme tabela vigente."></textarea>
@@ -4665,7 +4573,7 @@
                                                         <div class="modal-footer justify-content-center">
                                                             <button type="button" class="btn btn-success w-100 fw-bold"
                                                                 onclick="enviarNovaVersaoComposicao()">
-                                                                <i class="bi bi-send-check me-1"></i> SALVAR NOVA VERSÃO
+                                                                <i class="bi bi-send-check me-1"></i> Salvar nova versão
                                                             </button>
                                                         </div>
                                                     </div>
@@ -4678,8 +4586,7 @@
                                                         <div class="modal-content">
                                                             <div class="modal-header bg-success text-white">
                                                                 <h5 class="modal-title fs-6 fw-bold"><i
-                                                                        class="bi bi-check-circle-fill me-2"></i>ATENDER
-                                                                    SOLICITAO</h5>
+                                                                        class="bi bi-check-circle-fill me-2"></i>Atender solicitação</h5>
                                                                 <button type="button" class="btn-close btn-close-white"
                                                                     data-bs-dismiss="modal"></button>
                                                             </div>
@@ -4697,9 +4604,7 @@
                                                                     </div>
 
                                                                     <div class="mb-3">
-                                                                        <label class="form-label small fw-bold">RESPOSTA
-                                                                            /
-                                                                            OBSERVAO (OPCIONAL)</label>
+                                                                        <label class="form-label small fw-bold">Resposta / observação (opcional)</label>
                                                                         <textarea class="form-control"
                                                                             id="textoAtenderComp" rows="3"
                                                                             placeholder="Ex: Alteração realizada..."></textarea>
@@ -4725,9 +4630,7 @@
                                                             <div class="modal-content">
                                                                 <div class="modal-header bg-danger text-white">
                                                                     <h5 class="modal-title fs-6 fw-bold"><i
-                                                                            class="bi bi-x-circle-fill me-2"></i>NO
-                                                                        ACATAR
-                                                                        SOLICITAO</h5>
+                                                                            class="bi bi-x-circle-fill me-2"></i>Não acatar solicitação</h5>
                                                                     <button type="button"
                                                                         class="btn-close btn-close-white"
                                                                         data-bs-dismiss="modal"></button>
@@ -4749,8 +4652,7 @@
 
                                                                         <div class="mb-3">
                                                                             <label
-                                                                                class="form-label small fw-bold">JUSTIFICATIVA
-                                                                                (OPCIONAL)</label>
+                                                                                class="form-label small fw-bold">Justificativa (opcional)</label>
                                                                             <textarea class="form-control"
                                                                                 id="textoRecusarComp" rows="3"
                                                                                 placeholder="Explique o motivo..."></textarea>
@@ -4785,9 +4687,7 @@
                                                                                     <h6
                                                                                         class="modal-title fw-bold mb-0">
                                                                                         <i
-                                                                                            class="bi bi-file-text me-2"></i>RELATÓRIO
-                                                                                        DE COMPOSIÇÃO
-                                                                                        ANALÍTICA
+                                                                                            class="bi bi-file-text me-2"></i>Relatório de composição analítica
                                                                                     </h6>
 
                                                                                     <!-- NOVOS BOTÕES PARA INFORMAR BDI E DESC DENTRO DO RELATÓRIO -->

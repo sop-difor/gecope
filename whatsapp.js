@@ -816,7 +816,7 @@
                             <td class="small text-muted">${escapeHTML(nupExibicao)}</td>
                             <td class="small text-muted text-truncate" style="max-width: 150px;" title="${escapeHTML(objetoExibicao)}">${escapeHTML(objetoExibicao)}</td>
                             <td>
-                                <span class="badge ${statusColor}" style="font-size:0.65rem">
+                                <span class="badge ${statusColor}" style="font-size:0.75rem">
                                     ${escapeHTML(log.status.toUpperCase())}
                                 </span>
                             </td>

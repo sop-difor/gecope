@@ -134,7 +134,7 @@ function renderTabelaResults(lista) {
         const stylePreco = (bdiVal > 0 || descVal > 0) ? 'color: #d63384 !important;' : 'color: var(--sop-gray-dark);';
         // Selo "SP": preço vindo da coluna de São Paulo porque Ceará estava zerado (só SINAPI).
         const seloSP = (item.origem_preco === 'SP')
-            ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem;vertical-align:middle;" title="Preço de referência de São Paulo (valor de Ceará indisponível)">SP</span>'
+            ? ' <span class="badge bg-warning text-dark" style="font-size:0.75rem;vertical-align:middle;" title="Preço de referência de São Paulo (valor de Ceará indisponível)">SP</span>'
             : '';
 
         let btnAction = '';
@@ -235,10 +235,10 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                                     <td style="padding: 0.5rem 0.5rem; text-align: center;">SINAPI</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: center;">${versaoRef}</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: center; font-weight: bold;">${item.codigo_item || item.codigo}</td>
-                                    <td style="padding: 0.5rem 0.5rem; text-align: justify;">${(item.descricao_item || item.descricao || '').toUpperCase()}</td>
+                                    <td style="padding: 0.5rem 0.5rem; text-align: left;">${(item.descricao_item || item.descricao || '').toUpperCase()}</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: center;">${item.unidade || '-'}</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: center;">${formatDecimal(item.coeficiente)}</td>
-                                    <td style="padding: 0.5rem 0.5rem; text-align: right;">${formatDecimal(item.preco_unitario, 2)}${item.origem_preco === 'SP' ? ' <span class="badge bg-warning text-dark" style="font-size:0.6rem;" title="Preço de São Paulo (Ceará indisponível)">SP</span>' : ''}</td>
+                                    <td style="padding: 0.5rem 0.5rem; text-align: right;">${formatDecimal(item.preco_unitario, 2)}${item.origem_preco === 'SP' ? ' <span class="badge bg-warning text-dark" style="font-size:0.75rem;" title="Preço de São Paulo (Ceará indisponível)">SP</span>' : ''}</td>
                                     <td style="padding: 0.5rem 0.5rem; text-align: right; font-weight: bold;">${formatDecimal(item.total, 2)}</td>
                                 </tr>
                             `;
@@ -265,22 +265,22 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                                 </div>
                                 <div class="text-end">
                                     <h5 class="fw-bold mb-0 text-dark">COMPOSIÇÃO ANALÍTICA</h5>
-                                    <div class="text-muted fw-bold" style="font-size: 0.7rem;">GECOPE - GERÊNCIA DE CONTROLE DE ADITIVOS</div>
+                                    <div class="text-muted fw-bold" style="font-size: 0.75rem;">GECOPE - GERÊNCIA DE CONTROLE DE ADITIVOS</div>
                                 </div>
                             </div>
 
                             <!-- Metadados (Estilo SINAPI adaptado) -->
                             <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
                                 <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
                                 <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">DESCRIÇÃO DA COMPOSIÇÃO</small>
-                                    <div style="font-size: 1.05rem; font-weight: 800; color: #1a1a1a; text-transform: uppercase; text-align: justify;">${descricao}</div>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase;">DESCRIÇÃO DA COMPOSIÇÃO</small>
+                                    <div style="font-size: 1.05rem; font-weight: 800; color: #1a1a1a; text-transform: uppercase; text-align: left;">${descricao}</div>
                                 </div>
                                 <div style="flex: 0 0 8%; padding: 0 0.5rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; text-align: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">UNIDADE</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase;">UNIDADE</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a;">${unidade}</div>
                                 </div>
                             </div>
@@ -290,14 +290,14 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                                 <table class="table table-sm align-middle" style="border-collapse: collapse; width: 100%;">
                                     <thead>
                                         <tr style="font-size: 0.75rem; background-color: #f5f5f5; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
-                                            <th style="width: 8%;" class="fw-bold text-uppercase p-2">FONTE</th>
-                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSÃO</th>
-                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CÓDIGO</th>
-                                            <th style="width: 48%;" class="fw-bold text-uppercase p-2">DESCRIÇÃO DO INSUMO</th>
-                                            <th style="width: 5%;" class="fw-bold text-uppercase text-center p-2">UNID.</th>
-                                            <th style="width: 7%;" class="fw-bold text-uppercase text-center p-2">COEF.</th>
-                                            <th style="width: 9%;" class="fw-bold text-uppercase text-end p-2">P. UNIT.</th>
-                                            <th style="width: 8%;" class="fw-bold text-uppercase text-end p-2">TOTAL</th>
+                                            <th style="width: 8%;" class="fw-bold p-2">Fonte</th>
+                                            <th style="width: 7%;" class="fw-bold p-2">Versão</th>
+                                            <th style="width: 8%;" class="fw-bold text-center p-2">Código</th>
+                                            <th style="width: 48%;" class="fw-bold p-2">Descrição do insumo</th>
+                                            <th style="width: 5%;" class="fw-bold text-center p-2">Unid.</th>
+                                            <th style="width: 7%;" class="fw-bold text-center p-2">Coef.</th>
+                                            <th style="width: 9%;" class="fw-bold text-end p-2">P. unit.</th>
+                                            <th style="width: 8%;" class="fw-bold text-end p-2">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -310,7 +310,7 @@ function renderizarComposicaoSINAPI(dadosPai, modalBody) {
                             <div class="mt-4" style="padding: 1.8rem 2rem; background: linear-gradient(135deg, #008F3D 0%, #007233 100%); color: white; border-radius: 12px;">
                                 <div class="row align-items-center">
                                     <div class="col-8">
-                                        <small class="text-white-50 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase;">Preço Total Unitário (SINAPI)</small>
+                                        <small class="text-white-50 fw-bold d-block mb-1" style="font-size: 0.75rem; letter-spacing: 1.5px; text-transform: uppercase;">Preço Total Unitário (SINAPI)</small>
                                         <div style="font-size: 0.95rem; opacity: 0.9;">Versão: ${versaoRef} . Referência: ${(dadosPai.tipo_encargo || '').toLowerCase().includes('deson') ? 'Desonerada' : 'Onerada'}</div>
                                     </div>
                                     <div class="col-4 text-end">
@@ -391,7 +391,7 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                                         <td style="padding: 0.5rem 0.5rem; text-align: center;">SEINFRA</td>
                                         <td style="padding: 0.5rem 0.5rem; text-align: center;">${versaoRef}</td>
                                         <td style="padding: 0.5rem 0.5rem; text-align: center; font-weight: bold;">${item.codigo_item || item.codigo}</td>
-                                        <td style="padding: 0.5rem 0.5rem; text-align: justify;">${(item.descricao_item || item.descricao || '').toUpperCase()}</td>
+                                        <td style="padding: 0.5rem 0.5rem; text-align: left;">${(item.descricao_item || item.descricao || '').toUpperCase()}</td>
                                         <td style="padding: 0.5rem 0.5rem; text-align: center;">${item.unidade || '-'}</td>
                                         <td style="padding: 0.5rem 0.5rem; text-align: center;">${formatDecimal(item.coeficiente, 4)}</td>
                                         <td style="padding: 0.5rem 0.5rem; text-align: right;">${formatDecimal(item.preco_unitario, 2)}</td>
@@ -423,22 +423,22 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                                 </div>
                                 <div class="text-end">
                                     <h5 class="fw-bold mb-0 text-dark">COMPOSIÇÃO ANALÍTICA</h5>
-                                    <div class="text-muted fw-bold" style="font-size: 0.7rem;">GECOPE - GERÊNCIA DE CONTROLE DE ADITIVOS</div>
+                                    <div class="text-muted fw-bold" style="font-size: 0.75rem;">GECOPE - GERÊNCIA DE CONTROLE DE ADITIVOS</div>
                                 </div>
                             </div>
 
                             <!-- Metadados (Estilo SEINFRA adaptado) -->
                             <div style="background: white; border: 1px solid #eee; border-left: 6px solid #008F3D; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); padding: 1.5rem 0rem; display: flex; align-items: stretch; min-height: 100px; margin-bottom: 2rem;">
                                 <div style="flex: 0 0 8%; padding: 0 1rem; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">CÓDIGO</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a; line-height: 1;">${codigo}</div>
                                 </div>
                                 <div style="flex: 1; padding: 0 2rem; display: flex; flex-direction: column; justify-content: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">DESCRIÇÃO DA COMPOSIÇÃO</small>
-                                    <div style="font-size: 1.05rem; font-weight: 800; color: #1a1a1a; text-transform: uppercase; text-align: justify;">${descricao}</div>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase;">DESCRIÇÃO DA COMPOSIÇÃO</small>
+                                    <div style="font-size: 1.05rem; font-weight: 800; color: #1a1a1a; text-transform: uppercase; text-align: left;">${descricao}</div>
                                 </div>
                                 <div style="flex: 0 0 8%; padding: 0 0.5rem; border-left: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; text-align: center;">
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem; text-transform: uppercase;">UNIDADE</small>
+                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.75rem; text-transform: uppercase;">UNIDADE</small>
                                     <div style="font-size: 1.35rem; font-weight: 800; color: #1a1a1a;">${unidade}</div>
                                 </div>
                             </div>
@@ -448,14 +448,14 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                                 <table class="table table-sm align-middle" style="border-collapse: collapse; width: 100%;">
                                     <thead>
                                         <tr style="font-size: 0.75rem; background-color: #f5f5f5; border-top: 2px solid #ddd; border-bottom: 2px solid #ddd;">
-                                            <th style="width: 8%;" class="fw-bold text-uppercase p-2">FONTE</th>
-                                            <th style="width: 7%;" class="fw-bold text-uppercase p-2">VERSÃO</th>
-                                            <th style="width: 8%;" class="fw-bold text-uppercase text-center p-2">CÓDIGO</th>
-                                            <th style="width: 48%;" class="fw-bold text-uppercase p-2">DESCRIÇÃO DO INSUMO</th>
-                                            <th style="width: 5%;" class="fw-bold text-uppercase text-center p-2">UNID.</th>
-                                            <th style="width: 7%;" class="fw-bold text-uppercase text-center p-2">COEF.</th>
-                                            <th style="width: 9%;" class="fw-bold text-uppercase text-end p-2">P. UNIT.</th>
-                                            <th style="width: 8%;" class="fw-bold text-uppercase text-end p-2">TOTAL</th>
+                                            <th style="width: 8%;" class="fw-bold p-2">Fonte</th>
+                                            <th style="width: 7%;" class="fw-bold p-2">Versão</th>
+                                            <th style="width: 8%;" class="fw-bold text-center p-2">Código</th>
+                                            <th style="width: 48%;" class="fw-bold p-2">Descrição do insumo</th>
+                                            <th style="width: 5%;" class="fw-bold text-center p-2">Unid.</th>
+                                            <th style="width: 7%;" class="fw-bold text-center p-2">Coef.</th>
+                                            <th style="width: 9%;" class="fw-bold text-end p-2">P. unit.</th>
+                                            <th style="width: 8%;" class="fw-bold text-end p-2">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -468,7 +468,7 @@ function renderizarComposicaoSEINFRA(dadosPai, modalBody, tipoRef) {
                             <div class="mt-4" style="padding: 1.8rem 2rem; background: linear-gradient(135deg, #008F3D 0%, #007233 100%); color: white; border-radius: 12px;">
                                 <div class="row align-items-center">
                                     <div class="col-8">
-                                        <small class="text-white-50 fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1.5px; text-transform: uppercase;">Preço Total Unitário (SEINFRA)</small>
+                                        <small class="text-white-50 fw-bold d-block mb-1" style="font-size: 0.75rem; letter-spacing: 1.5px; text-transform: uppercase;">Preço Total Unitário (SEINFRA)</small>
                                         <div style="font-size: 0.95rem; opacity: 0.9;">Versão: ${versaoRef} . Referência: ${(tipoRef || dadosPai.tipo_encargo || '').toLowerCase().includes('deson') ? 'Desonerada' : 'Onerada'}</div>
                                     </div>
                                     <div class="col-4 text-end">
@@ -566,7 +566,7 @@ async function abrirDetalheTabela(codigo, fonte, versao, tipoRef) {
                                     </div>
                                     <div class="text-end">
                                         <h5 class="fw-bold mb-0 text-dark">DETALHE DA COMPOSIÇÃO</h5>
-                                        <div class="text-muted fw-bold" style="font-size: 0.7rem;">FONTE: ${fonte} / ${versaoSOP}</div>
+                                        <div class="text-muted fw-bold" style="font-size: 0.75rem;">FONTE: ${fonte} / ${versaoSOP}</div>
                                     </div>
                                 </div>
 
@@ -592,11 +592,11 @@ async function abrirDetalheTabela(codigo, fonte, versao, tipoRef) {
                                         <thead style="background-color: #f8f9fa;">
                                             <tr class="small fw-bold">
                                                 <th class="text-center">ITEM</th>
-                                                <th>DESCRIÇÃO DO INSUMO</th>
+                                                <th>Descrição do insumo</th>
                                                 <th class="text-center">UNID</th>
-                                                <th class="text-center">COEF.</th>
-                                                <th class="text-end">P. UNIT.</th>
-                                                <th class="text-end">TOTAL</th>
+                                                <th class="text-center">Coef.</th>
+                                                <th class="text-end">P. unit.</th>
+                                                <th class="text-end">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody class="small">

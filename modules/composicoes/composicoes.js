@@ -247,7 +247,7 @@ async function prepararComentarioComposicao(id) {
 
         chat.innerHTML = comments.length ? comments.map(c => `
                             <div class="mb-2 border-bottom pb-1">
-                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.7rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
+                                <div class="d-flex justify-content-between"><strong class="text-primary" style="font-size:0.75rem">${escapeHTML(c.autor)}</strong><span class="text-muted" style="font-size:0.75rem">${c.data ? new Date(c.data).toLocaleDateString() : '-'}</span></div>
                                 <div style="font-size:0.8rem">${escapeHTML(c.mensagem)}</div>
                                 ${c.arquivo ? `<a href="${escapeHTML(c.arquivo)}" target="_blank" rel="noopener noreferrer" class="badge bg-light text-dark border mt-1"><i class="bi bi-paperclip"></i> Anexo</a>` : ''}
                             </div>`).join('') : '<em class="text-muted">Sem mensagens.</em>';
@@ -561,7 +561,7 @@ async function renderizarComposicoes() {
                 let badgeStatus = '';
                 const temPendenteComp = historico.some(c => c.decisao === 'pendente');
                 if (temPendenteComp) {
-                    badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.65rem">Em Revisão</span>`;
+                    badgeStatus = `<span class="badge bg-warning text-dark ms-2" style="font-size:0.75rem">Em Revisão</span>`;
                 } else if (obra.status === 'Atualizado' || parseInt(String(obra.versao_atual || '').replace(/[^0-9]/g, '')) > 1) {
                     badgeStatus = `<span class="badge badge-status-atualizado">Atualizado</span>`;
                 }
@@ -603,10 +603,10 @@ async function renderizarComposicoes() {
                                             <div style="flex: 1; min-width: 0;">
                                                 <div class="d-flex align-items-center mb-1">
                                                     <span class="text-secondary small me-2" style="font-family: monospace; font-weight: 700; letter-spacing: 0.5px;">#${obra.codigo || 'S/C'}</span>
-                                                    <span class="badge bg-dark ms-1" style="font-size:0.65rem; font-weight: 700; border-radius: 4px; padding: 2px 6px;">${obra.versao_atual || 'V1'}</span>
+                                                    <span class="badge bg-dark ms-1" style="font-size:0.75rem; font-weight: 700; border-radius: 4px; padding: 2px 6px;">${obra.versao_atual || 'V1'}</span>
                                                     ${badgeStatus}
                                                 </div>
-                                                <div class="fw-bold text-dark pe-3" style="font-size:0.95rem; text-align: justify; line-height: 1.4;">
+                                                <div class="fw-bold text-dark pe-3" style="font-size:0.95rem; text-align: left; line-height: 1.4;">
                                                     ${escapeHTML(obra.descricao) || "Sem Descrição"}
                                                 </div>
                                                 <div class="text-muted mt-1" style="font-size:0.75rem;">
@@ -656,7 +656,7 @@ async function renderizarComposicoes() {
                             <div class="accordion-custom-item">
                                 <h2 class="accordion-header">
                                     <button class="accordion-button accordion-custom-button collapsed ${accordionClass}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                                        <i class="${iconClassHeader}"></i> ${titleLabel} <span class="badge bg-white text-dark ms-2 opacity-75" style="font-size: 0.65rem;">${badgeCount}</span>
+                                        <i class="${iconClassHeader}"></i> ${titleLabel} <span class="badge bg-white text-dark ms-2 opacity-75" style="font-size: 0.75rem;">${badgeCount}</span>
                                     </button>
                                 </h2>
                                 <div id="${collapseId}" class="accordion-collapse collapse">
@@ -1233,7 +1233,7 @@ async function executarBuscaItemComposicao() {
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <div class="fw-bold small">${codigo} - ${desc}</div>
-                                    <div class="text-muted" style="font-size:0.7rem">
+                                    <div class="text-muted" style="font-size:0.75rem">
                                         ${fonte} | ${unidade} | ${tipo} <br>
                                         <span class="text-primary">Ref: ${dbRef} | Ver: ${dbVer}</span>
                                     </div>
@@ -1374,17 +1374,17 @@ function renderizarItensComposicao() {
 
             let sourceDisplay = '';
             if (item.fonte === 'MERCADO') {
-                sourceDisplay = `<span class="badge bg-light text-secondary border me-1" style="font-size:0.65rem">MERCADO</span>`;
+                sourceDisplay = `<span class="badge bg-light text-secondary border me-1" style="font-size:0.75rem">MERCADO</span>`;
             } else if (item.fonte === 'OUTRAS') {
-                sourceDisplay = `<span class="badge bg-light text-secondary border me-1" style="font-size:0.65rem">OUTRAS</span>`;
+                sourceDisplay = `<span class="badge bg-light text-secondary border me-1" style="font-size:0.75rem">OUTRAS</span>`;
             } else {
                 sourceDisplay = `
                                     <div class="d-flex flex-column align-items-center" style="line-height:1.1;">
                                         <div>
-                                            <span class="badge bg-light text-secondary border me-1" style="font-size:0.65rem">${item.fonte}</span>
+                                            <span class="badge bg-light text-secondary border me-1" style="font-size:0.75rem">${item.fonte}</span>
                                             <span class="fw-bold small">${verShort}</span>
                                         </div>
-                                        <small class="text-muted" style="font-size:0.7rem;">${refShort}</small>
+                                        <small class="text-muted" style="font-size:0.75rem;">${refShort}</small>
                                     </div>
                                 `;
             }
@@ -1482,7 +1482,7 @@ async function salvarComposicaoAnalitica() {
     const btn = document.getElementById('btn-salvar-comp-analitica');
     const textoOriginal = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> SALVANDO...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
 
     try {
         const formData = new FormData(form);

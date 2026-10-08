@@ -1,0 +1,73 @@
+/* ==========================================================================
+   TOKENS DE DESIGN DO GECOPE — fonte única dos valores de cor, raio e sombra.
+   Spec: docs/revisao-design-tema-claro/spec.md (bloco B0).
+
+   Carregue ANTES de qualquer outro CSS da página. Todos os nomes têm o prefixo
+   --gc-, que nenhuma página usa hoje, então carregar este arquivo não altera
+   nada por si só: cada página aponta seus nomes antigos para cá (apelidos) e os
+   apelidos saem quando o último consumidor migrar.
+
+   B0 não muda nenhum valor. Os dois verdes de ação abaixo são a única duplicidade
+   que sobrou de propósito: o B1 escolhe o verde único (proposta: --gc-verde-escuro,
+   o único dos três que passa em AA com texto branco) e remove um dos dois.
+   ========================================================================== */
+
+:root {
+    /* Marca */
+    --gc-verde-app: #008F3D;        /* verde de ação do app principal (a unificar no B1) */
+    --gc-verde-escuro: #007233;
+    --gc-verde-claro: #4CC17C;
+    --gc-verde-mapa: #0C8A5C;       /* verde de ação do Mapa no tema claro (a unificar no B1) */
+    --gc-laranja: #F28C00;
+    --gc-azul: #018ABD;
+
+    /* Cor de ação do tema claro (B1): o verde único de botões, links e acentos.
+       #007233 dá 6,08:1 com texto branco e 5,41:1 sobre o fundo da página (AA exige 4,5:1);
+       os dois verdes anteriores davam 4,20 e 4,37 com branco. O tema escuro não usa estes
+       tokens: a paleta dele não muda. */
+    --gc-acao: #007233;
+    --gc-acao-hover: #005a29;
+    --gc-acao-suave: rgba(0, 114, 51, 0.10);   /* fundo de chips de ícone */
+    --gc-acao-foco-rgb: 0, 114, 51;
+
+    /* Escala tipográfica (B2). Montserrat em tudo. O piso de 12px vale para qualquer texto,
+       exceto selos de 1 a 3 caracteres; abaixo disso some em projeção.
+       piso     texto auxiliar, selos, legendas
+       rótulo   rótulos de campo e de KPI, cabeçalhos de tabela (em sentença, sem caixa alta)
+       corpo    texto corrido e células
+       seção    título de seção (ex.: "Panorama geral")
+       destaque número principal de um cartão de KPI */
+    --gc-fs-piso: 0.75rem;
+    --gc-fs-rotulo: 0.8125rem;
+    --gc-fs-corpo: 0.9375rem;
+    --gc-fs-secao: 1rem;
+    --gc-fs-destaque: 2.3rem;
+
+    /* Escala de cinzas (slate) */
+    --gc-slate-900: #0f172a;
+    --gc-slate-800: #1e293b;
+    --gc-slate-700: #334155;
+    --gc-slate-600: #475569;
+    --gc-slate-500: #64748b;
+    --gc-slate-200: #e2e8f0;
+    --gc-slate-100: #f1f5f9;
+    --gc-slate-50: #f8fafc;
+    --gc-branco: #FFFFFF;
+
+    /* Superfícies do tema claro */
+    --gc-pagina-claro: #eef3ef;     /* fundo do app principal */
+    --gc-pagina-claro-mapa: #F4F6F5; /* fundo do Mapa (a unificar no B3) */
+
+    /* Raios */
+    --gc-raio-sm: 8px;
+    --gc-raio-lg: 16px;
+    --gc-raio-xl: 20px;
+    --gc-raio-2xl: 24px;
+
+    /* Sombras */
+    --gc-sombra-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --gc-sombra-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --gc-sombra-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --gc-sombra-cartao: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    --gc-sombra-cartao-elevado: 0 6px 18px -8px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
+}

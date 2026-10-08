@@ -6,7 +6,8 @@
 <title>Assistente de Dados · GECOPE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <!-- Supabase: mesmo cliente/sessão do restante do GECOPE (config.js define URL/chave,
      database.js inicializa window.sbClient reaproveitando a sessão já autenticada).
@@ -20,13 +21,13 @@
 <style>
   :root {
     --bg-page: #ffffff;
-    --bg-card-usuario: #f2f2f0;
-    --border-soft: #e8e8e5;
-    --text-primary: #262624;
-    --text-secondary: #6b6b68;
-    --text-tertiary: #9c9c98;
-    --accent: #4f46e5;
-    --accent-soft: #eef0fd;
+    --bg-card-usuario: var(--gc-slate-100);
+    --border-soft: var(--gc-slate-200);
+    --text-primary: var(--gc-slate-900);
+    --text-secondary: var(--gc-slate-600);
+    --text-tertiary: var(--gc-slate-500);
+    --accent: var(--gc-acao);
+    --accent-soft: var(--gc-acao-suave);
     --erro-texto: #b3261e;
     --erro-fundo: #fdf2f2;
     --erro-borda: #f5c2c2;
@@ -68,7 +69,7 @@
     height: 100%;
     background: var(--bg-page);
     color: var(--text-primary);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
   body {
@@ -436,7 +437,7 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: var(--text-primary);
+    background: var(--accent);
     border: none;
     display: flex;
     align-items: center;

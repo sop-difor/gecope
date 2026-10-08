@@ -12,7 +12,7 @@
         .badge-status-atualizado {
             background-color: #0d6efd;
             color: #fff;
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             margin-left: 8px;
             border: 1px solid #0a58ca;
             padding: 2px 6px;
@@ -211,42 +211,44 @@
        VARIÁVEIS DE CORES & CONFIGURAÇÕES GERAIS
        ------------------------------------------------------------------------ */
         :root {
-            --sop-green: #008F3D;
-            --sop-green-dark: #007233;
-            --sop-green-light: #4CC17C;
-            --sop-orange: #F28C00;
-            --sop-blue: #018ABD;
+            /* Os valores moram em shared/tokens.css (carregado antes deste arquivo);
+               os nomes abaixo são apelidos que saem quando o último consumidor migrar. */
+            --sop-green: var(--gc-verde-app);
+            --sop-green-dark: var(--gc-verde-escuro);
+            --sop-green-light: var(--gc-verde-claro);
+            --sop-orange: var(--gc-laranja);
+            --sop-blue: var(--gc-azul);
 
             /* SaaS Colors (Tailwind Slate/Gray scale) */
-            --sop-slate-900: #0f172a;
-            --sop-slate-800: #1e293b;
-            --sop-slate-700: #334155;
-            --sop-slate-600: #475569;
-            --sop-slate-500: #64748b;
-            --sop-slate-200: #e2e8f0;
-            --sop-slate-100: #f1f5f9;
-            --sop-slate-50: #f8fafc;
+            --sop-slate-900: var(--gc-slate-900);
+            --sop-slate-800: var(--gc-slate-800);
+            --sop-slate-700: var(--gc-slate-700);
+            --sop-slate-600: var(--gc-slate-600);
+            --sop-slate-500: var(--gc-slate-500);
+            --sop-slate-200: var(--gc-slate-200);
+            --sop-slate-100: var(--gc-slate-100);
+            --sop-slate-50: var(--gc-slate-50);
 
             --sop-gray-dark: var(--sop-slate-900);
             --sop-gray-mid: var(--sop-slate-500);
             --sop-gray-light: var(--sop-slate-100);
-            --sop-white: #FFFFFF;
+            --sop-white: var(--gc-branco);
 
             /* Fundo da página no modo claro: um cinza-esverdeado bem suave,
                para os cartões brancos ganharem contraste em vez de "sumir"
                num fundo branco-sobre-branco. */
-            --sop-page-bg: #eef3ef;
-            --shadow-card-elevated: 0 6px 18px -8px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
+            --sop-page-bg: var(--gc-pagina-claro);
+            --shadow-card-elevated: var(--gc-sombra-cartao-elevado);
 
             /* Design Tokens */
             --border-soft: #f1f5f9;
-            --radius-xl: 20px;
-            --radius-2xl: 24px;
+            --radius-xl: var(--gc-raio-xl);
+            --radius-2xl: var(--gc-raio-2xl);
 
             /* Elegant SaaS Shadows */
-            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-sm: var(--gc-sombra-sm);
+            --shadow-md: var(--gc-sombra-md);
+            --shadow-lg: var(--gc-sombra-lg);
 
             --sop-card-shadow: var(--shadow-sm);
             --sop-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -254,10 +256,10 @@
             /* Tokens usados no redesign do Painel de Processos */
             --text-heading: var(--sop-slate-900);
             --text-muted: var(--sop-slate-500);
-            --shadow-card-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+            --shadow-card-subtle: var(--gc-sombra-cartao);
             --transition-fast: 0.2s ease;
-            --radius-lg: 16px;
-            --radius-sm: 8px;
+            --radius-lg: var(--gc-raio-lg);
+            --radius-sm: var(--gc-raio-sm);
             --icon-bg-slate: var(--sop-slate-100);
             --icon-fg-slate: var(--sop-slate-600);
             --filetype-pdf-fg: #DC3545;
@@ -323,11 +325,9 @@
         }
 
         .home-section-eyebrow {
-            font-size: 0.78rem;
+            font-size: 1rem;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
+            color: var(--text-heading);
             margin: 30px 0 12px;
         }
         body.theme-dark .home-section-eyebrow {
@@ -386,9 +386,6 @@
             transition: var(--transition-fast);
         }
 
-        .home-stat-card.accent-green { border-left-color: var(--sop-green); }
-        .home-stat-card.accent-blue { border-left-color: #0d6efd; }
-        .home-stat-card.accent-orange { border-left-color: var(--sop-orange); }
 
         .home-stat-card:hover {
             transform: translateY(-3px);
@@ -420,10 +417,8 @@
 
         .home-stat-label {
             display: block;
-            font-size: 0.76rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
             color: var(--text-muted);
             margin-bottom: 6px;
         }
@@ -499,8 +494,6 @@
             color: inherit !important;
         }
 
-        .home-action-card.accent-green { border-left-color: var(--sop-green); }
-        .home-action-card.accent-blue { border-left-color: #0d6efd; }
 
         .home-action-card:hover {
             transform: translateY(-4px);
@@ -544,7 +537,7 @@
             position: absolute;
             top: 24px;
             right: 24px;
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -881,7 +874,7 @@
         }
 
         .activity-badge {
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.4px;
@@ -984,10 +977,8 @@
 
         /* 3. Subcategorias (Hierarquia) */
         .subcategoria-header {
-            font-size: 0.8rem;
+            font-size: 0.875rem;
             font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
             color: #888;
             margin-top: 24px;
             margin-bottom: 12px;
@@ -1219,9 +1210,7 @@
 
         .landing-card-label {
             font-weight: 700;
-            font-size: 0.78rem;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
+            font-size: 0.875rem;
             color: #ffffff;
             margin-bottom: 18px;
             display: flex;
@@ -1246,10 +1235,8 @@
 
         .landing-input-label {
             display: block;
-            font-size: 0.72rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
             color: #94a3b8;
             margin-bottom: 6px;
         }
@@ -1360,7 +1347,7 @@
         .landing-footer {
             margin-top: 24px;
             text-align: center;
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             color: #64748b;
         }
 
@@ -1493,9 +1480,7 @@
         #pane-admin table thead th {
             background-color: var(--sop-slate-50) !important;
             color: var(--sop-slate-600) !important;
-            font-size: 0.75rem !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
+            font-size: var(--gc-fs-rotulo)!important;
             font-weight: 700 !important;
             border-top: none !important;
             padding: 15px 10px !important;
@@ -1713,34 +1698,78 @@
             font-size: 0.9rem;
         }
 
-        /* --- CABEÇALHO COMPACTO (body.modo-compacto, ligado em showPane) ---
-           Todos os módulos, menos o Início, usam uma barra só (~54px) no lugar de faixa do
-           portal + cabeçalho + subtítulo + linha do "Painel Principal" (~300px), para os dados
-           e o mapa ficarem com a tela. Os elementos .cb-* existem sempre no HTML, mas só
-           aparecem neste modo. body.modo-contratos acrescenta a data da base; body.modo-embutido
+        /* --- CABEÇALHO ÚNICO (revisão de 07/10/2026) ---
+           A barra é a mesma em todas as telas (marca da SOP, nome do sistema, tema, tela cheia
+           e usuário). Nos módulos (body.modo-compacto, ligado em showPane) a barra ganha, logo
+           abaixo, a trilha ".gc-trilha": o único botão de voltar ao Painel Principal, o nome do
+           módulo e, no Contratos, a data da base ("Base atualizada em ..."). body.modo-embutido
            aperta o espaçamento dos módulos que são iframes. */
-        .cb-voltar,
-        .cb-meio {
+        .gc-trilha {
             display: none;
         }
 
-        body.modo-compacto .top-bar,
-        body.modo-compacto .panel-subheader,
-        body.modo-compacto .sop-brand,
-        body.modo-compacto .sop-brand-text,
-        body.modo-compacto .sop-header-gecope,
-        body.modo-compacto #nav-back-container .btn-back-minimal:first-child {
-            display: none !important;
+        body.modo-compacto .gc-trilha {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            min-height: 36px;
+            margin-bottom: 8px;
         }
 
-        /* Contratos: "Base atualizada em ..." à direita, junto dos botões, só o ponto verde e o texto. */
+        .gc-trilha-voltar {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px 6px 4px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--gc-acao);
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .gc-trilha-voltar:hover {
+            background: var(--gc-acao-suave);
+        }
+
+        body.theme-dark .gc-trilha-voltar {
+            color: #4cc17c;
+        }
+
+        .gc-trilha-sep {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        .gc-trilha-atual {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+
+        body.theme-dark .gc-trilha-sep,
+        body.theme-dark .gc-trilha-atual {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Contratos: data da base, à direita da trilha. */
         .cb-base-info {
             display: none;
             align-items: center;
             gap: 8px;
+            margin-left: auto;
             white-space: nowrap;
-            font-size: 0.78rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        body.theme-dark .cb-base-info {
             color: rgba(255, 255, 255, 0.72);
         }
 
@@ -1748,64 +1777,14 @@
             display: inline-flex;
         }
 
-        body.modo-compacto .sop-header {
-            position: relative;
-            justify-content: flex-start;
-            gap: 14px;
-            padding: 8px 20px;
-            min-height: 54px;
+        body.modo-compacto .top-bar,
+        body.modo-compacto .panel-subheader,
+        body.modo-compacto .sop-header-gecope,
+        body.modo-compacto #nav-back-container .btn-back-minimal:first-child {
+            display: none !important;
         }
 
-        body.modo-compacto .cb-voltar {
-            display: inline-flex;
-        }
-
-        /* Título centralizado na barra, independente da largura dos lados. */
-        body.modo-compacto .cb-meio {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 0;
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-        }
-
-        /* Tema e tela cheia: só o ícone, discretos (o nome fica no title/aria-label). */
-        body.modo-compacto .sop-header-right .theme-toggle-btn {
-            width: 34px;
-            height: 34px;
-            padding: 0;
-            justify-content: center;
-            background: transparent;
-            border-color: transparent;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        body.modo-compacto .sop-header-right .theme-toggle-btn:hover,
-        body.modo-compacto .sop-header-right .theme-toggle-btn:focus-visible {
-            background: rgba(255, 255, 255, 0.12);
-            color: #ffffff;
-        }
-
-        body.modo-compacto .sop-header-right .theme-toggle-btn span {
-            display: none;
-        }
-
-        body.modo-compacto .sop-header-right .theme-toggle-btn i {
-            font-size: 1rem;
-        }
-
-        .cb-titulo {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 700;
-            letter-spacing: -0.01em;
-            color: #ffffff;
-        }
-
-        body.modo-compacto .sop-header-right {
+        .sop-header-right {
             margin-left: auto;
         }
 
@@ -1821,57 +1800,6 @@
 
         body.modo-embutido main.page-wrapper {
             padding: 10px 16px 12px;
-        }
-
-        /* Telas médias: sem o nome do usuário (e sem a data da base) para não encostar no título centralizado. */
-        @media (max-width: 1100px) {
-            body.modo-compacto #user-info-header .text-end {
-                display: none !important;
-            }
-        }
-
-        @media (max-width: 900px) {
-            body.modo-contratos .cb-base-info {
-                display: none;
-            }
-        }
-
-        @media (max-width: 1500px) {
-            body.modo-contratos #user-info-header .text-end {
-                display: none !important;
-            }
-        }
-
-        @media (max-width: 768px) {
-            body.modo-compacto .sop-header {
-                flex-direction: row;
-                flex-wrap: nowrap;
-                align-items: center;
-                gap: 8px;
-                padding: 8px 12px;
-            }
-
-            body.modo-compacto .cb-meio {
-                position: static;
-                transform: none;
-                flex: 1;
-                justify-content: center;
-            }
-
-            .cb-titulo {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            body.modo-compacto .sop-header-right {
-                gap: 6px !important;
-            }
-
-            body.modo-compacto #user-info-header {
-                border: 0 !important;
-                padding-left: 0 !important;
-            }
         }
 
         /* Módulos embutidos (Contratos, Atividades, Assistente); a altura exata é
@@ -2018,18 +1946,15 @@
         }
 
         .filters-title {
-            font-size: 0.85rem;
+            font-size: 0.875rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .08em;
             margin-bottom: 4px;
             color: var(--sop-gray-mid);
         }
 
         .form-label {
-            font-size: 0.75rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 600;
-            text-transform: uppercase;
             color: var(--sop-gray-mid);
             margin-bottom: 2px;
         }
@@ -2106,17 +2031,26 @@
 
         .btn-grid-clear {
             height: 27px;
-            background-color: var(--sop-green);
-            color: #fff;
             border-radius: var(--radius-sm);
             padding: 4px 16px;
             min-width: 100px;
-            border: none;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, color 0.2s;
         }
-
-        .btn-grid-clear:hover {
-            background-color: var(--sop-green-dark);
+        /* Estilo neutro compartilhado das ações de limpar filtros (B1): não compete
+           com o botão primário da tela. Vale nos dois temas (não usa paleta própria). */
+        .btn-grid-clear,
+        .btn-limpar {
+            background-color: transparent;
+            color: var(--text-muted);
+            border: 1px solid rgba(100, 116, 139, 0.55);
+            font-weight: 600;
+        }
+        .btn-grid-clear:hover,
+        .btn-limpar:hover,
+        .btn-limpar:focus-visible {
+            background-color: rgba(100, 116, 139, 0.14);
+            color: var(--text-heading);
+            border-color: rgba(100, 116, 139, 0.8);
         }
 
         .kpi-card {
@@ -2251,10 +2185,8 @@
         }
 
         .kpi-label {
-            font-size: 0.72rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .06em;
             color: var(--sop-gray-mid);
         }
 
@@ -2267,12 +2199,12 @@
         }
 
         .kpi-sub {
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             color: var(--sop-gray-mid);
         }
 
         .kpi-badge {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             font-weight: 600;
             border-radius: 999px;
             padding: 3px 9px;
@@ -2372,7 +2304,7 @@
         }
 
         .chart-subtitle {
-            font-size: 0.74rem;
+            font-size: 0.75rem;
             color: var(--sop-gray-mid);
             margin-top: 2px;
         }
@@ -2433,10 +2365,8 @@
         }
 
         .fin-section-heading-title {
-            font-size: 0.8rem;
+            font-size: 0.9375rem;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .07em;
             color: var(--text-heading, var(--sop-gray-dark));
         }
 
@@ -2523,7 +2453,7 @@
             position: absolute;
             right: 6px;
             opacity: .35;
-            font-size: .68rem;
+            font-size: 0.75rem;
         }
 
         #pane-financeiro .fin-table-wrap th[data-key].fin-th-sorted::after {
@@ -2600,7 +2530,7 @@
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            font-size: 0.74rem;
+            font-size: 0.75rem;
             line-height: 1.5;
             color: var(--sop-gray-mid);
             margin-top: 12px;
@@ -2639,7 +2569,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.72rem !important;
+            font-size: 0.75rem !important;
             padding: 0 8px;
             white-space: nowrap;
         }
@@ -2710,7 +2640,7 @@
             background: linear-gradient(135deg, #ff4d4d 0%, #ff8080 100%);
             color: white;
             font-weight: 700;
-            font-size: 0.55rem;
+            font-size: 0.75rem;
             padding: 1px 6px;
             border-radius: 4px;
             text-transform: uppercase;
@@ -2807,7 +2737,7 @@
             background: linear-gradient(135deg, #E67700 0%, #ffa733 100%);
             color: #ffffff;
             font-weight: 700;
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             line-height: 1;
             padding: 3px 7px;
             border-radius: 999px;
@@ -2889,10 +2819,8 @@
         }
 
         .proc-kpi-label {
-            font-size: 0.78rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
             color: var(--text-muted);
         }
 
@@ -2908,11 +2836,6 @@
             color: var(--text-muted);
         }
 
-        .proc-kpi-card.accent-green { border-left: 4px solid var(--sop-green); }
-        .proc-kpi-card.accent-orange { border-left: 4px solid var(--sop-orange); }
-        .proc-kpi-card.accent-purple { border-left: 4px solid #6f42c1; }
-        .proc-kpi-card.accent-blue { border-left: 4px solid #0d6efd; }
-        .proc-kpi-card.accent-red { border-left: 4px solid var(--filetype-pdf-fg); }
 
         .proc-kpi-icon.bg-green { background: var(--sop-green); box-shadow: 0 4px 10px -2px var(--sop-green); }
         .proc-kpi-icon.bg-orange { background: var(--sop-orange); box-shadow: 0 4px 10px -2px var(--sop-orange); }
@@ -3184,18 +3107,7 @@
             white-space: nowrap;
         }
 
-        .proc-btn-pdf {
-            border: 1px solid var(--filetype-pdf-fg);
-            color: var(--filetype-pdf-fg);
-            background: #fff;
-        }
-
-        .proc-btn-pdf:hover {
-            background: var(--filetype-pdf-fg);
-            color: #fff;
-        }
-
-        /* Container da tabela */
+                /* Container da tabela */
         .proc-table-wrap {
             background: #fff;
             border-radius: var(--radius-lg);
@@ -3233,9 +3145,7 @@
             z-index: 1030;
             background-color: var(--sop-slate-50) !important;
             padding: 13px 14px;
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 700;
             color: var(--sop-slate-600);
         }
@@ -3352,7 +3262,7 @@
         .multiselect-btn .ms-label-all { color: #777; font-weight: 400; }
         .multiselect-btn .ms-label-none { color: #dc3545; font-weight: 600; }
         .multiselect-btn .ms-label-single { color: #333; font-weight: 400; }
-        .multiselect-btn .ms-label-multi { color: #008F3D; font-weight: 600; }
+        .multiselect-btn .ms-label-multi { color: var(--sop-green, #008F3D); font-weight: 600; }
 
         .multiselect-dropdown {
             width: 100%;
@@ -3523,9 +3433,8 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 6px;
-            font-size: 0.75rem;
+            font-size: var(--gc-fs-rotulo);
             color: #888;
-            text-transform: uppercase;
             font-weight: 700;
         }
 
@@ -3608,7 +3517,7 @@
 
         /* Badges de Decisão */
         .badge-decision {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             padding: 4px 8px;
             border-radius: 4px;
             text-transform: uppercase;
@@ -3650,9 +3559,7 @@
 
         .swal2-html-container table th {
             font-family: "Montserrat", sans-serif;
-            font-size: 0.75rem !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
+            font-size: var(--gc-fs-rotulo)!important;
             font-weight: 700 !important;
             background-color: var(--sop-slate-50) !important;
             color: var(--sop-slate-600) !important;
@@ -3993,7 +3900,7 @@
         .cv-ruler-tick { position: absolute; bottom: 0; width: 1px; background: #b7bcc2; }
         .cv-ruler-tick.major { height: 100%; }
         .cv-ruler-tick.minor { height: 40%; }
-        .cv-ruler-tick-label { position: absolute; top: 1px; font-size: 8.5px; color: #7c8188; transform: translateX(-50%); }
+        .cv-ruler-tick-label { position: absolute; top: 1px; font-size: 12px; color: #7c8188; transform: translateX(-50%); }
         .cv-ruler-marker {
             position: absolute;
             width: 0;
@@ -4345,7 +4252,7 @@
         }
 
         .gp-tabs .nav-link .badge {
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             vertical-align: 2px;
         }
 
@@ -4360,10 +4267,8 @@
 
         .gp-identity-label {
             display: block;
-            font-size: 0.68rem;
+            font-size: var(--gc-fs-rotulo);
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
             color: var(--text-muted);
             margin-bottom: 5px;
         }
@@ -4389,35 +4294,36 @@
            demais campos do formulário) através da regra #formDetalhes .form-select
            logo abaixo, que já cobre qualquer .form-control/.form-select da janela. */
 
-        /* Todos os campos da janela GERENCIAR PROCESSO (Status, Tipologia,
-           Responsáveis etc. — exceto os que já são propositalmente
-           transparentes, como REPERCUSSÃO): mesmo visual "texto puro" do card
-           Histórico (bg-light + rounded, sem moldura de input) — a regra
-           genérica .form-control/.form-select do tema escuro (mais acima) força
-           borda/fundo em qualquer input, por isso precisa repetir aqui com
+        /* Todos os campos da janela Gerenciar processo (Status, Tipologia, Responsáveis etc. —
+           exceto os propositalmente transparentes, como Repercussão): campo editável com
+           moldura visível (revisão de design, B5, 07/10/2026; antes eram "texto puro", sem
+           borda, e não pareciam editáveis). A regra genérica .form-control/.form-select do tema
+           escuro força borda/fundo em qualquer input, por isso a regra repete aqui com
            !important e especificidade maior (via #formDetalhes) para vencer. */
         #formDetalhes .form-control:not(.bg-transparent),
         #formDetalhes .form-select:not(.bg-transparent) {
-            border: none !important;
+            border: 1px solid var(--sop-slate-200) !important;
             box-shadow: none !important;
-            background-color: transparent !important;
+            background-color: #ffffff !important;
         }
         #formDetalhes .form-control:not(.bg-transparent):focus,
         #formDetalhes .form-select:not(.bg-transparent):focus {
-            border: none !important;
-            box-shadow: none !important;
-            background-color: rgba(15, 23, 42, 0.035) !important;
+            border-color: var(--sop-green) !important;
+            box-shadow: 0 0 0 3px rgba(var(--gc-acao-foco-rgb), 0.18) !important;
+            background-color: #ffffff !important;
         }
         body.theme-dark #formDetalhes .form-control:not(.bg-transparent),
         body.theme-dark #formDetalhes .form-select:not(.bg-transparent) {
             background-color: transparent !important;
-            border: none !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
             color: rgba(255, 255, 255, 0.85) !important;
             box-shadow: none !important;
         }
         body.theme-dark #formDetalhes .form-control:not(.bg-transparent):focus,
         body.theme-dark #formDetalhes .form-select:not(.bg-transparent):focus {
             background-color: rgba(255, 255, 255, 0.05) !important;
+            border-color: var(--sop-green) !important;
+            box-shadow: none !important;
         }
         /* Seta do <select> some contra o fundo escuro do tema escuro — troca pra
            uma seta branca. */
@@ -4462,4 +4368,1186 @@
         body.theme-dark .gp-section-card .card-header,
         body.theme-dark .gp-section-card .card-footer {
             border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        /* ==========================================================================
+           B1 — COR SEMÂNTICA E BOTÕES (tema claro)
+           Spec: docs/revisao-design-tema-claro/spec.md. Tudo aqui vale só no claro
+           (body:not(.theme-dark)): a paleta do escuro não muda. As exceções que
+           valem nos dois temas estão marcadas.
+           ========================================================================== */
+
+        /* Um verde só, e cinza secundário com contraste AA sobre o fundo da página
+           (#eef3ef): o slate-500 antigo dava 4,24:1; o slate-600 dá mais de 5:1. */
+        body:not(.theme-dark) {
+            --sop-green: var(--gc-acao);
+            --sop-green-dark: var(--gc-acao-hover);
+            --text-muted: var(--gc-slate-600);
+            --sop-gray-mid: var(--gc-slate-600);
+            /* Azul de link/ícone (ex.: "Definir" meta): #018ABD dava 3,9:1 sobre branco. */
+            --sop-blue: #006f9a;
+        }
+
+        /* Textos cinza fixos que ficavam abaixo de 4,5:1 */
+        body:not(.theme-dark) .proc-tab {
+            color: var(--gc-slate-600);
+        }
+        body:not(.theme-dark) .multiselect-btn .ms-label-all {
+            color: var(--gc-slate-600);
+        }
+
+        /* Botão primário: verde cheio. O azul padrão do Bootstrap (btn-primary) deixa
+           de existir como ação principal e passa a ser o mesmo verde de btn-success. */
+        body:not(.theme-dark) .btn-success,
+        body:not(.theme-dark) .btn-primary {
+            --bs-btn-color: #fff;
+            --bs-btn-bg: var(--gc-acao);
+            --bs-btn-border-color: var(--gc-acao);
+            --bs-btn-hover-color: #fff;
+            --bs-btn-hover-bg: var(--gc-acao-hover);
+            --bs-btn-hover-border-color: var(--gc-acao-hover);
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: var(--gc-acao-hover);
+            --bs-btn-active-border-color: var(--gc-acao-hover);
+            --bs-btn-disabled-color: #fff;
+            --bs-btn-disabled-bg: var(--gc-acao);
+            --bs-btn-disabled-border-color: var(--gc-acao);
+            --bs-btn-focus-shadow-rgb: var(--gc-acao-foco-rgb);
+        }
+
+        /* Ação secundária: contorno verde (Excel, PDF, Ver, Relatório...). */
+        body:not(.theme-dark) .btn-outline-primary,
+        body:not(.theme-dark) .btn-outline-success {
+            --bs-btn-color: var(--gc-acao);
+            --bs-btn-border-color: var(--gc-acao);
+            --bs-btn-hover-color: #fff;
+            --bs-btn-hover-bg: var(--gc-acao);
+            --bs-btn-hover-border-color: var(--gc-acao);
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: var(--gc-acao-hover);
+            --bs-btn-active-border-color: var(--gc-acao-hover);
+            --bs-btn-disabled-color: var(--gc-acao);
+            --bs-btn-disabled-border-color: var(--gc-acao);
+            --bs-btn-focus-shadow-rgb: var(--gc-acao-foco-rgb);
+        }
+
+        /* Fechar/Cancelar: neutro com contorno, não cinza cheio. */
+        body:not(.theme-dark) .btn-secondary {
+            --bs-btn-color: var(--gc-slate-700);
+            --bs-btn-bg: transparent;
+            --bs-btn-border-color: #7b8aa0;
+            --bs-btn-hover-color: var(--gc-slate-900);
+            --bs-btn-hover-bg: var(--gc-slate-100);
+            --bs-btn-hover-border-color: var(--gc-slate-500);
+            --bs-btn-active-color: var(--gc-slate-900);
+            --bs-btn-active-bg: var(--gc-slate-200);
+            --bs-btn-active-border-color: var(--gc-slate-500);
+            --bs-btn-disabled-color: var(--gc-slate-500);
+            --bs-btn-disabled-bg: transparent;
+            --bs-btn-disabled-border-color: #b6c0cf;
+            --bs-btn-focus-shadow-rgb: 71, 85, 105;
+        }
+
+        /* Chips de ícone: um só tratamento neutro (fundo verde suave, ícone verde) em vez
+           de sete cores saturadas. Cor forte fica para status e alerta. */
+        body:not(.theme-dark) .home-stat-icon,
+        body:not(.theme-dark) .home-action-icon,
+        body:not(.theme-dark) .proc-kpi-icon {
+            background: var(--gc-acao-suave);
+            color: var(--gc-acao);
+            box-shadow: none;
+        }
+        body:not(.theme-dark) .proc-kpi-icon i {
+            color: inherit;
+        }
+        /* Os ícones das seções do admin trazem a cor inline (HTML); o !important vence o
+           inline. O do WhatsApp fica de fora: é a cor da marca, serve de reconhecimento. */
+        body:not(.theme-dark) .admin-section-icon:not([style*="25D366"]) {
+            background: var(--gc-acao-suave) !important;
+            color: var(--gc-acao);
+        }
+
+
+        /* ==========================================================================
+           B2 — TIPOGRAFIA
+           Spec: docs/revisao-design-tema-claro/spec.md. Vale nos dois temas (layout).
+           Escala em shared/tokens.css (--gc-fs-*). Rótulos e cabeçalhos de tabela em
+           sentença; caixa alta só para siglas e selos de status.
+           ========================================================================== */
+
+        /* Piso de 12px nos selos do Bootstrap: o .badge usa 0.75em do texto ao redor, e
+           dentro de uma tabela de 13px isso dava ~9,8px. */
+        .badge {
+            font-size: max(0.75em, var(--gc-fs-piso));
+        }
+
+
+        /* ==========================================================================
+           B3 — LAYOUT DE PÁGINA
+           Spec: docs/revisao-design-tema-claro/spec.md. Layout vale nos dois temas; só a
+           cor da barra e das janelas (paleta) fica restrita ao tema claro.
+           ========================================================================== */
+
+        /* Margem lateral única: 24px (32px a partir de 1200px) e largura máxima de 2000px (em 1920px o conteúdo ocupa a tela toda; o teto só vale em telas ultralargas)
+           centralizada. O .page-wrapper aninhado dentro de cada aba somava outros 24px
+           (48px no total em Orçamentos, Composições, Tabelas e Administração). Os módulos
+           embutidos (iframes) mantêm o espaçamento próprio de body.modo-embutido. */
+        @media (min-width: 769px) {
+            main.page-wrapper {
+                max-width: 2000px;
+                margin-inline: auto;
+                padding-inline: 24px;
+            }
+
+            body.modo-embutido main.page-wrapper {
+                max-width: none;
+                padding-inline: 16px;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            main.page-wrapper {
+                padding-inline: 32px;
+            }
+
+            body.modo-embutido main.page-wrapper {
+                padding-inline: 16px;
+            }
+        }
+
+        main.page-wrapper .page-wrapper {
+            padding-inline: 0;
+        }
+
+        /* Cabeçalho de página padrão: o nome do módulo já aparece na barra superior, então
+           aqui só entram a descrição (à esquerda) e as ações (à direita). */
+        .gc-page-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px 16px;
+            margin-bottom: 16px;
+        }
+
+        .gc-page-head-desc {
+            margin: 0;
+            max-width: 70ch;
+            font-size: var(--gc-fs-corpo);
+            color: var(--text-muted);
+        }
+
+        .gc-page-head-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        /* Janelas: o cabeçalho segue a barra (verde da marca) e o fundo escurecido é mais
+           firme, para a janela se destacar da página. Cabeçalhos com significado (perigo,
+           aviso) permanecem. */
+        .modal {
+            --bs-backdrop-opacity: 0.6;
+        }
+
+        .modal-backdrop {
+            --bs-backdrop-opacity: 0.6;
+            backdrop-filter: blur(2px);
+        }
+
+        body:not(.theme-dark) .modal-header.bg-dark,
+        body:not(.theme-dark) .modal-header.bg-primary,
+        body:not(.theme-dark) .modal-header.bg-secondary,
+        body:not(.theme-dark) .modal-header.bg-success {
+            background-color: var(--gc-acao) !important;
+            color: #ffffff !important;
+        }
+
+        /* Processos: em telas até 1400px a tabela (10 colunas) passava da margem e gerava
+           rolagem horizontal; encurta o recuo interno das células para caber. */
+        @media (max-width: 1400px) {
+            .proc-table-wrap thead th {
+                padding-inline: 6px;
+            }
+
+            .proc-table-wrap tbody td {
+                padding-inline: 4px;
+            }
+
+            .proc-table-wrap .badge-custom-size {
+                min-width: 120px;
+            }
+        }
+
+        /* O conteúdo do cabeçalho (logo, barra dos módulos, saudação do Início) segue a mesma
+           margem e a mesma largura máxima da página, para ficar alinhado com os cartões. */
+        @media (min-width: 769px) {
+            .gecope-hero-content {
+                max-width: 2000px;
+                margin-inline: auto;
+            }
+
+            .sop-header,
+            .panel-subheader {
+                padding-inline: 24px;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .sop-header,
+            .panel-subheader {
+                padding-inline: 32px;
+            }
+        }
+
+
+        /* ==========================================================================
+           B5 — EMBUTIDOS E JANELAS
+           Spec: docs/revisao-design-tema-claro/spec.md.
+           ========================================================================== */
+
+        /* Curva ABC: paleta própria (--cv-*, definida em <style> no index.html) passa ao verde
+           único no tema claro. #22a155 dava 3,3:1 com o texto branco dos botões; o verde
+           único dá 6,1:1. O azul e o cinza das classes B e C são codificação de dado e ficam. */
+        body:not(.theme-dark) #pane-curva-abc {
+            --cv-green: var(--gc-acao);
+            --cv-green-hi: var(--gc-acao-hover);
+            --cv-green-soft: var(--gc-acao-suave);
+            --cv-cA: var(--gc-acao);
+        }
+
+        /* Janelas: campo editável sempre com moldura. Os campos "bg-light border-0" (Gerenciar
+           processo, cadastros) tinham o fundo quase igual ao do cartão e nenhuma borda, e
+           pareciam texto solto. */
+        .modal .form-control.bg-light.border-0,
+        .modal .form-select.bg-light.border-0,
+        .gp-plain-field {
+            border: 1px solid var(--sop-slate-200) !important;
+        }
+
+        body:not(.theme-dark) .modal .form-control.bg-light.border-0,
+        body:not(.theme-dark) .modal .form-select.bg-light.border-0,
+        body:not(.theme-dark) .gp-plain-field {
+            background-color: #ffffff !important;
+        }
+
+        body.theme-dark .modal .form-control.bg-light.border-0,
+        body.theme-dark .modal .form-select.bg-light.border-0,
+        body.theme-dark .gp-plain-field {
+            border-color: rgba(255, 255, 255, 0.18) !important;
+        }
+
+        .modal .form-control.bg-light.border-0:focus,
+        .modal .form-select.bg-light.border-0:focus,
+        .gp-plain-field:focus {
+            border-color: var(--sop-green) !important;
+        }
+
+
+        /* ==========================================================================
+           INÍCIO — revisão de 07/10/2026
+           Faixa de fotos mais baixa (antes 420px, metade da tela), Processos e Atividades
+           como destaques de duas colunas e os demais módulos em grade de 4 colunas.
+           Só layout e peso visual; a paleta do escuro não muda.
+           ========================================================================== */
+
+        /* Cabeçalho do Início: a mesma barra verde baixa dos módulos, com a marca (brasão +
+           GECOPE) à esquerda; sem fotos, sem a faixa do portal e sem o texto repetido à
+           direita. No claro a barra é o verde da marca e, logo abaixo, vem a faixa com a onda
+           do portal da SOP (só aqui). O escuro mantém o fundo escuro de antes. */
+        body:not(.theme-dark) .gecope-hero {
+            background: linear-gradient(135deg, var(--gc-acao) 0%, #005f2a 100%);
+        }
+
+        .gecope-hero .sop-header {
+            padding-block: 8px;
+            min-height: 68px;
+        }
+
+        .sop-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        /* Marca da barra: brasão + a assinatura "SOP-CE | Superintendência de Obras Públicas"
+           em branco sobre fundo transparente (assets/sop-branco.png, derivada do sop.png),
+           e o nome do sistema ao lado, separado por um filete. */
+        .sop-brasao {
+            height: 46px;
+            width: auto;
+            flex: none;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
+        }
+
+        .sop-wordmark {
+            height: 32px;
+            width: auto;
+            max-width: 100%;
+            flex: none;
+        }
+
+        .sop-wordmark + .sop-brand-text {
+            padding-left: 18px;
+            border-left: 1px solid rgba(255, 255, 255, 0.35);
+        }
+
+        @media (max-width: 768px) {
+            .sop-wordmark {
+                height: 24px;
+            }
+
+            .sop-brasao {
+                height: 36px;
+            }
+
+            .sop-brand .sop-title-main {
+                font-size: 1.3rem;
+            }
+        }
+
+        /* Celular estreito: a assinatura da SOP não cabe ao lado do nome do sistema; fica só
+           o brasão e o GECOPE (a identificação completa está na tela de login). */
+        @media (max-width: 520px) {
+            .sop-wordmark {
+                display: none;
+            }
+
+            .sop-wordmark + .sop-brand-text {
+                padding-left: 0;
+                border-left: 0;
+            }
+
+            .sop-brand .sop-title-sub,
+            .sop-brand .sop-title-sep {
+                display: none;
+            }
+        }
+
+        .sop-brand {
+            gap: 18px;
+        }
+
+        /* Nome do sistema numa linha só, centralizado na vertical com o logotipo:
+           "| GECOPE · Gerência de Controle e Análise de Aditivos". */
+        .sop-brand .sop-brand-text {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sop-brand .sop-title-main {
+            font-size: 1.5rem;
+            line-height: 1;
+            letter-spacing: 0.06em;
+        }
+
+        .sop-brand .sop-title-sep {
+            font-size: 1.4rem;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .sop-brand .sop-title-main,
+        .sop-brand .sop-title-sub,
+        #header-user-name {
+            white-space: nowrap;
+        }
+
+        @media (max-width: 1400px) {
+            .gecope-hero .sop-wordmark {
+                height: 32px;
+            }
+
+            .sop-brand .sop-title-main {
+                font-size: 1.45rem;
+            }
+
+            .sop-brand .sop-title-sub {
+                font-size: 0.95rem;
+            }
+        }
+
+        /* Sem espaço para o nome por extenso: fica o GECOPE (a gerência aparece no título da aba). */
+        @media (max-width: 1150px) {
+            .sop-brand .sop-title-sub,
+            .sop-brand .sop-title-sep {
+                display: none;
+            }
+        }
+
+        .sop-brand .sop-title-sub {
+            margin-top: 0;
+            font-size: 1.05rem;
+            font-weight: 400;
+            line-height: 1.2;
+            opacity: 0.95;
+        }
+
+        /* Tema e tela cheia: só o ícone, simples e sem círculo (o nome fica no title/aria-label).
+           A área de clique segue de 38px; o destaque ao passar o mouse é só um leve fundo. */
+        .gecope-hero .sop-header-right .theme-toggle-btn {
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            justify-content: center;
+            border-radius: 8px;
+            background: transparent;
+            border: 0;
+        }
+
+        .gecope-hero .sop-header-right .theme-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .gecope-hero .sop-header-right .theme-toggle-btn span {
+            display: none;
+        }
+
+        .gecope-hero .sop-header-right .theme-toggle-btn i {
+            font-size: 1.1rem;
+        }
+
+        body:not(.theme-dark) .sop-header .text-white-50 {
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+
+        /* Faixa sob a barra (assinatura do portal da SOP): onda amarela e verde à esquerda
+           (uma crista suave, como no site) sobre um filete verde-vivo. Decoração só no Início, tema claro. */
+        body:not(.theme-dark) .gecope-hero::after {
+            content: "";
+            display: block;
+            height: 30px;
+            background:
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 560 30' preserveAspectRatio='none'%3E%3Cpath d='M0 30 L0.0 10.5 C1.0 10.5 4.0 10.2 6.0 10.0 C8.0 9.8 10.0 9.6 12.0 9.5 C14.0 9.3 16.0 9.2 18.0 9.0 C20.0 8.9 22.0 8.7 24.0 8.6 C26.0 8.5 28.0 8.4 30.0 8.2 C32.0 8.1 34.0 8.0 36.0 7.9 C38.0 7.8 40.0 7.8 42.0 7.7 C44.0 7.6 46.0 7.5 48.0 7.5 C50.0 7.4 52.0 7.4 54.0 7.3 C56.0 7.3 58.0 7.3 60.0 7.2 C62.0 7.2 64.0 7.2 66.0 7.2 C68.0 7.2 70.0 7.2 72.0 7.2 C74.0 7.2 76.0 7.2 78.0 7.3 C80.0 7.3 82.0 7.3 84.0 7.4 C86.0 7.4 88.0 7.5 90.0 7.6 C92.0 7.6 94.0 7.7 96.0 7.8 C98.0 7.9 100.0 7.9 102.0 8.0 C104.0 8.1 106.0 8.2 108.0 8.4 C110.0 8.5 112.0 8.6 114.0 8.7 C116.0 8.8 118.0 9.0 120.0 9.1 C122.0 9.2 124.0 9.4 126.0 9.5 C128.0 9.7 130.0 9.8 132.0 10.0 C134.0 10.2 136.0 10.3 138.0 10.5 C140.0 10.7 142.0 10.8 144.0 11.0 C146.0 11.2 148.0 11.4 150.0 11.6 C152.0 11.8 154.0 12.0 156.0 12.2 C158.0 12.4 160.0 12.6 162.0 12.8 C164.0 13.0 166.0 13.2 168.0 13.4 C170.0 13.6 172.0 13.8 174.0 14.1 C176.0 14.3 178.0 14.5 180.0 14.7 C182.0 14.9 184.0 15.2 186.0 15.4 C188.0 15.6 190.0 15.8 192.0 16.1 C194.0 16.3 196.0 16.5 198.0 16.8 C200.0 17.0 202.0 17.2 204.0 17.4 C206.0 17.7 208.0 17.9 210.0 18.1 C212.0 18.4 214.0 18.6 216.0 18.8 C218.0 19.1 220.0 19.3 222.0 19.5 C224.0 19.7 226.0 20.0 228.0 20.2 C230.0 20.4 232.0 20.6 234.0 20.8 C236.0 21.1 238.0 21.3 240.0 21.5 C242.0 21.7 244.0 21.9 246.0 22.1 C248.0 22.4 250.0 22.6 252.0 22.8 C254.0 23.0 256.0 23.2 258.0 23.4 C260.0 23.6 262.0 23.8 264.0 24.0 C266.0 24.1 268.0 24.3 270.0 24.5 C272.0 24.7 274.0 24.9 276.0 25.1 C278.0 25.2 280.0 25.4 282.0 25.6 C284.0 25.7 286.0 25.9 288.0 26.1 C290.0 26.2 292.0 26.4 294.0 26.5 C296.0 26.7 298.0 26.8 300.0 27.0 C302.0 27.1 304.0 27.2 306.0 27.4 C308.0 27.5 310.0 27.6 312.0 27.8 C314.0 27.9 316.0 28.0 318.0 28.1 C320.0 28.2 322.0 28.3 324.0 28.4 C326.0 28.5 328.0 28.6 330.0 28.7 C332.0 28.8 334.0 28.9 336.0 29.0 C338.0 29.1 340.0 29.1 342.0 29.2 C344.0 29.3 346.0 29.4 348.0 29.4 C350.0 29.5 352.0 29.6 354.0 29.6 C356.0 29.7 358.0 29.7 360.0 29.7 C362.0 29.8 364.0 29.8 366.0 29.8 C368.0 29.9 370.0 29.9 372.0 29.9 C374.0 29.9 376.0 30.0 378.0 30.0 C380.0 30.0 382.0 30.0 384.0 30.0 C386.0 30.0 388.0 30.0 390.0 30.0 C392.0 30.0 394.0 30.0 396.0 30.0 C398.0 30.0 400.0 30.0 402.0 30.0 C404.0 29.9 406.0 29.9 408.0 29.9 C410.0 29.9 412.0 29.9 414.0 29.9 C416.0 29.8 418.0 29.8 420.0 29.8 C422.0 29.8 424.0 29.8 426.0 29.7 C428.0 29.7 430.0 29.7 432.0 29.7 C434.0 29.6 436.0 29.6 438.0 29.6 C440.0 29.6 442.0 29.6 444.0 29.5 C446.0 29.5 448.0 29.5 450.0 29.5 C452.0 29.4 454.0 29.4 456.0 29.4 C458.0 29.4 460.0 29.4 462.0 29.4 C464.0 29.3 466.0 29.3 468.0 29.3 C470.0 29.3 472.0 29.3 474.0 29.3 C476.0 29.3 478.0 29.2 480.0 29.2 C482.0 29.2 484.0 29.2 486.0 29.2 C488.0 29.2 490.0 29.2 492.0 29.2 C494.0 29.2 496.0 29.2 498.0 29.2 C500.0 29.2 502.0 29.2 504.0 29.2 C506.0 29.2 508.0 29.3 510.0 29.3 C512.0 29.3 514.0 29.3 516.0 29.3 C518.0 29.3 520.0 29.4 522.0 29.4 C524.0 29.4 526.0 29.4 528.0 29.4 C530.0 29.5 532.0 29.5 534.0 29.5 C536.0 29.6 538.0 29.6 540.0 29.6 C542.0 29.6 544.0 29.7 546.0 29.7 C548.0 29.8 550.0 29.8 552.0 29.8 C554.0 29.9 557.0 29.9 558.0 30.0 L560 30 Z' fill='%23fcda39'/%3E%3Cpath d='M0 30 L0.0 13.7 C1.0 13.8 4.0 14.2 6.0 14.5 C8.0 14.7 10.0 14.9 12.0 15.2 C14.0 15.5 16.0 15.7 18.0 16.0 C20.0 16.2 22.0 16.5 24.0 16.8 C26.0 17.0 28.0 17.3 30.0 17.6 C32.0 17.8 34.0 18.1 36.0 18.4 C38.0 18.6 40.0 18.9 42.0 19.2 C44.0 19.5 46.0 19.7 48.0 20.0 C50.0 20.3 52.0 20.5 54.0 20.8 C56.0 21.0 58.0 21.3 60.0 21.6 C62.0 21.8 64.0 22.1 66.0 22.3 C68.0 22.6 70.0 22.8 72.0 23.1 C74.0 23.3 76.0 23.5 78.0 23.8 C80.0 24.0 82.0 24.2 84.0 24.5 C86.0 24.7 88.0 24.9 90.0 25.1 C92.0 25.3 94.0 25.5 96.0 25.7 C98.0 25.9 100.0 26.1 102.0 26.3 C104.0 26.5 106.0 26.7 108.0 26.9 C110.0 27.0 112.0 27.2 114.0 27.4 C116.0 27.5 118.0 27.7 120.0 27.8 C122.0 28.0 124.0 28.1 126.0 28.2 C128.0 28.4 130.0 28.5 132.0 28.6 C134.0 28.7 136.0 28.8 138.0 28.9 C140.0 29.0 142.0 29.1 144.0 29.2 C146.0 29.3 148.0 29.4 150.0 29.5 C152.0 29.5 154.0 29.6 156.0 29.7 C158.0 29.7 160.0 29.8 162.0 29.8 C164.0 29.8 166.0 29.9 168.0 29.9 C170.0 29.9 172.0 30.0 174.0 30.0 C176.0 30.0 178.0 30.0 180.0 30.0 C182.0 30.0 184.0 30.0 186.0 30.0 C188.0 30.0 190.0 30.0 192.0 29.9 C194.0 29.9 196.0 29.9 198.0 29.9 C200.0 29.8 202.0 29.8 204.0 29.7 C206.0 29.7 208.0 29.6 210.0 29.6 C212.0 29.5 214.0 29.5 216.0 29.4 C218.0 29.4 220.0 29.3 222.0 29.2 C224.0 29.2 226.0 29.1 228.0 29.0 C230.0 28.9 232.0 28.9 234.0 28.8 C236.0 28.7 238.0 28.6 240.0 28.5 C242.0 28.4 244.0 28.4 246.0 28.3 C248.0 28.2 250.0 28.1 252.0 28.0 C254.0 27.9 256.0 27.8 258.0 27.7 C260.0 27.6 262.0 27.5 264.0 27.4 C266.0 27.3 268.0 27.2 270.0 27.1 C272.0 27.0 274.0 26.9 276.0 26.9 C278.0 26.8 280.0 26.7 282.0 26.6 C284.0 26.5 286.0 26.4 288.0 26.3 C290.0 26.2 292.0 26.1 294.0 26.0 C296.0 25.9 298.0 25.8 300.0 25.8 C302.0 25.7 304.0 25.6 306.0 25.5 C308.0 25.4 310.0 25.4 312.0 25.3 C314.0 25.2 316.0 25.1 318.0 25.1 C320.0 25.0 322.0 24.9 324.0 24.9 C326.0 24.8 328.0 24.7 330.0 24.7 C332.0 24.6 334.0 24.5 336.0 24.5 C338.0 24.5 340.0 24.5 342.0 24.5 C344.0 24.5 346.0 24.5 348.0 24.6 C350.0 24.6 352.0 24.6 354.0 24.6 C356.0 24.6 358.0 24.7 360.0 24.7 C362.0 24.7 364.0 24.8 366.0 24.8 C368.0 24.8 370.0 24.9 372.0 24.9 C374.0 25.0 376.0 25.0 378.0 25.1 C380.0 25.1 382.0 25.2 384.0 25.3 C386.0 25.3 388.0 25.4 390.0 25.4 C392.0 25.5 394.0 25.6 396.0 25.6 C398.0 25.7 400.0 25.8 402.0 25.8 C404.0 25.9 406.0 26.0 408.0 26.1 C410.0 26.1 412.0 26.2 414.0 26.3 C416.0 26.4 418.0 26.4 420.0 26.5 C422.0 26.6 424.0 26.7 426.0 26.8 C428.0 26.8 430.0 26.9 432.0 27.0 C434.0 27.1 436.0 27.2 438.0 27.2 C440.0 27.3 442.0 27.4 444.0 27.5 C446.0 27.5 448.0 27.6 450.0 27.7 C452.0 27.8 454.0 27.8 456.0 27.9 C458.0 28.0 460.0 28.1 462.0 28.1 C464.0 28.2 466.0 28.3 468.0 28.3 C470.0 28.4 472.0 28.5 474.0 28.5 C476.0 28.6 478.0 28.6 480.0 28.7 C482.0 28.8 484.0 28.8 486.0 28.9 C488.0 28.9 490.0 29.0 492.0 29.0 C494.0 29.1 496.0 29.1 498.0 29.2 C500.0 29.2 502.0 29.3 504.0 29.3 C506.0 29.4 508.0 29.4 510.0 29.4 C512.0 29.5 514.0 29.5 516.0 29.6 C518.0 29.6 520.0 29.6 522.0 29.7 C524.0 29.7 526.0 29.7 528.0 29.7 C530.0 29.8 532.0 29.8 534.0 29.8 C536.0 29.8 538.0 29.9 540.0 29.9 C542.0 29.9 544.0 29.9 546.0 29.9 C548.0 29.9 550.0 29.9 552.0 30.0 C554.0 30.0 557.0 30.0 558.0 30.0 L560 30 Z' fill='%2324be1f'/%3E%3C/svg%3E") left bottom / 560px 30px no-repeat,
+                linear-gradient(#24be1f, #24be1f) left bottom / 100% 4px no-repeat,
+                var(--gc-pagina-claro);
+        }
+
+        /* Saudação: agora é o título da página, sobre o fundo claro (no escuro, texto claro). */
+        .hero-home-greeting {
+            padding: 2px 0 14px;
+            text-align: right;
+        }
+
+        .hero-home-greeting .home-welcome-title {
+            font-size: 1.6rem;
+            margin-bottom: 2px;
+        }
+
+        body:not(.theme-dark) .hero-home-greeting .home-welcome-title {
+            color: var(--text-heading);
+        }
+
+        body:not(.theme-dark) .hero-home-greeting .home-welcome-subtitle {
+            color: var(--text-muted);
+        }
+
+        /* Indicadores: faixa mais baixa, sem título acima (o conteúdo se explica). */
+        .home-stats-grid {
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .home-stat-card {
+            min-height: 0;
+            padding: 16px 22px;
+        }
+
+        /* Módulos: uma grade de 4 colunas. Os dois destaques ocupam 2 colunas cada e os oito
+           demais ocupam 1, então as bordas dos dois blocos se alinham. */
+        .home-quick-actions-grid {
+            gap: 16px;
+        }
+
+        .home-featured-grid {
+            gap: 16px;
+        }
+
+        .home-action-card {
+            min-height: 168px;
+            padding: 22px 24px 20px;
+        }
+
+        .home-list-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 1100px) {
+            .home-list-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .home-list-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Tile de módulo: ícone em cima, nome e descrição embaixo, seta discreta no canto. */
+        .home-list-row {
+            position: relative;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            min-height: 150px;
+            padding: 18px 20px 16px;
+            border-radius: var(--radius-lg);
+        }
+
+        .home-list-row .home-action-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            font-size: 1.2rem;
+        }
+
+        .home-list-row-title {
+            flex: none;
+            font-size: 1.05rem;
+            line-height: 1.25;
+        }
+
+        .home-list-row-desc {
+            margin-top: 3px;
+            font-size: var(--gc-fs-rotulo);
+            line-height: 1.35;
+            color: var(--text-muted);
+        }
+
+        body.theme-dark .home-list-row-desc {
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        .home-list-row .bi-chevron-right {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            font-size: 0.9rem;
+            opacity: 0.6;
+            transition: var(--transition-fast);
+        }
+
+        .home-list-row:hover .bi-chevron-right {
+            opacity: 1;
+            transform: translateX(2px);
+        }
+
+        /* Processos é o módulo principal: o único bloco em verde cheio da tela (tema claro).
+           No escuro ele já tem o gradiente verde próprio. */
+        body:not(.theme-dark) .home-action-card.accent-green {
+            background: var(--gc-acao);
+            border-color: var(--gc-acao);
+            color: #ffffff !important;
+        }
+
+        body:not(.theme-dark) .home-action-card.accent-green .home-action-text h3 {
+            color: #ffffff;
+        }
+
+        body:not(.theme-dark) .home-action-card.accent-green .home-action-text p {
+            color: rgba(255, 255, 255, 0.88);
+        }
+
+        body:not(.theme-dark) .home-action-card.accent-green .home-action-icon {
+            background: rgba(255, 255, 255, 0.16);
+            color: #ffffff;
+        }
+
+        body:not(.theme-dark) .home-action-card.accent-green .home-featured-badge {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.32);
+        }
+
+        /* Selo "Mais usado": sem caixa alta, é uma frase curta. */
+        .home-featured-badge {
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+
+        /* ==========================================================================
+           INÍCIO — cartões (revisão de 07/10/2026, grilling)
+           Os três indicadores saíram da faixa própria e viraram atalhos dentro do cartão
+           Processos; Atividades só explica o que é. Um detalhe de marca nos cartões: a barra
+           amarela do portal sob o nome do módulo, que alonga no hover. Cor só em Processos.
+           ========================================================================== */
+
+        /* Acabamento comum: borda e sombra mais leves que as de antes. */
+        .home-action-card,
+        .home-list-row,
+        .home-activities-panel {
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 18px -10px rgba(15, 23, 42, 0.14);
+        }
+
+        body.theme-dark .home-action-card,
+        body.theme-dark .home-list-row,
+        body.theme-dark .home-activities-panel {
+            border-color: rgba(255, 255, 255, 0.07);
+        }
+
+        .home-action-card {
+            gap: 16px;
+        }
+
+        .home-action-card .home-action-text h3,
+        .home-list-row-title {
+            letter-spacing: -0.005em;
+        }
+
+        /* Barra amarela sob o nome (assinatura do portal). */
+        .home-action-text h3::after,
+        .home-list-row-title::after {
+            content: "";
+            display: block;
+            width: 22px;
+            height: 3px;
+            margin-top: 7px;
+            border-radius: 2px;
+            background: #fcda39;
+            transition: width 0.25s ease;
+        }
+
+        .home-action-card:hover .home-action-text h3::after,
+        .home-list-row:hover .home-list-row-title::after {
+            width: 52px;
+        }
+
+        .home-action-card.locked-module .home-action-text h3::after,
+        .home-list-row.locked-module .home-list-row-title::after {
+            display: none;
+        }
+
+        .home-action-text p,
+        .home-list-row-desc {
+            margin-top: 8px;
+        }
+
+        .home-list-row:hover .home-action-icon {
+            box-shadow: 0 0 0 4px var(--gc-acao-suave);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .home-action-text h3::after,
+            .home-list-row-title::after {
+                transition: none;
+            }
+        }
+
+        /* Números do cartão Processos: três atalhos separados por filetes. */
+        .home-card-stats {
+            display: grid;
+            grid-template-columns: repeat(3, auto);
+            justify-content: start;
+            gap: 4px;
+            margin: 0 -10px -6px;
+        }
+
+        .home-card-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            min-width: 120px;
+            padding: 8px 14px;
+            border: 0;
+            border-radius: 12px;
+            background: transparent;
+            color: inherit;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .home-card-stat + .home-card-stat {
+            position: relative;
+        }
+
+        .home-card-stat + .home-card-stat::before {
+            content: "";
+            position: absolute;
+            left: -2px;
+            top: 12px;
+            bottom: 12px;
+            width: 1px;
+            background: currentColor;
+            opacity: 0.22;
+        }
+
+        .home-card-stat b {
+            font-size: var(--gc-fs-destaque);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .home-card-stat span {
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        .home-card-stat:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .home-card-stat:focus-visible {
+            outline: 2px solid currentColor;
+            outline-offset: 1px;
+        }
+
+        .home-action-card.locked-module .home-card-stats {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            .home-card-stats {
+                grid-template-columns: 1fr 1fr 1fr;
+                margin-inline: -14px;
+            }
+
+            .home-card-stat {
+                min-width: 0;
+                padding-inline: 10px;
+            }
+        }
+
+        /* Módulo bloqueado (tema claro): o cartão não fica apagado por inteiro. Só o ícone e o
+           nome esmaecem, e o motivo do bloqueio (no lugar da descrição) continua legível. */
+        body:not(.theme-dark) .home-action-card.locked-module,
+        body:not(.theme-dark) .home-list-row.locked-module {
+            opacity: 1;
+            filter: none;
+            background: var(--sop-slate-50);
+        }
+
+        body:not(.theme-dark) .home-action-card.locked-module .home-action-icon,
+        body:not(.theme-dark) .home-list-row.locked-module .home-action-icon {
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        body:not(.theme-dark) .home-action-card.locked-module .home-action-text h3,
+        body:not(.theme-dark) .home-list-row.locked-module .home-list-row-title {
+            color: var(--sop-slate-600);
+        }
+
+        body:not(.theme-dark) .locked-module .home-list-row-desc,
+        body:not(.theme-dark) .locked-module .home-action-text p {
+            color: var(--sop-slate-600);
+            font-weight: 600;
+        }
+
+        /* Painel "Atividades realizadas": mesmo raio dos cartões e link em verde. */
+        .home-activities-panel {
+            border-radius: var(--radius-lg);
+        }
+
+        .home-activities-link {
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 700;
+            color: var(--gc-acao);
+        }
+
+        body.theme-dark .home-activities-link {
+            color: #4cc17c;
+        }
+
+        /* Processos: as abas (Em tramitação / Aprovados / Arquivados) ficam na mesma linha das
+           ações (Atividades, Novo processo), à esquerda, em vez de uma linha própria centralizada. */
+        .gc-page-head .proc-tabs-row {
+            width: auto;
+            margin: 0;
+            justify-content: flex-start;
+        }
+
+        /* Nos módulos a faixa sob a barra é só o filete verde (a onda fica na Início). */
+        body:not(.theme-dark).modo-compacto .gecope-hero::after {
+            height: 4px;
+            background: #24be1f;
+        }
+
+
+        /* ==========================================================================
+           PROCESSOS — abas, faixa de números e barra de filtros
+           (revisão de 07/10/2026, grilling; ver docs/revisao-design-tema-claro)
+           ========================================================================== */
+
+        [hidden].proc-chips,
+        [hidden].proc-toolbar-count,
+        [hidden].proc-toolbar-field {
+            display: none !important;
+        }
+
+        /* Abas: texto com sublinhado verde (no lugar do comprimido cinza), com a contagem. */
+        .proc-tabs {
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            gap: 6px;
+        }
+
+        .proc-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 0;
+            border-bottom: 3px solid transparent;
+            font-size: 1rem;
+        }
+
+        .proc-tab:hover {
+            color: var(--text-heading);
+        }
+
+        .proc-tab.active,
+        body.theme-dark .proc-tab.active {
+            background: transparent;
+            box-shadow: none;
+            border-bottom-color: var(--sop-green);
+        }
+
+        body:not(.theme-dark) .proc-tab.active {
+            color: var(--gc-acao);
+            border-bottom-color: var(--gc-acao);
+        }
+
+        body.theme-dark .proc-tab.active {
+            color: #4cc17c;
+            border-bottom-color: #4cc17c;
+        }
+
+        .proc-tab-n {
+            padding: 1px 9px;
+            border-radius: 999px;
+            background: var(--sop-slate-100);
+            color: var(--sop-slate-600);
+            font-size: var(--gc-fs-piso);
+            font-weight: 700;
+            line-height: 1.5;
+        }
+
+        .proc-tab.active .proc-tab-n {
+            background: var(--gc-acao-suave);
+            color: var(--gc-acao);
+        }
+
+        body.theme-dark .proc-tab-n {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        body.theme-dark .proc-tab.active .proc-tab-n {
+            background: rgba(76, 193, 124, 0.18);
+            color: #4cc17c;
+        }
+
+        /* Faixa de números: quatro atalhos de situação (clicáveis) e a distribuição por fiscal. */
+        .proc-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: stretch;
+            gap: 10px;
+            margin: 4px 0 14px;
+        }
+
+        .proc-strip-item {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 10px 20px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 12px;
+            background: var(--sop-white);
+            color: var(--text-heading);
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .proc-strip-item b {
+            font-size: 1.7rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .proc-strip-item span {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .proc-strip-item:hover {
+            border-color: var(--sop-green);
+        }
+
+        .proc-strip-item.active {
+            border-color: var(--sop-green);
+            box-shadow: inset 0 0 0 1px var(--sop-green);
+        }
+
+        body:not(.theme-dark) .proc-strip-item.active {
+            border-color: var(--gc-acao);
+            box-shadow: inset 0 0 0 1px var(--gc-acao);
+            background: var(--gc-acao-suave);
+        }
+
+        body:not(.theme-dark) .proc-strip-item.active b,
+        body:not(.theme-dark) .proc-strip-item.active span {
+            color: var(--gc-acao);
+        }
+
+        body.theme-dark .proc-strip-item {
+            background: linear-gradient(155deg, #142e22 0%, #0c1f17 100%);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        body.theme-dark .proc-strip-item span {
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        body.theme-dark .proc-strip-item.active {
+            border-color: #4cc17c;
+            box-shadow: inset 0 0 0 1px #4cc17c;
+        }
+
+        .proc-strip-dist {
+            margin-left: auto;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--gc-acao);
+            font-size: 0.9375rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .proc-strip-dist:hover {
+            background: var(--gc-acao-suave);
+        }
+
+        body.theme-dark .proc-strip-dist {
+            color: #4cc17c;
+        }
+
+        /* Barra de filtros: uma linha só (busca, status, fiscal, mais filtros, exportar),
+           fixa no alto ao rolar, com os filtros ativos em chips logo abaixo. */
+        .proc-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 1040;
+            margin: 0 0 8px;
+            padding: 8px 0;
+            background: var(--gc-pagina-claro);
+        }
+
+        body.theme-dark .proc-toolbar {
+            background: #0a1a13;
+        }
+
+        .proc-toolbar-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 12px;
+        }
+
+        .proc-toolbar-search {
+            position: relative;
+            flex: 1 1 320px;
+            min-width: 220px;
+        }
+
+        .proc-toolbar-search .form-control {
+            height: 42px !important;
+            min-height: 42px !important;
+            padding: 0 16px 0 42px !important;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+        }
+
+        .proc-toolbar-search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--sop-slate-500);
+            pointer-events: none;
+        }
+
+        .proc-toolbar-field {
+            flex: 0 0 210px;
+            min-width: 150px;
+        }
+
+        .proc-toolbar-label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .proc-toolbar .form-select,
+        .proc-toolbar .multiselect-btn {
+            height: 42px !important;
+            min-height: 42px !important;
+            max-height: 42px !important;
+            border-radius: 10px;
+            font-size: 0.9375rem !important;
+            line-height: 1.2 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+
+        .proc-toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            padding: 0 16px;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 10px;
+            background: var(--sop-white);
+            color: var(--sop-slate-700);
+            font-size: 0.9375rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .proc-toolbar-btn:hover,
+        .proc-toolbar-btn.show {
+            border-color: var(--sop-green);
+            color: var(--sop-slate-700);
+            background: var(--sop-white);
+        }
+
+        .proc-toolbar-count {
+            min-width: 20px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: var(--gc-acao);
+            color: #fff;
+            font-size: var(--gc-fs-piso);
+            font-weight: 700;
+            line-height: 20px;
+            text-align: center;
+        }
+
+        body.theme-dark .proc-toolbar-count {
+            background: #4cc17c;
+            color: #0a1a13;
+        }
+
+        body.theme-dark .proc-toolbar-btn {
+            background: #142e22;
+            border-color: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .proc-more-menu {
+            min-width: 250px;
+            padding: 14px;
+        }
+
+        .proc-more-menu .form-select {
+            height: 40px;
+            margin-bottom: 12px;
+        }
+
+        .proc-more-menu .form-select:last-child {
+            margin-bottom: 0;
+        }
+
+        body.theme-dark .proc-toolbar .form-select,
+        body.theme-dark .proc-toolbar .form-control,
+        body.theme-dark .proc-more-menu .form-select {
+            background-color: #142e22 !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+            color: rgba(255, 255, 255, 0.92) !important;
+        }
+
+        .proc-chips {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding-top: 10px;
+        }
+
+        .proc-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 5px 3px 12px;
+            border-radius: 999px;
+            background: var(--gc-acao-suave);
+            color: var(--gc-acao);
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 600;
+        }
+
+        body.theme-dark .proc-chip {
+            background: rgba(76, 193, 124, 0.16);
+            color: #4cc17c;
+        }
+
+        .proc-chip-x {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: inherit;
+            font-size: var(--gc-fs-piso);
+            cursor: pointer;
+        }
+
+        .proc-chip-x:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .proc-chips-limpar {
+            padding: 4px 8px;
+            border: 0;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 600;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        /* O cabeçalho fixo da tabela desce a altura da barra de filtros (definida por JS). */
+        .proc-table-wrap thead th {
+            top: calc(var(--proc-toolbar-h, 0px) - 1px);
+        }
+
+        /* Em telas estreitas a barra de filtros ocupa metade da tela: não fica fixa. */
+        @media (max-width: 900px) {
+            .proc-toolbar {
+                position: static;
+            }
+
+            .proc-table-wrap thead th {
+                top: -1px;
+            }
         }

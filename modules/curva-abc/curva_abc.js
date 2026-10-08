@@ -66,9 +66,13 @@
      (mesma biblioteca usada no resto do GECOPE) em vez do alert()/confirm()
      nativo do navegador, que foge do visual do sistema. Cai pro nativo só se,
      por algum motivo, a biblioteca não tiver carregado ainda. */
+  /* Verde de ação dos botões das janelas: o único do tema claro (mesmo --gc-acao de
+     shared/tokens.css; passa em AA com texto branco). O escuro mantém o verde antigo. */
+  function cvVerdeAcao() { return document.body.classList.contains("theme-dark") ? "#22a155" : "#007233"; }
+
   function cvAlerta(titulo, texto, icone) {
     if (typeof Swal === "undefined") { alert(texto ? titulo + "\n\n" + texto : titulo); return; }
-    Swal.fire({ icon: icone || "error", title: titulo, html: texto || undefined, confirmButtonColor: "#22a155" });
+    Swal.fire({ icon: icone || "error", title: titulo, html: texto || undefined, confirmButtonColor: cvVerdeAcao() });
   }
   async function cvConfirmar(titulo, texto, opts) {
     opts = opts || {};
@@ -80,7 +84,7 @@
       showCancelButton: true,
       confirmButtonText: opts.confirmarTexto || "Sim, continuar",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: opts.perigo ? "#e1274a" : "#22a155",
+      confirmButtonColor: opts.perigo ? "#e1274a" : cvVerdeAcao(),
       cancelButtonColor: "#64798c",
       reverseButtons: true,
       focusCancel: !!opts.perigo
@@ -779,7 +783,7 @@
     var btn = $("cv-btnSalvarAnalise");
     var textoOriginal = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = "SALVANDO...";
+    btn.innerHTML = "Salvando...";
 
     try {
       var proximaVersao = (state.versaoMaisRecenteDoVinculo ? state.versaoMaisRecenteDoVinculo.versao : 0) + 1;

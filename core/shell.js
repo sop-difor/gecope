@@ -117,6 +117,32 @@ function updateHomeStats() {
     }).length;
     const elAprovMes = document.getElementById('stat-proc-aprovados');
     if (elAprovMes) elAprovMes.textContent = aprovadosMes;
+    const rotAprovMes = document.getElementById('stat-proc-aprovados-rotulo');
+    if (rotAprovMes) rotAprovMes.textContent = aprovadosMes === 1 ? 'aprovado no mês' : 'aprovados no mês';
+}
+
+// Atalhos dos números no cartão Processos da Início: abrem a lista já recortada.
+//   andamento -> aba "Em tramitação" (a mesma lista que o número conta);
+//   analise   -> "Em tramitação" só com os status Em análise/Em reanálise (mesma regra do
+//                número, sem os "aguardando");
+//   aprovados -> aba "Aprovados" (a aba não filtra por mês: mostra todos os aprovados).
+// Cartão bloqueado para o perfil não abre nada.
+function abrirProcessosDaInicio(filtro) {
+    const card = document.querySelector('.home-action-card[data-pane="pane-reuniao"]');
+    if (card && card.classList.contains('locked-module')) return;
+    showPane('pane-reuniao');
+    if (typeof switchProcessTab === 'function') switchProcessTab(filtro === 'aprovados' ? 'aprovados' : 'ativos');
+    if (filtro !== 'analise') return;
+    const sel = document.getElementById('meetingStatusSelect');
+    if (!sel) return;
+    Array.from(sel.options).forEach(o => {
+        const s = (o.value || '').toUpperCase();
+        const analise = s.includes('EM ANÁLISE') || s.includes('EM ANALISE') || s.includes('EM REANÁLISE') || s.includes('EM REANALISE');
+        o.selected = !!o.value && analise && !s.includes('AGUARD');
+    });
+    if (typeof renderMultiSelectUI === 'function') renderMultiSelectUI(sel);
+    sel.dispatchEvent(new Event('change'));
+    if (typeof updateReuniao === 'function') updateReuniao();
 }
 
 // Tema claro/escuro do conteúdo das abas (persistido em localStorage).
@@ -126,7 +152,7 @@ function updateThemeToggleUI() {
     const isDark = document.body.classList.contains('theme-dark');
     const icon = document.getElementById('theme-toggle-icon');
     const label = document.getElementById('theme-toggle-label');
-    if (icon) icon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+    if (icon) icon.className = isDark ? 'bi bi-sun' : 'bi bi-moon';
     if (label) label.textContent = isDark ? 'Claro' : 'Escuro';
 }
 
@@ -157,11 +183,10 @@ document.addEventListener('DOMContentLoaded', updateThemeToggleUI);
 function setHeroContext(paneId) {
     const subheader = document.getElementById('panel-subheader');
     const greeting = document.getElementById('hero-home-greeting');
-    const hero = document.querySelector('.gecope-hero');
     const isHome = paneId === 'pane-home';
     if (subheader) subheader.style.display = isHome ? 'none' : 'flex';
     if (greeting) greeting.style.display = isHome ? 'block' : 'none';
-    if (hero) hero.classList.toggle('has-photo', isHome);
+
 }
 
 // Módulos embutidos (Contratos, Atividades, Assistente): cada um é uma página própria
