@@ -57,8 +57,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   // Origin sem o path (/gecope/) — é assim que o navegador manda o cabeçalho Origin.
-  // gecope-assistant-painel e consulta-ceara-transparente também foram restritas a este
-  // Origin (revisão de 08/10/2026); só a gecope-assistant ainda está com "*".
+  // gecope-assistant-painel também foi restrita a este Origin (revisão de 08/10/2026);
+  // só a gecope-assistant ainda está com "*".
   "Access-Control-Allow-Origin": "https://sop-difor.github.io",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
