@@ -1,7 +1,9 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production || npm i --production
+# Sem fallback para `npm i`: se o package-lock.json sair de sincronia com o package.json o build
+# deve FALHAR, em vez de instalar versões diferentes das testadas (revisão 08/10/2026).
+RUN npm ci --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app

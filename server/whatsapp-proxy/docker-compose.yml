@@ -27,6 +27,10 @@ services:
   # confirmado como /evolution/instances (volume evolution_instances abaixo) — sem isso,
   # cada restart do container exige escanear o QR de novo.
   evolution-api:
+    # ATENÇÃO: ":latest" faz cada rebuild/pull puxar uma versão nova da Evolution sem aviso (pode
+    # quebrar o envio ou exigir novo QR). Fixe a versão que está rodando na VM: veja com
+    # `docker inspect gecope-evolution-api --format "{{.Config.Image}} {{.Image}}"` e troque
+    # abaixo por `evoapicloud/evolution-api:<versão>` (ou @sha256:<digest>). Revisão 08/10/2026.
     image: evoapicloud/evolution-api:latest
     container_name: gecope-evolution-api
     restart: unless-stopped

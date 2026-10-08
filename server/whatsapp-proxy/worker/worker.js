@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('node-fetch');
+const { envioPodeTerChegado } = require('./envio-erros');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -268,6 +269,12 @@ async function processJob(job) {
         } catch (err) {
             lastError = err;
             console.log(`Aviso: Tentativa ${tentativa} falhou para o job ${job.id}...`);
+            // Erro ambíguo (timeout/conexão cortada DEPOIS do envio): a mensagem pode já ter chegado.
+            // Repetir entregaria em duplicidade — encerra aqui e deixa para revisão manual.
+            if (envioPodeTerChegado(err)) {
+                lastError = new Error(`Sem resposta confiável da Evolution (${err.message}). Não reenviado automaticamente para evitar duplicidade — verificar se a mensagem chegou antes de reenviar.`);
+                break;
+            }
             if (tentativa < 3) await new Promise(r => setTimeout(r, 2000));
         }
     }

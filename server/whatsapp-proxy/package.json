@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node web/index.js",
     "worker": "node worker/worker.js",
-    "test": "node --test web/*.test.js"
+    "test": "node --test web/*.test.js worker/*.test.js"
   },
   "engines": {
     "node": ">=22"
