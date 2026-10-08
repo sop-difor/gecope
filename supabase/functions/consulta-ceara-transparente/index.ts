@@ -15,7 +15,11 @@
 //     (filtro search_sacc da listagem pública) e depois consulta o detalhe.
 //
 // Deploy:  supabase functions deploy consulta-ceara-transparente --no-verify-jwt
-// (função apenas repassa dados públicos do portal; não toca no banco, não precisa de secrets)
+// (repassa dados públicos do portal; não toca no banco. Desde 08/10/2026 exige sessão do
+// GECOPE, validada aqui dentro com auth.getUser — por isso o --no-verify-jwt continua, já
+// que a anon key também passaria no verify_jwt. SUPABASE_URL/SUPABASE_ANON_KEY são injetados.)
+
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const BASE = "https://www.cearatransparente.ce.gov.br";
 const HEADERS_HTML = {
@@ -35,7 +39,7 @@ const HEADERS_HTML = {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://sop-difor.github.io",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -131,26 +135,13 @@ function extrairTabela(html: string, prefixo: string): Record<string, string>[] 
   return linhas;
 }
 
-async function buscarContratoPorId(id: string, debug = false) {
+async function buscarContratoPorId(id: string) {
   const url = `${BASE}/portal-da-transparencia/contratos/contratos/${id}?locale=pt-BR`;
   const resp = await fetch(url, { headers: HEADERS_HTML });
   if (!resp.ok) {
     return { ok: false, status: "error", message: `Ceará Transparente respondeu HTTP ${resp.status}` };
   }
   const html = await resp.text();
-  if (debug) {
-    return {
-      ok: true,
-      debug: {
-        status: resp.status,
-        redirected: resp.redirected,
-        finalUrl: resp.url,
-        headers: Object.fromEntries(resp.headers.entries()),
-        len: html.length,
-        sample: html.slice(0, 1500),
-      },
-    };
-  }
   const campos = extrairCampos(html);
   const campo = (label: string) => campos[label] ?? "N/A";
 
@@ -242,6 +233,20 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ ok: false, message: "Method not allowed" }, 405);
   }
 
+  // Exige sessão real do GECOPE (revisão 08/10/2026): a função é publicada com
+  // --no-verify-jwt e antes respondia a qualquer um da internet, funcionando como proxy
+  // aberto para o portal. A anon key também é um JWT, por isso valida com auth.getUser.
+  const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) {
+    return jsonResponse({ ok: false, message: "Entre no GECOPE para consultar." }, 401);
+  }
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!);
+  const { data: { user }, error: erroAuth } = await supabase.auth.getUser(token);
+  if (erroAuth || !user) {
+    return jsonResponse({ ok: false, message: "Sua sessão do GECOPE expirou. Entre novamente." }, 401);
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const sacc = body?.sacc ? String(body.sacc).trim() : "";
@@ -249,6 +254,14 @@ Deno.serve(async (req: Request) => {
 
     if (!sacc && !idDireto) {
       return jsonResponse({ ok: false, message: "Informe 'sacc' ou 'id'." }, 400);
+    }
+    // `id` entra no caminho da URL do portal: só dígitos, senão "../" redirecionaria a
+    // consulta para qualquer outra página do mesmo host.
+    if (idDireto && !/^\d{1,12}$/.test(idDireto)) {
+      return jsonResponse({ ok: false, message: "'id' inválido." }, 400);
+    }
+    if (sacc && !/^\d{1,12}$/.test(sacc)) {
+      return jsonResponse({ ok: false, message: "'sacc' inválido." }, 400);
     }
 
     let id = idDireto;
@@ -258,7 +271,7 @@ Deno.serve(async (req: Request) => {
       id = resolvido.id!;
     }
 
-    const resultado = await buscarContratoPorId(id, !!body?.debug);
+    const resultado = await buscarContratoPorId(id);
     if (!resultado.ok) return jsonResponse(resultado, 502);
     return jsonResponse(resultado);
   } catch (e) {

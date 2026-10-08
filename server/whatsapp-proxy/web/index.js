@@ -4,6 +4,7 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 const { createAuthMiddleware } = require('./auth-middleware');
+const { createRateLimiter } = require('./rate-limit');
 
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -25,7 +26,7 @@ if (!EVO_API_URL || !EVO_API_KEY || !EVO_INSTANCE) {
 // Cliente service role: ignora RLS por design, é quem grava em whatsapp_jobs/whatsapp_logs
 // em nome do backend. Nunca deve ser usado para validar quem é o usuário que chamou.
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-const { requireAuth, requireAdmin } = createAuthMiddleware({
+const { requireAuth, requirePapelValido, requireAdmin } = createAuthMiddleware({
   supabaseUrl: SUPABASE_URL,
   supabaseAnonKey: SUPABASE_ANON_KEY,
   sb
@@ -161,7 +162,11 @@ async function markLogFailed(logId, motivo) {
 // isso este endpoint não é requireAdmin: em vez disso, isKnownRecipient() abaixo restringe
 // o destino a números já cadastrados em app_users, para que uma conta comum comprometida não
 // vire uma plataforma de disparo de texto livre a QUALQUER número.
-app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
+// Teto de envios por usuário por minuto (ver rate-limit.js). Uma ação de negócio notifica poucos
+// destinatários; 30/min é folga larga para uso normal.
+const sendRateLimited = createRateLimiter({ limitPerMin: parseInt(process.env.SEND_LIMIT_PER_MIN || '30', 10) });
+
+app.post('/api/whatsapp/send', requireAuth, requirePapelValido, async (req, res) => {
   const { number, text, log_id } = req.body || {};
   try {
     if (!number || !text) return res.status(400).json({ error: 'number_and_text_required' });
@@ -169,6 +174,12 @@ app.post('/api/whatsapp/send', requireAuth, async (req, res) => {
     if (!(await isKnownRecipient(number))) {
       await markLogFailed(log_id, 'Recusado: número não corresponde a nenhum destinatário cadastrado.');
       return res.status(403).json({ error: 'recipient_not_registered' });
+    }
+
+    // Depois da checagem de destinatário: tentativas recusadas não consomem a cota.
+    if (sendRateLimited(req.user.email)) {
+      await markLogFailed(log_id, 'Recusado: limite de envios por minuto excedido.');
+      return res.status(429).json({ error: 'rate_limited' });
     }
 
     // Se vier log_id, confirma que aponta para um log real e ainda em 'processando' —
@@ -271,7 +282,7 @@ async function getDegradedFlag() {
   }
 }
 
-app.get('/api/whatsapp/status', requireAuth, async (req, res) => {
+app.get('/api/whatsapp/status', requireAuth, requirePapelValido, async (req, res) => {
   const degraded = await getDegradedFlag();
   try {
     const result = await callEvolution(`/instance/connectionState/${EVO_INSTANCE}`);

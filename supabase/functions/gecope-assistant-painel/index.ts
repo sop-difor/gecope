@@ -6,9 +6,9 @@
 // "falha → intenção ou caso de eval", ver docs/assistente/rotina-revisao-falhas.md).
 //
 // Acesso: exige a mesma sessão real do GECOPE que a gecope-assistant (JWT via
-// auth.getUser) — sem checagem de cargo/permissão por decisão do usuário
-// (05/09/2026): qualquer pessoa logada no GECOPE com o link consegue abrir.
-// Revisitar quando o piloto (F8) começar de verdade.
+// auth.getUser) e a mesma autorização (admin ou "assistente_dados"). Até 08/10/2026 não
+// havia checagem de papel (decisão de 05/09/2026); foi fechada na revisão técnica porque o
+// cadastro é aberto e qualquer conta nova passava na checagem de sessão.
 //
 // consultas_ia_log só tem policy de escrita/leitura para service_role (F1) —
 // por isso o painel não lê a tabela direto do navegador: passa por aqui,
@@ -17,8 +17,9 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*", // restrinja ao domínio do GECOPE em produção
+  "Access-Control-Allow-Origin": "https://sop-difor.github.io",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
 // Teto de linhas trazidas para agregar em JS — um piloto de ~10-20 pessoas
@@ -63,6 +64,34 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ erro: "Sua sessão do GECOPE expirou. Entre novamente." }),
       { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+    );
+  }
+
+  // ---- Autorização: mesma regra da gecope-assistant (admin, ou autorização especial
+  // "assistente_dados"). Revisão 08/10/2026: antes bastava estar logado, e o cadastro é aberto
+  // (qualquer conta nova entra como 'pending'), então o painel — com todas as perguntas, o SQL
+  // gerado e os erros de todos os usuários, lidos com service role — ficava a um cadastro de
+  // distância de qualquer pessoa. Este client ignora RLS, então esta é a única trava. ----
+  const { data: perfilAcesso } = await supabase
+    .from("app_users")
+    .select("role")
+    .eq("email", user.email ?? "")
+    .maybeSingle();
+  let autorizado = (perfilAcesso?.role ?? "").toLowerCase() === "admin";
+  if (!autorizado) {
+    const { data: autorizacao } = await supabase
+      .from("autorizacoes_especiais")
+      .select("id")
+      .eq("permissao", "assistente_dados")
+      .ilike("usuario_email", user.email ?? "")
+      .is("revogado_em", null)
+      .maybeSingle();
+    autorizado = !!autorizacao;
+  }
+  if (!autorizado) {
+    return new Response(
+      JSON.stringify({ erro: "O painel do Assistente de Dados está disponível apenas para administradores." }),
+      { status: 403, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   }
 

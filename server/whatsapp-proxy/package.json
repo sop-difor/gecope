@@ -5,7 +5,8 @@
   "main": "web/index.js",
   "scripts": {
     "start": "node web/index.js",
-    "worker": "node worker/worker.js"
+    "worker": "node worker/worker.js",
+    "test": "node --test web/*.test.js"
   },
   "engines": {
     "node": ">=22"
