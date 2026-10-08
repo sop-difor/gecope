@@ -1,0 +1,10 @@
+proname,args,security_definer,definicao
+app_users_lookup_by_matricula,p_matricula text,true,"CREATE OR REPLACE FUNCTION public.app_users_lookup_by_matricula(p_matricula text)
+ RETURNS TABLE(nome text, sobrenome text, email text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select nome, sobrenome, email from public.app_users where matricula = p_matricula limit 1;
+$function$
+"

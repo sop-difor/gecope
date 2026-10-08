@@ -1,0 +1,9 @@
+policyname,cmd,roles,qual,with_check
+Public Upload 1e0n1yt_0,SELECT,{public},(bucket_id = 'composicoes_biblioteca'::text),null
+Public Upload 1e0n1yt_1,INSERT,{authenticated},null,(bucket_id = 'composicoes_biblioteca'::text)
+Public Upload 1e0n1yt_2,UPDATE,{authenticated},(bucket_id = 'composicoes_biblioteca'::text),null
+Public Upload 1e0n1yt_3,DELETE,{authenticated},(bucket_id = 'composicoes_biblioteca'::text),null
+Public Upload 1src1ab_0,SELECT,{public},(bucket_id = 'orcamentos'::text),null
+Public Upload 1src1ab_1,INSERT,{authenticated},null,(bucket_id = 'orcamentos'::text)
+Public Upload 1src1ab_2,UPDATE,{authenticated},(bucket_id = 'orcamentos'::text),null
+Public Upload 1src1ab_3,DELETE,{authenticated},(bucket_id = 'orcamentos'::text),null

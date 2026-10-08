@@ -1,0 +1,4 @@
+tablename,policyname,cmd,roles,qual,with_check
+whatsapp_logs,whatsapp_logs_insert_authenticated,INSERT,{authenticated},null,((status = 'processando'::text) AND ( SELECT tem_papel_valido() AS tem_papel_valido))
+app_atividades,app_atividades_insert,INSERT,{authenticated},null,( SELECT tem_papel_valido() AS tem_papel_valido)
+app_atividades,app_atividades_select,SELECT,{authenticated},( SELECT tem_papel_valido() AS tem_papel_valido),null

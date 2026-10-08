@@ -1,0 +1,4 @@
+id,name,public,file_size_limit,allowed_mime_types
+composicoes_biblioteca,composicoes_biblioteca,true,52428800,null
+orcamentos,orcamentos,true,52428800,null
+sop_inicial,sop_inicial,true,52428800,null
