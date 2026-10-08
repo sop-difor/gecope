@@ -344,4 +344,30 @@
     }
     window.carregarBiblioteca = carregarBiblioteca;
 
+    // Lê TODAS as linhas de uma consulta do supabase-js, página a página. O PostgREST devolve no
+    // máximo `max-rows` (1000) linhas SEM avisar, então um `select` simples trunca em silêncio
+    // qualquer tabela/versão maior que isso (revisão 08/10/2026, #8).
+    // `montarConsulta()` devolve um builder NOVO a cada chamada, já com `.select(cols, { count:
+    // 'exact' })` e uma ORDEM DETERMINÍSTICA (inclua o id como desempate) — sem ela a
+    // paginação pode repetir ou pular linhas. Resultado no mesmo formato do supabase-js:
+    // { data, error }. A parada usa a contagem do servidor; se ela não vier, uma página curta
+    // encerra. O avanço usa o que VEIO (não o que foi pedido), então um max-rows menor que
+    // a página também não perde linhas.
+    async function lerTodasAsLinhas(montarConsulta, tamanhoPagina) {
+        var PAGINA = tamanhoPagina || 1000;
+        var linhas = [];
+        var total = Infinity;
+        while (linhas.length < total) {
+            var r = await montarConsulta().range(linhas.length, linhas.length + PAGINA - 1);
+            if (r.error) return { data: null, error: r.error };
+            var pagina = r.data || [];
+            if (typeof r.count === 'number') total = r.count;
+            if (pagina.length === 0) break;
+            for (var i = 0; i < pagina.length; i++) linhas.push(pagina[i]);
+            if (typeof r.count !== 'number' && pagina.length < PAGINA) break;
+        }
+        return { data: linhas, error: null };
+    }
+    window.lerTodasAsLinhas = lerTodasAsLinhas;
+
 })(window);
