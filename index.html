@@ -3871,7 +3871,33 @@
                                                 </div>
 
                                                 <div class="mb-3 pb-3 border-bottom">
-                                                    <label class="form-label small fw-bold d-block">8. Composição
+                                                    <label class="form-label small fw-bold d-block">8. Cronograma?</label>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_cronograma" id="chk_cronograma_sim" value="sim">
+                                                        <label class="form-check-label"
+                                                            for="chk_cronograma_sim">Sim</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio"
+                                                            name="chk_cronograma" id="chk_cronograma_nao" value="nao">
+                                                        <label class="form-check-label"
+                                                            for="chk_cronograma_nao">Não</label>
+                                                    </div>
+                                                    <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                                        id="chk_cronograma_obs_toggle"
+                                                        onclick="toggleObsChecklistManual('chk_cronograma')"><i
+                                                            class="bi bi-chat-left-text me-1"></i>Adicionar
+                                                        observação</button>
+                                                    <div id="chk_cronograma_obs_wrap" class="mt-2 d-none">
+                                                        <textarea class="form-control form-control-sm"
+                                                            id="chk_cronograma_obs" rows="6"
+                                                            placeholder="Observação (opcional) — justificativa se ausente, ou inconsistência se apresentado"></textarea>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3 pb-3 border-bottom">
+                                                    <label class="form-label small fw-bold d-block">9. Composição
                                                         Própria (CXXXX)?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
@@ -3932,7 +3958,7 @@
                                                 </div>
 
                                                 <div class="mb-3 pb-3 border-bottom">
-                                                    <label class="form-label small fw-bold d-block">9. Todos os
+                                                    <label class="form-label small fw-bold d-block">10. Todos os
                                                         documentos anexados foram assinados pela Fiscalização?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"
@@ -3961,7 +3987,7 @@
                                                 </div>
 
                                                 <div class="mb-0">
-                                                    <label class="form-label small fw-bold d-block">10. Outros
+                                                    <label class="form-label small fw-bold d-block">11. Outros
                                                         documentos relevantes não listados acima?</label>
                                                     <div class="form-check form-check-inline">
                                                         <input class="form-check-input" type="radio"

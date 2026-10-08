@@ -77,7 +77,7 @@ medicoes (medições físico-financeiras por obra):
 
 checklist_documentacao_aditivo (checklist de documentos por processo):
   processo_id uuid, eh_primeiro_aditivo boolean, planilha_orcamentaria_validada boolean,
-  memoria_calculo boolean, parecer_tecnico boolean, art_fiscalizacao boolean, art_execucao boolean
+  memoria_calculo boolean, parecer_tecnico boolean, art_fiscalizacao boolean, art_execucao boolean, cronograma boolean
 
 comissao_fiscalizacao (pessoas designadas por obra):
   id_obra integer, codigo_obra text, tipo text, matricula text, nome_completo text

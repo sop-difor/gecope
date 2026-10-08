@@ -1974,6 +1974,7 @@ const CHECKLIST_ADITIVO_ITENS = [
     { key: 'chk_art_execucao', campo: 'art_execucao', obsCampo: 'art_execucao_obs', label: 'ART de Execução', obrigatorio: 'primeiro_aditivo' },
     { key: 'chk_portaria', campo: 'portaria_fiscalizacao', obsCampo: 'portaria_fiscalizacao_obs', label: 'Portaria de Fiscalização', obrigatorio: 'primeiro_aditivo' },
     { key: 'chk_curva_abc', campo: 'curva_abc', obsCampo: 'curva_abc_obs', label: 'Curva ABC', obrigatorio: 'sempre' },
+    { key: 'chk_cronograma', campo: 'cronograma', obsCampo: 'cronograma_obs', label: 'Cronograma', obrigatorio: 'sempre' },
     // pendenciaSeNao: false -> "Não" aqui só significa que a Composição Própria não foi
     // aprovada neste aditivo (nada a providenciar), então não conta como pendência nem
     // gera a observação automática de documento indispensável.
