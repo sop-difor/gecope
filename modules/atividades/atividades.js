@@ -84,7 +84,7 @@ async function carregarAtividades() {
                                             <i class="bi ${icon}"></i>
                                         </div>
                                         <div>
-                                            <div class="small text-muted mb-1">${dataHora}  ${at.tipo}</div>
+                                            <div class="small text-muted mb-1">${dataHora}  ${escapeHTML(at.tipo)}</div>
                                             <div class="fw-semibold" style="font-size: 0.95rem;">${escapeHTML(at.usuario)} ${escapeHTML(at.descricao)}</div>
                         </div>
                     </div>
@@ -167,7 +167,7 @@ async function _carregarAtividadesResumoHome() {
                                     <div class="activity-content">
                                         <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                                             <span class="activity-time mb-0">${timeLabel}</span>
-                                            <span class="activity-badge ${badgeClass}">${badgeLabel}</span>
+                                            <span class="activity-badge ${badgeClass}">${escapeHTML(badgeLabel)}</span>
                                         </div>
                                         <div class="activity-desc"><strong>${escapeHTML(at.usuario)}</strong> ${escapeHTML(at.descricao)}</div>
                                     </div>

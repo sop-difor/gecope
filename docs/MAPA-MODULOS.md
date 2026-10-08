@@ -88,7 +88,6 @@
 | `supabase/functions/gecope-assistant/schema_prompt.ts` | Dicionário condensado de schema e prompt das views permitidas. |
 | `supabase/functions/gecope-assistant/eval_run.ts` | Runner do harness de avaliação; casos em `docs/assistente/eval/casos.jsonl`. |
 | `supabase/functions/gecope-assistant-painel/index.ts` | Agrega consultas, erros e feedback para o painel administrativo do assistente. |
-| `supabase/functions/consulta-ceara-transparente/index.ts` | Integração separada com a consulta Ceará Transparente. |
 | `supabase/functions/sincronizar-suite/index.ts` | Função de sincronização com a Suite; tratar como integração externa, não como módulo da UI. **Leia a entrada completa em "Proxy e dados"** antes de editar — há um aviso de procedência do arquivo. |
 
 Documentação detalhada do assistente, escopo, segurança e avaliações: `docs/assistente/README.md`.

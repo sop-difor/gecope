@@ -75,6 +75,49 @@ function createAuthMiddleware({ supabaseUrl, supabaseAnonKey, sb }) {
     }
   }
 
+  // O cadastro do GECOPE é aberto: qualquer pessoa cria uma conta e recebe um JWT válido, com
+  // papel 'pending' em app_users. `requireAuth` só prova que o token é de uma conta real, não
+  // que ela foi aprovada — por isso as rotas que agem em nome do sistema (enviar mensagem,
+  // consultar/criar instância) passam também por aqui. Mesmos papéis de tem_papel_valido()
+  // no banco. O papel fica em cache por e-mail pelo mesmo prazo curto do cache de token, para
+  // não consultar app_users a cada chamada (o front faz polling de /status).
+  const PAPEIS_VALIDOS = new Set(['admin', 'gerente', 'fiscal', 'externo', 'eletrica']);
+  const roleCache = new Map(); // email -> { valido, expiresAt }
+
+  async function requirePapelValido(req, res, next) {
+    try {
+      const email = req.user?.email;
+      if (!email) return res.status(401).json({ error: 'missing_token' });
+
+      const key = email.toLowerCase();
+      const cached = roleCache.get(key);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.valido ? next() : res.status(403).json({ error: 'forbidden' });
+      }
+
+      const { data, error } = await sb
+        .from('app_users')
+        .select('role')
+        // ilike porque app_users pode ter e-mail com maiúsculas (o banco compara com lower());
+        // "\", "%" e "_" escapados para não virarem curinga.
+        .ilike('email', email.replace(/[\\%_]/g, '\\$&'))
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+
+      const valido = PAPEIS_VALIDOS.has(String(data?.role || '').toLowerCase());
+      roleCache.set(key, { valido, expiresAt: Date.now() + MAX_CACHE_MS });
+      if (roleCache.size > 500) {
+        const now = Date.now();
+        for (const [k, v] of roleCache) if (v.expiresAt <= now) roleCache.delete(k);
+      }
+      return valido ? next() : res.status(403).json({ error: 'forbidden' });
+    } catch (err) {
+      console.error('[requirePapelValido] erro inesperado:', err.message || err);
+      return res.status(403).json({ error: 'role_check_failed' });
+    }
+  }
+
   async function requireAdmin(req, res, next) {
     try {
       if (!req.user?.email) return res.status(401).json({ error: 'missing_token' });
@@ -95,7 +138,7 @@ function createAuthMiddleware({ supabaseUrl, supabaseAnonKey, sb }) {
     }
   }
 
-  return { requireAuth, requireAdmin };
+  return { requireAuth, requirePapelValido, requireAdmin };
 }
 
 module.exports = { createAuthMiddleware };
