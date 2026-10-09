@@ -2344,11 +2344,10 @@ body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet
 .modal .loc-btn.perigo{border-color:rgba(var(--status-stop-rgb),.5);background:transparent;color:var(--status-stop-text)}
 .modal .loc-btn.perigo:hover:not(:disabled){background:rgba(var(--status-stop-rgb),.12)}
 .modal .loc-btn:focus-visible,.modal .loc-modo:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
-.modal .loc-rapido{margin-top:10px}
-.modal .loc-rapido:empty{display:none}
-.modal .loc-rota{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;text-decoration:none;
+.modal .mtabs-grupo{display:contents}
+.modal .mrota{flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;
   border:1px solid rgba(var(--ng-rgb),.5);background:rgba(var(--ng-rgb),.12);color:var(--text-brightest);
-  border-radius:8px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700}
-.modal .loc-rota:hover{border-color:rgba(var(--ng-rgb),.75);background:rgba(var(--ng-rgb),.2)}
-.modal .loc-rota:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
-.modal .loc-rota svg{color:var(--ng-light)}
+  border-radius:999px;padding:7px 16px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;letter-spacing:.3px;transition:.15s}
+.modal .mrota:hover{border-color:rgba(var(--ng-rgb),.8);background:rgba(var(--ng-rgb),.22)}
+.modal .mrota:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
+.modal .mrota svg{color:var(--ng-light)}

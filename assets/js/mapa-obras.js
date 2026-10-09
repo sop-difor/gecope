@@ -2949,7 +2949,7 @@ function obrasCards(ids){
    - Sem biblioteca nova: o mapa já é Leaflet. O botão "Ruas e rotas" vale nos três níveis (estado,
      distrito e município) e só carrega tiles do OpenStreetMap depois do clique; os pinos das obras
      aparecem com um município aberto. O mapa mostra rodovias e ruas, mas NÃO calcula trajeto:
-     "Como chegar" na Ficha abre o Google Maps com o destino.
+     o botão "Rota" da Ficha abre o Google Maps com o destino.
    - Marcadores saem de obrasOf(st.city): os filtros e a busca valem sozinhos. Sem cluster — o
      município com mais obras tem 662 no histórico completo, e o Leaflet desenha isso sem esforço.
    - Obras na mesma coordenada (arredondada a ~1 m) viram UM marcador com a lista delas.
@@ -3213,11 +3213,13 @@ function locResumoHtml(o){
     +`<div class="fc-hnote">Fonte: ${escHtml(LOC_FONTE_ROT[l.fonte]||l.fonte||'—')}${quem}${quando}</div>`
     +(s&&!s.ok?`<div class="loc-msg erro">Esta coordenada não confere e por isso não aparece no mapa: ${escHtml(s.motivo)}</div>`:'');
 }
-// atalho "Como chegar" (Google Maps, a partir de onde a pessoa estiver): fica fora do cartão recolhido
-function locRapidoHtml(o){
+// botão "Rota", ao lado das abas da Ficha: abre o Google Maps com o destino já preenchido, a partir de onde
+// a pessoa estiver. Só existe para obra com ponto válido (o mapa não calcula trajeto, o Google Maps calcula).
+function locRotaHtml(o){
   const s=locStatus(o); if(!s||!s.ok) return '';
-  return `<a class="loc-rota" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.loc.lat},${o.loc.lng}" target="_blank" rel="noopener">`
-    +`<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg>Como chegar</a>`;
+  return `<a class="mrota" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.loc.lat},${o.loc.lng}" target="_blank" rel="noopener"`
+    +` title="Abrir a rota até a obra no Google Maps" aria-label="Rota até a obra (abre o Google Maps)">`
+    +`<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg>Rota</a>`;
 }
 function locIrmasSemPonto(o){
   return obrasDoContrato(o).filter(x=>x!==o&&x.munId===o.munId&&!x.loc);
@@ -3243,7 +3245,7 @@ function buildLocCard(o,toggleBtn){
       +`<div class="loc-acoes"><button type="button" class="loc-btn prim" id="locSalvar" disabled>Salvar localização</button>`
         +(remover?`<button type="button" class="loc-btn perigo" id="locRemover">Remover localização</button>`:'')+`</div>`;
   } else form='<div class="fc-hnote">Seu perfil só permite consultar a localização.</div>';
-  return `<section class="fc-sec fc-sec-toggle">${toggleBtn('mFcLoc',escHtml(rot))}<div id="locRapido" class="loc-rapido">${locRapidoHtml(o)}</div><div id="mFcLoc" class="loc-box" hidden>`
+  return `<section class="fc-sec fc-sec-toggle">${toggleBtn('mFcLoc',escHtml(rot))}<div id="mFcLoc" class="loc-box" hidden>`
     +`<div id="locResumo">${locResumoHtml(o)}</div>${form}</div></section>`;
 }
 function locMsg(txt,tipo){
@@ -3325,7 +3327,7 @@ function aplicaLocNaObra(x,r){
 }
 function locAtualizaTela(o){
   const rs=document.getElementById('locResumo'); if(rs) rs.innerHTML=locResumoHtml(o);
-  const rp=document.getElementById('locRapido'); if(rp) rp.innerHTML=locRapidoHtml(o);
+  const rp=document.getElementById('locRotaSlot'); if(rp) rp.innerHTML=locRotaHtml(o);
   const t=document.querySelector('.modal .adToggle[data-target="mFcLoc"] span');
   if(t) t.textContent='Localização da obra'+(!o.loc?' — não cadastrada':'');
   _ruasSig=''; if(ruasAtivo()) render(); // marcadores e contagens do painel
@@ -4083,9 +4085,12 @@ function openModal(o,voltarChave){
            <div class="fc-ctr"><span>Contrato</span> <b>${fmtContratoExt(raw.nr_contrato_ext)}</b>${(o.nObras||1)>1?'':`<span class="fc-ctr-obra">${escHtml(o.codigo_obra||('#'+o.id_obra))}</span>`}</div>
            ${fichaObrasNav(o,irmas)}</div>
          <div class="mh-actions">${fecharBtn}</div></div>
-       <div class="mtabs" role="tablist">
-         <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneFicha" data-tab="ficha">Ficha Obra</button>
-         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneEletrica" data-tab="eletrica">Elétrica</button>
+       <div class="mtabs">
+         <div class="mtabs-grupo" role="tablist">
+           <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneFicha" data-tab="ficha">Ficha Obra</button>
+           <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneEletrica" data-tab="eletrica">Elétrica</button>
+         </div>
+         <span class="mtabs-grupo" id="locRotaSlot">${locRotaHtml(o)}</span>
        </div>
      </div>
      <div class="mbody" data-tab="ficha">

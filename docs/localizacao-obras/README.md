@@ -10,9 +10,8 @@ com um município aberto ele aparece como pino, e o ponto é cadastrado no cart�
   com as contagens continuam. Município: só o contorno e os pinos.
 - Peso (medido em 09/10/2026): Ceará inteiro ≈ 40 blocos ≈ 235 KB; um zoom acima ≈ 840 KB. Nada é pedido
   antes de ligar o botão; o navegador guarda os blocos em cache.
-- O mapa mostra rodovias e ruas, mas **não calcula trajeto**. O botão **Como chegar** da Ficha (visível sem
-  abrir o cartão, só para obra com ponto válido) abre o Google Maps com o destino, a partir de onde a pessoa
-  estiver.
+- O mapa mostra rodovias e ruas, mas **não calcula trajeto**. O botão **Rota**, ao lado das abas Ficha Obra e
+  Elétrica (só para obra com ponto válido), abre o Google Maps com o destino, a partir de onde a pessoa estiver.
 - Em Replanilhamentos o botão some (o modo não tem obras no mapa).
 
 ## Onde está o dado
