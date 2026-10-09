@@ -10,9 +10,8 @@ com um município aberto ele aparece como pino, e o ponto é cadastrado no cart�
   com as contagens continuam. Município: só o contorno e os pinos.
 - Peso (medido em 09/10/2026): Ceará inteiro ≈ 40 blocos ≈ 235 KB; um zoom acima ≈ 840 KB. Nada é pedido
   antes de ligar o botão; o navegador guarda os blocos em cache.
-- O mapa mostra rodovias e ruas, mas **não calcula trajeto**. O botão **Como chegar** da Ficha (visível sem
-  abrir o cartão, só para obra com ponto válido) abre o Google Maps com o destino, a partir de onde a pessoa
-  estiver.
+- O mapa mostra rodovias e ruas, mas **não calcula trajeto**. O botão **Rota**, ao lado das abas Ficha Obra e
+  Elétrica (só para obra com ponto válido), abre o Google Maps com o destino, a partir de onde a pessoa estiver.
 - Em Replanilhamentos o botão some (o modo não tem obras no mapa).
 
 ## Onde está o dado
@@ -32,12 +31,19 @@ com um município aberto ele aparece como pino, e o ponto é cadastrado no cart�
 
 Sem o passo 1 o mapa continua funcionando; só não há pontos e o painel avisa que as localizações não carregaram.
 
-## Como o ponto é informado (cartão da Ficha)
+## Quem pode cadastrar e como
 
-Três jeitos, à escolha: **marcar no mapa** (clique ou arrastar o marcador), **digitar coordenadas**
-(`-3.7319, -38.5267` ou graus/minutos/segundos) e **usar minha posição** (GPS do aparelho; exige HTTPS e a
-permissão `geolocation` do iframe em `index.html`). Em contrato com várias obras no mesmo município, uma
-caixa permite usar o mesmo ponto nas obras irmãs que ainda não têm localização.
+- **Cadastrar/alterar:** admin, gerente, fiscal, externo e eletrica (os mesmos papéis que enxergam o módulo;
+  90 pessoas em 09/10/2026), em qualquer obra. Conta "pending" não entra. **Remover:** só admin e gerente.
+- No cartão **Localização da obra** da Ficha, o botão **Cadastrar localização** (ou **Alterar localização**)
+  abre um diálogo com mapa grande: o clique do mouse (ou arrastar o marcador) preenche latitude e longitude,
+  e **Cadastrar** grava. Dentro do mesmo diálogo também dá para digitar/colar as coordenadas (decimais como
+  o Google Maps copia, ou graus/minutos/segundos) e usar **Usar minha posição** (GPS; exige HTTPS e a
+  permissão `geolocation` do iframe em `index.html`). Esc ou Cancelar fecham sem gravar.
+- Em contrato com várias obras no mesmo município, uma caixa permite usar o mesmo ponto nas obras irmãs que
+  ainda não têm localização.
+- No painel do município (modo Ruas e rotas), a lista "Sem localização — clique para cadastrar" abre a Ficha
+  já com o mapa de cadastro.
 
 ## Regras de validade (front e carga inicial usam a mesma)
 

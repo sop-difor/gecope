@@ -2949,7 +2949,7 @@ function obrasCards(ids){
    - Sem biblioteca nova: o mapa já é Leaflet. O botão "Ruas e rotas" vale nos três níveis (estado,
      distrito e município) e só carrega tiles do OpenStreetMap depois do clique; os pinos das obras
      aparecem com um município aberto. O mapa mostra rodovias e ruas, mas NÃO calcula trajeto:
-     "Como chegar" na Ficha abre o Google Maps com o destino.
+     o botão "Rota" da Ficha abre o Google Maps com o destino.
    - Marcadores saem de obrasOf(st.city): os filtros e a busca valem sozinhos. Sem cluster — o
      município com mais obras tem 662 no histórico completo, e o Leaflet desenha isso sem esforço.
    - Obras na mesma coordenada (arredondada a ~1 m) viram UM marcador com a lista delas.
@@ -3192,18 +3192,22 @@ function obraPorIdObra(idObra){
   const m=DB.municipios[st.city]; if(!m) return null;
   return m.obras.find(o=>String(o.id_obra)===String(idObra))||null;
 }
-function abreLocalizacaoDaObra(o){
-  openModal(o);
-  const b=document.querySelector('.modal .adToggle[data-target="mFcLoc"]'); if(b) b.click();
-}
 document.getElementById('body').addEventListener('click',e=>{
   const b=e.target.closest&&e.target.closest('[data-loc-obra]'); if(!b) return;
   const o=obraPorIdObra(b.dataset.locObra); if(o) abreLocalizacaoDaObra(o);
 });
 
-// ---- cartão "Localização da obra" na Ficha ----
-let _locMini=null; // {map,marker,sel,o} — o mini-mapa do cartão; vive só enquanto a janela da obra existe
-function destroyLocMini(){ if(_locMini){ try{ _locMini.map.remove(); }catch(e){ /* já fora do DOM */ } _locMini=null; } }
+// ---- cartão "Localização da obra" na Ficha e diálogo do mapa ----
+// O cartão mostra a localização atual e o botão "Cadastrar localização". O botão abre um diálogo com um mapa
+// grande: o clique (ou o arrasto do marcador) preenche latitude/longitude, e "Cadastrar" grava. Digitar as
+// coordenadas e usar a posição do aparelho são atalhos dentro do mesmo diálogo.
+let _locMini=null; // {map,marker,sel,o} — o mapa do diálogo; vive só enquanto o diálogo existe
+function destroyLocMini(){
+  if(_locMini){ try{ _locMini.map.remove(); }catch(e){ /* já fora do DOM */ } _locMini=null; }
+  const d=document.getElementById('locDlgBg'); if(d) d.remove();
+}
+function locDialogoAberto(){ return !!document.getElementById('locDlgBg'); }
+function fechaLocDialogo(){ destroyLocMini(); }
 function locResumoHtml(o){
   if(!o.loc) return '<div class="fc-hnote">Esta obra ainda não tem localização cadastrada.</div>';
   const s=locStatus(o), l=o.loc;
@@ -3213,46 +3217,40 @@ function locResumoHtml(o){
     +`<div class="fc-hnote">Fonte: ${escHtml(LOC_FONTE_ROT[l.fonte]||l.fonte||'—')}${quem}${quando}</div>`
     +(s&&!s.ok?`<div class="loc-msg erro">Esta coordenada não confere e por isso não aparece no mapa: ${escHtml(s.motivo)}</div>`:'');
 }
-// atalho "Como chegar" (Google Maps, a partir de onde a pessoa estiver): fica fora do cartão recolhido
-function locRapidoHtml(o){
+// botão "Rota", ao lado das abas da Ficha: abre o Google Maps com o destino já preenchido, a partir de onde
+// a pessoa estiver. Só existe para obra com ponto válido (o mapa não calcula trajeto, o Google Maps calcula).
+function locRotaHtml(o){
   const s=locStatus(o); if(!s||!s.ok) return '';
-  return `<a class="loc-rota" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.loc.lat},${o.loc.lng}" target="_blank" rel="noopener">`
-    +`<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg>Como chegar</a>`;
+  return `<a class="mrota" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.loc.lat},${o.loc.lng}" target="_blank" rel="noopener"`
+    +` title="Abrir a rota até a obra no Google Maps" aria-label="Rota até a obra (abre o Google Maps)">`
+    +`<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg>Rota</a>`;
 }
 function locIrmasSemPonto(o){
   return obrasDoContrato(o).filter(x=>x!==o&&x.munId===o.munId&&!x.loc);
 }
-function buildLocCard(o,toggleBtn){
-  const s=locStatus(o);
-  const rot='Localização da obra'+(!o.loc?' — não cadastrada':(s&&!s.ok?' — coordenada não confere':''));
-  let form='';
+function locCorpoHtml(o){
+  let acoes;
   if(podeLocalizar()){
-    const irmas=locIrmasSemPonto(o), n=irmas.length;
     const remover=o.loc&&PAPEIS_LOC_REMOVER.includes(USER_PAPEL);
-    form=`<div class="loc-modos" role="group" aria-label="Como informar a localização">`
-        +`<button type="button" class="loc-modo on" data-loc-modo="mapa" aria-pressed="true">Marcar no mapa</button>`
-        +`<button type="button" class="loc-modo" data-loc-modo="digitar" aria-pressed="false">Digitar coordenadas</button>`
-        +`<button type="button" class="loc-modo" data-loc-modo="gps" aria-pressed="false">Usar minha posição</button></div>`
-      +`<div class="loc-ent" data-loc-ent="mapa"><div class="fc-hnote">Clique no mapa ou arraste o marcador até o local da obra. Aproxime o zoom para achar a rua.</div></div>`
-      +`<div class="loc-ent" data-loc-ent="digitar" hidden><div class="loc-linha"><input id="locTxt" type="text" autocomplete="off" placeholder="-3.731900, -38.526700" aria-label="Latitude e longitude"><button type="button" class="loc-btn" id="locAplicar">Aplicar</button></div>`
-        +`<div class="fc-hnote">Cole “latitude, longitude” (como o Google Maps copia) ou em graus, minutos e segundos.</div></div>`
-      +`<div class="loc-ent" data-loc-ent="gps" hidden><button type="button" class="loc-btn" id="locGps">Obter minha posição</button><div class="fc-hnote" id="locGpsInfo">Use quando estiver no local da obra e autorize o acesso à localização do navegador.</div></div>`
-      +`<div class="loc-mapa" id="locMapa"></div>`
-      +`<div class="loc-msg" id="locMsg" role="status" aria-live="polite"></div>`
-      +(n?`<label class="loc-chk"><input type="checkbox" id="locIrmas"> Usar este mesmo ponto ${n===1?'na outra obra':`nas outras ${n} obras`} deste contrato em ${escHtml(o.municipioTxt||'')} que ainda não ${n===1?'tem':'têm'} localização</label>`:'')
-      +`<div class="loc-acoes"><button type="button" class="loc-btn prim" id="locSalvar" disabled>Salvar localização</button>`
-        +(remover?`<button type="button" class="loc-btn perigo" id="locRemover">Remover localização</button>`:'')+`</div>`;
-  } else form='<div class="fc-hnote">Seu perfil só permite consultar a localização.</div>';
-  return `<section class="fc-sec fc-sec-toggle">${toggleBtn('mFcLoc',escHtml(rot))}<div id="locRapido" class="loc-rapido">${locRapidoHtml(o)}</div><div id="mFcLoc" class="loc-box" hidden>`
-    +`<div id="locResumo">${locResumoHtml(o)}</div>${form}</div></section>`;
+    acoes=`<div class="loc-acoes"><button type="button" class="loc-btn prim" id="locCadastrar">${o.loc?'Alterar localização':'Cadastrar localização'}</button>`
+      +(remover?`<button type="button" class="loc-btn perigo" id="locRemover">Remover localização</button>`:'')+`</div>`;
+  } else acoes='<div class="fc-hnote">Seu perfil só permite consultar a localização.</div>';
+  return `<div id="locResumo">${locResumoHtml(o)}</div><div class="loc-msg" id="locCardMsg" role="status" aria-live="polite"></div>${acoes}`;
 }
-function locMsg(txt,tipo){
+function buildLocCard(o){
+  return fcSec('Localização da obra','local',`<div id="locCardCorpo">${locCorpoHtml(o)}</div>`);
+}
+function locMsg(txt,tipo){ // mensagem do diálogo
   const el=document.getElementById('locMsg'); if(!el) return;
   el.textContent=txt||''; el.className='loc-msg'+(tipo?' '+tipo:'');
 }
+function locCardMsg(txt,tipo){ // mensagem do cartão
+  const el=document.getElementById('locCardMsg'); if(!el) return;
+  el.textContent=txt||''; el.className='loc-msg'+(tipo?' '+tipo:'');
+}
 function iniciaLocMini(o){
-  if(_locMini){ setTimeout(()=>{ if(_locMini) _locMini.map.invalidateSize(); },0); return; }
-  const el=document.getElementById('locMapa'); if(!el) return; // perfil só de consulta: sem mini-mapa
+  const el=document.getElementById('locMapa'); if(!el) return;
+  if(_locMini){ try{ _locMini.map.remove(); }catch(e){ /* ignora */ } _locMini=null; }
   const m=L.map(el,{minZoom:6,maxZoom:19,zoomSnap:.5});
   m.attributionControl.setPrefix(false);
   novoTileOSM().addTo(m);
@@ -3263,7 +3261,11 @@ function iniciaLocMini(o){
     b=gj.getBounds();
   }
   _locMini={map:m,marker:null,sel:null,o};
-  if(o.loc&&locNoCE(o.loc.lat,o.loc.lng)){ colocaMarcadorLoc(o.loc.lat,o.loc.lng); m.setView([o.loc.lat,o.loc.lng],16); }
+  if(o.loc&&locNoCE(o.loc.lat,o.loc.lng)){
+    colocaMarcadorLoc(o.loc.lat,o.loc.lng); m.setView([o.loc.lat,o.loc.lng],16);
+    const li=document.getElementById('locLat'), ln=document.getElementById('locLng');
+    if(li&&ln){ li.value=fmtCoord(o.loc.lat); ln.value=fmtCoord(o.loc.lng); }
+  }
   else if(b) m.fitBounds(b); else m.setView([-5.2,-39.3],7);
   m.on('click',e=>locDefine(e.latlng.lat,e.latlng.lng,'mapa'));
   setTimeout(()=>{ if(_locMini) _locMini.map.invalidateSize(); },0);
@@ -3275,64 +3277,90 @@ function colocaMarcadorLoc(lat,lng){
   L_.marker=L.marker([lat,lng],{icon,draggable:true,keyboard:false}).addTo(L_.map);
   L_.marker.on('dragend',()=>{ const p=L_.marker.getLatLng(); locDefine(p.lat,p.lng,'mapa'); });
 }
-// define o ponto escolhido (clique, arrasto, texto ou GPS): valida, move o marcador, libera o salvar
+// define o ponto escolhido (clique, arrasto, campos ou GPS): valida, move o marcador, preenche os campos
+// e libera o "Cadastrar"
 function locDefine(lat,lng,fonte,extra){
   if(!_locMini) return;
   const o=_locMini.o, v=locValidaPonto(o,lat,lng);
   _locMini.sel=v.ok?{lat,lng,fonte}:null;
+  const li=document.getElementById('locLat'), ln=document.getElementById('locLng');
+  if(li&&ln&&fonte!=='digitada'){ li.value=isFinite(lat)?fmtCoord(lat):''; ln.value=isFinite(lng)?fmtCoord(lng):''; }
   if(isFinite(lat)&&isFinite(lng)&&locNoCE(lat,lng)){
     colocaMarcadorLoc(lat,lng);
     if(fonte!=='mapa') _locMini.map.setView([lat,lng],Math.max(_locMini.map.getZoom(),16));
   }
   locMsg(v.ok?`${fmtCoord(lat)}, ${fmtCoord(lng)} — ${v.msg}${extra?' '+extra:''}`:v.msg,v.ok?'ok':'erro');
-  const s=document.getElementById('locSalvar'); if(s){ s.disabled=!v.ok; s.textContent='Salvar localização'; }
+  const s=document.getElementById('locSalvar'); if(s){ s.disabled=!v.ok; s.textContent='Cadastrar'; }
 }
-function wireLocalizacao(o){
-  const tg=document.querySelector('.modal .adToggle[data-target="mFcLoc"]'); if(!tg) return;
-  tg.addEventListener('click',()=>{ const box=document.getElementById('mFcLoc'); if(box&&!box.hidden) iniciaLocMini(o); });
-  if(!podeLocalizar()) return;
+function abreLocDialogo(o){
+  destroyLocMini();
+  const irmas=locIrmasSemPonto(o), n=irmas.length;
+  const bg=document.createElement('div'); bg.className='ele-dialog-bg'; bg.id='locDlgBg';
+  bg.innerHTML=`<div class="ele-dialog loc-dlg" role="dialog" aria-modal="true" aria-label="Localizar a obra no mapa" tabindex="-1">`
+    +`<div class="ele-dialog-head"><span>${o.loc?'Alterar a localização':'Cadastrar a localização'} · ${escHtml(o.codigo_obra||('#'+o.id_obra))}</span>`
+    +`<button type="button" class="ele-dialog-x" id="locDlgX" aria-label="Fechar">&times;</button></div>`
+    +`<div class="fc-hnote loc-dica">Clique no mapa onde fica a obra. Arraste o marcador para ajustar e aproxime o zoom para achar a rua.</div>`
+    +`<div class="loc-mapa" id="locMapa"></div>`
+    +`<div class="loc-campos"><label>Latitude<input id="locLat" type="text" inputmode="decimal" autocomplete="off" placeholder="-3.731900"></label>`
+    +`<label>Longitude<input id="locLng" type="text" inputmode="decimal" autocomplete="off" placeholder="-38.526700"></label>`
+    +`<button type="button" class="loc-btn" id="locGps">Usar minha posição</button></div>`
+    +`<div class="fc-hnote" id="locGpsInfo">Você também pode digitar ou colar as coordenadas (como o Google Maps copia, ou em graus, minutos e segundos).</div>`
+    +`<div class="loc-msg" id="locMsg" role="status" aria-live="polite"></div>`
+    +(n?`<label class="loc-chk"><input type="checkbox" id="locIrmas"> Usar este mesmo ponto ${n===1?'na outra obra':`nas outras ${n} obras`} deste contrato em ${escHtml(o.municipioTxt||'')} que ainda não ${n===1?'tem':'têm'} localização</label>`:'')
+    +`<div class="loc-acoes"><button type="button" class="loc-btn prim" id="locSalvar" disabled>Cadastrar</button>`
+    +`<button type="button" class="loc-btn" id="locCancelar">Cancelar</button></div></div>`;
+  document.getElementById('modal').appendChild(bg);
   const $=id=>document.getElementById(id);
-  document.querySelectorAll('.modal [data-loc-modo]').forEach(b=>{ b.onclick=()=>{
-    document.querySelectorAll('.modal [data-loc-modo]').forEach(x=>{ const on=x===b; x.classList.toggle('on',on); x.setAttribute('aria-pressed',String(on)); });
-    document.querySelectorAll('.modal [data-loc-ent]').forEach(x=>{ x.hidden=x.dataset.locEnt!==b.dataset.locModo; });
-    if(b.dataset.locModo==='digitar'&&$('locTxt')) $('locTxt').focus();
-  }; });
-  const aplica=()=>{
-    const p=parseCoordTexto($('locTxt').value);
-    if(!p){ locMsg('Não entendi as coordenadas. Exemplo: -3.731900, -38.526700','erro'); return; }
-    iniciaLocMini(o); locDefine(p.lat,p.lng,'digitada');
+  bg.addEventListener('click',e=>{ if(e.target===bg) fechaLocDialogo(); });
+  $('locDlgX').onclick=fechaLocDialogo; $('locCancelar').onclick=fechaLocDialogo;
+  const doCampos=()=>{
+    const li=$('locLat'), ln=$('locLng'); if(!_locMini) return;
+    const p=!ln.value.trim()?parseCoordTexto(li.value):null; // "lat, lng" colado de uma vez no primeiro campo
+    if(p){ li.value=fmtCoord(p.lat); ln.value=fmtCoord(p.lng); locDefine(p.lat,p.lng,'digitada'); return; }
+    if(!li.value.trim()||!ln.value.trim()){ _locMini.sel=null; $('locSalvar').disabled=true; locMsg('Clique no mapa ou informe latitude e longitude.',''); return; }
+    locDefine(Number(li.value.trim().replace(',','.')),Number(ln.value.trim().replace(',','.')),'digitada');
   };
-  $('locAplicar').onclick=aplica;
-  $('locTxt').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); aplica(); } };
+  for(const id of ['locLat','locLng']){ $(id).onchange=doCampos; $(id).onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); doCampos(); } }; }
   $('locGps').onclick=()=>{
     const info=$('locGpsInfo');
     if(!navigator.geolocation){ info.textContent='Este navegador não oferece localização.'; return; }
     info.textContent='Obtendo a posição…';
     navigator.geolocation.getCurrentPosition(pos=>{
+      if(!_locMini) return;
       const prec=Math.round(pos.coords.accuracy||0);
       info.textContent=`Posição obtida (precisão de cerca de ${NUM.format(prec)} m).`;
-      iniciaLocMini(o); locDefine(pos.coords.latitude,pos.coords.longitude,'gps',prec>100?'Precisão baixa: confira o marcador antes de salvar.':'');
+      locDefine(pos.coords.latitude,pos.coords.longitude,'gps',prec>100?'Precisão baixa: confira o marcador antes de cadastrar.':'');
     },err=>{
-      info.textContent=err.code===1?'Acesso à localização negado. Autorize no navegador ou marque o ponto no mapa.':'Não foi possível obter a posição agora. Marque o ponto no mapa.';
+      info.textContent=err.code===1?'Acesso à localização negado. Autorize no navegador ou clique no mapa.':'Não foi possível obter a posição agora. Clique no mapa.';
     },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   };
   $('locSalvar').onclick=()=>salvaLocalizacao(o);
+  iniciaLocMini(o);
+  bg.querySelector('.loc-dlg').focus();
+}
+function wireLocalizacao(o){
+  const $=id=>document.getElementById(id);
+  const cad=$('locCadastrar'); if(cad) cad.onclick=()=>abreLocDialogo(o);
   const rm=$('locRemover'); if(rm) rm.onclick=()=>removeLocalizacao(o,rm);
+}
+// "Sem localização — clique para cadastrar" (painel): abre a Ficha e já leva ao mapa de cadastro
+function abreLocalizacaoDaObra(o){
+  openModal(o);
+  const b=document.getElementById('locCadastrar'); if(b) b.click();
 }
 function aplicaLocNaObra(x,r){
   const loc={lat:Number(r.latitude),lng:Number(r.longitude),fonte:r.fonte||'',por:r.atualizado_por||'',em:r.atualizado_em||''};
   LOCS.set(r.id_obra,loc); x.loc=loc; x._locSt=undefined;
 }
-function locAtualizaTela(o){
-  const rs=document.getElementById('locResumo'); if(rs) rs.innerHTML=locResumoHtml(o);
-  const rp=document.getElementById('locRapido'); if(rp) rp.innerHTML=locRapidoHtml(o);
-  const t=document.querySelector('.modal .adToggle[data-target="mFcLoc"] span');
-  if(t) t.textContent='Localização da obra'+(!o.loc?' — não cadastrada':'');
+function locAtualizaTela(o,msg,tipo){
+  const c=document.getElementById('locCardCorpo'); if(c){ c.innerHTML=locCorpoHtml(o); wireLocalizacao(o); }
+  const rp=document.getElementById('locRotaSlot'); if(rp) rp.innerHTML=locRotaHtml(o);
+  if(msg) locCardMsg(msg,tipo);
   _ruasSig=''; if(ruasAtivo()) render(); // marcadores e contagens do painel
 }
 async function salvaLocalizacao(o){
   const s=_locMini&&_locMini.sel; if(!s) return;
-  const btn=document.getElementById('locSalvar'); btn.disabled=true; btn.textContent='Salvando…';
+  const btn=document.getElementById('locSalvar'); btn.disabled=true; btn.textContent='Cadastrando…';
   const alvo=[o];
   const chk=document.getElementById('locIrmas'); if(chk&&chk.checked) alvo.push(...locIrmasSemPonto(o));
   const rows=alvo.map(x=>({id_obra:x.id_obra,latitude:+s.lat.toFixed(7),longitude:+s.lng.toFixed(7),fonte:s.fonte}));
@@ -3343,14 +3371,12 @@ async function salvaLocalizacao(o){
     // RLS que recusa a escrita não dá erro: devolve menos linhas (ou nenhuma)
     if(!data||data.length<rows.length) throw new Error('o banco não gravou todas as linhas (permissão?)');
     for(const r of data){ const x=alvo.find(a=>a.id_obra===r.id_obra); if(x) aplicaLocNaObra(x,r); }
-    locAtualizaTela(o);
-    locMsg(`Localização salva${alvo.length>1?` em ${alvo.length} obras`:''}.`,'ok');
-    btn.textContent='Salvar localização'; // continua desabilitado até um novo ponto
-    if(_locMini) _locMini.sel=null;
+    fechaLocDialogo();
+    locAtualizaTela(o,`Localização cadastrada${alvo.length>1?` em ${alvo.length} obras`:''}.`,'ok');
   }catch(e){
-    console.error('Falha ao salvar a localização:',e);
-    locMsg('Não foi possível salvar: '+(e&&e.message||e),'erro');
-    btn.disabled=false; btn.textContent='Salvar localização';
+    console.error('Falha ao cadastrar a localização:',e);
+    locMsg('Não foi possível cadastrar: '+(e&&e.message||e),'erro');
+    btn.disabled=false; btn.textContent='Cadastrar';
   }
 }
 async function removeLocalizacao(o,btn){
@@ -3365,11 +3391,10 @@ async function removeLocalizacao(o,btn){
     if(error) throw error;
     if(!data||!data.length) throw new Error('o banco não removeu a localização (permissão?)');
     LOCS.delete(o.id_obra); o.loc=null; o._locSt=undefined;
-    if(_locMini){ if(_locMini.marker){ _locMini.map.removeLayer(_locMini.marker); _locMini.marker=null; } _locMini.sel=null; }
-    locAtualizaTela(o); locMsg('Localização removida.','ok'); btn.remove();
+    locAtualizaTela(o,'Localização removida.','ok');
   }catch(e){
     console.error('Falha ao remover a localização:',e);
-    locMsg('Não foi possível remover: '+(e&&e.message||e),'erro');
+    locCardMsg('Não foi possível remover: '+(e&&e.message||e),'erro');
     btn.disabled=false; btn.dataset.armado=''; btn.textContent='Remover localização';
   }
 }
@@ -3825,6 +3850,7 @@ const FC_ICO={
   prazos:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16"/><path d="M9 3v4"/><path d="M15 3v4"/>',
   valores:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10"/><path d="M14.5 9.2c-.6-.8-1.6-1.2-2.6-1.2-1.7 0-2.9.9-2.9 2.1 0 1.3 1.1 1.8 2.9 2.3 1.8.5 2.9 1 2.9 2.3 0 1.2-1.2 2.1-2.9 2.1-1 0-2-.4-2.6-1.2"/>',
   comissao:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18 14.4c1.8.9 3 2.7 3 5.6"/>',
+  local:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>',
   medicoes:'<path d="M4 20V11"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/>',
 };
 function fcSec(titulo,ico,corpo,cls){
@@ -4007,7 +4033,7 @@ function buildFichaPane(o,raw){
       +`<div id="mFcCurva" class="fc-curva" hidden>${ultimaTxt?`<div class="fc-hnote">${ultimaTxt}</div>`:''}${rsLineChart(pts)}</div></section>`
     : '';
 
-  return attHTML+bContrato+bTri+bCom+bMed+bCurva+buildLocCard(o,toggleBtn);
+  return attHTML+bContrato+bTri+buildLocCard(o)+bCom+bMed+bCurva;
 }
 // obras do mesmo contrato que estão carregadas na tela (DB.municipios[].obras vem do recorte da
 // carteira: na ativa só as obras ativas, no histórico a base inteira). Ordem estável por código.
@@ -4083,9 +4109,12 @@ function openModal(o,voltarChave){
            <div class="fc-ctr"><span>Contrato</span> <b>${fmtContratoExt(raw.nr_contrato_ext)}</b>${(o.nObras||1)>1?'':`<span class="fc-ctr-obra">${escHtml(o.codigo_obra||('#'+o.id_obra))}</span>`}</div>
            ${fichaObrasNav(o,irmas)}</div>
          <div class="mh-actions">${fecharBtn}</div></div>
-       <div class="mtabs" role="tablist">
-         <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneFicha" data-tab="ficha">Ficha Obra</button>
-         <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneEletrica" data-tab="eletrica">Elétrica</button>
+       <div class="mtabs">
+         <div class="mtabs-grupo" role="tablist">
+           <button type="button" class="mtab on" role="tab" aria-selected="true" aria-controls="mPaneFicha" data-tab="ficha">Ficha Obra</button>
+           <button type="button" class="mtab" role="tab" aria-selected="false" aria-controls="mPaneEletrica" data-tab="eletrica">Elétrica</button>
+         </div>
+         <span class="mtabs-grupo" id="locRotaSlot">${locRotaHtml(o)}</span>
        </div>
      </div>
      <div class="mbody" data-tab="ficha">
@@ -4604,6 +4633,7 @@ function fecharOuVoltar(){
   // acima do modal — Esc fecha o que estiver aberto primeiro, mesmo padrão de
   // early-return por camada já usado no handler de Esc que limpa a seleção combinada
   // (checa modalBg/.msel.on/fullscreen abaixo).
+  if(locDialogoAberto()){ fechaLocDialogo(); return; } // diálogo do mapa de cadastro da localização
   for(const id of ['eleDialogBg','eleAgendaDialogBg']){
     const dlg=document.getElementById(id);
     if(dlg&&!dlg.hidden){ dlg.hidden=true; return; }
