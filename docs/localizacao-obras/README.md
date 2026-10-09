@@ -33,8 +33,11 @@ Sem o passo 1 o mapa continua funcionando; só não há pontos e o painel avisa 
 
 ## Quem pode cadastrar e como
 
-- **Cadastrar/alterar:** admin, gerente, fiscal, externo e eletrica (os mesmos papéis que enxergam o módulo;
-  90 pessoas em 09/10/2026), em qualquer obra. Conta "pending" não entra. **Remover:** só admin e gerente.
+- **Cadastrar/alterar:** admin e gerente pelo papel. Fiscal, externo e eletrica **só com a autorização especial
+  "Localização das obras: cadastrar/alterar no mapa"**, que o Admin concede e revoga pessoa a pessoa em
+  Administração > Autorizações Especiais (`sql/add_autorizacao_localizacao_cadastrar.sql`). Vale em qualquer
+  obra. Conta "pending" nunca cadastra. **Remover:** só admin e gerente. Quem não está autorizado vê a
+  localização e o botão **Rota**, mas não o botão de cadastrar, e o banco recusa a gravação de qualquer forma.
 - No cartão **Localização da obra** da Ficha, o botão **Cadastrar localização** (ou **Alterar localização**)
   abre um diálogo com mapa grande: o clique do mouse (ou arrastar o marcador) preenche latitude e longitude,
   e **Cadastrar** grava. Dentro do mesmo diálogo também dá para digitar/colar as coordenadas (decimais como

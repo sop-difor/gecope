@@ -9,8 +9,9 @@
 --
 -- Quem lê:     os mesmos papéis que leem contratos_edificacao (contratos_edificacao_pode_ler():
 --              admin, gerente, fiscal, externo, eletrica).
--- Quem grava:  os mesmos 5 papéis (INSERT/UPDATE) — pedido do usuário em 09/10/2026: o ponto
---              pode ser cadastrado no front por qualquer papel que enxergue o módulo.
+-- Quem grava:  (versão inicial: os 5 papéis.) SUBSTITUÍDO por sql/add_autorizacao_localizacao_cadastrar.sql:
+--              admin/gerente pelo papel; fiscal/externo/eletrica só com a autorização especial
+--              'localizacao_cadastrar', concedida pelo Admin.
 -- Quem apaga:  só admin e gerente (remover a localização é decisão de gestão; corrigir um
 --              ponto errado não exige apagar, basta gravar o novo).
 --

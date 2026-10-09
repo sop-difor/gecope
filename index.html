@@ -724,6 +724,14 @@
                                                         <input class="form-check-input autorizacao-checkbox" type="checkbox" value="orcamentos_gravar" id="autorizacao-orcamentos_gravar">
                                                         <label class="form-check-label small" for="autorizacao-orcamentos_gravar">Orçamentos: criar/nova versão/excluir (igual Gerente)</label>
                                                     </div>
+                                                    <!-- Mapa de Obras: cadastrar/alterar o ponto da obra. Admin e Gerente já podem pelo papel;
+                                                         esta caixa libera Fiscal/Externo/Eletrica. A regra de banco é
+                                                         `pode_cadastrar_localizacao()` (sql/add_autorizacao_localizacao_cadastrar.sql) e o mapa
+                                                         a lê em `obterAutorizacaoLocalizacao()` (assets/js/mapa-obras.js). -->
+                                                    <div class="form-check">
+                                                        <input class="form-check-input autorizacao-checkbox" type="checkbox" value="localizacao_cadastrar" id="autorizacao-localizacao_cadastrar">
+                                                        <label class="form-check-label small" for="autorizacao-localizacao_cadastrar">Localização das obras: cadastrar/alterar no mapa</label>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

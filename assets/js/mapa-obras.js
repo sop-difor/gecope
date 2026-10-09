@@ -2959,7 +2959,11 @@ function obrasCards(ids){
    ============================================================ */
 const SB_LOCAL='obra_localizacao';
 const LOC_COLS='id_obra,latitude,longitude,fonte,atualizado_em,atualizado_por';
-const PAPEIS_LOCALIZAR=['admin','gerente','fiscal','externo','eletrica'];
+// admin e gerente cadastram pelo papel; os demais (fiscal, externo, eletrica) só com a autorização especial
+// 'localizacao_cadastrar', que o Admin concede em Administração > Autorizações Especiais
+// (sql/add_autorizacao_localizacao_cadastrar.sql). A trava de verdade é a RLS; isto só evita oferecer o botão.
+const PAPEIS_LOCALIZAR=['admin','gerente'];
+let LOC_AUTORIZADO=null; // true/false = tem ou não a autorização especial; null = ainda não sabido ou a consulta falhou
 const PAPEIS_LOC_REMOVER=['admin','gerente'];
 const LOC_CE={latMin:-7.95,latMax:-2.70,lngMin:-41.50,lngMax:-37.20}; // caixa do Ceará com folga (igual ao CHECK da tabela)
 const LOC_TOL_DIVISA_M=2000; // obra na divisa: aceita até 2 km fora do polígono (o contorno do GeoJSON é simplificado)
@@ -2979,7 +2983,21 @@ async function fetchLocalizacoes(){
   }
   return m;
 }
-function podeLocalizar(){ return PAPEIS_LOCALIZAR.includes(USER_PAPEL)||papelIndefinido(); }
+function podeLocalizar(){
+  if(PAPEIS_LOCALIZAR.includes(USER_PAPEL)||LOC_AUTORIZADO===true) return true;
+  return LOC_AUTORIZADO!==false; // sem resposta da consulta: oferece, e o banco decide (mesmo critério de papelIndefinido)
+}
+async function obterAutorizacaoLocalizacao(){
+  try{
+    if(!window.sbClient) return null;
+    const {data:sess}=await window.sbClient.auth.getSession();
+    const email=sess&&sess.session&&sess.session.user&&sess.session.user.email; if(!email) return null;
+    const {data,error}=await window.sbClient.from('autorizacoes_especiais').select('permissao')
+      .ilike('usuario_email',email).eq('permissao','localizacao_cadastrar').is('revogado_em',null).limit(1);
+    if(error) throw error;
+    return !!(data&&data.length);
+  }catch(e){ console.warn('Não foi possível ler a autorização de localização:',e.message||e); return null; }
+}
 
 // ---- validação geográfica ----
 function locNoCE(lat,lng){
@@ -3186,7 +3204,7 @@ function ruasPainelHtml(){
     +`<div class="ruas-leg">${leg}</div>`
     +(LOC_ERRO?`<div class="ruas-aviso">Não foi possível carregar as localizações agora; recarregue a página para tentar de novo.</div>`:'')
     +`</div>`
-    +lista(invalidas,'Coordenada não confere (não plotada)')+lista(semLoc,'Sem localização — clique para cadastrar');
+    +lista(invalidas,'Coordenada não confere (não plotada)')+lista(semLoc,podeLocalizar()?'Sem localização — clique para cadastrar':'Sem localização');
 }
 function obraPorIdObra(idObra){
   const m=DB.municipios[st.city]; if(!m) return null;
@@ -3234,7 +3252,7 @@ function locCorpoHtml(o){
     const remover=o.loc&&PAPEIS_LOC_REMOVER.includes(USER_PAPEL);
     acoes=`<div class="loc-acoes"><button type="button" class="loc-btn prim" id="locCadastrar">${o.loc?'Alterar localização':'Cadastrar localização'}</button>`
       +(remover?`<button type="button" class="loc-btn perigo" id="locRemover">Remover localização</button>`:'')+`</div>`;
-  } else acoes='<div class="fc-hnote">Seu perfil só permite consultar a localização.</div>';
+  } else acoes='<div class="fc-hnote">Você pode consultar a localização, mas não tem autorização para cadastrá-la. Peça ao administrador.</div>';
   return `<div id="locResumo">${locResumoHtml(o)}</div><div class="loc-msg" id="locCardMsg" role="status" aria-live="polite"></div>${acoes}`;
 }
 function buildLocCard(o){
@@ -7240,6 +7258,7 @@ render();
   // Papel resolvido em paralelo com a carga das obras: ele só decide se o seletor de
   // modo aparece, então não vale atrasar o painel esperando por ele.
   USER_PAPEL=await obterPapelUsuario();
+  if(!PAPEIS_LOCALIZAR.includes(USER_PAPEL)){ LOC_AUTORIZADO=await obterAutorizacaoLocalizacao(); if(ruasAtivo()) render(); }
   revelarControleModo();
 })();
 
