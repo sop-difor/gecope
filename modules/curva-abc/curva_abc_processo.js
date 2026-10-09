@@ -53,10 +53,13 @@ let curvaAbcProcessoState = {
       }
 
       var atual = data[0];
-      var { data: itensStatus, error: errItens } = await sbClient
-        .from("curva_abc_itens")
-        .select("status_analise")
-        .eq("versao_id", atual.id);
+      var { data: itensStatus, error: errItens } = await lerTodasAsLinhas(function () {
+        return sbClient
+          .from("curva_abc_itens")
+          .select("status_analise", { count: "exact" })
+          .eq("versao_id", atual.id)
+          .order("id", { ascending: true });
+      });
       if (errItens) throw errItens;
 
       var incN = 0;
@@ -147,11 +150,14 @@ let curvaAbcProcessoState = {
     if (!versoes || !versoes.length) { alert("Nenhuma Curva ABC importada ainda para este processo."); return; }
     var versaoRegistro = versoes[0];
 
-    var { data: itens, error: errI } = await sbClient
-      .from("curva_abc_itens")
-      .select("*")
-      .eq("versao_id", versaoRegistro.id)
-      .order("posicao", { ascending: true });
+    var { data: itens, error: errI } = await lerTodasAsLinhas(function () {
+      return sbClient
+        .from("curva_abc_itens")
+        .select("*", { count: "exact" })
+        .eq("versao_id", versaoRegistro.id)
+        .order("posicao", { ascending: true })
+        .order("id", { ascending: true });
+    });
     if (errI) { alert("Erro ao buscar os itens da Curva ABC: " + errI.message); return; }
 
     var comentados = (itens || []).filter(function (x) {

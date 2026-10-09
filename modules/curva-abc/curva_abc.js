@@ -615,11 +615,14 @@
 
   async function carregarVersaoDb(versaoRegistro, somenteLeitura) {
     limpaErro();
-    var { data: itensDb, error } = await sbClient
-      .from("curva_abc_itens")
-      .select("*")
-      .eq("versao_id", versaoRegistro.id)
-      .order("posicao", { ascending: true });
+    var { data: itensDb, error } = await lerTodasAsLinhas(function () {
+      return sbClient
+        .from("curva_abc_itens")
+        .select("*", { count: "exact" })
+        .eq("versao_id", versaoRegistro.id)
+        .order("posicao", { ascending: true })
+        .order("id", { ascending: true });
+    });
     if (error) { erro("Erro ao carregar itens da Curva ABC: " + esc(error.message)); return; }
 
     var itens = (itensDb || []).map(function (x) {

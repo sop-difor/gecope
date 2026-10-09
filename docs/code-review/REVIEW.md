@@ -71,3 +71,20 @@ Os itens #3 (parte SQL), #4 (parte SQL) e #9 exigem rodar SQL no banco. Eu escre
 **Revisor (1 rodada):** achou que o papel `eletrica` ficava de fora do proxy (quebraria notificações e status para engenheiros elétricos) — corrigido e coberto por teste. Também ajustados: o limite agora só conta destinatários válidos e um comentário desatualizado em `eletrica-drive-token`. Sem pendências abertas do revisor.
 
 **Efeito esperado após o deploy:** contas `pending` passam a receber 403 no painel do assistente, no `/send` e `/status` do proxy, e deixam de ler/gravar `app_atividades` e inserir `whatsapp_logs`. 
+
+### Lote B — integridade de dados (#1, #5, #8) · branch `fix/revisao-lote-b`
+
+| # | O que mudou | Status |
+|---|---|---|
+| 1 | **Cronograma não apaga mais as tabelas.** Nova `shared/cronograma-persist.js`: leitura paginada (contagem exata, resiste a `max-rows` menor que a página) que guarda um retrato id→linha; gravação só das diferenças (`upsert` em lotes de 500) e `delete` só dos ids que esta sessão removeu, pais antes dos filhos. Falha de rede/RLS/FK não perde nada: aparece um banner vermelho fixo, o retrato só avança no que o banco confirmou e a próxima gravação reenvia. Linha com FK violada (analista removido por outra pessoa) é isolada, não prende o banner e gera aviso próprio. Tarefas sincronizadas de Processos passam a ter id `sync-<NUP>` para duas sessões não duplicarem. | Corrigido no código (front, vai com o merge) |
+| 5 | `executarAcaoDetalhes` só envia `status` se a pessoa o alterou em relação ao exibido; antes, editar outro campo devolvia o processo ao status velho se o `sincronizar-suite` o tivesse mudado com a tela aberta. | Corrigido no código |
+| 8 | `lerTodasAsLinhas()` em `utils.js` (paginação com contagem exata) usada nas 3 leituras de `curva_abc_itens` (carregar versão, contagem de inconsistências, comentários do relatório). | Corrigido no código |
+
+**Testes rodados:** `node --test shared/cronograma-persist.test.js` (13/13: leitura >1000 e com `max-rows` baixo, nada escrito sem mudança, só diferenças, linha de outra pessoa sobrevive, falha de gravação/exclusão sem perda e com reenvio, ordem pai/filho, FK, erro isolado por linha); `node --test utils.test.js` (5/5); `npm test` do proxy (13/13). Sintaxe: `node --check` em `utils.js`, `curva_abc*.js`, `processos.js`; os dois blocos de script inline do `cronograma.html` compilam.
+
+**Não validado:** nada foi executado no navegador nem contra o banco real (cronograma com duas abas, Curva ABC com >1000 itens, salvar processo com o cron mexendo no status). O #5 não tem teste automatizado (função grande, presa ao DOM).
+
+**Revisor (1 rodada):** sem achados Críticos/Altos. Médio tratado: uma linha impossível de gravar (FK) mantinha o banner de erro para sempre → corrigido, com testes. Registrado, não corrigido:
+- **Ordem dos analistas pode mudar uma vez** (Médio, visual): o código antigo regravava todos num só insert, então todos têm o mesmo `created_at`; agora o desempate é por `id` (aleatório). Os 6 analistas semeados juntos podem aparecer em outra ordem; depois fica estável. Se importar, definir `created_at` crescente por SQL na ordem desejada.
+- **Última escrita vence por linha** (Baixo): se duas pessoas editam a MESMA tarefa, a última a salvar vence naquela linha; e uma sessão desatualizada pode recriar uma linha que outra apagou. É inerente ao desenho e muito menor que o apagar-tudo anterior. Controle de versão por linha seria a evolução, não feita.
+- **Sincronização simultânea** (Baixo): duas sessões criando a mesma `sync-<NUP>` ao mesmo tempo — a segunda sobrescreve a primeira com conteúdo equivalente.

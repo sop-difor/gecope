@@ -19,6 +19,7 @@
 <script src="database.js"></script>
 <script src="shared/fullscreen.js"></script>
 <script src="shared/embed.js"></script>
+<script src="shared/cronograma-persist.js"></script>
 <!-- Sanitiza o HTML rico do campo "Observações" da tarefa (#t-obs, contenteditable com
      negrito/itálico/alinhamento) antes de salvar/exibir — mesmo padrão já usado para o
      comentário rich-text da Curva ABC (utils.js/sanitizeRichHTML). -->
@@ -2005,11 +2006,60 @@ function rotinaFromRow(row) { return { id: row.id, analistaId: row.analista_id, 
 function rotinaToRow(r)     { return { id: r.id, analista_id: r.analistaId, freq: r.freq, descricao: r.desc, setor: r.setor, obs: r.obs || '' }; }
 
 // ── Persistência no Supabase ──
-// Estratégia: sincronização completa (apaga tudo e reinsere o estado atual em
-// memória) a cada salvarDados(). Simples e segura para o volume de dados desta
-// ferramenta (uso interno de uma equipe pequena). As chamadas a salvarDados()
-// continuam disparadas do mesmo jeito em todo o app (sem esperar o resultado);
-// a fila abaixo garante que as gravações não se sobreponham.
+// Estratégia (revisão 08/10/2026, ver shared/cronograma-persist.js): a leitura é paginada e
+// guarda um retrato do banco; cada salvarDados() envia só as linhas que mudaram (upsert) e
+// apaga só os ids que esta sessão removeu. Antes, cada gravação apagava as três tabelas
+// inteiras e reinseria a memória: duas pessoas se sobrescreviam e uma falha no meio perdia
+// tudo. As chamadas a salvarDados() continuam disparadas do mesmo jeito em todo o app (sem
+// esperar o resultado); a fila abaixo garante que as gravações não se sobreponham.
+const TABELAS_CRONOGRAMA = [ // pais antes dos filhos (chaves estrangeiras)
+  { nome: 'cronograma_analistas', ordem: ['created_at', 'id'], obter: () => analistas, paraLinha: analistaToRow, deLinha: analistaFromRow },
+  { nome: 'cronograma_tarefas',   ordem: ['id'],                obter: () => tarefas,   paraLinha: tarefaToRow,   deLinha: tarefaFromRow },
+  { nome: 'cronograma_rotinas',   ordem: ['id'],                obter: () => rotinas,   paraLinha: rotinaToRow,   deLinha: rotinaFromRow },
+];
+
+// Aviso fixo no topo quando uma gravação falha — antes o erro só ia para o console e a
+// pessoa seguia trabalhando achando que estava salvo. Some sozinho na próxima gravação que der certo.
+function mostrarAvisoSalvar() {
+  let el = document.getElementById('aviso-salvar-cronograma');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aviso-salvar-cronograma';
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 16px;text-align:center;font:600 14px Montserrat,sans-serif;background:#b42318;color:#fff;';
+    el.textContent = 'Não foi possível salvar suas últimas alterações. Verifique a conexão; o sistema tenta de novo a cada nova alteração. Não feche esta página.';
+    document.body.appendChild(el);
+  }
+}
+function esconderAvisoSalvar() {
+  const el = document.getElementById('aviso-salvar-cronograma');
+  if (el) el.remove();
+}
+// Itens que não puderam ser gravados porque o analista dono foi removido por outra pessoa
+// (violação de chave estrangeira). Não adianta tentar de novo, então o aviso fica até a pessoa
+// fechá-lo (clique) e recomenda recarregar para ver o estado atual.
+function avisarItensDescartados(descartadas) {
+  if (document.getElementById('aviso-descartado-cronograma')) return;
+  const el = document.createElement('div');
+  el.id = 'aviso-descartado-cronograma';
+  el.setAttribute('role', 'alert');
+  el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;padding:10px 16px;text-align:center;cursor:pointer;font:600 14px Montserrat,sans-serif;background:#b54708;color:#fff;';
+  el.textContent = descartadas.length + ' item(ns) não foram salvos porque o analista deles foi removido por outra pessoa. Recarregue a página para ver o estado atual. (Clique para fechar.)';
+  el.addEventListener('click', () => el.remove());
+  document.body.appendChild(el);
+}
+
+let _persistencia = null;
+function _obterPersistencia() {
+  if (!_persistencia && window.sbClient) {
+    _persistencia = CronogramaPersist.criarPersistencia({
+      sb: window.sbClient, tabelas: TABELAS_CRONOGRAMA,
+      aoFalhar: mostrarAvisoSalvar, aoRecuperar: esconderAvisoSalvar, aoDescartar: avisarItensDescartados,
+    });
+  }
+  return _persistencia;
+}
+
 let _salvarDadosChain = Promise.resolve();
 function salvarDados() {
   _salvarDadosChain = _salvarDadosChain
@@ -2019,38 +2069,23 @@ function salvarDados() {
 }
 
 async function _persistirNoSupabase() {
-  if (!window.sbClient) { console.warn('[Cronograma] Supabase indisponível — alteração não foi salva no banco.'); return; }
-  await sbClient.from('cronograma_tarefas').delete().not('id', 'is', null);
-  await sbClient.from('cronograma_rotinas').delete().not('id', 'is', null);
-  await sbClient.from('cronograma_analistas').delete().not('id', 'is', null);
-  if (analistas.length) {
-    const { error } = await sbClient.from('cronograma_analistas').insert(analistas.map(analistaToRow));
-    if (error) console.error('[Cronograma/Supabase] Erro ao salvar analistas:', error);
+  if (!window.sbClient) {
+    console.warn('[Cronograma] Supabase indisponível — alteração não foi salva no banco.');
+    mostrarAvisoSalvar();
+    return;
   }
-  if (tarefas.length) {
-    const { error } = await sbClient.from('cronograma_tarefas').insert(tarefas.map(tarefaToRow));
-    if (error) console.error('[Cronograma/Supabase] Erro ao salvar tarefas:', error);
-  }
-  if (rotinas.length) {
-    const { error } = await sbClient.from('cronograma_rotinas').insert(rotinas.map(rotinaToRow));
-    if (error) console.error('[Cronograma/Supabase] Erro ao salvar rotinas:', error);
-  }
+  await _obterPersistencia().salvar(); // não lança; falhas viram aviso na tela e nova tentativa
 }
 
 async function carregarDadosSupabase() {
-  const [an, tf, rt] = await Promise.all([
-    sbClient.from('cronograma_analistas').select('*').order('created_at', { ascending: true }),
-    sbClient.from('cronograma_tarefas').select('*'),
-    sbClient.from('cronograma_rotinas').select('*'),
-  ]);
-  if (an.error || tf.error || rt.error) {
-    console.error('[Cronograma/Supabase] Erro ao carregar dados:', an.error || tf.error || rt.error);
-    return null;
-  }
+  const p = _obterPersistencia();
+  if (!p) return null;
+  const r = await p.carregar();
+  if (!r) return null;
   return {
-    analistas: (an.data || []).map(analistaFromRow),
-    tarefas:   (tf.data || []).map(tarefaFromRow),
-    rotinas:   (rt.data || []).map(rotinaFromRow),
+    analistas: r.cronograma_analistas,
+    tarefas:   r.cronograma_tarefas,
+    rotinas:   r.cronograma_rotinas,
   };
 }
 
@@ -3695,7 +3730,11 @@ async function sincronizarComProcessos() {
       if (!analistaObj) return;
       const maxO = tarefas.filter(x => x.analistaId === analistaObj.id).reduce((m, x) => Math.max(m, x.ordem || 0), 0);
       tarefas.push({
-        id: uid(),
+        // Id derivado do processo (e não aleatório): se duas pessoas abrirem o Cronograma ao
+        // mesmo tempo e ambas criarem a tarefa sincronizada, as duas gravações caem na MESMA
+        // linha (upsert) em vez de duplicar — desde que a gravação deixou de apagar tudo,
+        // o último a salvar não esconde mais a duplicata.
+        id: 'sync-' + p.processo,
         analistaId: analistaObj.id,
         setor: 'GECOPE',
         processo: p.processo,

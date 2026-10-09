@@ -2202,6 +2202,16 @@ async function executarAcaoDetalhes(actionType) {
             // A data 'ultima_atualizacao' não é definida aqui para não resetar o contador de dias sem mudança de status
         };
 
+        // O `status` também é escrito pelo job `sincronizar-suite` (pg_cron), que roda com a
+        // tela aberta. `registroOriginal` vem de window.allData, carregado quando a página abriu
+        // (ou no último salvamento), e o formulário foi preenchido com ele — então reenviar o
+        // status "sem ter mexido nele" desfazia, em silêncio, o que o SUITE tinha atualizado
+        // nesse intervalo (ex.: editar só o fiscal e voltar o processo de AGUAR. ANÁLISE para o
+        // status velho). Só vai para o banco se a pessoa realmente o alterou. — 08/10/2026
+        const statusEnviado = (updates.status || '').toString().trim().toUpperCase();
+        const statusExibido = (registroOriginal.status || '').toString().trim().toUpperCase();
+        if (statusEnviado === statusExibido) delete updates.status;
+
         // A meta é só-admin no banco (trigger `processos_restringir_prioridade_meta`), então
         // para quem não é admin a coluna nem entra no payload vindo do formulário. Reenviar o
         // valor seria inofensivo ENQUANTO fosse idêntico ao gravado — mas basta uma diferença
