@@ -88,3 +88,22 @@ Os itens #3 (parte SQL), #4 (parte SQL) e #9 exigem rodar SQL no banco. Eu escre
 - **Ordem dos analistas pode mudar uma vez** (Médio, visual): o código antigo regravava todos num só insert, então todos têm o mesmo `created_at`; agora o desempate é por `id` (aleatório). Os 6 analistas semeados juntos podem aparecer em outra ordem; depois fica estável. Se importar, definir `created_at` crescente por SQL na ordem desejada.
 - **Última escrita vence por linha** (Baixo): se duas pessoas editam a MESMA tarefa, a última a salvar vence naquela linha; e uma sessão desatualizada pode recriar uma linha que outra apagou. É inerente ao desenho e muito menor que o apagar-tudo anterior. Controle de versão por linha seria a evolução, não feita.
 - **Sincronização simultânea** (Baixo): duas sessões criando a mesma `sync-<NUP>` ao mesmo tempo — a segunda sobrescreve a primeira com conteúdo equivalente.
+
+### Lote C — endurecimento (#7, #9, #11, #12, #13) · branch `fix/revisao-lote-c` (empilhada sobre o Lote B)
+
+| # | O que mudou | Status |
+|---|---|---|
+| 7 | SRI (`integrity` sha384 + `crossorigin`) em 17 tags de CDN de `index.html`, `cronograma.html`, `assistente.html`, `assistente-painel.html` e `gecope_mapa_obras.html` (supabase-js, plotly, sweetalert2, dompurify, chart.js, leaflet js/css, bootstrap js/css, bootstrap-icons). Versões fixadas: `supabase-js@2` → `2.117.2` (a que `index.html` e o mapa já usavam), `sweetalert2@11` → `11.26.25` (arquivo byte a byte igual ao que a página carregava). Todos os hosts devolvem CORS `*`. | Corrigido (front, vai com o merge) |
+| 9 | Aviso "NÃO REAPLIQUE" no topo de `sql/_aplicados/rls_app_users.sql`; novo `sql/diagnostico_exportar_rls_atual.sql` (somente leitura) para trazer ao repositório as policies atuais de `app_users`, a função `app_users_lookup_by_matricula`, buckets/policies de Storage, policies com condição `true` e funções SECURITY DEFINER abertas ao `anon`. | **Parcial**: falta rodar o script no banco e versionar o resultado |
+| 11 | Worker: erro ambíguo (timeout de resposta, conexão cortada depois do envio) não é mais repetido; o job vira `failed` com instrução de conferir se a mensagem chegou, e o botão "Reenviar" do admin segue disponível. `worker/envio-erros.js` + testes. | Corrigido no código — **precisa rebuild do container `whatsapp-proxy-worker`** |
+| 12 | `Dockerfile`: `npm ci --omit=dev` sem o fallback `npm i` (lockfile conferido em dia com `npm ci --dry-run`). `docker-compose.yml`: imagem da Evolution fixada em `2.3.7@sha256:96662553…` (versão e digest lidos na própria VM em 08/10/2026, ou seja, a imagem que já rodava). | Corrigido no repositório — **a VM só adota ao editar o compose dela** (não recria o container se não for pedido) |
+| 13 | `sincronizar-suite` e `backfill-historico-suite`: `x-sync-secret` comparado em tempo constante (`segredoConfere`, SHA-256 + XOR). Sem segredo configurado continua negando. | Corrigido no código — **precisa deploy das 2 funções** |
+
+**Testes rodados:** `npm test` do proxy (18/18: inclui 5 novos do classificador de erros); `node --test` do cronograma e do helper (18/18). `node --check` em `worker.js`. Em navegador headless, as 5 páginas carregam com todas as bibliotecas definidas (`supabase.createClient`, `Swal`, `DOMPurify`, `Plotly`, `bootstrap`, `Chart`, `L`) e sem erro de integridade no console; um hash propositalmente errado é bloqueado (SRI efetivamente em vigor). O revisor recalculou os 9 hashes de forma independente: todos batem.
+
+**Não validado:** as duas Edge Functions em TypeScript (sem `deno`; a lógica de `segredoConfere` foi conferida em Node com os mesmos casos); o rebuild real dos containers; o script de diagnóstico no banco (sintaxe revisada, não executado).
+
+**Revisor (1 rodada):** sem regressões. Apontou o `bootstrap.bundle` sem SRI, **corrigido** (hash idêntico ao publicado pelo Bootstrap). Registrado sem tratar:
+- **Ainda sem SRI** (Baixo): carregamento dinâmico de jspdf, autotable, docx e exceljs em `utils.js` (`carregarBiblioteca`), e o HTML gerado por `relatorio.js` (bootstrap, bootstrap-icons e `cdn.tailwindcss.com`, este último sem versão fixa por natureza). Exigem fixar versões e calcular hashes um a um.
+- **Imports Deno** `esm.sh/@supabase/supabase-js@2` e `std@0.168.0` em `sincronizar-suite`/`backfill`: não fixados, porque sem `deno` não dá para testar a troca nem sei a versão publicada.
+- **Worker mais conservador** (Baixo): um `ETIMEDOUT` que ocorreu antes do envio agora também vai para revisão manual em vez de tentar 3 vezes.

@@ -350,6 +350,23 @@ async function emLotes<T>(
   }
 }
 
+// Comparação do segredo em tempo constante (revisão 08/10/2026): `!==` direto sai no primeiro
+// caractere diferente, e o tempo de resposta vazaria quantos caracteres do chute estão certos.
+// Comparar o SHA-256 dos dois lados também iguala o tamanho antes do XOR.
+async function segredoConfere(recebido: string | null, esperado: string | undefined): Promise<boolean> {
+  if (!recebido || !esperado) return false
+  const enc = new TextEncoder()
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(recebido)),
+    crypto.subtle.digest("SHA-256", enc.encode(esperado)),
+  ])
+  const x = new Uint8Array(a)
+  const y = new Uint8Array(b)
+  let diff = 0
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i]
+  return diff === 0
+}
+
 // ---------- handler ----------
 
 serve(async (req) => {
@@ -357,10 +374,7 @@ serve(async (req) => {
   const secret =
     req.headers.get("x-sync-secret")
 
-  if (
-    !secret ||
-    secret !== Deno.env.get("SYNC_SECRET")
-  ) {
+  if (!(await segredoConfere(secret, Deno.env.get("SYNC_SECRET")))) {
     return new Response(
       JSON.stringify({
         erro: "não autorizado",

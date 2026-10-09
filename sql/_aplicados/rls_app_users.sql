@@ -1,3 +1,11 @@
+-- !!! NÃO REAPLIQUE ESTE ARQUIVO (revisão técnica 08/10/2026) !!!
+-- Ele descreve o estado de 14/08/2026, com SELECT liberado para todos, inclusive anon
+-- ("app_users_select" using (true)). O front atual (core/auth.js) já assume que a tabela NÃO é
+-- mais publicamente legível: o login por matrícula usa a função SECURITY DEFINER
+-- app_users_lookup_by_matricula, que não está versionada em nenhum arquivo deste repositório.
+-- Reexecutar este script reabriria nome, e-mail, telefone, matrícula e papel de todos os
+-- usuários para qualquer pessoa com a chave anon (que é pública, está em config.js).
+-- Para ver o estado real: rode sql/diagnostico_exportar_rls_atual.sql no SQL Editor.
 -- =====================================================================================
 -- RLS de public.app_users — versão consolidada e atual (2026-08-14)
 -- =====================================================================================

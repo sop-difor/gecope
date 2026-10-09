@@ -34,3 +34,6 @@ sql/reestruturacao_tabelas/**/db-url.local
 sql/reestruturacao_tabelas/**/stg_*.csv
 sql/reestruturacao_tabelas/**/*.xls
 sql/reestruturacao_tabelas/**/*.xlsx
+
+# Saídas de diagnóstico do banco (metadados de RLS) — ficam só na máquina local
+resultados_diagnostico_*/
