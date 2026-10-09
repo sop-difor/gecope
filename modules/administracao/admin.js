@@ -552,13 +552,14 @@
     }
 
     // --- AUTORIZAÇÕES ESPECIAIS (plano de permissões por papel — Fase 5) ---
-    // Admin concede, pra um usuário específico, uma das 6 permissões abaixo,
+    // Admin concede, pra um usuário específico, uma das 7 permissões abaixo,
     // sem precisar mudar o papel dele — fica valendo até ser revogada (nunca
     // expira sozinha). Ver sql/autorizacoes_especiais.sql pra a definição
     // completa das permissões e das regras de banco que elas destravam.
     const PERMISSOES_ESPECIAIS = [
         'financeiro', 'assistente_dados', 'processos_ver_todos',
-        'processos_gravar', 'composicoes_editar_terceiros', 'orcamentos_gravar'
+        'processos_gravar', 'composicoes_editar_terceiros', 'orcamentos_gravar',
+        'localizacao_cadastrar'
     ];
     const ROTULOS_AUTORIZACAO = {
         financeiro: 'Financeiro',
@@ -566,7 +567,8 @@
         processos_ver_todos: 'Processos: ver todos',
         processos_gravar: 'Processos: gravar/editar/excluir',
         composicoes_editar_terceiros: 'Composições: editar/excluir de terceiros',
-        orcamentos_gravar: 'Orçamentos: criar/nova versão/excluir'
+        orcamentos_gravar: 'Orçamentos: criar/nova versão/excluir',
+        localizacao_cadastrar: 'Localização das obras: cadastrar/alterar'
     };
 
     async function carregarAutorizacoesEspeciais() {
@@ -579,7 +581,7 @@
             try {
                 const { data: usuarios, error } = await sbClient.from('app_users')
                     .select('email, nome, sobrenome, full_name, role')
-                    .in('role', ['gerente', 'fiscal', 'externo'])
+                    .in('role', ['gerente', 'fiscal', 'externo', 'eletrica'])
                     .order('nome', { ascending: true });
                 if (error) throw error;
                 selectUsuario.innerHTML = (usuarios || []).map(u => {
