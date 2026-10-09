@@ -2312,29 +2312,28 @@ body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet
 .ruas-sem b{flex:none;color:var(--text-brightest);font-weight:700}
 .ruas-sem span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim);font-weight:500}
 
-/* cartão "Localização da obra" (Ficha) */
-.modal .loc-box{display:flex;flex-direction:column;gap:12px;margin-top:14px}
-.modal .loc-box[hidden]{display:none}
+/* cartão "Localização da obra" (Ficha) e diálogo do mapa de cadastro */
 .modal .loc-coord{font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-brightest)}
 .modal .loc-gm{margin-left:10px;font-size:12px;font-weight:600;color:var(--ng-light);text-decoration:none}
 .modal .loc-gm:hover{text-decoration:underline}
-.modal .loc-modos{display:flex;flex-wrap:wrap;gap:6px}
-.modal .loc-modo{height:34px;padding:0 14px;cursor:pointer;border:1px solid var(--card-border);background:transparent;color:var(--text-muted);
-  border-radius:8px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600}
-.modal .loc-modo:hover{border-color:rgba(var(--ng-rgb),.5)}
-.modal .loc-modo.on{background:rgba(var(--ng-rgb),.16);border-color:rgba(var(--ng-rgb),.6);color:var(--text-brightest)}
-.modal .loc-ent[hidden]{display:none}
-.modal .loc-linha{display:flex;gap:8px;margin-bottom:6px}
-.modal .loc-linha input{flex:1;min-width:0;padding:8px 10px;background:var(--card-bg-2);border:1px solid var(--card-border);border-radius:8px;
+.modal #locCardCorpo{display:flex;flex-direction:column;gap:10px}
+.modal .loc-dlg{width:min(940px,100%)}
+.modal .loc-dlg:focus{outline:none}
+.modal .loc-dica{margin-top:10px}
+.modal .loc-mapa{height:min(52vh,480px);margin:12px 0;border:1px solid var(--card-border);border-radius:10px;overflow:hidden;background:var(--map-field)}
+.modal .loc-mapa.leaflet-container,.modal .loc-mapa .leaflet-grab{cursor:crosshair}
+.modal .loc-campos{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:6px}
+.modal .loc-campos label{display:flex;flex-direction:column;gap:4px;flex:1 1 160px;font-family:Montserrat,sans-serif;font-size:12px;font-weight:600;color:var(--text-label)}
+.modal .loc-campos input{min-width:0;padding:8px 10px;background:var(--card-bg-2);border:1px solid var(--card-border);border-radius:8px;
   color:var(--text-bright);font-family:Montserrat,sans-serif;font-size:13px}
-.modal .loc-linha input:focus{outline:2px solid var(--ng);outline-offset:1px}
-.modal .loc-mapa{height:300px;border:1px solid var(--card-border);border-radius:10px;overflow:hidden;background:var(--map-field)}
-.modal .loc-msg{min-height:18px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600;color:var(--text-muted)}
+.modal .loc-campos input:focus{outline:2px solid var(--ng);outline-offset:1px}
+.modal .loc-msg{min-height:18px;margin-top:6px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600;color:var(--text-muted)}
+.modal .loc-msg:empty{min-height:0;margin:0}
 .modal .loc-msg.ok{color:var(--status-ok)}
 .modal .loc-msg.erro{color:var(--status-stop-text)}
-.modal .loc-chk{display:flex;gap:8px;align-items:flex-start;font-family:Montserrat,sans-serif;font-size:12.5px;color:var(--text-base);cursor:pointer}
+.modal .loc-chk{display:flex;gap:8px;align-items:flex-start;margin:8px 0 4px;font-family:Montserrat,sans-serif;font-size:12.5px;color:var(--text-base);cursor:pointer}
 .modal .loc-chk input{margin-top:2px;accent-color:var(--ng)}
-.modal .loc-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.modal .loc-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .modal .loc-btn{height:36px;padding:0 16px;cursor:pointer;border:1px solid rgba(var(--ng-rgb),.4);background:rgba(var(--ng-rgb),.1);color:var(--text-brightest);
   border-radius:8px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700}
 .modal .loc-btn:hover:not(:disabled){border-color:rgba(var(--ng-rgb),.65);background:rgba(var(--ng-rgb),.18)}
@@ -2343,7 +2342,7 @@ body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet
 .modal .loc-btn.prim:hover:not(:disabled){background:var(--ng-mid);border-color:var(--ng-mid)}
 .modal .loc-btn.perigo{border-color:rgba(var(--status-stop-rgb),.5);background:transparent;color:var(--status-stop-text)}
 .modal .loc-btn.perigo:hover:not(:disabled){background:rgba(var(--status-stop-rgb),.12)}
-.modal .loc-btn:focus-visible,.modal .loc-modo:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
+.modal .loc-btn:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
 .modal .mtabs-grupo{display:contents}
 .modal .mrota{flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;
   border:1px solid rgba(var(--ng-rgb),.5);background:rgba(var(--ng-rgb),.12);color:var(--text-brightest);
