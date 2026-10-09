@@ -107,3 +107,29 @@ Os itens #3 (parte SQL), #4 (parte SQL) e #9 exigem rodar SQL no banco. Eu escre
 - **Ainda sem SRI** (Baixo): carregamento dinâmico de jspdf, autotable, docx e exceljs em `utils.js` (`carregarBiblioteca`), e o HTML gerado por `relatorio.js` (bootstrap, bootstrap-icons e `cdn.tailwindcss.com`, este último sem versão fixa por natureza). Exigem fixar versões e calcular hashes um a um.
 - **Imports Deno** `esm.sh/@supabase/supabase-js@2` e `std@0.168.0` em `sincronizar-suite`/`backfill`: não fixados, porque sem `deno` não dá para testar a troca nem sei a versão publicada.
 - **Worker mais conservador** (Baixo): um `ETIMEDOUT` que ocorreu antes do envio agora também vai para revisão manual em vez de tentar 3 vezes.
+
+## 7. Achados novos do diagnóstico de RLS (08/10/2026, depois da Etapa 1)
+
+Vieram da saída de `sql/diagnostico_exportar_rls_atual.sql` rodado em produção (a saída fica só na máquina local, pasta ignorada pelo Git).
+
+| # | Problema | Criticidade | Onde | Correção |
+|---|---|---|---|---|
+| 16 | **Storage aberto a qualquer conta logada:** as policies "Public Upload …" dos buckets `orcamentos` e `composicoes_biblioteca` permitem enviar, sobrescrever e **apagar** arquivos a qualquer autenticado (inclusive autocadastro `pending`), pois só checam o nome do bucket. | **Alto** | `storage.objects` | Lote D, bloco 1 |
+| 17 | **Todos os usuários legíveis por qualquer conta logada:** a policy "Usuários autenticados podem ver perfis" (`SELECT … true`) em `app_users` expõe nome, e-mail, matrícula, **telefone** e papel de toda a equipe a quem se cadastrar. | **Alto** | `public.app_users` | Lote D, bloco 2 (preserva a busca de "fantasma" do cadastro; o telefone dos fantasmas continua visível a contas novas) |
+| 18 | **Funções SECURITY DEFINER executáveis por `anon`:** `atualizar_tempos_suite`, `atualizar_tempo_suite_processo`, `atualizar_tempos_suite_processos`, `calcular_tempo_suite_*` podem ser chamadas por quem tem a chave pública (que está em `config.js`): recálculo pesado sob demanda. | Médio | `public` | Lote D, bloco 3 |
+| 19 | `historico_metas` aceita INSERT de qualquer autenticado; `historico_metas`, `historico_atribuicao_fiscal` e `config_whatsapp` são legíveis por qualquer autenticado. | Baixo/Médio | `public` | Lote D, bloco 4 |
+| 20 | **Edge Functions em produção que não existem no repositório e não foram revisadas:** `approve-user` (aprova usuários, ou seja, decide quem ganha acesso), `disparar-whatsapp` (de 6 meses atrás, anterior ao proxy; pode falar direto com a Evolution), `get-economic-indices` e `sync-institutional-emails`. | Médio (não validado: o código não foi lido) | Supabase > Edge Functions | Baixar o código (aba de código da função ou `supabase functions download`), revisar e versionar; apagar o que não for usado (`disparar-whatsapp` é o primeiro candidato) |
+
+Também confirmados no mesmo diagnóstico, sem ação nova: os buckets `orcamentos`, `composicoes_biblioteca` e `sop_inicial` são públicos para leitura (decisão #10); a função de login `app_users_lookup_by_matricula` existe e devolve só `nome, sobrenome, email` de uma matrícula (por desenho, mas permite descobrir o e-mail de quem tem uma matrícula conhecida).
+
+### Lote D — preparado, NÃO aplicado (#16 a #19) · branch `fix/revisao-lote-d` (sobre o Lote C)
+
+`sql/fix_lote_d_acesso_contas_pending.sql`: 4 blocos independentes, cada um com conferência prévia, teste sugerido e reversão. Nada é apagado; só trocam regras de acesso.
+
+**Testado:** o arquivo foi executado inteiro contra um Postgres real (pglite, em WASM) com um esquema simulado das tabelas/policies afetadas e os papéis `anon`, `authenticated` e `service_role`: 17 verificações, todas passaram. Reproduz o problema antes (conta `pending` apaga arquivo e lê todos os usuários) e confirma depois que `pending` não envia, não apaga, não lê usuários alheios, não insere em `historico_metas`; que fiscal e admin seguem operando; que a leitura pública dos arquivos continua; que o login com matrícula e a busca do "fantasma" no cadastro continuam funcionando; e que `anon` perde o acesso às funções mas `authenticated` e `service_role` mantêm.
+
+**Não validado:** é um modelo do banco, não o banco real (as policies reais de `app_users` além da de leitura ampla não foram vistas; o bloco 2 manda conferir antes). Falta o teste no sistema de verdade, descrito no fim de cada bloco, em especial **um cadastro de teste com matrícula de fantasma** (bloco 2).
+
+### Ocorrência de deploy (08/10/2026, ~17h)
+
+Ao publicar a correção do painel, o código de `gecope-assistant-painel` foi colado na função `gecope-assistant`. Comprovado de fora: ambas respondem no formato do painel (`{"erro":…}`) e a `gecope-assistant` passou a devolver o CORS do painel. Efeito: o Assistente de Dados fica sem funcionar até o código correto voltar. Correção: republicar `supabase/functions/gecope-assistant/index.ts` na `gecope-assistant` e `supabase/functions/gecope-assistant-painel/index.ts` na `gecope-assistant-painel`.
