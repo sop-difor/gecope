@@ -768,6 +768,8 @@ async function loadData(){
     if(!window.sbClient){ showDataError('Não consegui carregar o componente de acesso ao banco. Verifique a conexão e tente novamente.'); return; }
     showLoginRequired('Faça login no GECOPE para consultar o módulo de Contratos.'); return; }
   const seq=++_loadSeq;
+  // localização das obras: tabela pequena, buscada à parte do cache (um ponto cadastrado por outra pessoa aparece na próxima carga)
+  const locP=fetchLocalizacoes().then(m=>{ LOC_ERRO=false; return m; }).catch(e=>{ LOC_ERRO=true; console.warn(SB_LOCAL+' indisponível:',e.message); return new Map(); });
   for(const c in DB.municipios) DB.municipios[c].obras=[];
   invalidateAggCache(); // sem isso, um hover no mapa durante o fetch devolveria contagens da era de filtro anterior
   try{
@@ -779,6 +781,7 @@ async function loadData(){
     _prefetchDados=null;
     if(!dados) dados=await fetchDadosBrutos(scope);
     if(seq!==_loadSeq) return; // outra carga começou depois desta — ela é quem preenche DB
+    LOCS=await locP;
     const {fisc,adit,ficha,medic,vist,agend,parcial}=dados, falhas=dados.falhas||[];
     // a paginação por offset pode, numa gravação do SIGSOP no meio da carga, trazer a mesma obra
     // duas vezes — sem isto ela entraria duplicada em DB.municipios[].obras (valor e contagem em dobro)
@@ -791,7 +794,7 @@ async function loadData(){
     const obraCountBySop={...(dados.nobras||{})};
     if(!dados.nobras) for(const r of rows){ const k=r.nr_contrato_sop; if(k) obraCountBySop[k]=(obraCountBySop[k]||0)+1; }
     let sem=0;
-    for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); const com=fisc[o.id_obra]||[]; o.comissao=com; const _fi=pickFiscal(com); o.fiscal=_fi?_fi.nome:'—'; o.fiscalTipo=_fi?_fi.tipo:'FISCAL';
+    for(const r of rows){ const cod=NAMEIDX[normTxt(r.municipio)]; if(!cod){sem++;continue;} const o=mapRow(r); o.munId=cod; o.loc=LOCS.get(o.id_obra)||null; const com=fisc[o.id_obra]||[]; o.comissao=com; const _fi=pickFiscal(com); o.fiscal=_fi?_fi.nome:'—'; o.fiscalTipo=_fi?_fi.tipo:'FISCAL';
       const nrKey=r.nr_contrato_sop; o.aditivos=(nrKey&&adit[nrKey])||[]; o.ficha=(nrKey&&ficha[nrKey])||null;
       o.medicoes=medic[o.id_obra]||[];
       o.relatoriosEletrica=vist[o.id_obra]||[];
@@ -1008,6 +1011,7 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
   // abaixo, que é de contratos e fica intacto na troca de modo). Ver FILTER_DEFS_RP.
   rp:{metrica:'tempo', periodo:'6m', fiscaisAberto:false, filtro:{q:'', situacao:new Set(), prazo:new Set()}},
   sel:null, // Ctrl+clique em vários distritos/municípios: {kind:'group'|'city', ids:Set}
+  ruas:false, // modo "Ruas e bairros" (só no nível município; ver o bloco LOCALIZAÇÃO DAS OBRAS)
   // Etapa C: chaves novas declaradas já como Set (as defs em FILTER_DEFS e a UI
   // entram no Bloco 2 — até lá ficam vazias e inertes).
   f:{ano:new Set(),status:new Set(),contratada:new Set(),contratante:new Set(),fiscal:new Set(),
@@ -1363,6 +1367,7 @@ function styleFeature(f){
     // "só tem muita obra" (que usa a mesma cor base, só mais opaca)
     if(st.sel&&st.sel.kind==='city'&&st.sel.ids.has(String(id))) return {fillColor:TOKENS.ng,color:TOKENS.mapLine,weight:1.6+0.8*zt(),fillOpacity:.78,opacity:1};
     if(modoReplan()) return {...rpPreenche(_rpMun.get(id),_rpMaxMun),color:TOKENS.mapOpenBorder,weight:0.5+0.7*zt(),opacity:.85};
+    if(ruasAtivo()) return ruasEstilo(choroT(mval(aggIds([id])),_levelMax)); // mapa de ruas por baixo: contorno + preenchimento leve
     if(noMatchCity(id)) return NOMATCH_STYLE();   // Etapa C: filtro ativo, 0 contratos
     // preenchimento varia com a métrica atual (obra/valor/aditivo), não é mais
     // uma cor uniforme — um município com 0 obras e um com o máximo do distrito
@@ -1370,12 +1375,13 @@ function styleFeature(f){
     const t=choroT(mval(aggIds([id])),_levelMax);
     return {fillColor:BASE,color:TOKENS.mapOpenBorder,weight:0.5+0.7*zt(),fillOpacity:TOKENS.choroFloor+TOKENS.choroSpan*t,opacity:.85};
   }
+  if(ruasAtivo()) return {fillColor:TOKENS.ng,color:TOKENS.ng,weight:2.2,fillOpacity:.04,opacity:.9}; // mapa de ruas: o município vira só contorno
   if(noMatchCity(id)) return NOMATCH_STYLE();     // Etapa C: nível 3, cidade aberta sem resultado
   return {fillColor:TOKENS.mapOpenFill,color:TOKENS.mapLine,weight:1.0+1.0*zt(),fillOpacity:.85,opacity:1};  // cidade aberta (nível 3)
 }
 function applyInteractivity(){
   // Etapa C: polígono "sem correspondência" também fica inerte (não navegável).
-  layer.eachLayer(l=>{ if(l._path){ const id=l.feature.properties.id; l._path.style.pointerEvents = (visible(id) && !noMatchCity(id))?'':'none';
+  layer.eachLayer(l=>{ if(l._path){ const id=l.feature.properties.id; l._path.style.pointerEvents = (visible(id) && !noMatchCity(id) && !(ruasAtivo()&&st.level===3))?'':'none';
     // E2: o tracejado de "sem amostra" é classe, não opção de estilo — `setStyle` do
     // Leaflet MESCLA opções, então um dashArray aplicado aqui ficaria preso no polígono
     // ao voltar para o modo Obras. A classe sai sozinha na próxima passada.
@@ -1441,6 +1447,7 @@ function groupStyle(f){
   // pra município selecionado no nível 2 — consistência visual entre os dois níveis
   if(f&&st.sel&&st.sel.kind==='group'&&st.sel.ids.has(String(f.properties.gid))) return {fillColor:TOKENS.ng,color:TOKENS.mapLine,weight:gw()+1.2,fillOpacity:.68,opacity:1};
   if(f&&modoReplan()) return {...rpPreenche(_rpGrp.get(String(f.properties.gid)),_rpMaxGrp),color:TOKENS.mapGroupBorder,weight:gw(),opacity:.9};
+  if(f&&ruasAtivo()){ const k=String(f.properties.gid); return ruasEstilo(_groupValByGid.has(k)?choroT(_groupValByGid.get(k)||0,_levelMaxGroup):0); } // mapa de ruas por baixo
   if(f&&noMatchGroup(f.properties.gid)) return NOMATCH_STYLE(); // Etapa C: filtro ativo, distrito sem contratos
   // Elétrica com um card do resumo ativo (eleFiltroCategoria): pinta cada distrito com
   // a cor do engenheiro responsável em vez do verde único/coroplético — só a partir do
@@ -1547,7 +1554,7 @@ function fitFull(instant){
 }
 function fitGroup(instant){ const b=boundsOfIds(idsOfGroup(st.group)); if(!b) return;
   const o={...fitPad(40),maxZoom:10}; if(instant) o.animate=false; map.fitBounds(b,o); }
-function fitCity(instant){ const b=boundsOfIds([st.city]); if(!b) return;
+function fitCity(instant){ if(ruasAtivo()){ fitRuas(instant); return; } const b=boundsOfIds([st.city]); if(!b) return;
   const o={...fitPad(60),maxZoom:11}; if(instant) o.animate=false; map.fitBounds(b,o); }
 
 // navegação
@@ -2933,6 +2940,440 @@ function obrasCards(ids){
   return arr.slice(0,120).map((o,i)=>obraCard(o,i)).join('') + (arr.length>120?`<div class="empty">+ ${arr.length-120} contratos… refine a busca/filtros</div>`:'');
 }
 
+/* ============================================================
+   LOCALIZAÇÃO DAS OBRAS — mapa de ruas e cadastro do ponto (09/10/2026)
+   Tabela própria `obra_localizacao` (sql/create_obra_localizacao.sql): contratos_edificacao é
+   espelho do SIGSOP e não traz coordenada. 1 linha por id_obra; a carga inicial veio da planilha
+   obras_georeferencia.ods e o resto é cadastrado aqui, pelo cartão "Localização da obra" da Ficha.
+   Decisões:
+   - Sem biblioteca nova: o mapa já é Leaflet. O botão "Ruas e rotas" vale nos três níveis (estado,
+     distrito e município) e só carrega tiles do OpenStreetMap depois do clique; os pinos das obras
+     aparecem com um município aberto. O mapa mostra rodovias e ruas, mas NÃO calcula trajeto:
+     "Como chegar" na Ficha abre o Google Maps com o destino.
+   - Marcadores saem de obrasOf(st.city): os filtros e a busca valem sozinhos. Sem cluster — o
+     município com mais obras tem 662 no histórico completo, e o Leaflet desenha isso sem esforço.
+   - Obras na mesma coordenada (arredondada a ~1 m) viram UM marcador com a lista delas.
+   - Coordenada que não confere (fora do Ceará ou a mais de 2 km do município da obra) NÃO é
+     plotada; fica contada no painel para alguém corrigir. Nunca é "consertada" sozinha.
+   - A trava de verdade de quem grava é a RLS da tabela; PAPEIS_* só evita oferecer o que o banco nega.
+   ============================================================ */
+const SB_LOCAL='obra_localizacao';
+const LOC_COLS='id_obra,latitude,longitude,fonte,atualizado_em,atualizado_por';
+const PAPEIS_LOCALIZAR=['admin','gerente','fiscal','externo','eletrica'];
+const PAPEIS_LOC_REMOVER=['admin','gerente'];
+const LOC_CE={latMin:-7.95,latMax:-2.70,lngMin:-41.50,lngMax:-37.20}; // caixa do Ceará com folga (igual ao CHECK da tabela)
+const LOC_TOL_DIVISA_M=2000; // obra na divisa: aceita até 2 km fora do polígono (o contorno do GeoJSON é simplificado)
+const LOC_FONTE_ROT={planilha:'planilha de georreferência',mapa:'marcada no mapa',digitada:'coordenadas digitadas',gps:'posição do aparelho'};
+const OSM_URL='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_ATTR='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+let LOCS=new Map();  // id_obra -> {lat,lng,fonte,por,em}
+let LOC_ERRO=false;  // a tabela não veio (ainda não criada, rede): o mapa segue, só sem pontos
+
+async function fetchLocalizacoes(){
+  const rows=await fetchTable(SB_LOCAL,{select:LOC_COLS,order:'id_obra.asc'});
+  const m=new Map();
+  for(const r of rows){
+    const lat=Number(r.latitude), lng=Number(r.longitude);
+    if(r.id_obra==null||!isFinite(lat)||!isFinite(lng)) continue;
+    m.set(r.id_obra,{lat,lng,fonte:r.fonte||'',por:r.atualizado_por||'',em:r.atualizado_em||''});
+  }
+  return m;
+}
+function podeLocalizar(){ return PAPEIS_LOCALIZAR.includes(USER_PAPEL)||papelIndefinido(); }
+
+// ---- validação geográfica ----
+function locNoCE(lat,lng){
+  return isFinite(lat)&&isFinite(lng)&&!(lat===0&&lng===0)
+    &&lat>=LOC_CE.latMin&&lat<=LOC_CE.latMax&&lng>=LOC_CE.lngMin&&lng<=LOC_CE.lngMax;
+}
+let _munPolys=null;
+function polysDoMunicipio(id){
+  if(!_munPolys){
+    _munPolys=new Map();
+    for(const f of GEO.features){ const g=f.geometry; _munPolys.set(String(f.properties.id),g.type==='Polygon'?[g.coordinates]:g.coordinates); }
+  }
+  return _munPolys.get(String(id))||null;
+}
+function ptNoAnel(x,y,ring){
+  let c=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+    if((yi>y)!==(yj>y) && x<(xj-xi)*(y-yi)/(yj-yi)+xi) c=!c;
+  }
+  return c;
+}
+function distAnelM(lat,lng,ring){ // distância mínima (m) do ponto ao contorno; equiretangular basta nessa escala
+  const k=111320, kx=k*Math.cos(lat*Math.PI/180); let best=Infinity;
+  for(let i=0;i<ring.length-1;i++){
+    const ax=(ring[i][0]-lng)*kx, ay=(ring[i][1]-lat)*k, bx=(ring[i+1][0]-lng)*kx, by=(ring[i+1][1]-lat)*k;
+    const dx=bx-ax, dy=by-ay, d2=dx*dx+dy*dy;
+    const t=d2===0?0:Math.max(0,Math.min(1,-(ax*dx+ay*dy)/d2));
+    const d=Math.hypot(ax+t*dx,ay+t*dy); if(d<best) best=d;
+  }
+  return best;
+}
+// 0 = dentro do município; >0 = metros além do contorno; null = município sem polígono (não dá para checar)
+function distAoMunicipioM(id,lat,lng){
+  const P=polysDoMunicipio(id); if(!P) return null;
+  if(P.some(p=>ptNoAnel(lng,lat,p[0]))) return 0;
+  let best=Infinity; for(const p of P){ const d=distAnelM(lat,lng,p[0]); if(d<best) best=d; }
+  return best;
+}
+const fmtKm=m=>(m/1000).toFixed(1).replace('.',',')+' km';
+// {ok,msg} para um ponto candidato desta obra — usado no cadastro; locStatus() reaproveita a regra
+function locValidaPonto(o,lat,lng){
+  if(!isFinite(lat)||!isFinite(lng)) return {ok:false,msg:'Informe latitude e longitude válidas.'};
+  if(!locNoCE(lat,lng)) return {ok:false,msg:locNoCE(lng,lat)?'Latitude e longitude parecem estar trocadas.':'O ponto está fora do Ceará. Confira os valores e os sinais (no Ceará a latitude e a longitude são negativas).'};
+  const nome=(DB.municipios[o.munId]||{}).nome||o.municipioTxt||'município da obra';
+  const d=distAoMunicipioM(o.munId,lat,lng);
+  if(d!=null&&d>LOC_TOL_DIVISA_M) return {ok:false,msg:`O ponto fica a ${fmtKm(d)} fora de ${nome}. Leve o marcador para dentro do município.`};
+  return {ok:true,msg:`Ponto dentro de ${nome}${d>0?' (na divisa)':''}.`};
+}
+// estado da localização JÁ cadastrada: null (sem), {ok:true} ou {ok:false,motivo}. Guardado na obra.
+function locStatus(o){
+  if(!o.loc) return null;
+  const k=o.loc.lat+','+o.loc.lng;
+  if(o._locSt&&o._locSt.k===k) return o._locSt;
+  const v=locValidaPonto(o,o.loc.lat,o.loc.lng);
+  const r={k,ok:v.ok,motivo:v.ok?'':v.msg};
+  o._locSt=r; return r;
+}
+
+// ---- leitura de coordenadas digitadas: "-3.7319, -38.5267" ou graus/minutos/segundos ----
+function parseCoordTexto(txt){
+  const t=String(txt||'').trim(); if(!t) return null;
+  const dms=[...t.matchAll(/(\d{1,3})\s*[°º]\s*(?:(\d{1,2})\s*['′’]\s*)?(?:(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|”|'')\s*)?([NSLOWE])/gi)];
+  if(dms.length===2){
+    const v=dms.map(m=>{
+      const g=+m[1]+(m[2]?+m[2]/60:0)+(m[3]?+m[3].replace(',','.')/3600:0);
+      return /[SWO]/i.test(m[4])?-g:g;
+    });
+    const hLat=/[NS]/i.test(dms[0][4]); // N/S primeiro = latitude primeiro
+    return hLat?{lat:v[0],lng:v[1]}:{lat:v[1],lng:v[0]};
+  }
+  let partes;
+  if(t.includes(';')) partes=t.split(';');
+  else if(t.includes('.')) partes=t.split(/\s*,\s*|\s+/);          // ponto decimal: vírgula/espaço separa
+  else if((t.match(/,/g)||[]).length===1&&!/\s/.test(t)) partes=t.split(','); // "-3,7,-38,5" não existe; 1 vírgula sem espaço
+  else partes=t.split(/\s+/);                                      // vírgula decimal: o espaço separa
+  partes=partes.map(p=>p.trim()).filter(Boolean);
+  if(partes.length!==2) return null;
+  const lat=Number(partes[0].replace(',','.')), lng=Number(partes[1].replace(',','.'));
+  return isFinite(lat)&&isFinite(lng)?{lat,lng}:null;
+}
+const fmtCoord=v=>v.toFixed(6);
+
+// ---- mapa de ruas (nível município) ----
+let ruasBtn=null, ruasTiles=null, ruasLayer=null, _ruasOn=false, _ruasSig='', _ruasResumo=null;
+function ruasAtivo(){ return !!st.ruas && !modoReplan(); }
+// contorno com preenchimento leve (t = 0..1 pela métrica do nível) para o mapa de ruas aparecer por baixo
+function ruasEstilo(t){ return {fillColor:BASE,color:TOKENS.ng,weight:1.4,fillOpacity:.03+.2*t,opacity:.9}; }
+function novoTileOSM(){ return L.tileLayer(OSM_URL,{maxZoom:19,attribution:OSM_ATTR}); }
+// a atribuição do OSM é obrigatória; o controle existe sempre e o CSS só o mostra com body.modo-ruas
+L.control.attribution({prefix:false,position:'bottomleft'}).addTo(map);
+{
+  const Ctl=L.Control.extend({options:{position:'bottomright'},onAdd(){
+    const b=L.DomUtil.create('button','ruas-btn'); b.type='button'; b.hidden=true;
+    b.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span></span>';
+    L.DomEvent.disableClickPropagation(b);
+    b.addEventListener('click',()=>{ st.ruas=!st.ruas; render(); });
+    ruasBtn=b; return b;
+  }});
+  new Ctl().addTo(map);
+}
+// Agrupa as obras do município por ponto e separa as que não vão para o mapa.
+function ruasClassifica(id){
+  const grupos=new Map(), semLoc=[], invalidas=[];
+  for(const o of obrasOf(id)){
+    if(!o.loc){ semLoc.push(o); continue; }
+    const s=locStatus(o);
+    if(!s.ok){ invalidas.push(o); continue; }
+    const k=o.loc.lat.toFixed(5)+','+o.loc.lng.toFixed(5);
+    let g=grupos.get(k); if(!g){ g={lat:o.loc.lat,lng:o.loc.lng,obras:[]}; grupos.set(k,g); }
+    g.obras.push(o);
+  }
+  return {grupos:[...grupos.values()],semLoc,invalidas};
+}
+const RUAS_PRIO={stop:0,wait:1,exec:2,ok:3};
+function ruasClasseGrupo(g){ // cor do pino: a situação mais urgente entre as obras ATIVAS do ponto; só encerradas = esmaecido
+  const ativas=g.obras.filter(o=>ACTIVE_STATUSES.includes(o.statusObra));
+  if(!ativas.length) return 'hist';
+  return 's-'+ativas.map(o=>o.stBucket).sort((a,b)=>(RUAS_PRIO[a]??9)-(RUAS_PRIO[b]??9))[0];
+}
+function ruasPopupGrupo(g){ // DOM, não innerHTML: o texto vem do banco
+  const box=document.createElement('div'); box.className='ruas-pop';
+  const h=document.createElement('div'); h.className='ruas-pop-h'; h.textContent=`${g.obras.length} obras neste ponto`; box.appendChild(h);
+  for(const o of g.obras){
+    const b=document.createElement('button'); b.type='button'; b.className='ruas-pop-i';
+    const c=document.createElement('b'); c.textContent=o.codigo_obra||('#'+o.id_obra);
+    const t=document.createElement('span'); t.textContent=o.objeto;
+    b.append(c,t); b.addEventListener('click',()=>{ map.closePopup(); openModal(o); });
+    box.appendChild(b);
+  }
+  return box;
+}
+function desenhaMarcadoresRuas(){
+  const id=st.city, obras=obrasOf(id);
+  const sig=id+'|'+obras.map(o=>o.id_obra+(o.loc?':'+o.loc.lat+','+o.loc.lng:'')).join(';');
+  if(sig===_ruasSig&&_ruasResumo) return;
+  _ruasSig=sig;
+  _ruasResumo=ruasClassifica(id);
+  if(!ruasLayer) ruasLayer=L.layerGroup().addTo(map); else ruasLayer.clearLayers();
+  for(const g of _ruasResumo.grupos){
+    const n=g.obras.length, cls=ruasClasseGrupo(g);
+    const icon=L.divIcon({className:'ruas-pin '+cls+(n>1?' multi':''),html:n>1?`<b>${n}</b>`:'',iconSize:n>1?[28,28]:[20,20],iconAnchor:n>1?[14,14]:[10,10]});
+    const mk=L.marker([g.lat,g.lng],{icon,riseOnHover:true,keyboard:true,title:n>1?`${n} obras neste ponto`:(g.obras[0].codigo_obra||'')});
+    if(n>1){
+      mk.bindPopup(ruasPopupGrupo(g),{className:'ruas-popup',maxWidth:340,minWidth:240,autoPanPadding:[30,30]});
+      mk.bindTooltip(escHtml(`${n} obras neste ponto — clique para ver`),{direction:'top',offset:[0,-12]});
+    } else {
+      const o=g.obras[0];
+      mk.bindTooltip(`<b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><br>${escHtml(o.objeto.length>110?o.objeto.slice(0,107)+'…':o.objeto)}<br>${escHtml(o.statusObra)}`,{direction:'top',offset:[0,-12]});
+      mk.on('click',()=>openModal(o));
+    }
+    mk.addTo(ruasLayer);
+  }
+}
+function fitRuas(instant){
+  const pts=_ruasResumo?_ruasResumo.grupos:[];
+  const b=pts.length?L.latLngBounds(pts.map(g=>[g.lat,g.lng])):boundsOfIds([st.city]);
+  if(!b) return;
+  const o={...fitPad(60),maxZoom:pts.length?(pts.length===1?16:17):13}; if(instant) o.animate=false;
+  map.fitBounds(b,o);
+}
+function limpaMarcadoresRuas(){ if(ruasLayer) ruasLayer.clearLayers(); _ruasSig=''; _ruasResumo=null; }
+function entraRuas(){
+  tip.remove();
+  map.setMaxZoom(18);
+  if(!ruasTiles) ruasTiles=novoTileOSM();
+  if(!map.hasLayer(ruasTiles)) ruasTiles.addTo(map);
+}
+function saiRuas(){
+  if(ruasTiles&&map.hasLayer(ruasTiles)) map.removeLayer(ruasTiles);
+  limpaMarcadoresRuas();
+  map.setMaxZoom(11);
+  refit(); // o zoom pode ter passado de 11 com o mapa de ruas: volta ao enquadramento do nível
+}
+// chamada por render(): liga/desliga o modo e mantém os marcadores em dia com filtros e cadastro
+function syncRuas(){
+  const on=ruasAtivo();
+  if(ruasBtn){
+    ruasBtn.hidden=modoReplan();
+    ruasBtn.classList.toggle('on',on); ruasBtn.setAttribute('aria-pressed',String(on));
+    ruasBtn.querySelector('span').textContent=on?'Ocultar ruas e rotas':'Ruas e rotas';
+  }
+  document.body.classList.toggle('modo-ruas',on);
+  document.body.dataset.ruasNivel=on?String(st.level):''; // o CSS esconde os rótulos só no município
+  const mudou=on!==_ruasOn; _ruasOn=on;
+  if(mudou&&on) entraRuas();
+  if(on){
+    if(st.level===3){ desenhaMarcadoresRuas(); if(mudou) fitRuas(); } // pinos só com um município aberto
+    else limpaMarcadoresRuas();
+  }
+  else if(mudou) saiRuas();
+}
+// bloco do painel lateral (nível município com o modo ligado)
+function ruasPainelHtml(){
+  if(!ruasAtivo()||!_ruasResumo) return '';
+  const {grupos,semLoc,invalidas}=_ruasResumo;
+  const plot=grupos.reduce((s,g)=>s+g.obras.length,0);
+  const leg=[['s-exec','Em execução'],['s-wait','Aguardando OS'],['s-stop','Paralisada'],['hist','Encerrada']]
+    .map(([c,t])=>`<span class="ruas-leg-i"><i class="ruas-dot ${c}"></i>${t}</span>`).join('');
+  const lista=(arr,rot)=>arr.length?`<div class="sec-h" style="margin-top:12px"><span>${rot}</span><span>${arr.length}</span></div>`
+    +arr.slice(0,15).map(o=>`<button type="button" class="ruas-sem" data-loc-obra="${escHtml(String(o.id_obra))}"><b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><span>${escHtml(o.objeto)}</span></button>`).join('')
+    +(arr.length>15?`<div class="empty">+ ${arr.length-15} obras…</div>`:''):'';
+  return `<div class="ruas-resumo"><div><b>${NUM.format(plot)}</b> no mapa · <b>${NUM.format(semLoc.length)}</b> sem localização${invalidas.length?` · <b>${NUM.format(invalidas.length)}</b> com coordenada que não confere`:''}</div>`
+    +`<div class="ruas-leg">${leg}</div>`
+    +(LOC_ERRO?`<div class="ruas-aviso">Não foi possível carregar as localizações agora; recarregue a página para tentar de novo.</div>`:'')
+    +`</div>`
+    +lista(invalidas,'Coordenada não confere (não plotada)')+lista(semLoc,'Sem localização — clique para cadastrar');
+}
+function obraPorIdObra(idObra){
+  const m=DB.municipios[st.city]; if(!m) return null;
+  return m.obras.find(o=>String(o.id_obra)===String(idObra))||null;
+}
+function abreLocalizacaoDaObra(o){
+  openModal(o);
+  const b=document.querySelector('.modal .adToggle[data-target="mFcLoc"]'); if(b) b.click();
+}
+document.getElementById('body').addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('[data-loc-obra]'); if(!b) return;
+  const o=obraPorIdObra(b.dataset.locObra); if(o) abreLocalizacaoDaObra(o);
+});
+
+// ---- cartão "Localização da obra" na Ficha ----
+let _locMini=null; // {map,marker,sel,o} — o mini-mapa do cartão; vive só enquanto a janela da obra existe
+function destroyLocMini(){ if(_locMini){ try{ _locMini.map.remove(); }catch(e){ /* já fora do DOM */ } _locMini=null; } }
+function locResumoHtml(o){
+  if(!o.loc) return '<div class="fc-hnote">Esta obra ainda não tem localização cadastrada.</div>';
+  const s=locStatus(o), l=o.loc;
+  const quem=l.por?` por ${escHtml(l.por)}`:'', quando=l.em?` em ${fmtDateTimeBR(l.em)}`:'';
+  return `<div class="loc-coord"><b>${fmtCoord(l.lat)}, ${fmtCoord(l.lng)}</b>`
+    +` <a class="loc-gm" href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">Abrir no Google Maps</a></div>`
+    +`<div class="fc-hnote">Fonte: ${escHtml(LOC_FONTE_ROT[l.fonte]||l.fonte||'—')}${quem}${quando}</div>`
+    +(s&&!s.ok?`<div class="loc-msg erro">Esta coordenada não confere e por isso não aparece no mapa: ${escHtml(s.motivo)}</div>`:'');
+}
+// atalho "Como chegar" (Google Maps, a partir de onde a pessoa estiver): fica fora do cartão recolhido
+function locRapidoHtml(o){
+  const s=locStatus(o); if(!s||!s.ok) return '';
+  return `<a class="loc-rota" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.loc.lat},${o.loc.lng}" target="_blank" rel="noopener">`
+    +`<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg>Como chegar</a>`;
+}
+function locIrmasSemPonto(o){
+  return obrasDoContrato(o).filter(x=>x!==o&&x.munId===o.munId&&!x.loc);
+}
+function buildLocCard(o,toggleBtn){
+  const s=locStatus(o);
+  const rot='Localização da obra'+(!o.loc?' — não cadastrada':(s&&!s.ok?' — coordenada não confere':''));
+  let form='';
+  if(podeLocalizar()){
+    const irmas=locIrmasSemPonto(o), n=irmas.length;
+    const remover=o.loc&&PAPEIS_LOC_REMOVER.includes(USER_PAPEL);
+    form=`<div class="loc-modos" role="group" aria-label="Como informar a localização">`
+        +`<button type="button" class="loc-modo on" data-loc-modo="mapa" aria-pressed="true">Marcar no mapa</button>`
+        +`<button type="button" class="loc-modo" data-loc-modo="digitar" aria-pressed="false">Digitar coordenadas</button>`
+        +`<button type="button" class="loc-modo" data-loc-modo="gps" aria-pressed="false">Usar minha posição</button></div>`
+      +`<div class="loc-ent" data-loc-ent="mapa"><div class="fc-hnote">Clique no mapa ou arraste o marcador até o local da obra. Aproxime o zoom para achar a rua.</div></div>`
+      +`<div class="loc-ent" data-loc-ent="digitar" hidden><div class="loc-linha"><input id="locTxt" type="text" autocomplete="off" placeholder="-3.731900, -38.526700" aria-label="Latitude e longitude"><button type="button" class="loc-btn" id="locAplicar">Aplicar</button></div>`
+        +`<div class="fc-hnote">Cole “latitude, longitude” (como o Google Maps copia) ou em graus, minutos e segundos.</div></div>`
+      +`<div class="loc-ent" data-loc-ent="gps" hidden><button type="button" class="loc-btn" id="locGps">Obter minha posição</button><div class="fc-hnote" id="locGpsInfo">Use quando estiver no local da obra e autorize o acesso à localização do navegador.</div></div>`
+      +`<div class="loc-mapa" id="locMapa"></div>`
+      +`<div class="loc-msg" id="locMsg" role="status" aria-live="polite"></div>`
+      +(n?`<label class="loc-chk"><input type="checkbox" id="locIrmas"> Usar este mesmo ponto ${n===1?'na outra obra':`nas outras ${n} obras`} deste contrato em ${escHtml(o.municipioTxt||'')} que ainda não ${n===1?'tem':'têm'} localização</label>`:'')
+      +`<div class="loc-acoes"><button type="button" class="loc-btn prim" id="locSalvar" disabled>Salvar localização</button>`
+        +(remover?`<button type="button" class="loc-btn perigo" id="locRemover">Remover localização</button>`:'')+`</div>`;
+  } else form='<div class="fc-hnote">Seu perfil só permite consultar a localização.</div>';
+  return `<section class="fc-sec fc-sec-toggle">${toggleBtn('mFcLoc',escHtml(rot))}<div id="locRapido" class="loc-rapido">${locRapidoHtml(o)}</div><div id="mFcLoc" class="loc-box" hidden>`
+    +`<div id="locResumo">${locResumoHtml(o)}</div>${form}</div></section>`;
+}
+function locMsg(txt,tipo){
+  const el=document.getElementById('locMsg'); if(!el) return;
+  el.textContent=txt||''; el.className='loc-msg'+(tipo?' '+tipo:'');
+}
+function iniciaLocMini(o){
+  if(_locMini){ setTimeout(()=>{ if(_locMini) _locMini.map.invalidateSize(); },0); return; }
+  const el=document.getElementById('locMapa'); if(!el) return; // perfil só de consulta: sem mini-mapa
+  const m=L.map(el,{minZoom:6,maxZoom:19,zoomSnap:.5});
+  m.attributionControl.setPrefix(false);
+  novoTileOSM().addTo(m);
+  const feat=GEO.features.find(f=>String(f.properties.id)===String(o.munId));
+  let b=null;
+  if(feat){
+    const gj=L.geoJSON(feat,{interactive:false,style:{fill:false,color:TOKENS.ng,weight:2.2,opacity:.95,dashArray:'7 5'}}).addTo(m);
+    b=gj.getBounds();
+  }
+  _locMini={map:m,marker:null,sel:null,o};
+  if(o.loc&&locNoCE(o.loc.lat,o.loc.lng)){ colocaMarcadorLoc(o.loc.lat,o.loc.lng); m.setView([o.loc.lat,o.loc.lng],16); }
+  else if(b) m.fitBounds(b); else m.setView([-5.2,-39.3],7);
+  m.on('click',e=>locDefine(e.latlng.lat,e.latlng.lng,'mapa'));
+  setTimeout(()=>{ if(_locMini) _locMini.map.invalidateSize(); },0);
+}
+function colocaMarcadorLoc(lat,lng){
+  const L_=_locMini; if(!L_) return;
+  if(L_.marker){ L_.marker.setLatLng([lat,lng]); return; }
+  const icon=L.divIcon({className:'ruas-pin s-sel',html:'',iconSize:[22,22],iconAnchor:[11,11]});
+  L_.marker=L.marker([lat,lng],{icon,draggable:true,keyboard:false}).addTo(L_.map);
+  L_.marker.on('dragend',()=>{ const p=L_.marker.getLatLng(); locDefine(p.lat,p.lng,'mapa'); });
+}
+// define o ponto escolhido (clique, arrasto, texto ou GPS): valida, move o marcador, libera o salvar
+function locDefine(lat,lng,fonte,extra){
+  if(!_locMini) return;
+  const o=_locMini.o, v=locValidaPonto(o,lat,lng);
+  _locMini.sel=v.ok?{lat,lng,fonte}:null;
+  if(isFinite(lat)&&isFinite(lng)&&locNoCE(lat,lng)){
+    colocaMarcadorLoc(lat,lng);
+    if(fonte!=='mapa') _locMini.map.setView([lat,lng],Math.max(_locMini.map.getZoom(),16));
+  }
+  locMsg(v.ok?`${fmtCoord(lat)}, ${fmtCoord(lng)} — ${v.msg}${extra?' '+extra:''}`:v.msg,v.ok?'ok':'erro');
+  const s=document.getElementById('locSalvar'); if(s){ s.disabled=!v.ok; s.textContent='Salvar localização'; }
+}
+function wireLocalizacao(o){
+  const tg=document.querySelector('.modal .adToggle[data-target="mFcLoc"]'); if(!tg) return;
+  tg.addEventListener('click',()=>{ const box=document.getElementById('mFcLoc'); if(box&&!box.hidden) iniciaLocMini(o); });
+  if(!podeLocalizar()) return;
+  const $=id=>document.getElementById(id);
+  document.querySelectorAll('.modal [data-loc-modo]').forEach(b=>{ b.onclick=()=>{
+    document.querySelectorAll('.modal [data-loc-modo]').forEach(x=>{ const on=x===b; x.classList.toggle('on',on); x.setAttribute('aria-pressed',String(on)); });
+    document.querySelectorAll('.modal [data-loc-ent]').forEach(x=>{ x.hidden=x.dataset.locEnt!==b.dataset.locModo; });
+    if(b.dataset.locModo==='digitar'&&$('locTxt')) $('locTxt').focus();
+  }; });
+  const aplica=()=>{
+    const p=parseCoordTexto($('locTxt').value);
+    if(!p){ locMsg('Não entendi as coordenadas. Exemplo: -3.731900, -38.526700','erro'); return; }
+    iniciaLocMini(o); locDefine(p.lat,p.lng,'digitada');
+  };
+  $('locAplicar').onclick=aplica;
+  $('locTxt').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); aplica(); } };
+  $('locGps').onclick=()=>{
+    const info=$('locGpsInfo');
+    if(!navigator.geolocation){ info.textContent='Este navegador não oferece localização.'; return; }
+    info.textContent='Obtendo a posição…';
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const prec=Math.round(pos.coords.accuracy||0);
+      info.textContent=`Posição obtida (precisão de cerca de ${NUM.format(prec)} m).`;
+      iniciaLocMini(o); locDefine(pos.coords.latitude,pos.coords.longitude,'gps',prec>100?'Precisão baixa: confira o marcador antes de salvar.':'');
+    },err=>{
+      info.textContent=err.code===1?'Acesso à localização negado. Autorize no navegador ou marque o ponto no mapa.':'Não foi possível obter a posição agora. Marque o ponto no mapa.';
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  };
+  $('locSalvar').onclick=()=>salvaLocalizacao(o);
+  const rm=$('locRemover'); if(rm) rm.onclick=()=>removeLocalizacao(o,rm);
+}
+function aplicaLocNaObra(x,r){
+  const loc={lat:Number(r.latitude),lng:Number(r.longitude),fonte:r.fonte||'',por:r.atualizado_por||'',em:r.atualizado_em||''};
+  LOCS.set(r.id_obra,loc); x.loc=loc; x._locSt=undefined;
+}
+function locAtualizaTela(o){
+  const rs=document.getElementById('locResumo'); if(rs) rs.innerHTML=locResumoHtml(o);
+  const rp=document.getElementById('locRapido'); if(rp) rp.innerHTML=locRapidoHtml(o);
+  const t=document.querySelector('.modal .adToggle[data-target="mFcLoc"] span');
+  if(t) t.textContent='Localização da obra'+(!o.loc?' — não cadastrada':'');
+  _ruasSig=''; if(ruasAtivo()) render(); // marcadores e contagens do painel
+}
+async function salvaLocalizacao(o){
+  const s=_locMini&&_locMini.sel; if(!s) return;
+  const btn=document.getElementById('locSalvar'); btn.disabled=true; btn.textContent='Salvando…';
+  const alvo=[o];
+  const chk=document.getElementById('locIrmas'); if(chk&&chk.checked) alvo.push(...locIrmasSemPonto(o));
+  const rows=alvo.map(x=>({id_obra:x.id_obra,latitude:+s.lat.toFixed(7),longitude:+s.lng.toFixed(7),fonte:s.fonte}));
+  try{
+    await tokenVigente();
+    const {data,error}=await window.sbClient.from(SB_LOCAL).upsert(rows,{onConflict:'id_obra'}).select(LOC_COLS);
+    if(error) throw error;
+    // RLS que recusa a escrita não dá erro: devolve menos linhas (ou nenhuma)
+    if(!data||data.length<rows.length) throw new Error('o banco não gravou todas as linhas (permissão?)');
+    for(const r of data){ const x=alvo.find(a=>a.id_obra===r.id_obra); if(x) aplicaLocNaObra(x,r); }
+    locAtualizaTela(o);
+    locMsg(`Localização salva${alvo.length>1?` em ${alvo.length} obras`:''}.`,'ok');
+    btn.textContent='Salvar localização'; // continua desabilitado até um novo ponto
+    if(_locMini) _locMini.sel=null;
+  }catch(e){
+    console.error('Falha ao salvar a localização:',e);
+    locMsg('Não foi possível salvar: '+(e&&e.message||e),'erro');
+    btn.disabled=false; btn.textContent='Salvar localização';
+  }
+}
+async function removeLocalizacao(o,btn){
+  if(btn.dataset.armado!=='1'){ // duas etapas no lugar de confirm(): clicar de novo em 4 s confirma
+    btn.dataset.armado='1'; btn.textContent='Clique de novo para remover';
+    setTimeout(()=>{ if(btn.isConnected){ btn.dataset.armado=''; btn.textContent='Remover localização'; } },4000); return;
+  }
+  btn.disabled=true;
+  try{
+    await tokenVigente();
+    const {data,error}=await window.sbClient.from(SB_LOCAL).delete().eq('id_obra',o.id_obra).select('id_obra');
+    if(error) throw error;
+    if(!data||!data.length) throw new Error('o banco não removeu a localização (permissão?)');
+    LOCS.delete(o.id_obra); o.loc=null; o._locSt=undefined;
+    if(_locMini){ if(_locMini.marker){ _locMini.map.removeLayer(_locMini.marker); _locMini.marker=null; } _locMini.sel=null; }
+    locAtualizaTela(o); locMsg('Localização removida.','ok'); btn.remove();
+  }catch(e){
+    console.error('Falha ao remover a localização:',e);
+    locMsg('Não foi possível remover: '+(e&&e.message||e),'erro');
+    btn.disabled=false; btn.dataset.armado=''; btn.textContent='Remover localização';
+  }
+}
+
 // ---- modal com os dados do contrato ----
 function fmtContratoExt(v){
   if(v===null||v===undefined||v==='') return '—';
@@ -3566,7 +4007,7 @@ function buildFichaPane(o,raw){
       +`<div id="mFcCurva" class="fc-curva" hidden>${ultimaTxt?`<div class="fc-hnote">${ultimaTxt}</div>`:''}${rsLineChart(pts)}</div></section>`
     : '';
 
-  return attHTML+bContrato+bTri+bCom+bMed+bCurva;
+  return attHTML+bContrato+bTri+bCom+bMed+bCurva+buildLocCard(o,toggleBtn);
 }
 // obras do mesmo contrato que estão carregadas na tela (DB.municipios[].obras vem do recorte da
 // carteira: na ativa só as obras ativas, no histórico a base inteira). Ordem estável por código.
@@ -3618,6 +4059,7 @@ let _lastModalVoltarChave=null;
 // cabeçalho, mesmo padrão de abreModalFiscal(mat, voltarGid). undefined/null = fluxo
 // normal (obra aberta direto da lista/mapa), com "✕" de sempre.
 function openModal(o,voltarChave){
+  destroyLocMini();
   _lastModalObra=o; _lastModalVoltarChave=voltarChave||null;
   const raw=o.raw||{};
   // 2 abas (remodelação de 04/10/2026): "Ficha Obra" (modelo ficha_obra.pdf; aditivos, medições
@@ -3660,6 +4102,7 @@ function openModal(o,voltarChave){
   wireModalTabs();
   wireFichaObras(irmas,voltarChave);
   wireAdToggles();
+  wireLocalizacao(o);
   wireEletricaPane(o);
 }
 // mapa id do relatório -> número de versão (V1, V2, …), pela ordem de ENVIO (criado_em),
@@ -4144,7 +4587,7 @@ function wireAdToggles(){
     };
   });
 }
-function closeModal(){ _lastModalObra=null; _origemProc=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
+function closeModal(){ destroyLocMini(); _lastModalObra=null; _origemProc=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
 // Fecha OU volta um nível: se a janela do fiscal está aberta por cima de um distrito
 // (o botão "#modalVoltar" existe), Esc e clicar fora devem se comportar como o próprio
 // "← Voltar" faria — não só o clique nele. Sem isso os dois gestos mais comuns de
@@ -5565,6 +6008,7 @@ function renderPanel(){
     const id=st.city, g=grpById(gidOf(id));
     scope.innerHTML=`Município selecionado · ${g.nome.replace(/^D\.O\.\s*/,'')}${resultsSuffix([id])}`;
     body.innerHTML=`<div style="font-family:'Montserrat',sans-serif;font-size:18px;font-weight:700;color:${TOKENS.textBrightest};text-shadow:0 0 20px rgba(${TOKENS.ngRgb},.22)">${DB.municipios[id].nome}</div>`
+      +ruasPainelHtml()
       +`<div class="sec-h" style="margin-top:12px"><span>Contratos</span><span>${obrasOf(id).length}</span></div>`+obrasCards([id]);
   }
 }
@@ -5650,6 +6094,7 @@ function render(){
   }
   setLayer(stateShape, false); // Etapa D: nível 0 removido — stateShape nunca é exibido
   if(st.level===1 && groupLayer) groupLayer.bringToFront();
+  syncRuas(); // antes do painel: ele lê o resumo dos marcadores
   renderCrumb(); renderPanel(); renderFoot(); renderFilterChips(); renderFilterChipsRp();
   syncControlesModo(); renderLegendaReplan();
 }

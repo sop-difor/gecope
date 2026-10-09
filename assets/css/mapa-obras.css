@@ -2247,3 +2247,108 @@
   padding:8px 18px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;
   display:inline-block;text-decoration:none}
 .data-error-box button:hover,.data-error-box .btn-error:hover{background:var(--ng);color:var(--bg-header-1)}
+
+/* ============================================================
+   MAPA DE RUAS E LOCALIZAÇÃO DAS OBRAS (09/10/2026)
+   Botão "Ruas e bairros", pinos, popup de obras no mesmo ponto, bloco do painel e
+   cartão "Localização da obra" da Ficha. Cores só por token; fontes >= 12px (B4).
+   ============================================================ */
+.ruas-btn{display:inline-flex;align-items:center;gap:8px;margin-bottom:10px;padding:9px 13px;cursor:pointer;
+  background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);border:1px solid rgba(var(--raise-rgb),.12);color:var(--text-base);
+  border-radius:11px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3)}
+.ruas-btn[hidden]{display:none}
+.ruas-btn svg{color:var(--ng-light)}
+.ruas-btn:hover{border-color:rgba(var(--ng-rgb),.4)}
+.ruas-btn.on{border-color:rgba(var(--ng-rgb),.55);background:rgba(var(--ng-rgb),.14)}
+.ruas-btn:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
+/* o mapa do OpenStreetMap é claro: no tema escuro ele é escurecido por filtro */
+.theme-dark.modo-ruas .leaflet-tile-pane,.theme-dark .loc-mapa .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.75)}
+/* estado/distrito: os rótulos com as contagens ficam, num fundo que os separa das ruas; com um município aberto
+   só há um contorno e os rótulos dos vizinhos só atrapalham */
+body.modo-ruas .grp-label .lbl,body.modo-ruas .mun-label .lbl{padding:2px 8px;border-radius:8px;background:rgba(var(--panel-rgb),.78)}
+body.modo-ruas[data-ruas-nivel="3"] .mun-label,body.modo-ruas[data-ruas-nivel="3"] .grp-label{display:none}
+/* atribuição do OpenStreetMap: obrigatória, só aparece com o mapa de ruas */
+.leaflet-container .leaflet-control-attribution{display:none;font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-muted);
+  background:rgba(var(--panel-rgb),.9);padding:2px 8px;border-radius:6px 6px 0 0}
+body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet-container .leaflet-control-attribution{display:block}
+.leaflet-container .leaflet-control-attribution a{color:var(--ng-light)}
+
+.ruas-pin{display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:50%;
+  background:var(--status-exec);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#fff}
+.ruas-pin b{font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;line-height:1}
+.ruas-pin.s-exec{background:var(--status-exec)}
+.ruas-pin.s-ok{background:var(--status-ok)}
+.ruas-pin.s-wait{background:var(--status-wait)}
+.ruas-pin.s-wait b{color:#241800}
+.ruas-pin.s-stop{background:var(--status-stop)}
+.ruas-pin.hist{background:var(--text-dim);opacity:.8}
+.ruas-pin.s-sel{background:var(--ng);box-shadow:0 0 0 4px rgba(var(--ng-rgb),.3),0 2px 6px rgba(0,0,0,.45)}
+.leaflet-marker-icon.ruas-pin:hover,.leaflet-marker-icon.ruas-pin:focus-visible{box-shadow:0 0 0 4px rgba(var(--ng-rgb),.4),0 2px 6px rgba(0,0,0,.45);outline:none}
+
+.ruas-popup .leaflet-popup-content-wrapper{background:var(--bg-modal);color:var(--text-base);border-radius:12px;border:1px solid var(--card-border)}
+.ruas-popup .leaflet-popup-tip{background:var(--bg-modal)}
+.ruas-popup .leaflet-popup-content{margin:12px 14px;font-family:Montserrat,sans-serif}
+.ruas-popup a.leaflet-popup-close-button{color:var(--text-dim)}
+.ruas-pop{max-height:260px;overflow:auto}
+.ruas-pop-h{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-label)}
+.ruas-pop-i{display:flex;flex-direction:column;gap:2px;width:100%;margin-top:6px;padding:7px 10px;text-align:left;cursor:pointer;
+  background:transparent;border:1px solid var(--card-border);border-radius:8px;color:inherit;font-family:Montserrat,sans-serif;font-size:12px}
+.ruas-pop-i:hover,.ruas-pop-i:focus-visible{border-color:rgba(var(--ng-rgb),.55);outline:none}
+.ruas-pop-i b{color:var(--text-brightest);font-weight:700}
+.ruas-pop-i span{color:var(--text-dim);font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* painel lateral, nível município com o mapa de ruas ligado */
+.ruas-resumo{margin-top:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:var(--card-bg-2);
+  border:1px solid var(--card-border);border-radius:10px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:500;color:var(--text-base)}
+.ruas-resumo b{color:var(--text-brightest);font-weight:700}
+.ruas-leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-dim)}
+.ruas-dot{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:50%;vertical-align:-1px;background:var(--status-exec)}
+.ruas-dot.s-exec{background:var(--status-exec)}.ruas-dot.s-wait{background:var(--status-wait)}
+.ruas-dot.s-stop{background:var(--status-stop)}.ruas-dot.hist{background:var(--text-dim)}
+.ruas-aviso{font-size:12px;color:var(--status-stop-text)}
+.ruas-sem{display:flex;gap:8px;align-items:baseline;width:100%;margin-top:6px;padding:8px 10px;text-align:left;cursor:pointer;
+  background:transparent;border:1px solid var(--card-border);border-radius:8px;color:var(--text-base);font-family:Montserrat,sans-serif;font-size:12px}
+.ruas-sem:hover,.ruas-sem:focus-visible{border-color:rgba(var(--ng-rgb),.55);outline:none}
+.ruas-sem b{flex:none;color:var(--text-brightest);font-weight:700}
+.ruas-sem span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim);font-weight:500}
+
+/* cartão "Localização da obra" (Ficha) */
+.modal .loc-box{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.modal .loc-box[hidden]{display:none}
+.modal .loc-coord{font-family:Montserrat,sans-serif;font-size:13px;color:var(--text-brightest)}
+.modal .loc-gm{margin-left:10px;font-size:12px;font-weight:600;color:var(--ng-light);text-decoration:none}
+.modal .loc-gm:hover{text-decoration:underline}
+.modal .loc-modos{display:flex;flex-wrap:wrap;gap:6px}
+.modal .loc-modo{height:34px;padding:0 14px;cursor:pointer;border:1px solid var(--card-border);background:transparent;color:var(--text-muted);
+  border-radius:8px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600}
+.modal .loc-modo:hover{border-color:rgba(var(--ng-rgb),.5)}
+.modal .loc-modo.on{background:rgba(var(--ng-rgb),.16);border-color:rgba(var(--ng-rgb),.6);color:var(--text-brightest)}
+.modal .loc-ent[hidden]{display:none}
+.modal .loc-linha{display:flex;gap:8px;margin-bottom:6px}
+.modal .loc-linha input{flex:1;min-width:0;padding:8px 10px;background:var(--card-bg-2);border:1px solid var(--card-border);border-radius:8px;
+  color:var(--text-bright);font-family:Montserrat,sans-serif;font-size:13px}
+.modal .loc-linha input:focus{outline:2px solid var(--ng);outline-offset:1px}
+.modal .loc-mapa{height:300px;border:1px solid var(--card-border);border-radius:10px;overflow:hidden;background:var(--map-field)}
+.modal .loc-msg{min-height:18px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600;color:var(--text-muted)}
+.modal .loc-msg.ok{color:var(--status-ok)}
+.modal .loc-msg.erro{color:var(--status-stop-text)}
+.modal .loc-chk{display:flex;gap:8px;align-items:flex-start;font-family:Montserrat,sans-serif;font-size:12.5px;color:var(--text-base);cursor:pointer}
+.modal .loc-chk input{margin-top:2px;accent-color:var(--ng)}
+.modal .loc-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.modal .loc-btn{height:36px;padding:0 16px;cursor:pointer;border:1px solid rgba(var(--ng-rgb),.4);background:rgba(var(--ng-rgb),.1);color:var(--text-brightest);
+  border-radius:8px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700}
+.modal .loc-btn:hover:not(:disabled){border-color:rgba(var(--ng-rgb),.65);background:rgba(var(--ng-rgb),.18)}
+.modal .loc-btn:disabled{opacity:.45;cursor:not-allowed}
+.modal .loc-btn.prim{background:var(--ng);border-color:var(--ng);color:var(--bg-header-1)}
+.modal .loc-btn.prim:hover:not(:disabled){background:var(--ng-mid);border-color:var(--ng-mid)}
+.modal .loc-btn.perigo{border-color:rgba(var(--status-stop-rgb),.5);background:transparent;color:var(--status-stop-text)}
+.modal .loc-btn.perigo:hover:not(:disabled){background:rgba(var(--status-stop-rgb),.12)}
+.modal .loc-btn:focus-visible,.modal .loc-modo:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
+.modal .loc-rapido{margin-top:10px}
+.modal .loc-rapido:empty{display:none}
+.modal .loc-rota{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;text-decoration:none;
+  border:1px solid rgba(var(--ng-rgb),.5);background:rgba(var(--ng-rgb),.12);color:var(--text-brightest);
+  border-radius:8px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700}
+.modal .loc-rota:hover{border-color:rgba(var(--ng-rgb),.75);background:rgba(var(--ng-rgb),.2)}
+.modal .loc-rota:focus-visible{outline:2px solid var(--ng);outline-offset:2px}
+.modal .loc-rota svg{color:var(--ng-light)}
