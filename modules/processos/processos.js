@@ -780,6 +780,289 @@ function selecionarFiscalCadastro(btnEl, nome, matricula) {
     }
 }
 
+// --- Gerenciar Processo: base de cálculo dos percentuais da Análise financeira ---
+// Acréscimo, Supressão e Repercussão são mostrados também como % do "valor inicial atualizado"
+// do contrato = valor original + reajuste + realinhamento (NUNCA o valor atual do SIGSOP, que
+// já embute os aditivos — comparar um aditivo com um valor que o contém subestimaria o peso dele).
+//
+// Escopo: quando a obra pertence a um contrato com ficha (ficha_contrato), a base é a do CONTRATO
+// inteiro (original e realinhamento da ficha + soma do reajuste das obras do contrato — a ficha
+// não guarda reajuste). Sem ficha (obras antigas, sem id_contrato), a base é a da própria obra.
+// Em ambos os casos o resultado reproduz valor_atual − total_aditivo, conferido no banco em
+// 09/10/2026 (245 de 247 contratos). A origem aparece na tela para o usuário saber qual valeu.
+// Tudo é calculado no navegador; nada é gravado. Leitura liberada a todos os papéis do app
+// (contratos_edificacao_pode_ler), então não há migração.
+//
+// Aditivos: a composição também lista os aditivos de valor já formalizados (aditivos_contrato). A tabela
+// NÃO tem id_obra — a chave é o nr_contrato_sop —, então em contrato com várias obras a lista é
+// do contrato inteiro. A mesma leitura liberada vale (política "leitura autenticada aditivos_contrato").
+const BASE_CONTRATO_TTL_MS = 10 * 60 * 1000;
+const GP_ADIT_COLS = 'nr_aditivo,tipo_aditivo,valor_aprovado,valor_supressao,valor_repercussao,data_publicacao,data_assinatura';
+const baseContratoCache = new Map(); // codigo_obra -> { em, base } (só bases válidas)
+let baseContratoDetalhes = { estado: 'vazio', motivo: 'sem-codigo' };
+let baseContratoReq = 0; // descarta resposta de uma consulta que ficou velha (modal reaberto/Vincular)
+
+// Aditivos DE VALOR formalizados do contrato, do mais recente ao mais antigo. Só entram os que
+// alteram valor — tipo_aditivo começando em "Valor" (Valor; Valor e vigência; Valor e execução;
+// Valor, vigência e execução). Ficam de fora os de prazo/execução/vigência e também "Reajuste de
+// Preço"/"Reajuste de Medição": o reajuste já compõe a base, contá-lo aqui seria duplicar.
+// [] = sem número de contrato ou nenhum aditivo; null = a consulta falhou (a base continua
+// valendo sem a lista).
+async function buscarAditivosDoContrato(nrContrato) {
+    const nr = (nrContrato || '').toString().trim();
+    if (!nr) return [];
+    try {
+        const { data, error } = await sbClient.from('aditivos_contrato').select(GP_ADIT_COLS)
+            .eq('nr_contrato_sop', nr).ilike('tipo_aditivo', 'valor%');
+        if (error) throw error;
+        const dataDe = a => a.data_publicacao || a.data_assinatura || '';
+        return (data || []).slice().sort((a, b) => dataDe(b).localeCompare(dataDe(a)));
+    } catch (e) {
+        console.error('[ERRO] buscarAditivosDoContrato:', e);
+        return null;
+    }
+}
+
+async function buscarBaseContrato(codigo) {
+    const cod = (codigo || '').trim();
+    if (!cod) return { estado: 'vazio', motivo: 'sem-codigo' };
+    const emCache = baseContratoCache.get(cod);
+    if (emCache && Date.now() - emCache.em < BASE_CONTRATO_TTL_MS) return emCache.base;
+
+    const n = v => Number(v) || 0;
+    try {
+        const { data: obra, error } = await sbClient
+            .from('contratos_edificacao')
+            .select('id_obra, id_contrato, nr_contrato_sop, valor_original, total_reajuste, total_realinhado')
+            .eq('codigo_obra', cod)
+            .maybeSingle();
+        if (error) throw error;
+        if (!obra) return { estado: 'vazio', motivo: 'nao-encontrada' };
+
+        // Dispara já: corre em paralelo com a ficha. Nunca rejeita (trata o próprio erro).
+        const pAditivos = buscarAditivosDoContrato(obra.nr_contrato_sop);
+
+        let ficha = null;
+        let obrasDoContrato = [];
+        if (obra.id_contrato != null) {
+            const [rFicha, rObras] = await Promise.all([
+                sbClient.from('ficha_contrato').select('valor_original, total_realinhado')
+                    .eq('id_contrato', obra.id_contrato).maybeSingle(),
+                sbClient.from('contratos_edificacao').select('total_reajuste')
+                    .eq('id_contrato', obra.id_contrato)
+            ]);
+            if (rFicha.error) throw rFicha.error;
+            if (rObras.error) throw rObras.error;
+            ficha = rFicha.data;
+            obrasDoContrato = rObras.data || [];
+        }
+
+        let base;
+        if (ficha && n(ficha.valor_original) > 0) {
+            const reajuste = obrasDoContrato.reduce((s, o) => s + n(o.total_reajuste), 0);
+            base = {
+                estado: 'ok', origem: 'contrato', numero: obra.nr_contrato_sop || '',
+                obras: obrasDoContrato.length || 1,
+                original: n(ficha.valor_original), reajuste, realinhamento: n(ficha.total_realinhado)
+            };
+        } else if (n(obra.valor_original) > 0) {
+            base = {
+                estado: 'ok', origem: 'obra', codigo: cod,
+                original: n(obra.valor_original), reajuste: n(obra.total_reajuste),
+                realinhamento: n(obra.total_realinhado)
+            };
+        } else {
+            return { estado: 'vazio', motivo: 'sem-valor' };
+        }
+        base.total = Number((base.original + base.reajuste + base.realinhamento).toFixed(2));
+        base.codigoObra = cod;
+        base.aditivos = await pAditivos;
+        baseContratoCache.set(cod, { em: Date.now(), base });
+        return base;
+    } catch (e) {
+        console.error('[ERRO] buscarBaseContrato:', e);
+        return { estado: 'erro' };
+    }
+}
+
+// Zera a faixa (estado "carregando"), busca a base do código e repinta quando a resposta chega.
+function carregarBaseContratoDetalhes(codigo) {
+    const req = ++baseContratoReq;
+    baseContratoDetalhes = { estado: 'carregando' };
+    const comp = document.getElementById('det_base_comp');
+    if (comp) comp.classList.remove('show');
+    renderBaseContratoDetalhes();
+    atualizarPercentuaisDetalhes();
+    return buscarBaseContrato(codigo).then(base => {
+        if (req !== baseContratoReq) return;
+        baseContratoDetalhes = base;
+        renderBaseContratoDetalhes();
+        atualizarPercentuaisDetalhes();
+    });
+}
+
+function renderBaseContratoDetalhes() {
+    const box = document.getElementById('det_base');
+    if (!box) return;
+    const b = baseContratoDetalhes;
+    const reais = v => 'R$ ' + formatCurrencyValue(v);
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    box.dataset.estado = b.estado;
+
+    let origem = '';
+    if (b.estado === 'carregando') origem = 'Carregando…';
+    else if (b.estado === 'erro') origem = 'Não foi possível carregar a base. Feche e abra o processo para tentar de novo.';
+    else if (b.estado === 'vazio') {
+        origem = b.motivo === 'sem-valor'
+            ? 'Sem base: a obra não tem valor original cadastrado.'
+            : 'Sem base: vincule a obra pelo Código da Obra.';
+    } else if (b.origem === 'contrato') {
+        const obras = `${b.obras} ${b.obras === 1 ? 'obra' : 'obras'}`;
+        origem = `${b.numero ? 'Contrato ' + b.numero : 'Contrato'} · ${obras}`;
+    } else {
+        origem = `Obra ${b.codigo} · sem ficha de contrato`;
+    }
+    set('det_base_origem', origem);
+    set('det_base_valor', b.estado === 'ok' ? reais(b.total) : '—');
+    set('det_base_original', b.estado === 'ok' ? reais(b.original) : '—');
+    set('det_base_reajuste', b.estado === 'ok' ? reais(b.reajuste) : '—');
+    set('det_base_realinhamento', b.estado === 'ok' ? reais(b.realinhamento) : '—');
+
+    const toggle = document.getElementById('det_base_toggle');
+    if (toggle) toggle.hidden = b.estado !== 'ok';
+    renderAditivosBaseDetalhes();
+}
+
+// "+R$ 1.234,56" / "−R$ 1.234,56" / "R$ 0,00"
+function gpReaisComSinal(v) {
+    const n = Number(v) || 0;
+    if (Math.abs(n) < 0.005) return 'R$ 0,00';
+    return (n < 0 ? '−' : '+') + 'R$ ' + formatCurrencyValue(Math.abs(n));
+}
+
+function gpDataBr(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
+}
+
+// Dentro de "Ver composição" da Base de cálculo: (1) aditivos já formalizados do contrato e
+// (2) os outros processos desta mesma obra no GECOPE (vêm de window.allData, sem consulta).
+// Tudo por textContent — o conteúdo é dado do banco.
+function renderAditivosBaseDetalhes() {
+    const blocoAd = document.getElementById('det_base_aditivos');
+    const blocoPr = document.getElementById('det_base_outros');
+    if (!blocoAd || !blocoPr) return;
+    const b = baseContratoDetalhes;
+    const el = (tag, cls, txt) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (txt !== undefined) e.textContent = txt;
+        return e;
+    };
+
+    if (b.estado !== 'ok') { blocoAd.hidden = true; blocoPr.hidden = true; return; }
+
+    // (1) aditivos formalizados
+    const listaAd = document.getElementById('det_base_adit_lista');
+    const resumoAd = document.getElementById('det_base_adit_resumo');
+    const notaAd = document.getElementById('det_base_adit_nota');
+    blocoAd.hidden = false;
+    listaAd.replaceChildren();
+    notaAd.textContent = '';
+    const ads = b.aditivos;
+    if (ads === null || ads === undefined) {
+        resumoAd.textContent = 'Não foi possível carregar os aditivos.';
+    } else if (!ads.length) {
+        resumoAd.textContent = 'Nenhum aditivo de valor formalizado registrado para este contrato.';
+    } else {
+        const soma = Number(ads.reduce((s, a) => s + (Number(a.valor_repercussao) || 0), 0).toFixed(2));
+        let txt = `${ads.length} ${ads.length === 1 ? 'aditivo de valor' : 'aditivos de valor'} · repercussão ${gpReaisComSinal(soma)}`;
+        // O percentual só faz sentido quando a base também é do contrato inteiro.
+        if (b.origem === 'contrato' && b.total > 0) {
+            txt += ` (${formatarPercentualBase(soma, b.total).texto} da base)`;
+        }
+        resumoAd.textContent = txt;
+        ads.forEach(a => {
+            const li = el('li', 'gp-adit-item');
+            li.appendChild(el('span', 'gp-adit-nome', a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : 'Aditivo'));
+            li.appendChild(el('span', 'gp-adit-tipo', a.tipo_aditivo || '—'));
+            li.appendChild(el('span', 'gp-adit-data', gpDataBr(a.data_publicacao || a.data_assinatura)));
+            const rep = Number(a.valor_repercussao) || 0;
+            const v = el('span', 'gp-adit-valor' + (rep < -0.004 ? ' gp-val-neg' : rep > 0.004 ? ' gp-val-pos' : ''),
+                gpReaisComSinal(rep));
+            li.appendChild(v);
+            listaAd.appendChild(li);
+        });
+        const multi = b.origem === 'contrato' && b.obras > 1;
+        notaAd.textContent = (multi
+            ? 'Os aditivos são registrados por contrato: esta lista reúne as obras do contrato.'
+            : 'Os aditivos são registrados por contrato (SIGSOP), não por obra.')
+            + ' Só aditivos de valor; os reajustes já compõem a base.';
+    }
+
+    // (2) outros processos desta obra no GECOPE
+    const listaPr = document.getElementById('det_base_outros_lista');
+    listaPr.replaceChildren();
+    const atual = ((document.getElementById('det_processo') || {}).value || '').trim();
+    const cod = (b.codigoObra || '').trim();
+    const outros = cod ? (window.allData || []).filter(r =>
+        r.codigoObra && String(r.codigoObra).trim() === cod && r.processo !== atual && r.status !== 'EXCLUÍDO') : [];
+    if (!outros.length) { blocoPr.hidden = true; return; }
+    blocoPr.hidden = false;
+    outros.sort((x, y) => ((y.dataAbertura && y.dataAbertura.getTime && y.dataAbertura.getTime()) || 0)
+        - ((x.dataAbertura && x.dataAbertura.getTime && x.dataAbertura.getTime()) || 0));
+    outros.forEach(r => {
+        const li = el('li', 'gp-adit-item');
+        li.appendChild(el('span', 'gp-adit-nome', r.processo || '—'));
+        const selo = el('span', 'gp-adit-selo ' + classeBadgeStatus(r.status), (r.status || '—'));
+        li.appendChild(selo);
+        const rep = Number(r.repercGecope) || 0;
+        li.appendChild(el('span', 'gp-adit-valor' + (rep < -0.004 ? ' gp-val-neg' : rep > 0.004 ? ' gp-val-pos' : ''),
+            gpReaisComSinal(rep)));
+        listaPr.appendChild(li);
+    });
+}
+
+// "+4,87%", "−0,08%", "0,00%" — sinal sempre explícito (menos tipográfico), 2 casas.
+function formatarPercentualBase(valor, base) {
+    const p = Math.round((valor / base) * 10000) / 100;
+    if (p === 0) return { texto: '0,00%', sinal: 0 };
+    const abs = Math.abs(p).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return { texto: (p > 0 ? '+' : '−') + abs + '%', sinal: p > 0 ? 1 : -1 };
+}
+
+// Repinta os 6 percentuais (Fiscalização/GECOPE × Acréscimo/Supressão/Repercussão) a partir dos
+// campos de valor. Chamada a cada tecla (via calcularRepercussao) e quando a base muda.
+function atualizarPercentuaisDetalhes() {
+    const b = baseContratoDetalhes;
+    const temBase = b.estado === 'ok' && b.total > 0;
+    const reais = v => 'R$ ' + formatCurrencyValue(v);
+    const valorDe = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
+
+    ['f', 'g'].forEach(col => {
+        const vA = valorDe(`det_acresc_${col}`);
+        const vS = valorDe(`det_supress_${col}`);
+        const itens = [['acresc', vA], ['supress', vS], ['reperc', Number((vA + vS).toFixed(2))]];
+        itens.forEach(([chave, valor]) => {
+            const el = document.getElementById(`pct_${chave}_${col}`);
+            if (!el) return;
+            el.classList.remove('is-pos', 'is-neg', 'is-zero', 'is-na');
+            if (temBase) {
+                const { texto, sinal } = formatarPercentualBase(valor, b.total);
+                el.textContent = texto;
+                el.classList.add(sinal > 0 ? 'is-pos' : sinal < 0 ? 'is-neg' : 'is-zero');
+                el.title = `${reais(valor)} ÷ ${reais(b.total)} (base de cálculo)`;
+            } else {
+                el.textContent = b.estado === 'carregando' ? '…' : '—';
+                el.classList.add('is-na');
+                el.title = b.estado === 'carregando' ? 'Calculando a base…' : 'Sem base de cálculo para o percentual';
+            }
+        });
+    });
+    // A camada de leitura da Análise financeira espelha estes spans (ver gpAtualizarResumo).
+    if (typeof gpAtualizarResumo === 'function') gpAtualizarResumo();
+}
+
 // --- Gerenciar Processo: vincular/atualizar obra de um processo já cadastrado (admin) ---
 async function buscarObraDetalhes() {
     await garantirFiscaisCarregados();
@@ -824,6 +1107,10 @@ async function buscarObraDetalhes() {
 
     statusEl.className = 'form-text text-success';
     statusEl.textContent = 'Obra encontrada — revise os campos e clique em "Salvar Alterações" para confirmar o vínculo.';
+    carregarBaseContratoDetalhes(codigo);
+    // Os campos preenchidos acima moram em várias seções (Responsáveis, Descrição, Obra): a
+    // camada de leitura delas precisa refletir o vínculo e marcá-las como alteradas.
+    gpAtualizarResumo();
 }
 
 // --- LIMPAR ARQUIVOS DE COMENTÁRIOS RESOLVIDOS ---
@@ -1746,6 +2033,224 @@ function atualizarBadgeAba(elId, count) {
     }
 }
 
+// --- GERENCIAR PROCESSO: ficha em modo leitura, edição seção a seção ---
+// A janela abre como uma ficha: cada seção ([data-gp-secao]) mostra os dados formatados
+// (camada .gp-view) e só revela os campos (camada .gp-edit) quando a pessoa clica em "Editar".
+// Os campos continuam sendo os mesmos — ids `det_*` e names intactos —, porque a validação,
+// o payload de executarAcaoDetalhes e as automações leem por eles. A camada de leitura é só
+// um espelho: gpAtualizarResumo() a repinta a partir dos campos.
+//
+// "Concluir" não grava: volta à leitura e deixa a seção marcada como alterada. Quem grava é
+// o botão "Salvar alterações" do rodapé, que continua sendo um só (uma validação, um UPDATE).
+//
+// Armadilha: nunca trocar `display:none` por `disabled` para esconder campo. Campo desabilitado
+// some do FormData, e o payload é montado com `new FormData(form)`.
+const GP_CAMPO_SEL = 'input[id], select[id], textarea[id]';
+const GP_TXT_VAZIO = 'Não informado';
+let gpBaseline = {};                // id do campo -> valor ao abrir o processo
+const gpSnapshots = new WeakMap();  // seção -> valores ao entrar em edição (para Cancelar)
+
+function gpModal() { return document.getElementById('modalDetalhes'); }
+
+function gpSecoes() {
+    const modal = gpModal();
+    return modal ? Array.from(modal.querySelectorAll('[data-gp-secao]')) : [];
+}
+
+function gpCamposDe(secao) { return Array.from(secao.querySelectorAll(GP_CAMPO_SEL)); }
+
+function gpLerCampos(secao) {
+    const valores = {};
+    gpCamposDe(secao).forEach(el => { valores[el.id] = el.value; });
+    return valores;
+}
+
+// Devolve os valores aos campos e refaz o que depende deles (cor do status, repercussão,
+// contagem de dias) — mexer em `.value` por script não dispara os handlers de `input`.
+function gpAplicarCampos(valores) {
+    Object.keys(valores).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = valores[id];
+    });
+    aplicarCorStatusSelect(document.getElementById('det_status'));
+    calcularRepercussao();
+    calcularDiasDevolucao();
+}
+
+function gpCapturarBaseline() {
+    gpBaseline = {};
+    gpSecoes().forEach(secao => {
+        gpCamposDe(secao).forEach(el => { gpBaseline[el.id] = el.value; });
+    });
+}
+
+function gpSecaoAlterada(secao) {
+    return gpCamposDe(secao).some(el =>
+        el.id !== 'det_processo' && (el.id in gpBaseline) && gpBaseline[el.id] !== el.value);
+}
+
+function gpResetarModos() {
+    gpSecoes().forEach(secao => {
+        secao.dataset.gpModo = 'leitura';
+        secao.dataset.gpSujo = '0';
+        gpSnapshots.delete(secao);
+    });
+}
+
+function gpEditar(secao, { focar = true } = {}) {
+    if (!secao || secao.dataset.gpModo === 'edicao') return;
+    gpSnapshots.set(secao, gpLerCampos(secao));
+    secao.dataset.gpModo = 'edicao';
+    if (!focar) return;
+    const primeiro = gpCamposDe(secao).find(el => !el.disabled && !el.readOnly && el.offsetParent !== null);
+    if (primeiro) primeiro.focus();
+}
+
+function gpConcluir(secao) {
+    if (!secao) return;
+    secao.dataset.gpModo = 'leitura';
+    gpSnapshots.delete(secao);
+    gpAtualizarResumo();
+}
+
+function gpCancelar(secao) {
+    if (!secao) return;
+    const snap = gpSnapshots.get(secao);
+    if (snap) gpAplicarCampos(snap);
+    gpConcluir(secao);
+}
+
+// Descarta o que foi alterado na seção desde que o processo foi aberto.
+function gpDesfazer(secao) {
+    if (!secao) return;
+    const base = {};
+    gpCamposDe(secao).forEach(el => { if (el.id in gpBaseline) base[el.id] = gpBaseline[el.id]; });
+    gpAplicarCampos(base);
+    gpAtualizarResumo();
+}
+
+// Abre a seção que contém o campo, para a validação poder apontar para ele. Sem isto, um
+// campo obrigatório vazio ficaria escondido atrás da camada de leitura.
+function gpRevelarCampo(idOuEl) {
+    const el = typeof idOuEl === 'string' ? document.getElementById(idOuEl) : idOuEl;
+    const secao = el && el.closest ? el.closest('[data-gp-secao]') : null;
+    if (secao && secao.dataset.gpModo !== 'edicao') gpEditar(secao, { focar: false });
+}
+
+// Permissões da tela. O banco é quem decide de verdade (política `processos_update`); isto só
+// evita oferecer um botão que levaria a um erro.
+function gpAplicarPermissoes(podeEditar, isAdmin) {
+    const modal = gpModal();
+    if (!modal) return;
+    modal.dataset.gpSomenteLeitura = podeEditar ? '0' : '1';
+    modal.querySelectorAll('[data-gp-requer="admin"] .gp-btn-editar').forEach(btn => {
+        btn.disabled = !isAdmin;
+        btn.title = isAdmin ? '' : 'Restrito a administradores.';
+    });
+}
+
+function gpPreencherValor(el) {
+    const src = document.getElementById(el.dataset.gpV);
+    let txt = '';
+    if (src) {
+        if (src.tagName === 'SELECT') {
+            const opt = src.selectedOptions && src.selectedOptions[0];
+            txt = (opt && src.value) ? opt.textContent.trim() : '';
+        } else {
+            txt = (src.value || '').trim();
+        }
+    }
+
+    el.classList.remove('gp-val-neg', 'gp-val-pos');
+    if (el.dataset.gpFmt === 'money' && txt) {
+        const n = parseMoneyInput(txt);
+        txt = (n < 0 ? '−' : '') + 'R$ ' + formatCurrencyValue(Math.abs(n));
+        if ('gpSinal' in el.dataset) {
+            if (n < -0.004) el.classList.add('gp-val-neg');
+            else if (n > 0.004) el.classList.add('gp-val-pos');
+        }
+    }
+
+    // Complemento ao lado do valor (ex.: "12 dias" da Devolução p/ correções), só quando há valor.
+    if (txt && el.dataset.gpExtra) {
+        const extra = document.getElementById(el.dataset.gpExtra);
+        const extraTxt = extra ? extra.textContent.replace(/\s+/g, ' ').trim() : '';
+        if (extraTxt && /\d/.test(extraTxt)) txt += ' (' + extraTxt + ')';
+    }
+
+    el.classList.toggle('is-vazio', !txt);
+    el.textContent = txt || GP_TXT_VAZIO;
+}
+
+// Repinta toda a camada de leitura, o selo de status, os percentuais espelhados, o marcador
+// "alterado" de cada seção e o aviso do rodapé. Barato (≈30 campos): pode rodar a cada tecla.
+function gpAtualizarResumo() {
+    const modal = gpModal();
+    if (!modal) return;
+
+    modal.querySelectorAll('[data-gp-v]').forEach(gpPreencherValor);
+
+    const sel = document.getElementById('det_status');
+    const pill = document.getElementById('det_status_view');
+    if (sel && pill) {
+        GP_STATUS_BADGE_CLASSES.forEach(c => pill.classList.remove(c));
+        const cls = classeBadgeStatus(sel.value);
+        if (cls) pill.classList.add(cls);
+        const opt = sel.selectedOptions && sel.selectedOptions[0];
+        pill.textContent = opt ? opt.textContent.trim() : (sel.value || GP_TXT_VAZIO);
+    }
+
+    // Percentuais: quem calcula é atualizarPercentuaisDetalhes (nos spans da camada de edição);
+    // aqui só se copia o resultado para a leitura.
+    modal.querySelectorAll('[data-gp-espelha]').forEach(el => {
+        const src = document.getElementById(el.dataset.gpEspelha);
+        if (!src) return;
+        el.textContent = src.textContent;
+        el.title = src.title;
+        ['is-pos', 'is-neg', 'is-zero', 'is-na'].forEach(c => el.classList.toggle(c, src.classList.contains(c)));
+    });
+
+    let alteradas = 0;
+    gpSecoes().forEach(secao => {
+        const alterada = gpSecaoAlterada(secao);
+        secao.dataset.gpSujo = alterada ? '1' : '0';
+        if (alterada) alteradas++;
+    });
+    const aviso = document.getElementById('gp-aviso-sujo');
+    if (aviso) aviso.hidden = alteradas === 0;
+}
+
+function gpInicializarFicha() {
+    const modal = gpModal();
+    if (!modal || modal.dataset.gpFichaPronta) return;
+    modal.dataset.gpFichaPronta = '1';
+
+    modal.addEventListener('click', ev => {
+        const btn = ev.target.closest ? ev.target.closest('[data-gp-acao]') : null;
+        if (!btn || btn.disabled) return;
+        const secao = btn.closest('[data-gp-secao]');
+        if (!secao) return;
+        switch (btn.dataset.gpAcao) {
+            case 'editar': gpEditar(secao); break;
+            case 'concluir': gpConcluir(secao); break;
+            case 'cancelar': gpCancelar(secao); break;
+            case 'desfazer': gpDesfazer(secao); break;
+        }
+    });
+
+    const form = document.getElementById('formDetalhes');
+    if (form) {
+        form.addEventListener('input', gpAtualizarResumo);
+        form.addEventListener('change', gpAtualizarResumo);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', gpInicializarFicha);
+} else {
+    gpInicializarFicha();
+}
+
 async function abrirDetalhes(processoStr) {
     // garante que a role local esteja atualizada com o servidor
     await refreshUserRole();
@@ -1754,6 +2259,7 @@ async function abrirDetalhes(processoStr) {
     if (!row) { alert("Erro: Dados não encontrados na memória."); return; }
 
     resetarAbasGerenciarProcesso();
+    gpResetarModos();
 
     document.getElementById('det_processo').value = row.processo;
     document.getElementById('det_tipo').value = row.tipo;
@@ -1783,6 +2289,7 @@ async function abrirDetalhes(processoStr) {
     if (document.getElementById('det_distrito')) document.getElementById('det_distrito').value = row.distritoOperacional || '';
     if (document.getElementById('det_municipio')) document.getElementById('det_municipio').value = row.municipio || '';
     if (document.getElementById('det_obra_status')) document.getElementById('det_obra_status').textContent = '';
+    carregarBaseContratoDetalhes(row.codigoObra);
 
     // Seleciona pelo vínculo estável (fiscal_matricula); cai no nome só para processos
     // antigos ainda sem matrícula. "Não informado" é fallback de exibição, não é nome real.
@@ -1914,6 +2421,13 @@ async function abrirDetalhes(processoStr) {
 
     // Buscar Curva ABC do processo (resumo + versões anteriores)
     if (typeof carregarCurvaAbcResumo === 'function') carregarCurvaAbcResumo(processoStr, row.id);
+
+    // Ficha em leitura: a repercussão é recalculada AGORA (o setTimeout acima só a repete) para
+    // o baseline já nascer com o valor final; senão ela apareceria como "alterada" ao abrir.
+    calcularRepercussao('det');
+    gpCapturarBaseline();
+    gpAplicarPermissoes(podeEditar, isAdmin);
+    gpAtualizarResumo();
 
     const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
     modal.show();
@@ -2114,6 +2628,7 @@ async function executarAcaoDetalhes(actionType) {
             const el = document.getElementById(campo.id);
             if (!el || !el.value.trim()) {
                 if (campo.tab) mostrarAbaGerenciarProcesso(campo.tab);
+                gpRevelarCampo(el || campo.id);
                 alert(`O campo "${campo.nome}" é obrigatório.`);
                 // `el.focus()` sem guarda estourava justamente no caso `!el` (campo ausente
                 // no HTML), trocando o aviso legível por um erro de script. — 22/09/2026
@@ -2129,6 +2644,7 @@ async function executarAcaoDetalhes(actionType) {
             const valRecebimento = document.getElementById('det_data_recebimento').value.trim();
             if (!valRecebimento) {
                 mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
+                gpRevelarCampo('det_data_recebimento');
                 alert("Para o status 'AGUAR. ANÁLISE', o campo 'Recebimento' é obrigatório.");
                 document.getElementById('det_data_recebimento').focus();
                 return;
@@ -2140,6 +2656,7 @@ async function executarAcaoDetalhes(actionType) {
             const valDevolucao = document.getElementById('det_data_devolucao').value.trim();
             if (!valDevolucao) {
                 mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
+                gpRevelarCampo('det_data_devolucao');
                 alert("Para o status 'REANÁLISE FISCAL', o campo 'Devolução p/ Correções' é obrigatório.");
                 document.getElementById('det_data_devolucao').focus();
                 return;
@@ -2154,6 +2671,9 @@ async function executarAcaoDetalhes(actionType) {
 
             if (!valAcrescG || !valSupressG || !valAprovacaoG) {
                 mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
+                // Abre as duas seções envolvidas (financeira e cronograma), já que o aviso cita ambas.
+                if (!valAcrescG || !valSupressG) gpRevelarCampo('det_acresc_g');
+                if (!valAprovacaoG) gpRevelarCampo('det_data_aprovacao');
                 alert(`Para o status "${statusAtual}", os campos de ACRÉSCIMO (GECOPE), SUPRESSÃO (GECOPE) e APROVAÇÃO GECOPE devem estar preenchidos.`);
                 return;
             }
@@ -2462,6 +2982,7 @@ function calcularRepercussao() {
                 else { elR.classList.add('text-dark'); elR.value = "0,00"; }
             }
         });
+        atualizarPercentuaisDetalhes();
     } catch (err) {
         console.error('Erro no cálculo:', err);
     }

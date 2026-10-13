@@ -4370,6 +4370,515 @@
             border-color: rgba(255, 255, 255, 0.1) !important;
         }
 
+        /* ANÁLISE FINANCEIRA — base de cálculo e percentuais (processos.js:
+           carregarBaseContratoDetalhes / atualizarPercentuaisDetalhes). A faixa é referência,
+           não entrada: fundo neutro e filete fino, sem cor de destaque — o destaque continua
+           sendo o que o usuário digita. Números em algarismos tabulares para os % alinharem. */
+        .gp-base {
+            margin-bottom: 1.5rem;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--sop-slate-200, #e2e8f0);
+            border-left: 3px solid var(--sop-slate-500, #64748b);
+            border-radius: 8px;
+            background: var(--sop-slate-50, #f8fafc);
+        }
+        .gp-base[data-estado="vazio"],
+        .gp-base[data-estado="erro"] {
+            border-left-color: #b7791f;
+        }
+        .gp-base-topo {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 0.25rem 1.5rem;
+        }
+        .gp-base-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.125rem;
+            min-width: 0;
+        }
+        .gp-base-titulo {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-heading, #0f172a);
+        }
+        .gp-base-origem {
+            font-size: 0.8rem;
+            color: var(--sop-slate-600, #475569);
+        }
+        .gp-base-resumo {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.125rem;
+        }
+        .gp-base-valor {
+            font-size: 1.15rem;
+            font-weight: 600;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-heading, #0f172a);
+        }
+        .gp-base-toggle {
+            padding: 0;
+            border: 0;
+            background: none;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--sop-green, #007233);
+            cursor: pointer;
+        }
+        .gp-base-toggle:hover { text-decoration: underline; }
+        .gp-base-toggle:focus-visible {
+            outline: 2px solid var(--sop-green, #007233);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+        .gp-base-toggle .bi { font-size: 0.7rem; transition: transform 0.2s ease; }
+        .gp-base-toggle[aria-expanded="true"] .bi { transform: rotate(180deg); }
+        .gp-base-lista {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.25rem 1.5rem;
+            width: min(100%, 22rem);
+            margin: 0.75rem 0 0 auto;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--sop-slate-200, #e2e8f0);
+            font-size: 0.8rem;
+        }
+        .gp-base-lista dt { font-weight: 400; color: var(--sop-slate-600, #475569); }
+        .gp-base-lista dd {
+            margin: 0;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-heading, #0f172a);
+        }
+        @media (max-width: 575.98px) {
+            .gp-base-resumo { align-items: flex-start; }
+            .gp-base-lista { margin-left: 0; }
+        }
+
+        /* Composição da base: aditivos formalizados e outros processos da obra. Referência,
+           como o resto da faixa — peso normal, sem cor de destaque além do sinal do valor. */
+        .gp-base-bloco {
+            margin-top: 0.9rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--sop-slate-200, #e2e8f0);
+        }
+        .gp-base-bloco-titulo {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-heading, #0f172a);
+        }
+        .gp-base-bloco-resumo,
+        .gp-base-bloco-nota {
+            margin-top: 0.15rem;
+            font-size: 0.78rem;
+            color: var(--sop-slate-600, #475569);
+        }
+        .gp-base-bloco-nota:empty { display: none; }
+        .gp-adit-lista {
+            list-style: none;
+            margin: 0.5rem 0 0;
+            padding: 0;
+            max-height: 14rem;
+            overflow-y: auto;
+        }
+        .gp-adit-lista:empty { display: none; }
+        .gp-adit-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            align-items: baseline;
+            gap: 0.1rem 1rem;
+            padding: 0.4rem 0;
+            border-top: 1px solid var(--sop-slate-200, #e2e8f0);
+            font-size: 0.8rem;
+        }
+        .gp-adit-item:first-child { border-top: 0; }
+        .gp-adit-nome { color: var(--text-heading, #0f172a); overflow-wrap: anywhere; }
+        .gp-adit-tipo {
+            grid-column: 1;
+            grid-row: 2;
+            color: var(--sop-slate-600, #475569);
+            overflow-wrap: anywhere;
+        }
+        .gp-adit-data {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            align-self: center;
+            color: var(--sop-slate-600, #475569);
+            font-variant-numeric: tabular-nums;
+        }
+        .gp-adit-valor {
+            grid-column: 3;
+            grid-row: 1 / span 2;
+            align-self: center;
+            text-align: right;
+            min-width: 7.5rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-heading, #0f172a);
+        }
+        /* Na lista de processos o selo de status ocupa o lugar da data */
+        .gp-adit-selo {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            align-self: center;
+            padding: 0.1rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid var(--sop-slate-200, #e2e8f0);
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
+        body.theme-dark .gp-base-bloco,
+        body.theme-dark .gp-adit-item { border-top-color: rgba(255, 255, 255, 0.14); }
+        body.theme-dark .gp-base-bloco-titulo { color: #f1f5f9; }
+        body.theme-dark .gp-base-bloco-resumo,
+        body.theme-dark .gp-base-bloco-nota,
+        body.theme-dark .gp-adit-tipo,
+        body.theme-dark .gp-adit-data { color: rgba(255, 255, 255, 0.68); }
+        body.theme-dark .gp-adit-nome,
+        body.theme-dark .gp-adit-valor { color: #f1f5f9; }
+        body.theme-dark .gp-adit-valor.gp-val-neg { color: #ff9b91; }
+        body.theme-dark .gp-adit-valor.gp-val-pos { color: #6ee7a0; }
+
+        .gp-lbl-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        .gp-lbl-row .form-label { margin-bottom: 0; }
+        .gp-reperc-linha {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        .gp-reperc-linha input { flex: 1 1 auto; min-width: 0; }
+        .gp-pct {
+            flex: none;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            cursor: help;
+        }
+        .gp-pct-lg { font-size: 1rem; }
+        .gp-pct.is-pos { color: var(--gc-acao, #007233); }
+        .gp-pct.is-neg { color: #b42318; }
+        .gp-pct.is-zero { color: var(--sop-slate-600, #475569); }
+        .gp-pct.is-na { color: var(--sop-slate-500, #64748b); font-weight: 500; }
+
+        body.theme-dark .gp-base {
+            background: rgba(255, 255, 255, 0.045);
+            border-color: rgba(255, 255, 255, 0.14);
+            border-left-color: rgba(255, 255, 255, 0.4);
+        }
+        body.theme-dark .gp-base[data-estado="vazio"],
+        body.theme-dark .gp-base[data-estado="erro"] { border-left-color: #e0a63a; }
+        body.theme-dark .gp-base-titulo,
+        body.theme-dark .gp-base-valor,
+        body.theme-dark .gp-base-lista dd { color: #f1f5f9; }
+        body.theme-dark .gp-base-origem,
+        body.theme-dark .gp-base-lista dt { color: rgba(255, 255, 255, 0.68); }
+        body.theme-dark .gp-base-lista { border-top-color: rgba(255, 255, 255, 0.14); }
+        body.theme-dark .gp-base-toggle { color: #6ee7a0; }
+        body.theme-dark .gp-pct.is-pos { color: #6ee7a0; }
+        body.theme-dark .gp-pct.is-neg { color: #ff9b91; }
+        body.theme-dark .gp-pct.is-zero,
+        body.theme-dark .gp-pct.is-na { color: rgba(255, 255, 255, 0.6); }
+        /* o valor da Repercussão funde com a caixa (comentário acima); no escuro o campo ganhava fundo
+           próprio e, agora que o % divide a linha, aparecia como uma segunda caixa dentro da primeira */
+        body.theme-dark .gp-reperc-linha input { background: transparent !important; }
+        @media (prefers-reduced-motion: reduce) {
+            .gp-base-toggle .bi { transition: none; }
+        }
+
+        /* ── GERENCIAR PROCESSO: ficha em leitura, edição seção a seção ───────────
+           Marcação em index.html (#modalDetalhes) e lógica em processos.js
+           (gpEditar/gpConcluir/gpCancelar/gpAtualizarResumo). Cada [data-gp-secao]
+           tem duas camadas: .gp-view (dados formatados) e .gp-edit (os campos de
+           sempre). O estado vem de data-gp-modo ("leitura"|"edicao") e data-gp-sujo
+           ("1" quando algum campo difere do valor com que o processo foi aberto). */
+        .gp-secao[data-gp-modo="leitura"] .gp-edit,
+        .gp-secao[data-gp-modo="edicao"] .gp-view {
+            display: none !important;
+        }
+        .gp-secao[data-gp-modo="leitura"] .gp-req {
+            display: none;
+        }
+
+        /* Cabeçalho do cartão: título à esquerda, ações à direita (quebra em tela estreita) */
+        .gp-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem 0.75rem;
+        }
+        .gp-card-titulo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin: 0;
+            font-size: var(--gc-fs-secao);
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+        .gp-card-icone {
+            display: inline-grid;
+            place-items: center;
+            flex: none;
+            width: 1.9rem;
+            height: 1.9rem;
+            border-radius: 8px;
+            background: var(--gc-acao-suave);
+            color: var(--gc-acao);
+            font-size: 0.95rem;
+        }
+        .gp-card-acoes {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .gp-card-acoes .btn {
+            align-items: center;
+            gap: 0.35rem;
+            font-weight: 600;
+        }
+        .gp-identity .gp-card-acoes {
+            margin-left: auto;
+            align-self: flex-end;
+        }
+
+        /* Botões por estado: só um conjunto aparece por vez */
+        .gp-btn-cancelar,
+        .gp-btn-concluir,
+        .gp-btn-desfazer,
+        .gp-sujo-pill {
+            display: none !important;
+        }
+        .gp-btn-editar {
+            display: inline-flex;
+        }
+        .gp-secao[data-gp-modo="edicao"] .gp-btn-cancelar,
+        .gp-secao[data-gp-modo="edicao"] .gp-btn-concluir {
+            display: inline-flex !important;
+        }
+        .gp-secao[data-gp-modo="edicao"] .gp-btn-editar {
+            display: none !important;
+        }
+        .gp-secao[data-gp-sujo="1"][data-gp-modo="leitura"] .gp-btn-desfazer,
+        .gp-secao[data-gp-sujo="1"][data-gp-modo="leitura"] .gp-sujo-pill {
+            display: inline-flex !important;
+        }
+        /* Quem não pode editar vê a ficha sem nenhum botão de edição */
+        #modalDetalhes[data-gp-somente-leitura="1"] .gp-btn-editar {
+            display: none !important;
+        }
+        .gp-btn-desfazer {
+            padding-inline: 0.25rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .gp-sujo-pill {
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.2rem 0.65rem;
+            border-radius: 999px;
+            border: 1px solid #f0d9a0;
+            background: #fdf3dc;
+            color: #8a5a00;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .gp-sujo-pill::before {
+            content: "";
+            width: 0.45rem;
+            height: 0.45rem;
+            border-radius: 50%;
+            background: #d98e04;
+        }
+        .gp-aviso-sujo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-right: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #8a5a00;
+        }
+        .gp-aviso-sujo[hidden] { display: none; }
+
+        /* Seção aberta para edição: o contorno verde diz onde se está mexendo */
+        .gp-section-card.gp-secao[data-gp-modo="edicao"] {
+            border-color: var(--gc-acao) !important;
+            box-shadow: 0 0 0 3px var(--gc-acao-suave) !important;
+        }
+
+        /* Dados em leitura: rótulo pequeno acima, valor logo abaixo */
+        .gp-ficha {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr));
+            gap: 1.1rem 1.5rem;
+            margin: 0;
+        }
+        .gp-campo {
+            min-width: 0;
+        }
+        /* Cronograma: a data fica centralizada sob o próprio rótulo da coluna */
+        .gp-ficha-datas .gp-campo {
+            text-align: center;
+        }
+        .gp-campo dt {
+            margin-bottom: 0.2rem;
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .gp-campo dd {
+            margin: 0;
+            font-size: 0.875rem;
+            font-weight: 400;
+            color: var(--text-heading);
+            overflow-wrap: anywhere;
+        }
+        .gp-campo dd.is-vazio,
+        .gp-descricao.is-vazio,
+        .gp-fin-valor.is-vazio,
+        .gp-identity-valor.is-vazio {
+            font-weight: 400;
+            font-style: italic;
+            color: var(--text-muted);
+        }
+        .gp-descricao {
+            max-height: 16rem;
+            overflow-y: auto;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            color: var(--text-heading);
+        }
+
+        /* Barra de identidade em leitura */
+        .gp-identity-valor {
+            display: inline-flex;
+            align-items: center;
+            min-height: 2.4rem;
+            font-size: 0.875rem;
+            font-weight: 400;
+            color: var(--text-heading);
+        }
+        .gp-status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 2.4rem;
+            padding: 0 1rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        /* Sem classe badge-status-* (status desconhecido/vazio): visual neutro. Com ela, a cor
+           vem da mesma classificação usada na tabela de processos. */
+        .gp-status-pill:not([class*="badge-status-"]) {
+            border-color: var(--sop-slate-200);
+            background: var(--sop-slate-100);
+            color: var(--sop-slate-700);
+        }
+
+        /* Análise financeira em leitura: dois painéis (Fiscalização × GECOPE) */
+        .gp-fin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+            gap: 1.25rem;
+        }
+        .gp-fin-col {
+            min-width: 0;
+            padding: 1rem 1.15rem;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 10px;
+            background: var(--sop-slate-50);
+        }
+        .gp-fin-lista {
+            display: grid;
+            margin: 0.75rem 0 0;
+        }
+        .gp-fin-linha {
+            display: grid;
+            grid-template-columns: 1fr auto 5rem;
+            align-items: baseline;
+            gap: 0.75rem;
+            padding: 0.6rem 0;
+            border-top: 1px solid var(--sop-slate-200);
+        }
+        .gp-fin-linha:first-child {
+            border-top: 0;
+        }
+        .gp-fin-linha dt {
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .gp-fin-valor {
+            margin: 0;
+            text-align: right;
+            font-size: 0.875rem;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-heading);
+        }
+        .gp-fin-linha .gp-pct {
+            margin: 0;
+            text-align: right;
+            font-size: 0.8rem;
+            font-weight: 400;
+        }
+        .gp-fin-linha.is-total {
+            border-top-width: 2px;
+        }
+        /* Repercussão não se destaca em tamanho: valor e percentual na mesma escala das linhas acima */
+        .gp-fin-linha.is-total .gp-fin-valor {
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+        .gp-val-neg { color: #b42318; }
+        .gp-val-pos { color: var(--gc-acao); }
+
+        body.theme-dark .gp-card-icone {
+            background: rgba(110, 231, 160, 0.12);
+            color: #6ee7a0;
+        }
+        body.theme-dark .gp-sujo-pill {
+            border-color: rgba(224, 166, 58, 0.35);
+            background: rgba(224, 166, 58, 0.14);
+            color: #f2c46d;
+        }
+        body.theme-dark .gp-sujo-pill::before { background: #e0a63a; }
+        body.theme-dark .gp-aviso-sujo { color: #f2c46d; }
+        body.theme-dark .gp-section-card.gp-secao[data-gp-modo="edicao"] {
+            border-color: #6ee7a0 !important;
+            box-shadow: 0 0 0 3px rgba(110, 231, 160, 0.14) !important;
+        }
+        body.theme-dark .gp-val-neg { color: #ff9b91; }
+        body.theme-dark .gp-val-pos { color: #6ee7a0; }
+        body.theme-dark .gp-fin-col {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.14);
+        }
+        body.theme-dark .gp-fin-linha { border-top-color: rgba(255, 255, 255, 0.12); }
+        body.theme-dark .gp-status-pill:not([class*="badge-status-"]) {
+            border-color: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.85);
+        }
+
         /* ==========================================================================
            B1 — COR SEMÂNTICA E BOTÕES (tema claro)
            Spec: docs/revisao-design-tema-claro/spec.md. Tudo aqui vale só no claro
