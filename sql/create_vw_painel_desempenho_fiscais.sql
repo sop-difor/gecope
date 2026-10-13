@@ -38,6 +38,12 @@
 --   TEMPO (tempo_fiscal_dias) = dias na unidade do fiscal até esse corte, só no
 --   despachado. NULL não é zero: aberto já pronto (aberto_ja_pronto, menos de 1 dia) ou
 --   motivo em `conferencia`.
+--   TEMPO E DATA INFORMADOS À MÃO (usuário, 2026-10-13): processo despachado cujo tempo o
+--   SUITE não entrega pode ter tempo e data de despacho conferidos manualmente e registrados
+--   em public.suite_tempo_manual (sql/create_suite_tempo_manual.sql, executar ANTES deste
+--   arquivo). Só preenchem lacuna: se a view de tempo calculou um valor, ele vale. Quando o
+--   tempo manual entra, tempo_manual = true e `conferencia` registra a origem. Menos de 1 dia
+--   segue a regra do aberto já pronto: aberto_ja_pronto = true e tempo_fiscal_dias nulo.
 --
 --   UMA LINHA POR PROCESSO: a linha da view de tempo com responde_pelo_processo — a do
 --   fiscal que despachou, se despachado com corte; senão a do fiscal atual.
@@ -99,7 +105,8 @@
 -- resultado 04): se um dia faltar a linha, o processo continua aparecendo, sem tempo e
 -- sem despacho, em vez de sumir.
 --
--- Execute no SQL Editor do Supabase DEPOIS de sql/create_vw_tempo_fiscal_processo.sql.
+-- Execute no SQL Editor do Supabase DEPOIS de sql/create_vw_tempo_fiscal_processo.sql e de
+-- sql/create_suite_tempo_manual.sql.
 -- É seguro executar novamente. drop + create numa transação: as colunas mudaram em
 -- 2026-09-16, e create or replace não remove nem renomeia coluna.
 -- ============================================================================
@@ -130,6 +137,13 @@ with base as (
     t.situacao                                                 as t_situacao,
     t.data_despacho                                            as t_data_despacho,
     t.tempo_fiscal_dias                                        as t_tempo_fiscal_dias,
+    -- tempo conferido à mão: só entra no despachado que ficou sem tempo calculado
+    (t.situacao = 'despachado' and t.tempo_fiscal_dias is null
+       and m.tempo_dias is not null)                           as t_tempo_manual,
+    -- menos de 1 dia é "aberto já pronto" (regra da view de tempo): despacho sem tempo
+    case when m.tempo_dias >= 1 then m.tempo_dias end          as t_tempo_manual_dias,
+    coalesce(m.tempo_dias < 1, false)                          as t_manual_pronto,
+    m.data_despacho                                            as t_data_despacho_manual,
     t.aberto_ja_pronto                                         as t_aberto_ja_pronto,
     t.retornos_correcao                                        as t_retornos_correcao,
     t.dias_na_unidade_agora                                    as t_dias_na_unidade_agora,
@@ -139,6 +153,7 @@ with base as (
          else b.fiscal_matricula end                           as t_resp_matricula
   from base b
   left join tf t on t.processo_id = b.id
+  left join public.suite_tempo_manual m on m.processo = trim(b.processo)
 )
 select
   b.id,
@@ -156,11 +171,17 @@ select
   b.status_norm in ('ANÁLISE FISCAL', 'DEVOLVIDO P/ REANÁLISE FISCAL')  as na_fila,
   b.t_situacao                                               as situacao,
   coalesce(b.t_situacao = 'despachado', false)               as despachado,
-  b.t_data_despacho                                          as data_despacho,
-  case when b.t_situacao = 'despachado' then b.t_tempo_fiscal_dias end as tempo_fiscal_dias,
-  coalesce(b.t_aberto_ja_pronto, false)                      as aberto_ja_pronto,
+  -- a data manual só preenche lacuna, e só no despachado
+  coalesce(b.t_data_despacho,
+           case when b.t_situacao = 'despachado' then b.t_data_despacho_manual end) as data_despacho,
+  case when b.t_situacao = 'despachado'
+       then coalesce(b.t_tempo_fiscal_dias, b.t_tempo_manual_dias) end as tempo_fiscal_dias,
+  case when coalesce(b.t_tempo_manual, false) then b.t_manual_pronto
+       else coalesce(b.t_aberto_ja_pronto, false) end         as aberto_ja_pronto,
   b.t_retornos_correcao                                      as retornos_correcao,
-  b.t_conferencia                                            as conferencia,
+  case when coalesce(b.t_tempo_manual, false)
+       then 'tempo informado manualmente' || coalesce(' (SUITE: ' || b.t_conferencia || ')', '')
+       else b.t_conferencia end                              as conferencia,
   case
     when b.status_norm in ('ANÁLISE FISCAL', 'DEVOLVIDO P/ REANÁLISE FISCAL')
       then floor(b.t_dias_na_unidade_agora)::int
@@ -226,7 +247,10 @@ select
   -- rastreio no SUITE
   b.suite,
   b.sigla_suite,
-  b.suite_data_chegada
+  b.suite_data_chegada,
+
+  -- auditoria: tempo_fiscal_dias veio de public.suite_tempo_manual, não do SUITE
+  coalesce(b.t_tempo_manual, false)                          as tempo_manual
 
 from resp b
 -- order by explícito: `limit 1` sem ordem é não determinístico, e numa matrícula
