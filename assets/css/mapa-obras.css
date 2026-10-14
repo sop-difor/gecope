@@ -449,6 +449,12 @@
      sistema principal. O cabeçalho some, mas #syncTime/#syncWarn continuam no DOM — o index
      os lê e mostra a "Base atualizada em" na faixa de título do módulo. */
   .embutido header.top{display:none}
+  /* Modo "só a ficha" (?embed=1&ficha=1): o iframe cobre a tela do Processos e só a ficha aparece. O resto
+     da página segue montado (o mapa precisa de tamanho real para iniciar), mas invisível; a janela de erro
+     também some, quem avisa o usuário é a página de fora. */
+  html.ficha-so,html.ficha-so body{background:transparent}
+  html.ficha-so main{visibility:hidden}
+  html.ficha-so #dataError{display:none!important}
   body.presentation header.top{padding:19px 30px}
   body.presentation .top h1{font-size:17px}
   body.presentation .top .sub{font-size:12px}

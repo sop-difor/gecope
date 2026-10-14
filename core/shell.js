@@ -465,13 +465,14 @@ function wireEvents() {
     fin.clear.addEventListener("click", (e) => { e.preventDefault(); clearFinanceiro(); });
     fin.diffMetric.addEventListener("change", updateFinanceiro);
     mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
+    mt.contratante.addEventListener("change", updateReuniao); mt.contratada.addEventListener("change", updateReuniao);
     // Debounce no search de reunião
     mt.search.addEventListener("input", debounce(updateReuniao, 300));
 
     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
         e.preventDefault();
         if (mt && mt.search) mt.search.value = "";
-        [mt.meta, mt.prioritario, mt.fiscal, mt.status].forEach(el => {
+        [mt.meta, mt.prioritario, mt.fiscal, mt.status, mt.contratante, mt.contratada].forEach(el => {
             if (!el) return;
             if (el.multiple) {
                 Array.from(el.options).forEach(o => { if (o.value) o.selected = true; });

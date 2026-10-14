@@ -838,8 +838,11 @@ async function loadData(){
     showDataError('Não foi possível carregar os contratos: '+e.message);
     return;
   }
+  _cargaOk=true;
+  _esperaCarga.splice(0).forEach(f=>f());
   document.body.classList.remove('boot-loading');
-  fillFilters(); render(); refit(true);
+  // no modo "só a ficha" o mapa está invisível: desenhá-lo só atrasaria a abertura da ficha
+  if(!FICHA_SO){ fillFilters(); render(); refit(true); }
 }
 
 /* ============================================================
@@ -851,6 +854,9 @@ async function loadData(){
    os rótulos e o enquadramento que já existem.
    ============================================================ */
 let PROCESSOS=[], _procCarregado=false, _procDiag=null;
+// true depois que a 1ª carga das obras terminou com sucesso — o modo "só a ficha" (abrirFichaPedida) espera por isso
+let _cargaOk=false;
+const _esperaCarga=[];   // funções que aguardam essa 1ª carga (modo "só a ficha")
 // Processos por distrito, indexados nas duas chaves possíveis (String(gid) -> processos).
 // Montados uma vez na carga. `_procPorObra` é a fonte do mapa e das janelas de detalhe
 // (sempre pelo local da obra); `_procPorEquipe` (lotação do fiscal, gedop) sobrevive só
@@ -4682,7 +4688,12 @@ function wireAdToggles(){
     };
   });
 }
-function closeModal(){ destroyLocMini(); _lastModalObra=null; _origemProc=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela; }
+// Modo "só a ficha" (?embed=1&ficha=1): a página é aberta pelo módulo Processos num iframe por cima da lista deles
+// (ver "Ficha da obra" em modules/processos/processos.js). Ela só mostra a ficha, aberta por pedido do pai.
+const FICHA_SO=document.documentElement.classList.contains('ficha-so');
+function avisaPaiFicha(msg){ try{ window.parent.postMessage(msg,location.origin); }catch(e){} }
+function closeModal(){ destroyLocMini(); _lastModalObra=null; _origemProc=null; escondeEdTip(); document.getElementById('modalBg').classList.remove('show'); delete document.getElementById('modal').dataset.rpDistrito; delete document.getElementById('modal').dataset.rpJanela;
+  if(FICHA_SO) avisaPaiFicha({tipo:'gecope-ficha-fechada'}); }
 // Fecha OU volta um nível: se a janela do fiscal está aberta por cima de um distrito
 // (o botão "#modalVoltar" existe), Esc e clicar fora devem se comportar como o próprio
 // "← Voltar" faria — não só o clique nele. Sem isso os dois gestos mais comuns de
@@ -4708,6 +4719,55 @@ function fecharOuVoltar(){
   const v=document.getElementById('modalVoltar'); if(v){ v.click(); return; } closeModal();
 }
 document.getElementById('modalBg').addEventListener('click',e=>{ if(e.target.id==='modalBg') fecharOuVoltar(); });
+// Obra do pedido do Processos: pelo município quando ele é conhecido (o mesmo critério de obraDoProcesso); sem
+// município, só vale se o código for único em todo o estado — na dúvida, não abre a ficha de outra obra.
+function acharObraPorCodigo(codigo,municipio){
+  const igual=x=>String(x.codigo_obra==null?'':x.codigo_obra).trim()===codigo;
+  const cod=municipio?NAMEIDX[normTxt(municipio)]:null;
+  if(cod&&DB.municipios[cod]) return DB.municipios[cod].obras.find(igual)||null;
+  const achadas=[];
+  for(const c in DB.municipios) for(const o of DB.municipios[c].obras) if(igual(o)) achadas.push(o);
+  return achadas.length===1?achadas[0]:null;
+}
+// Espera a carga das obras (a página acabou de abrir, ou nem terminou de carregar) e abre a ficha. O resultado volta
+// ao pai, que mostra o carregando ou o aviso.
+function abrirFichaPedida(d){
+  const codigo=String(d.codigo_obra==null?'':d.codigo_obra).trim();
+  const resp=(ok,motivo)=>avisaPaiFicha({tipo:'gecope-ficha-resultado',ok,motivo:motivo||null});
+  if(!codigo){ resp(false,'sem-vinculo'); return; }
+  const inicio=Date.now();
+  const abre=()=>{
+    const o=acharObraPorCodigo(codigo,d.municipio);
+    if(!o){ resp(false,'sem-obra'); return; }
+    const modal=document.getElementById('modal');
+    _origemProc=null; delete modal.dataset.rpJanela;   // sem janela de origem: "✕" e não "← Voltar"
+    openModal(o);
+    modal.scrollTop=0;
+    resp(true);
+  };
+  if(_cargaOk){ abre(); return; }
+  // ainda carregando: abre no instante em que a carga termina (sem esperar um ciclo de verificação);
+  // o intervalo só vigia erro e tempo esgotado
+  _esperaCarga.push(abre);
+  const vigia=setInterval(()=>{
+    if(_cargaOk){ clearInterval(vigia); return; }
+    const erro=document.getElementById('dataError');
+    const falha=(erro&&!erro.hidden)?'erro':(Date.now()-inicio>45000?'tempo':null);
+    if(!falha) return;
+    clearInterval(vigia);
+    const i=_esperaCarga.indexOf(abre); if(i>=0) _esperaCarga.splice(i,1);
+    resp(false,falha);
+  },250);
+}
+if(FICHA_SO){
+  window.addEventListener('message',e=>{
+    if(e.origin!==location.origin || e.source!==window.parent) return;
+    const d=e.data; if(!d) return;
+    if(d.tipo==='gecope-abrir-ficha') abrirFichaPedida(d);
+    else if(d.tipo==='gecope-ficha-fechar' && document.getElementById('modalBg').classList.contains('show')) closeModal();
+  });
+  avisaPaiFicha({tipo:'gecope-ficha-pronta'});
+}
 // E5 — a janela de distrito lista a equipe em linhas (.frow), e cada uma abre o painel
 // daquele fiscal por cima. #modal fica fora de #body, então precisa do próprio listener.
 // `dataset.rpDistrito` (gravado por abreModalDistrito, sobrevive à troca de innerHTML)

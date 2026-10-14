@@ -46,6 +46,9 @@
   if(embutido){
     document.documentElement.classList.add('embutido');
     try{ dark = window.parent.document.body.classList.contains('theme-dark'); }catch(e){}
+    /* ?embed=1&ficha=1: cópia usada pelo módulo Processos para abrir só a ficha da obra por
+       cima da lista (ver "Ficha da obra" em modules/processos/processos.js). */
+    if(/[?&]ficha=1\b/.test(location.search)) document.documentElement.classList.add('ficha-so');
   }
   document.documentElement.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-dark', dark);

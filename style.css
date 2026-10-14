@@ -5969,17 +5969,348 @@
         }
 
         .proc-more-menu {
-            min-width: 250px;
+            min-width: 280px;
+            max-height: min(72vh, 560px);
+            overflow-y: auto;
             padding: 14px;
         }
 
-        .proc-more-menu .form-select {
-            height: 40px;
-            margin-bottom: 12px;
+        .proc-more-field + .proc-more-field {
+            margin-top: 12px;
         }
 
-        .proc-more-menu .form-select:last-child {
-            margin-bottom: 0;
+        /* Status e Fiscal (multisseleção) com a mesma cara de Metas e Prioritário (<select>):
+           mesma altura, fundo, borda, texto e seta. O rótulo "Todos" deixa de ser cinza (só o
+           que é diferente do padrão chama atenção) e o botão ganha o anel verde de foco. */
+        .proc-toolbar .multiselect-btn {
+            position: relative;
+            background-color: var(--bs-body-bg, #fff);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 16px 12px;
+            color: var(--bs-body-color, #212529);
+            font-weight: 400;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .proc-toolbar .multiselect-btn::after {
+            display: none;
+        }
+
+        body .proc-toolbar .multiselect-btn .ms-label-all,
+        body .proc-toolbar .multiselect-btn .ms-label-single,
+        body .proc-toolbar .multiselect-btn .ms-label-multi {
+            color: inherit;
+            font-weight: 400;
+        }
+
+        .proc-toolbar .multiselect-btn:focus,
+        .proc-toolbar .multiselect-btn.show {
+            border-color: var(--sop-green);
+            box-shadow: 0 0 0 0.15rem rgba(0, 143, 61, 0.15);
+            outline: 0;
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-btn {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-btn .ms-label-all,
+        body.theme-dark .proc-toolbar .multiselect-btn .ms-label-single,
+        body.theme-dark .proc-toolbar .multiselect-btn .ms-label-multi {
+            color: inherit !important;
+        }
+
+        /* Lista que abre em Status, Fiscal, Contratante e Contratada: no padrão das listas de Metas e
+           Prioritário — mais larga que o botão (nomes inteiros, sem quebrar em 3 linhas), linhas
+           altas, texto do mesmo tamanho do campo, busca e ações com cara de controle do sistema. */
+        .proc-toolbar .multiselect-dropdown {
+            min-width: 380px;
+            max-width: min(460px, calc(100vw - 32px));
+            max-height: min(380px, 60vh);
+            margin-top: 6px;
+            padding: 8px;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 12px;
+            background: var(--sop-white);
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+            font-size: 0.9375rem;
+            scrollbar-width: thin;
+        }
+
+        .proc-toolbar .multiselect-dropdown input.form-control {
+            width: 100% !important;
+            height: 40px !important;
+            margin: 0 0 8px !important;
+            padding: 0 12px !important;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+        }
+
+        .proc-toolbar .multiselect-dropdown > .d-flex {
+            margin: 0 0 6px !important;
+            padding: 0 4px 8px !important;
+        }
+
+        .proc-toolbar .multiselect-dropdown > .d-flex .btn-link {
+            font-size: 0.8125rem !important;
+            font-weight: 600;
+            padding: 4px 8px !important;
+            border-radius: 6px;
+        }
+
+        .proc-toolbar .multiselect-dropdown > .d-flex .btn-link:hover {
+            background: rgba(15, 23, 42, 0.06);
+        }
+
+        .proc-toolbar .multiselect-option {
+            gap: 10px;
+            min-height: 40px;
+            padding: 8px 12px !important;
+            border-radius: 8px;
+            line-height: 1.3;
+        }
+
+        .proc-toolbar .multiselect-option:hover {
+            background: rgba(0, 143, 61, 0.09);
+        }
+
+        .proc-toolbar .multiselect-option input {
+            flex: none;
+            width: 17px;
+            height: 17px;
+            margin: 0;
+            accent-color: var(--sop-green);
+        }
+
+        .proc-toolbar .multiselect-option span {
+            margin-left: 0 !important;
+            overflow-wrap: anywhere;
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-dropdown {
+            background: #142e22;
+            border-color: rgba(255, 255, 255, 0.14);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-dropdown > .d-flex {
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-dropdown > .d-flex .btn-link:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-option {
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-option:hover {
+            background: rgba(76, 193, 124, 0.16);
+        }
+
+        body.theme-dark .proc-toolbar .multiselect-option input {
+            accent-color: #4cc17c;
+        }
+
+        /* Dentro de "Mais filtros" a lista de opções abre na própria coluna do menu (e não
+           flutuando por cima dele), então não é cortada pela borda do menu nem da janela. */
+        .proc-more-menu .multiselect-container {
+            width: 100%;
+        }
+
+        .proc-more-menu .multiselect-dropdown {
+            position: static;
+            width: 100%;
+            min-width: 0;
+            max-height: 240px;
+            margin-top: 6px;
+            box-shadow: none;
+        }
+
+        /* Número do processo + botão da ficha da obra */
+        .proc-nup-linha {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .proc-nup-num {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-heading);
+        }
+
+        .proc-ficha-btn {
+            flex: none;
+            display: inline-grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--sop-slate-500);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+        }
+
+        .proc-ficha-btn:hover {
+            color: var(--sop-green);
+            border-color: var(--sop-green);
+            background: rgba(0, 143, 61, 0.08);
+        }
+
+        .proc-ficha-btn:focus-visible {
+            outline: 2px solid var(--sop-green);
+            outline-offset: 2px;
+        }
+
+        .proc-ficha-btn[aria-disabled="true"] {
+            opacity: 0.38;
+            cursor: not-allowed;
+        }
+
+        .proc-ficha-btn[aria-disabled="true"]:hover {
+            color: var(--sop-slate-500);
+            border-color: transparent;
+            background: transparent;
+        }
+
+        body.theme-dark .proc-ficha-btn {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Ficha da obra por cima da lista: iframe em tela cheia (a página do mapa no modo
+           ?ficha=1), invisível até haver o que mostrar. Sem display:none de propósito: o iframe
+           precisa de tamanho real para o mapa dele inicializar. */
+        .ficha-obra-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2100;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .ficha-obra-overlay[data-estado="carregando"],
+        .ficha-obra-overlay[data-estado="aviso"],
+        .ficha-obra-overlay[data-estado="aberta"] {
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .ficha-obra-overlay[data-estado="carregando"],
+        .ficha-obra-overlay[data-estado="aviso"] {
+            background: rgba(3, 10, 7, 0.72);
+            backdrop-filter: blur(4px);
+        }
+
+        .ficha-obra-frame {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: transparent;
+        }
+
+        .ficha-obra-overlay:not([data-estado="aberta"]) .ficha-obra-frame {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .ficha-obra-estado {
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            align-items: center;
+            gap: 12px;
+            max-width: min(440px, calc(100vw - 32px));
+            padding: 14px 16px 14px 18px;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 12px;
+            background: var(--sop-white);
+            color: var(--sop-slate-700);
+            font-size: 0.9rem;
+            font-weight: 500;
+            line-height: 1.4;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+        }
+
+        .ficha-obra-overlay[data-estado="carregando"] .ficha-obra-estado,
+        .ficha-obra-overlay[data-estado="aviso"] .ficha-obra-estado {
+            display: flex;
+        }
+
+        .ficha-obra-overlay[data-estado="aviso"] .ficha-obra-spinner {
+            display: none;
+        }
+
+        .ficha-obra-spinner {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--sop-slate-200);
+            border-top-color: var(--sop-green);
+            border-radius: 50%;
+            animation: ficha-obra-gira 0.8s linear infinite;
+        }
+
+        @keyframes ficha-obra-gira {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ficha-obra-spinner {
+                animation-duration: 2.4s;
+            }
+        }
+
+        .ficha-obra-fechar {
+            flex: none;
+            height: 32px;
+            padding: 0 12px;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 8px;
+            background: transparent;
+            color: inherit;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .ficha-obra-fechar:hover {
+            border-color: var(--sop-green);
+        }
+
+        .ficha-obra-fechar:focus-visible {
+            outline: 2px solid var(--sop-green);
+            outline-offset: 2px;
+        }
+
+        body.theme-dark .ficha-obra-estado {
+            background: #142e22;
+            border-color: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        body.theme-dark .ficha-obra-fechar,
+        body.theme-dark .ficha-obra-spinner {
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        body.theme-dark .ficha-obra-spinner {
+            border-top-color: #4cc17c;
         }
 
         body.theme-dark .proc-toolbar .form-select,

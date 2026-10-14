@@ -2154,20 +2154,34 @@
                                         <span class="proc-toolbar-count" id="mais-filtros-contagem" hidden>0</span>
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-end proc-more-menu">
-                                        <label class="proc-toolbar-label" for="meetingMetaSelect">Metas</label>
-                                        <select class="form-select" id="meetingMetaSelect">
-                                            <option value="">Todos</option>
-                                            <option value="Cumprido">Cumprido</option>
-                                            <option value="No prazo">No prazo</option>
-                                            <option value="Atrasado">Atrasado</option>
-                                            <option value="Sem meta">Sem meta</option>
-                                        </select>
-                                        <label class="proc-toolbar-label" for="meetingPrioritarioSelect">Prioritário</label>
-                                        <select class="form-select" id="meetingPrioritarioSelect">
-                                            <option value="">Todos</option>
-                                            <option value="Sim">Prioritário</option>
-                                            <option value="Não">Não prioritário</option>
-                                        </select>
+                                        <div class="proc-more-field">
+                                            <label class="proc-toolbar-label" for="meetingMetaSelect">Metas</label>
+                                            <select class="form-select" id="meetingMetaSelect">
+                                                <option value="">Todos</option>
+                                                <option value="Cumprido">Cumprido</option>
+                                                <option value="No prazo">No prazo</option>
+                                                <option value="Atrasado">Atrasado</option>
+                                                <option value="Sem meta">Sem meta</option>
+                                            </select>
+                                        </div>
+                                        <div class="proc-more-field">
+                                            <label class="proc-toolbar-label" for="meetingPrioritarioSelect">Prioritário</label>
+                                            <select class="form-select" id="meetingPrioritarioSelect">
+                                                <option value="">Todos</option>
+                                                <option value="Sim">Prioritário</option>
+                                                <option value="Não">Não prioritário</option>
+                                            </select>
+                                        </div>
+                                        <!-- Contratante e Contratada: multisseleção com busca, preenchida com os valores dos
+                                             processos carregados (fillCommonStatusFilters, modules/processos/processos.js). -->
+                                        <div class="proc-more-field">
+                                            <label class="proc-toolbar-label" for="meetingContratanteSelect">Contratante</label>
+                                            <select class="form-select" id="meetingContratanteSelect"></select>
+                                        </div>
+                                        <div class="proc-more-field">
+                                            <label class="proc-toolbar-label" for="meetingContratadaSelect">Contratada</label>
+                                            <select class="form-select" id="meetingContratadaSelect"></select>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="dropdown proc-toolbar-export">

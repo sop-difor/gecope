@@ -2993,7 +2993,7 @@ function calcularRepercussao() {
 // Dashboard/UI helpers moved to dashboard.js
 
 // LOGIC: REUNIO
-const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: document.getElementById("meetingPrioritarioSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
+const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: document.getElementById("meetingPrioritarioSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), contratante: document.getElementById("meetingContratanteSelect"), contratada: document.getElementById("meetingContratadaSelect"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
 let mtBase = [];
 window.currentProcessesTab = 'ativos';
 
@@ -3034,13 +3034,19 @@ function switchProcessTab(tab) {
             if (mt.fiscal && typeof fillSelect === 'function' && Array.isArray(window.allData)) {
                 fillSelect(mt.fiscal, window.allData.map(d => d.fiscal));
             }
+            if (mt.contratante && typeof fillSelect === 'function' && Array.isArray(window.allData)) {
+                fillSelect(mt.contratante, entidadesDoFiltro('contratante', window.allData));
+            }
+            if (mt.contratada && typeof fillSelect === 'function' && Array.isArray(window.allData)) {
+                fillSelect(mt.contratada, entidadesDoFiltro('contratada', window.allData));
+            }
 
             // Para selects simples (meta, prioritario) definir como vazio => Todos
             if (mt.meta) mt.meta.value = "";
             if (mt.prioritario) mt.prioritario.value = "";
 
             // Disparar eventos de change para atualizar labels/estado visual (ex: bootstrap-select)
-            ['status', 'fiscal', 'meta', 'prioritario'].forEach(k => {
+            ['status', 'fiscal', 'contratante', 'contratada', 'meta', 'prioritario'].forEach(k => {
                 try { mt[k]?.dispatchEvent(new Event('change')); } catch (e) { /* noop */ }
             });
 
@@ -3700,6 +3706,10 @@ function _updateReuniaoInterno() {
         const fs = Array.from(new Set(mtBase.map(d => d.fiscal).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
         fillSelect(mt.fiscal, fs);
     }
+    // Contratante e Contratada normalmente são preenchidas por fillCommonStatusFilters(); isto
+    // só cobre o render que chegue antes dela.
+    if (mt.contratante && mt.contratante.options.length === 0 && mtBase.length) fillSelect(mt.contratante, entidadesDoFiltro('contratante', mtBase));
+    if (mt.contratada && mt.contratada.options.length === 0 && mtBase.length) fillSelect(mt.contratada, entidadesDoFiltro('contratada', mtBase));
     let rows = mtBase.slice();
 
     // Fase 5: Fiscal com a autorização especial "processos_ver_todos" concedida
@@ -3805,18 +3815,24 @@ function _updateReuniaoInterno() {
     const s = getSelectedValues(mt.status);
     const m = getSelectedValues(mt.meta);
     const priorFilt = getSelectedValues(mt.prioritario);
+    const ctte = getSelectedValues(mt.contratante);
+    const ctda = getSelectedValues(mt.contratada);
     const qRaw = mt.search.value.trim();
 
     const totalF = mt.fiscal.options.length;
     const totalS = mt.status.options.length;
     const totalM = mt.meta.options.length;
     const totalP = mt.prioritario.options.length;
+    const totalCte = mt.contratante.options.length;
+    const totalCda = mt.contratada.options.length;
 
     // Detecção robusta de "Tudo Selecionado"
     const allF = mt.fiscal.querySelectorAll('option:checked').length === totalF;
     const allS = mt.status.querySelectorAll('option:checked').length === totalS;
     const allM = mt.meta.querySelectorAll('option:checked').length === totalM;
     const allP = mt.prioritario.querySelectorAll('option:checked').length === totalP;
+    const allCte = mt.contratante.querySelectorAll('option:checked').length === totalCte;
+    const allCda = mt.contratada.querySelectorAll('option:checked').length === totalCda;
 
     // Aplica os filtros do painel. `comStatus=false` ignora o filtro de status: a faixa de
     // números (Todos / Com o fiscal / ...) precisa contar sem ele, senão filtrar por uma
@@ -3834,6 +3850,12 @@ function _updateReuniaoInterno() {
         }
         if (priorFilt.length > 0 && !allP) {
             rows = rows.filter(d => priorFilt.includes(isPrioritario(d) ? "Sim" : "Não"));
+        }
+        if (ctte.length > 0 && !allCte) {
+            rows = rows.filter(d => ctte.includes(rotuloEntidade('contratante', d.contratante)));
+        }
+        if (ctda.length > 0 && !allCda) {
+            rows = rows.filter(d => ctda.includes(rotuloEntidade('contratada', d.contratada)));
         }
 
         if (qRaw) {
@@ -4107,7 +4129,7 @@ function _updateReuniaoInterno() {
                 </div>
             </td>
             <td class="text-center"><i class="bi ${isPrioritario(d) ? 'bi-star-fill' : 'bi-star'} proc-star-prioritario" data-proc="${escapeHTML(d.processo)}" style="color: ${isPrioritario(d) ? 'var(--sop-orange)' : 'var(--sop-slate-200)'}; font-size: 1.1rem; cursor: ${uRole === 'admin' ? 'pointer' : 'not-allowed'};" title="${uRole === 'admin' ? (isPrioritario(d) ? 'Remover prioridade' : 'Marcar como prioritário') : 'Você não tem permissão'}"></i></td>
-            <td><div style="font-weight: 700; font-size: 1rem; color: var(--text-heading); white-space: nowrap;">${escapeHTML(d.processo)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
+            <td><div class="proc-nup-linha"><span class="proc-nup-num">${escapeHTML(d.processo)}</span>${botaoFichaObraHTML(d)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
             <td class="text-center">
                 <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
                 <div style="font-size: 0.75rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
@@ -4132,6 +4154,7 @@ function _updateReuniaoInterno() {
         </tr>`);
     });
     mt.body.innerHTML = groupedHTML.join("");
+    try { if (rows.some(r => r.codigoObra)) agendarPrecargaFichaObra(); } catch (e) { /* pré-carga é só um adiantamento */ }
 
     // SweetAlert para definir Meta
     window.abrirModalMeta = async function (processo, dataAtual) {
@@ -4393,11 +4416,57 @@ function atualizarTabelaSuite(rows) {
     atualizarBadgeAbaAprovados();
 }
 
+// Contratante e Contratada vêm de texto livre: "SEDUC", "SEDUC " e "Seduc" são a mesma entidade, mas o
+// fillSelect só junta textos idênticos e a lista mostrava o nome repetido. A chave ignora espaços
+// sobrando, acento e caixa; o rótulo mostrado é a grafia mais usada nos processos. Só afeta o filtro —
+// a tabela, a exportação e os formulários continuam com o texto gravado.
+function _chaveEntidade(v) {
+    return String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+const _entidadesCache = { ref: null, n: -1, contratante: null, contratada: null };
+function _rotulosEntidade(campo, base, refazer) {
+    if (refazer || _entidadesCache.ref !== base || _entidadesCache.n !== base.length) {
+        _entidadesCache.ref = base; _entidadesCache.n = base.length;
+        _entidadesCache.contratante = null; _entidadesCache.contratada = null;
+    }
+    if (!_entidadesCache[campo]) {
+        const grafias = new Map();   // chave -> Map(grafia -> quantidade)
+        base.forEach(d => {
+            const grafia = String(d[campo] ?? '').replace(/\s+/g, ' ').trim();
+            if (!grafia) return;
+            const k = _chaveEntidade(grafia);
+            if (!grafias.has(k)) grafias.set(k, new Map());
+            const g = grafias.get(k);
+            g.set(grafia, (g.get(grafia) || 0) + 1);
+        });
+        const rotulos = new Map();
+        grafias.forEach((g, k) => {
+            rotulos.set(k, [...g.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))[0][0]);
+        });
+        _entidadesCache[campo] = rotulos;
+    }
+    return _entidadesCache[campo];
+}
+function rotuloEntidade(campo, valor) {
+    const grafia = String(valor ?? '').replace(/\s+/g, ' ').trim();
+    if (!grafia) return 'Não informado';
+    return _rotulosEntidade(campo, window.allData || []).get(_chaveEntidade(grafia)) || grafia;
+}
+function entidadesDoFiltro(campo, base) {
+    const rotulos = _rotulosEntidade(campo, base, true);
+    return base.map(d => {
+        const grafia = String(d[campo] ?? '').replace(/\s+/g, ' ').trim();
+        return grafia ? (rotulos.get(_chaveEntidade(grafia)) || grafia) : 'Não informado';
+    });
+}
+
 function fillCommonStatusFilters() {
     try {
         const statuses = Array.from(new Set((window.allData || []).map(d => d.status))).filter(v => v);
         if (typeof fillSelect === 'function') {
             if (mt && mt.status) fillSelect(mt.status, statuses);
+            if (mt && mt.contratante) fillSelect(mt.contratante, entidadesDoFiltro('contratante', window.allData || []));
+            if (mt && mt.contratada) fillSelect(mt.contratada, entidadesDoFiltro('contratada', window.allData || []));
         }
     } catch (e) { console.warn('fillCommonStatusFilters error', e); }
 }
@@ -4549,6 +4618,8 @@ function atualizarEstadoFiltrosProcessos() {
     const el = id => document.getElementById(id);
     const status = _selecaoMultiProcessos(el('meetingStatusSelect'));
     const fiscal = _selecaoMultiProcessos(el('meetingFiscalSelect'));
+    const contratante = _selecaoMultiProcessos(el('meetingContratanteSelect'));
+    const contratada = _selecaoMultiProcessos(el('meetingContratadaSelect'));
     const meta = el('meetingMetaSelect');
     const prior = el('meetingPrioritarioSelect');
     const busca = (el('meetingSearch')?.value || '').trim();
@@ -4575,6 +4646,8 @@ function atualizarEstadoFiltrosProcessos() {
     if (fiscalVisivel && !fiscal.todas && fiscal.opcoes.length) chips.push(['fiscal', `Fiscal: ${_rotuloMulti(fiscal.marcadas)}`]);
     if (meta && meta.value) chips.push(['meta', `Meta: ${meta.options[meta.selectedIndex]?.text || meta.value}`]);
     if (prior && prior.value) chips.push(['prior', `Prioritário: ${prior.options[prior.selectedIndex]?.text || prior.value}`]);
+    if (!contratante.todas && contratante.opcoes.length) chips.push(['contratante', `Contratante: ${_rotuloMulti(contratante.marcadas)}`]);
+    if (!contratada.todas && contratada.opcoes.length) chips.push(['contratada', `Contratada: ${_rotuloMulti(contratada.marcadas)}`]);
     if (busca) chips.push(['busca', `Busca: “${busca.length > 28 ? busca.slice(0, 28) + '…' : busca}”`]);
     const caixa = el('proc-chips');
     if (caixa) {
@@ -4586,7 +4659,8 @@ function atualizarEstadoFiltrosProcessos() {
     }
 
     // 3) "Mais filtros" mostra quantos dos filtros guardados nele estão ativos.
-    const nMais = (meta && meta.value ? 1 : 0) + (prior && prior.value ? 1 : 0);
+    const nMais = (meta && meta.value ? 1 : 0) + (prior && prior.value ? 1 : 0)
+        + (!contratante.todas && contratante.opcoes.length ? 1 : 0) + (!contratada.todas && contratada.opcoes.length ? 1 : 0);
     const badge = el('mais-filtros-contagem');
     if (badge) { badge.textContent = nMais; badge.hidden = nMais === 0; }
 
@@ -4602,6 +4676,8 @@ function removerFiltroProcessos(chave) {
     };
     if (chave === 'status') marcarTodas(sel('meetingStatusSelect'));
     else if (chave === 'fiscal') marcarTodas(sel('meetingFiscalSelect'));
+    else if (chave === 'contratante') marcarTodas(sel('meetingContratanteSelect'));
+    else if (chave === 'contratada') marcarTodas(sel('meetingContratadaSelect'));
     else if (chave === 'meta') sel('meetingMetaSelect').value = '';
     else if (chave === 'prior') sel('meetingPrioritarioSelect').value = '';
     else if (chave === 'busca') sel('meetingSearch').value = '';
@@ -4616,3 +4692,170 @@ function ajustarAlturaBarraProcessos() {
     if (barra && pane && barra.offsetHeight) pane.style.setProperty('--proc-toolbar-h', barra.offsetHeight + 'px');
 }
 window.addEventListener('resize', () => ajustarAlturaBarraProcessos());
+
+// ---- Ficha da obra por cima da lista de Processos ----
+// A ficha mora no módulo Mapa de Obras (gecope_mapa_obras.html), que é uma página própria. Para
+// abri-la sem tirar o usuário da lista, uma segunda cópia dessa página (?embed=1&ficha=1) fica
+// num iframe em tela cheia, invisível, criado só no primeiro clique. Nesse modo a página esconde o
+// mapa e só mostra a ficha (assets/css/mapa-obras.css, html.ficha-so). A conversa é por
+// postMessage, só entre mesma origem:
+//   aqui -> iframe : gecope-abrir-ficha {codigo_obra, municipio} | gecope-ficha-fechar
+//   iframe -> aqui : gecope-ficha-pronta | gecope-ficha-resultado {ok, motivo} | gecope-ficha-fechada
+// O iframe é mantido: do segundo clique em diante a ficha abre sem recarregar a página.
+const FICHA_OBRA_AVISOS = {
+    'sem-vinculo': 'Este processo não tem obra vinculada.',
+    'sem-obra': 'Esta obra não está na base de contratos: já foi encerrada ou está fora da sua carteira.',
+    'tempo': 'A ficha demorou demais para carregar. Feche e tente de novo.',
+    'erro': 'Não foi possível carregar os dados da obra. Verifique a conexão e tente de novo.'
+};
+const _fichaObra = { overlay: null, frame: null, pronta: false, pedido: null };
+
+function botaoFichaObraHTML(d) {
+    const temObra = !!d.codigoObra;
+    const rotulo = temObra ? 'Abrir a ficha da obra' : 'Processo sem obra vinculada';
+    const acessivel = temObra ? `Abrir a ficha da obra do processo ${d.processo}` : rotulo;
+    return `<button type="button" class="proc-ficha-btn" data-ficha-proc="${escapeHTML(String(d.id))}" title="${escapeHTML(rotulo)}" aria-label="${escapeHTML(acessivel)}"${temObra ? '' : ' aria-disabled="true"'}><i class="bi bi-file-earmark-text" aria-hidden="true"></i></button>`;
+}
+
+function _fichaObraCriarOverlay() {
+    if (_fichaObra.overlay) return _fichaObra.overlay;
+    const overlay = document.createElement('div');
+    overlay.id = 'ficha-obra-overlay';
+    overlay.className = 'ficha-obra-overlay';
+    overlay.innerHTML = `
+        <div class="ficha-obra-estado" role="status" aria-live="polite">
+            <span class="ficha-obra-spinner" aria-hidden="true"></span>
+            <span class="ficha-obra-msg">Abrindo a ficha da obra…</span>
+            <button type="button" class="ficha-obra-fechar">Fechar</button>
+        </div>
+        <iframe class="ficha-obra-frame" title="Ficha da obra" allow="geolocation"></iframe>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.ficha-obra-fechar').addEventListener('click', fecharFichaObraProcesso);
+    // clicar no fundo enquanto carrega ou mostra um aviso também fecha
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay && overlay.dataset.estado !== 'aberta') fecharFichaObraProcesso();
+    });
+    _fichaObra.overlay = overlay;
+    _fichaObra.frame = overlay.querySelector('iframe');
+    return overlay;
+}
+
+function _fichaObraEstado(estado, mensagem) {
+    const overlay = _fichaObra.overlay;
+    if (!overlay) return;
+    overlay.dataset.estado = estado;   // vazio | carregando | aviso | aberta
+    const msg = overlay.querySelector('.ficha-obra-msg');
+    if (mensagem && msg) msg.textContent = mensagem;
+}
+
+function _fichaObraEnviarPedido() {
+    const p = _fichaObra.pedido;
+    if (!p || !_fichaObra.pronta || !_fichaObra.frame?.contentWindow) return;
+    const janela = _fichaObra.frame.contentWindow;
+    // o iframe só lê o tema ao carregar; se o usuário trocou de tema depois, acompanha agora
+    janela.postMessage({ tipo: 'gecope-tema', dark: document.body.classList.contains('theme-dark') }, window.location.origin);
+    janela.postMessage({ tipo: 'gecope-abrir-ficha', codigo_obra: p.codigo_obra, municipio: p.municipio }, window.location.origin);
+}
+
+// Pré-carga: a espera do primeiro clique é a página do mapa carregar e buscar as obras. Então o iframe é
+// criado antes — quando o ponteiro/foco chega a um botão de ficha, ou, na falta disso, alguns segundos
+// depois de a lista aparecer (com a aba ociosa). Depois de pronto, o pedido abre a ficha direto.
+function precarregarFichaObra() {
+    _fichaObraCriarOverlay();
+    if (!_fichaObra.frame.getAttribute('src')) {
+        _fichaObra.frame.setAttribute('src', 'gecope_mapa_obras.html?embed=1&ficha=1');
+    }
+}
+
+function agendarPrecargaFichaObra() {
+    if (_fichaObra.precargaAgendada || _fichaObra.frame) return;
+    _fichaObra.precargaAgendada = true;
+    setTimeout(() => {
+        const aba = document.getElementById('pane-reuniao');
+        const aguardar = window.requestIdleCallback || (fn => setTimeout(fn, 500));
+        if (!aba || !aba.classList.contains('active')) { _fichaObra.precargaAgendada = false; return; }  // tenta de novo no próximo render da lista
+        aguardar(() => precarregarFichaObra());
+    }, 2500);
+}
+
+function abrirFichaObraProcesso(btn) {
+    if (!btn) return;
+    const id = btn.dataset.fichaProc;
+    const d = (window.allData || []).find(r => String(r.id) === String(id));
+    if (!d || !d.codigoObra) {
+        // Aviso no próprio botão apagado: o title já explica, mas toque/teclado não o mostram.
+        _fichaObraCriarOverlay();
+        _fichaObraEstado('aviso', FICHA_OBRA_AVISOS['sem-vinculo']);
+        return;
+    }
+    const overlay = _fichaObraCriarOverlay();
+    _fichaObra.pedido = { codigo_obra: d.codigoObra, municipio: d.municipio || '' };
+    _fichaObra.origem = btn;
+    _fichaObraEstado('carregando', 'Abrindo a ficha da obra…');
+    if (!_fichaObra.frame.getAttribute('src')) {
+        _fichaObra.frame.setAttribute('src', 'gecope_mapa_obras.html?embed=1&ficha=1');   // envia o pedido em gecope-ficha-pronta
+    } else {
+        _fichaObraEnviarPedido();
+    }
+    overlay.querySelector('.ficha-obra-fechar').focus({ preventScroll: true });
+}
+
+function fecharFichaObraProcesso() {
+    if (!_fichaObra.overlay) return;
+    _fichaObra.pedido = null;
+    _fichaObraEstado('', '');
+    try { _fichaObra.frame?.contentWindow?.postMessage({ tipo: 'gecope-ficha-fechar' }, window.location.origin); } catch (e) { /* iframe ainda não pronto */ }
+    // devolve o foco ao botão de onde a ficha saiu (a lista pode ter sido redesenhada)
+    const id = _fichaObra.origem?.dataset?.fichaProc;
+    _fichaObra.origem = null;
+    const alvo = id && document.querySelector(`#meetingTableBody .proc-ficha-btn[data-ficha-proc="${CSS.escape(String(id))}"]`);
+    if (alvo) alvo.focus({ preventScroll: true });
+}
+
+window.addEventListener('message', (e) => {
+    const frame = _fichaObra.frame;
+    if (!frame || e.origin !== window.location.origin || e.source !== frame.contentWindow) return;
+    const d = e.data;
+    if (!d) return;
+    if (d.tipo === 'gecope-ficha-pronta') {
+        _fichaObra.pronta = true;
+        _fichaObraEnviarPedido();
+    } else if (d.tipo === 'gecope-ficha-resultado') {
+        if (!_fichaObra.pedido) return;   // fechada enquanto carregava
+        if (d.ok) {
+            _fichaObraEstado('aberta', '');
+            try { frame.contentWindow.focus(); } catch (err) { /* noop */ }
+        } else {
+            _fichaObraEstado('aviso', FICHA_OBRA_AVISOS[d.motivo] || FICHA_OBRA_AVISOS.erro);
+            if (d.motivo === 'erro' || d.motivo === 'tempo') {
+                // a carga do mapa falhou: recarrega o iframe em segundo plano para o próximo clique tentar de novo
+                _fichaObra.pronta = false;
+                _fichaObra.pedido = null;
+                frame.setAttribute('src', 'gecope_mapa_obras.html?embed=1&ficha=1&t=' + Date.now());
+            }
+        }
+    } else if (d.tipo === 'gecope-ficha-fechada') {
+        if (_fichaObra.overlay?.dataset.estado === 'aberta') fecharFichaObraProcesso();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _fichaObra.overlay?.dataset.estado && !e.defaultPrevented) fecharFichaObraProcesso();
+});
+
+if (mt.body) {
+    ['pointerover', 'focusin'].forEach(tipo => mt.body.addEventListener(tipo, (e) => {
+        if (!_fichaObra.frame && e.target.closest?.('.proc-ficha-btn:not([aria-disabled="true"])')) precarregarFichaObra();
+    }));
+    mt.body.addEventListener('click', (e) => {
+        const btn = e.target.closest('.proc-ficha-btn');
+        if (!btn) return;
+        e.stopPropagation();
+        if (btn.getAttribute('aria-disabled') === 'true') {
+            _fichaObraCriarOverlay();
+            _fichaObraEstado('aviso', FICHA_OBRA_AVISOS['sem-vinculo']);
+            return;
+        }
+        abrirFichaObraProcesso(btn);
+    });
+}
