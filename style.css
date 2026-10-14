@@ -4489,54 +4489,49 @@
         .gp-adit-lista:empty { display: none; }
         .gp-adit-item {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto auto;
-            align-items: baseline;
-            gap: 0.1rem 1rem;
+            grid-template-columns: minmax(0, 1fr) auto 5.5rem auto;
+            align-items: center;
+            gap: 0.1rem 0.9rem;
             padding: 0.4rem 0;
             border-top: 1px solid var(--sop-slate-200, #e2e8f0);
             font-size: 0.8rem;
         }
         .gp-adit-item:first-child { border-top: 0; }
-        .gp-adit-nome { color: var(--text-heading, #0f172a); overflow-wrap: anywhere; }
-        .gp-adit-tipo {
-            grid-column: 1;
-            grid-row: 2;
-            color: var(--sop-slate-600, #475569);
+        .gp-adit-nome {
+            color: var(--text-heading, #0f172a);
+            font-variant-numeric: tabular-nums;
             overflow-wrap: anywhere;
         }
-        .gp-adit-data {
-            grid-column: 2;
-            grid-row: 1 / span 2;
-            align-self: center;
-            color: var(--sop-slate-600, #475569);
-            font-variant-numeric: tabular-nums;
-        }
-        .gp-adit-valor {
-            grid-column: 3;
-            grid-row: 1 / span 2;
-            align-self: center;
-            text-align: right;
-            min-width: 7.5rem;
-            font-variant-numeric: tabular-nums;
-            color: var(--text-heading, #0f172a);
-        }
-        /* Na lista de processos o selo de status ocupa o lugar da data */
         .gp-adit-selo {
-            grid-column: 2;
-            grid-row: 1 / span 2;
-            align-self: center;
+            justify-self: start;
             padding: 0.1rem 0.6rem;
             border-radius: 999px;
             border: 1px solid var(--sop-slate-200, #e2e8f0);
             font-size: 0.72rem;
             white-space: nowrap;
         }
+        .gp-adit-data {
+            color: var(--sop-slate-600, #475569);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .gp-adit-valor {
+            text-align: right;
+            min-width: 7.5rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-heading, #0f172a);
+        }
+        @media (max-width: 575.98px) {
+            .gp-adit-item { grid-template-columns: minmax(0, 1fr) auto; }
+            .gp-adit-selo { grid-column: 1; grid-row: 2; }
+            .gp-adit-data { grid-column: 1; grid-row: 3; }
+            .gp-adit-valor { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+        }
         body.theme-dark .gp-base-bloco,
         body.theme-dark .gp-adit-item { border-top-color: rgba(255, 255, 255, 0.14); }
         body.theme-dark .gp-base-bloco-titulo { color: #f1f5f9; }
         body.theme-dark .gp-base-bloco-resumo,
         body.theme-dark .gp-base-bloco-nota,
-        body.theme-dark .gp-adit-tipo,
         body.theme-dark .gp-adit-data { color: rgba(255, 255, 255, 0.68); }
         body.theme-dark .gp-adit-nome,
         body.theme-dark .gp-adit-valor { color: #f1f5f9; }
@@ -4599,7 +4594,7 @@
 
         /* ── GERENCIAR PROCESSO: ficha em leitura, edição seção a seção ───────────
            Marcação em index.html (#modalDetalhes) e lógica em processos.js
-           (gpEditar/gpConcluir/gpCancelar/gpAtualizarResumo). Cada [data-gp-secao]
+           (gpEditarTudo/gpCancelarEdicao/gpAtualizarResumo). Cada [data-gp-secao]
            tem duas camadas: .gp-view (dados formatados) e .gp-edit (os campos de
            sempre). O estado vem de data-gp-modo ("leitura"|"edicao") e data-gp-sujo
            ("1" quando algum campo difere do valor com que o processo foi aberto). */
@@ -4639,70 +4634,26 @@
             color: var(--gc-acao);
             font-size: 0.95rem;
         }
-        .gp-card-acoes {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+        /* Botões do rodapé: "Editar" até alguma seção abrir; depois "Cancelar edição". */
+        .gp-rodape-cancelar {
+            display: none !important;
         }
-        .gp-card-acoes .btn {
+        #modalDetalhes[data-gp-editando="1"] .gp-rodape-cancelar {
+            display: inline-flex !important;
+        }
+        #modalDetalhes[data-gp-editando="1"] .gp-rodape-editar,
+        /* Quem não pode editar vê a ficha sem nenhum botão de edição */
+        #modalDetalhes[data-gp-somente-leitura="1"] .gp-rodape-editar {
+            display: none !important;
+        }
+        .gp-restrito-nota {
+            display: inline-flex;
             align-items: center;
             gap: 0.35rem;
-            font-weight: 600;
-        }
-        .gp-identity .gp-card-acoes {
-            margin-left: auto;
-            align-self: flex-end;
-        }
-
-        /* Botões por estado: só um conjunto aparece por vez */
-        .gp-btn-cancelar,
-        .gp-btn-concluir,
-        .gp-btn-desfazer,
-        .gp-sujo-pill {
-            display: none !important;
-        }
-        .gp-btn-editar {
-            display: inline-flex;
-        }
-        .gp-secao[data-gp-modo="edicao"] .gp-btn-cancelar,
-        .gp-secao[data-gp-modo="edicao"] .gp-btn-concluir {
-            display: inline-flex !important;
-        }
-        .gp-secao[data-gp-modo="edicao"] .gp-btn-editar {
-            display: none !important;
-        }
-        .gp-secao[data-gp-sujo="1"][data-gp-modo="leitura"] .gp-btn-desfazer,
-        .gp-secao[data-gp-sujo="1"][data-gp-modo="leitura"] .gp-sujo-pill {
-            display: inline-flex !important;
-        }
-        /* Quem não pode editar vê a ficha sem nenhum botão de edição */
-        #modalDetalhes[data-gp-somente-leitura="1"] .gp-btn-editar {
-            display: none !important;
-        }
-        .gp-btn-desfazer {
-            padding-inline: 0.25rem;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             color: var(--text-muted);
         }
-        .gp-sujo-pill {
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.2rem 0.65rem;
-            border-radius: 999px;
-            border: 1px solid #f0d9a0;
-            background: #fdf3dc;
-            color: #8a5a00;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-        .gp-sujo-pill::before {
-            content: "";
-            width: 0.45rem;
-            height: 0.45rem;
-            border-radius: 50%;
-            background: #d98e04;
-        }
+        .gp-restrito-nota[hidden] { display: none; }
         .gp-aviso-sujo {
             display: inline-flex;
             align-items: center;
@@ -4855,12 +4806,6 @@
             background: rgba(110, 231, 160, 0.12);
             color: #6ee7a0;
         }
-        body.theme-dark .gp-sujo-pill {
-            border-color: rgba(224, 166, 58, 0.35);
-            background: rgba(224, 166, 58, 0.14);
-            color: #f2c46d;
-        }
-        body.theme-dark .gp-sujo-pill::before { background: #e0a63a; }
         body.theme-dark .gp-aviso-sujo { color: #f2c46d; }
         body.theme-dark .gp-section-card.gp-secao[data-gp-modo="edicao"] {
             border-color: #6ee7a0 !important;

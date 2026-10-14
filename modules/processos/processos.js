@@ -797,26 +797,36 @@ function selecionarFiscalCadastro(btnEl, nome, matricula) {
 // NÃO tem id_obra — a chave é o nr_contrato_sop —, então em contrato com várias obras a lista é
 // do contrato inteiro. A mesma leitura liberada vale (política "leitura autenticada aditivos_contrato").
 const BASE_CONTRATO_TTL_MS = 10 * 60 * 1000;
-const GP_ADIT_COLS = 'nr_aditivo,tipo_aditivo,valor_aprovado,valor_supressao,valor_repercussao,data_publicacao,data_assinatura';
+const GP_ADIT_COLS = 'nr_aditivo,nr_protocolo,tipo_aditivo,valor_aprovado,valor_supressao,valor_repercussao,data_publicacao,data_assinatura';
 const baseContratoCache = new Map(); // codigo_obra -> { em, base } (só bases válidas)
 let baseContratoDetalhes = { estado: 'vazio', motivo: 'sem-codigo' };
 let baseContratoReq = 0; // descarta resposta de uma consulta que ficou velha (modal reaberto/Vincular)
 
-// Aditivos DE VALOR formalizados do contrato, do mais recente ao mais antigo. Só entram os que
-// alteram valor — tipo_aditivo começando em "Valor" (Valor; Valor e vigência; Valor e execução;
-// Valor, vigência e execução). Ficam de fora os de prazo/execução/vigência e também "Reajuste de
-// Preço"/"Reajuste de Medição": o reajuste já compõe a base, contá-lo aqui seria duplicar.
-// [] = sem número de contrato ou nenhum aditivo; null = a consulta falhou (a base continua
-// valendo sem a lista).
+// Aditivos formalizados do contrato (SIGSOP), numa consulta só. Devolve
+//   { valor, reajusteMedicao }  ou  null (a consulta falhou).
+// - valor: aditivos DE VALOR, do mais recente ao mais antigo — tipo_aditivo começando em "Valor"
+//   (Valor; Valor e vigência; Valor e execução; Valor, vigência e execução). Ficam de fora os de
+//   prazo/execução/vigência e os reajustes: o reajuste já compõe a base, listá-lo duplicaria.
+// - reajusteMedicao: Σ dos aditivos "Reajuste de Medição". É a parcela D da base do SIGSOP e só
+//   conta depois de formalizada; o acumulado de contratos_edificacao.total_reajuste NÃO é a base
+//   (contrato 05732024SEDUC: 1.007.267,24 lá, 0,00 formalizado, e o SIGSOP calcula sobre 0,00).
+// Sem número de contrato => { valor: [], reajusteMedicao: 0 }.
 async function buscarAditivosDoContrato(nrContrato) {
     const nr = (nrContrato || '').toString().trim();
-    if (!nr) return [];
+    if (!nr) return { valor: [], reajusteMedicao: 0 };
     try {
         const { data, error } = await sbClient.from('aditivos_contrato').select(GP_ADIT_COLS)
-            .eq('nr_contrato_sop', nr).ilike('tipo_aditivo', 'valor%');
+            .eq('nr_contrato_sop', nr)
+            .or('tipo_aditivo.ilike.valor%,tipo_aditivo.ilike.reajuste%medi%');
         if (error) throw error;
+        const linhas = data || [];
+        const ehReajusteMedicao = a => /^reajuste.*medi/i.test(a.tipo_aditivo || '');
         const dataDe = a => a.data_publicacao || a.data_assinatura || '';
-        return (data || []).slice().sort((a, b) => dataDe(b).localeCompare(dataDe(a)));
+        const valor = linhas.filter(a => !ehReajusteMedicao(a))
+            .sort((a, b) => dataDe(b).localeCompare(dataDe(a)));
+        const reajusteMedicao = Number(linhas.filter(ehReajusteMedicao)
+            .reduce((s, a) => s + (Number(a.valor_aprovado) || 0), 0).toFixed(2));
+        return { valor, reajusteMedicao };
     } catch (e) {
         console.error('[ERRO] buscarAditivosDoContrato:', e);
         return null;
@@ -848,7 +858,7 @@ async function buscarBaseContrato(codigo) {
             const [rFicha, rObras] = await Promise.all([
                 sbClient.from('ficha_contrato').select('valor_original, total_realinhado')
                     .eq('id_contrato', obra.id_contrato).maybeSingle(),
-                sbClient.from('contratos_edificacao').select('total_reajuste')
+                sbClient.from('contratos_edificacao').select('id_obra')
                     .eq('id_contrato', obra.id_contrato)
             ]);
             if (rFicha.error) throw rFicha.error;
@@ -857,18 +867,25 @@ async function buscarBaseContrato(codigo) {
             obrasDoContrato = rObras.data || [];
         }
 
+        // Base do SIGSOP (replanilhamento): valor original + reajuste de preço + reajuste de
+        // medição FORMALIZADO. Aditivos de valor e o acumulado de reajuste das obras ficam fora.
+        // base.reajuste = reajuste de medição formalizado; base.realinhamento = reajuste de preço
+        // (ficha_contrato.total_realinhado = Σ aditivos "Reajuste de Preço").
+        const ads = await pAditivos;
+        if (ads === null) return { estado: 'erro' };
+
         let base;
         if (ficha && n(ficha.valor_original) > 0) {
-            const reajuste = obrasDoContrato.reduce((s, o) => s + n(o.total_reajuste), 0);
             base = {
                 estado: 'ok', origem: 'contrato', numero: obra.nr_contrato_sop || '',
                 obras: obrasDoContrato.length || 1,
-                original: n(ficha.valor_original), reajuste, realinhamento: n(ficha.total_realinhado)
+                original: n(ficha.valor_original), reajuste: ads.reajusteMedicao,
+                realinhamento: n(ficha.total_realinhado)
             };
         } else if (n(obra.valor_original) > 0) {
             base = {
                 estado: 'ok', origem: 'obra', codigo: cod,
-                original: n(obra.valor_original), reajuste: n(obra.total_reajuste),
+                original: n(obra.valor_original), reajuste: ads.reajusteMedicao,
                 realinhamento: n(obra.total_realinhado)
             };
         } else {
@@ -876,7 +893,7 @@ async function buscarBaseContrato(codigo) {
         }
         base.total = Number((base.original + base.reajuste + base.realinhamento).toFixed(2));
         base.codigoObra = cod;
-        base.aditivos = await pAditivos;
+        base.aditivos = ads.valor;
         baseContratoCache.set(cod, { em: Date.now(), base });
         return base;
     } catch (e) {
@@ -945,9 +962,11 @@ function gpDataBr(iso) {
     return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
 }
 
-// Dentro de "Ver composição" da Base de cálculo: (1) aditivos já formalizados do contrato e
-// (2) os outros processos desta mesma obra no GECOPE (vêm de window.allData, sem consulta).
-// Tudo por textContent — o conteúdo é dado do banco.
+// Dentro de "Ver composição" da Base de cálculo: uma lista enxuta dos aditivos de valor já
+// formalizados do contrato — processo, status atual, data de aprovação e valor. O processo é o
+// do aditivo (nr_protocolo); o status e a data vêm do processo correspondente no GECOPE
+// (window.allData, sem consulta). Abaixo, só se houver, os demais processos da obra que ainda
+// não viraram aditivo. Tudo por textContent — o conteúdo é dado do banco.
 function renderAditivosBaseDetalhes() {
     const blocoAd = document.getElementById('det_base_aditivos');
     const blocoPr = document.getElementById('det_base_outros');
@@ -959,8 +978,30 @@ function renderAditivosBaseDetalhes() {
         if (txt !== undefined) e.textContent = txt;
         return e;
     };
+    const classeValor = v => 'gp-adit-valor' + (v < -0.004 ? ' gp-val-neg' : v > 0.004 ? ' gp-val-pos' : '');
+    // Uma linha: processo | status | aprovação | valor.
+    const linha = ({ processo, dica, status, selo, data, dataDica, valor }) => {
+        const li = el('li', 'gp-adit-item');
+        const nome = el('span', 'gp-adit-nome', processo);
+        if (dica) nome.title = dica;
+        li.appendChild(nome);
+        const s = el('span', 'gp-adit-selo ' + (selo || ''), status);
+        li.appendChild(s);
+        const d = el('span', 'gp-adit-data', data || '—');
+        if (dataDica) d.title = dataDica;
+        li.appendChild(d);
+        li.appendChild(el('span', classeValor(valor), gpReaisComSinal(valor)));
+        return li;
+    };
 
     if (b.estado !== 'ok') { blocoAd.hidden = true; blocoPr.hidden = true; return; }
+
+    const todos = window.allData || [];
+    const porNumero = new Map();
+    todos.forEach(r => {
+        const k = String(r.processo || '').trim();
+        if (k && r.status !== 'EXCLUÍDO') porNumero.set(k, r);
+    });
 
     // (1) aditivos formalizados
     const listaAd = document.getElementById('det_base_adit_lista');
@@ -970,56 +1011,61 @@ function renderAditivosBaseDetalhes() {
     listaAd.replaceChildren();
     notaAd.textContent = '';
     const ads = b.aditivos;
+    const jaListados = new Set();
     if (ads === null || ads === undefined) {
         resumoAd.textContent = 'Não foi possível carregar os aditivos.';
     } else if (!ads.length) {
-        resumoAd.textContent = 'Nenhum aditivo de valor formalizado registrado para este contrato.';
+        resumoAd.textContent = 'Nenhum aditivo de valor formalizado neste contrato.';
     } else {
         const soma = Number(ads.reduce((s, a) => s + (Number(a.valor_repercussao) || 0), 0).toFixed(2));
-        let txt = `${ads.length} ${ads.length === 1 ? 'aditivo de valor' : 'aditivos de valor'} · repercussão ${gpReaisComSinal(soma)}`;
         // O percentual só faz sentido quando a base também é do contrato inteiro.
-        if (b.origem === 'contrato' && b.total > 0) {
-            txt += ` (${formatarPercentualBase(soma, b.total).texto} da base)`;
-        }
-        resumoAd.textContent = txt;
+        const pct = (b.origem === 'contrato' && b.total > 0)
+            ? `${formatarPercentualBase(soma, b.total).texto} da base` : '';
+        resumoAd.textContent = ads.length > 1
+            ? `Total ${gpReaisComSinal(soma)}${pct ? ' · ' + pct : ''}`
+            : pct;
         ads.forEach(a => {
-            const li = el('li', 'gp-adit-item');
-            li.appendChild(el('span', 'gp-adit-nome', a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : 'Aditivo'));
-            li.appendChild(el('span', 'gp-adit-tipo', a.tipo_aditivo || '—'));
-            li.appendChild(el('span', 'gp-adit-data', gpDataBr(a.data_publicacao || a.data_assinatura)));
-            const rep = Number(a.valor_repercussao) || 0;
-            const v = el('span', 'gp-adit-valor' + (rep < -0.004 ? ' gp-val-neg' : rep > 0.004 ? ' gp-val-pos' : ''),
-                gpReaisComSinal(rep));
-            li.appendChild(v);
-            listaAd.appendChild(li);
+            const protocolo = String(a.nr_protocolo || '').trim();
+            const proc = protocolo ? porNumero.get(protocolo) : null;
+            if (protocolo) jaListados.add(protocolo);
+            const dataProc = proc ? dateParaInput(proc.dataAprovacao) : '';
+            const dataAd = gpDataBr(a.data_publicacao || a.data_assinatura);
+            listaAd.appendChild(linha({
+                processo: protocolo || (a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : 'Aditivo'),
+                dica: [a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : '', a.tipo_aditivo || ''].filter(Boolean).join(' · '),
+                status: proc ? (proc.status || '—') : 'Formalizado',
+                selo: proc ? classeBadgeStatus(proc.status) : '',
+                data: dataProc || (dataAd !== '—' ? dataAd : ''),
+                dataDica: dataProc ? 'Data de aprovação' : 'Data de publicação do aditivo',
+                valor: Number(a.valor_repercussao) || 0
+            }));
         });
-        const multi = b.origem === 'contrato' && b.obras > 1;
-        notaAd.textContent = (multi
-            ? 'Os aditivos são registrados por contrato: esta lista reúne as obras do contrato.'
-            : 'Os aditivos são registrados por contrato (SIGSOP), não por obra.')
-            + ' Só aditivos de valor; os reajustes já compõem a base.';
+        if (b.origem === 'contrato' && b.obras > 1) {
+            notaAd.textContent = 'Aditivos do contrato, reunindo todas as obras.';
+        }
     }
 
-    // (2) outros processos desta obra no GECOPE
+    // (2) outros processos desta obra no GECOPE que ainda não são aditivo formalizado
     const listaPr = document.getElementById('det_base_outros_lista');
     listaPr.replaceChildren();
     const atual = ((document.getElementById('det_processo') || {}).value || '').trim();
     const cod = (b.codigoObra || '').trim();
-    const outros = cod ? (window.allData || []).filter(r =>
-        r.codigoObra && String(r.codigoObra).trim() === cod && r.processo !== atual && r.status !== 'EXCLUÍDO') : [];
+    const outros = cod ? todos.filter(r =>
+        r.codigoObra && String(r.codigoObra).trim() === cod && r.processo !== atual
+        && r.status !== 'EXCLUÍDO' && !jaListados.has(String(r.processo || '').trim())) : [];
     if (!outros.length) { blocoPr.hidden = true; return; }
     blocoPr.hidden = false;
     outros.sort((x, y) => ((y.dataAbertura && y.dataAbertura.getTime && y.dataAbertura.getTime()) || 0)
         - ((x.dataAbertura && x.dataAbertura.getTime && x.dataAbertura.getTime()) || 0));
     outros.forEach(r => {
-        const li = el('li', 'gp-adit-item');
-        li.appendChild(el('span', 'gp-adit-nome', r.processo || '—'));
-        const selo = el('span', 'gp-adit-selo ' + classeBadgeStatus(r.status), (r.status || '—'));
-        li.appendChild(selo);
-        const rep = Number(r.repercGecope) || 0;
-        li.appendChild(el('span', 'gp-adit-valor' + (rep < -0.004 ? ' gp-val-neg' : rep > 0.004 ? ' gp-val-pos' : ''),
-            gpReaisComSinal(rep)));
-        listaPr.appendChild(li);
+        listaPr.appendChild(linha({
+            processo: r.processo || '—',
+            status: r.status || '—',
+            selo: classeBadgeStatus(r.status),
+            data: dateParaInput(r.dataAprovacao),
+            dataDica: 'Data de aprovação',
+            valor: Number(r.repercGecope) || 0
+        }));
     });
 }
 
@@ -2035,19 +2081,21 @@ function atualizarBadgeAba(elId, count) {
 
 // --- GERENCIAR PROCESSO: ficha em modo leitura, edição seção a seção ---
 // A janela abre como uma ficha: cada seção ([data-gp-secao]) mostra os dados formatados
-// (camada .gp-view) e só revela os campos (camada .gp-edit) quando a pessoa clica em "Editar".
+// (camada .gp-view) e só revela os campos (camada .gp-edit) quando a pessoa clica em "Editar",
+// o único botão de edição, no rodapé: ele abre todas as seções de uma vez.
 // Os campos continuam sendo os mesmos — ids `det_*` e names intactos —, porque a validação,
 // o payload de executarAcaoDetalhes e as automações leem por eles. A camada de leitura é só
 // um espelho: gpAtualizarResumo() a repinta a partir dos campos.
 //
-// "Concluir" não grava: volta à leitura e deixa a seção marcada como alterada. Quem grava é
-// o botão "Salvar alterações" do rodapé, que continua sendo um só (uma validação, um UPDATE).
+// "Cancelar edição" (rodapé) devolve os campos ao que eram ao clicar em "Editar" e volta à
+// leitura. Quem grava é o botão "Salvar alterações" do rodapé (uma validação, um UPDATE).
 //
 // Armadilha: nunca trocar `display:none` por `disabled` para esconder campo. Campo desabilitado
 // some do FormData, e o payload é montado com `new FormData(form)`.
 const GP_CAMPO_SEL = 'input[id], select[id], textarea[id]';
 const GP_TXT_VAZIO = 'Não informado';
 let gpBaseline = {};                // id do campo -> valor ao abrir o processo
+let gpEhAdmin = false;              // seções data-gp-requer="admin" só abrem para admin
 const gpSnapshots = new WeakMap();  // seção -> valores ao entrar em edição (para Cancelar)
 
 function gpModal() { return document.getElementById('modalDetalhes'); }
@@ -2095,22 +2143,52 @@ function gpResetarModos() {
         secao.dataset.gpSujo = '0';
         gpSnapshots.delete(secao);
     });
+    gpSincronizarRodape();
+}
+
+// data-gp-editando no modal diz ao CSS qual dos dois botões do rodapé mostrar: "Editar" (nenhuma
+// seção aberta) ou "Cancelar edição". Derivado das seções, para não sair de sincronia.
+function gpSincronizarRodape() {
+    const modal = gpModal();
+    if (!modal) return;
+    const editando = gpSecoes().some(secao => secao.dataset.gpModo === 'edicao');
+    modal.dataset.gpEditando = editando ? '1' : '0';
 }
 
 function gpEditar(secao, { focar = true } = {}) {
     if (!secao || secao.dataset.gpModo === 'edicao') return;
     gpSnapshots.set(secao, gpLerCampos(secao));
     secao.dataset.gpModo = 'edicao';
+    gpSincronizarRodape();
     if (!focar) return;
     const primeiro = gpCamposDe(secao).find(el => !el.disabled && !el.readOnly && el.offsetParent !== null);
     if (primeiro) primeiro.focus();
+}
+
+// Abre a ficha inteira para edição (botão "Editar" do rodapé). A seção restrita a admin fica
+// de fora para os demais perfis; o banco continua sendo quem decide de verdade.
+function gpEditarTudo() {
+    const abertas = gpSecoes().filter(secao =>
+        secao.dataset.gpRequer !== 'admin' || gpEhAdmin);
+    abertas.forEach(secao => gpEditar(secao, { focar: false }));
+    for (const secao of abertas) {
+        const primeiro = gpCamposDe(secao).find(el => !el.disabled && !el.readOnly && el.offsetParent !== null);
+        if (primeiro) { primeiro.focus(); break; }
+    }
 }
 
 function gpConcluir(secao) {
     if (!secao) return;
     secao.dataset.gpModo = 'leitura';
     gpSnapshots.delete(secao);
+    gpSincronizarRodape();
     gpAtualizarResumo();
+}
+
+function gpCancelarEdicao() {
+    gpSecoes().forEach(secao => {
+        if (secao.dataset.gpModo === 'edicao') gpCancelar(secao);
+    });
 }
 
 function gpCancelar(secao) {
@@ -2118,15 +2196,6 @@ function gpCancelar(secao) {
     const snap = gpSnapshots.get(secao);
     if (snap) gpAplicarCampos(snap);
     gpConcluir(secao);
-}
-
-// Descarta o que foi alterado na seção desde que o processo foi aberto.
-function gpDesfazer(secao) {
-    if (!secao) return;
-    const base = {};
-    gpCamposDe(secao).forEach(el => { if (el.id in gpBaseline) base[el.id] = gpBaseline[el.id]; });
-    gpAplicarCampos(base);
-    gpAtualizarResumo();
 }
 
 // Abre a seção que contém o campo, para a validação poder apontar para ele. Sem isto, um
@@ -2143,10 +2212,8 @@ function gpAplicarPermissoes(podeEditar, isAdmin) {
     const modal = gpModal();
     if (!modal) return;
     modal.dataset.gpSomenteLeitura = podeEditar ? '0' : '1';
-    modal.querySelectorAll('[data-gp-requer="admin"] .gp-btn-editar').forEach(btn => {
-        btn.disabled = !isAdmin;
-        btn.title = isAdmin ? '' : 'Restrito a administradores.';
-    });
+    gpEhAdmin = !!isAdmin;
+    modal.querySelectorAll('.gp-restrito-nota').forEach(el => { el.hidden = gpEhAdmin; });
 }
 
 function gpPreencherValor(el) {
@@ -2228,13 +2295,9 @@ function gpInicializarFicha() {
     modal.addEventListener('click', ev => {
         const btn = ev.target.closest ? ev.target.closest('[data-gp-acao]') : null;
         if (!btn || btn.disabled) return;
-        const secao = btn.closest('[data-gp-secao]');
-        if (!secao) return;
         switch (btn.dataset.gpAcao) {
-            case 'editar': gpEditar(secao); break;
-            case 'concluir': gpConcluir(secao); break;
-            case 'cancelar': gpCancelar(secao); break;
-            case 'desfazer': gpDesfazer(secao); break;
+            case 'editar-tudo': gpEditarTudo(); break;
+            case 'cancelar-edicao': gpCancelarEdicao(); break;
         }
     });
 
