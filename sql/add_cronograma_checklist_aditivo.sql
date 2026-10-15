@@ -11,3 +11,7 @@
 alter table checklist_documentacao_aditivo
   add column if not exists cronograma     boolean,
   add column if not exists cronograma_obs text;
+
+-- Faz o PostgREST recarregar o cache do schema; sem isto o app continua
+-- recebendo "Could not find the 'cronograma' column ... in the schema cache".
+notify pgrst, 'reload schema';

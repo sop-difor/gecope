@@ -4306,6 +4306,18 @@
             box-shadow: none !important;
             background-color: #ffffff !important;
         }
+        /* Tema claro: aplicarCorStatusSelect() põe uma classe .badge-status-* no select de
+           Status (algumas com color:#fff). O fundo branco acima vence o fundo do badge, mas o
+           texto branco continuava — o valor atual sumia e a lista nativa abria com opções
+           brancas sobre branco, só aparecendo no hover. Cor sólida no select e nas <option>
+           (o popup do Chromium não repinta com rgba/herança). O tema escuro tem regra própria. */
+        body:not(.theme-dark) #formDetalhes select.gp-status-select {
+            color: #212529 !important;
+        }
+        body:not(.theme-dark) #formDetalhes select.gp-status-select option {
+            background-color: #ffffff;
+            color: #212529;
+        }
         #formDetalhes .form-control:not(.bg-transparent):focus,
         #formDetalhes .form-select:not(.bg-transparent):focus {
             border-color: var(--sop-green) !important;
