@@ -2289,17 +2289,22 @@ body.modo-ruas[data-ruas-nivel="3"] .mun-label,body.modo-ruas[data-ruas-nivel="3
 body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet-container .leaflet-control-attribution{display:block}
 .leaflet-container .leaflet-control-attribution a{color:var(--ng-light)}
 
-.ruas-pin{display:flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:50%;
-  background:var(--status-exec);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);color:#fff}
-.ruas-pin b{font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;line-height:1}
-.ruas-pin.s-exec{background:var(--status-exec)}
-.ruas-pin.s-ok{background:var(--status-ok)}
-.ruas-pin.s-wait{background:var(--status-wait)}
-.ruas-pin.s-wait b{color:#241800}
-.ruas-pin.s-stop{background:var(--status-stop)}
-.ruas-pin.hist{background:var(--text-dim);opacity:.8}
-.ruas-pin.s-sel{background:var(--ng);box-shadow:0 0 0 4px rgba(var(--ng-rgb),.3),0 2px 6px rgba(0,0,0,.45)}
-.leaflet-marker-icon.ruas-pin:hover,.leaflet-marker-icon.ruas-pin:focus-visible{box-shadow:0 0 0 4px rgba(var(--ng-rgb),.4),0 2px 6px rgba(0,0,0,.45);outline:none}
+/* pino fino em gota (SVG montado em ruasPinIcon): contorno branco para destacar sobre ruas e contornos, sombra suave */
+.ruas-pin{background:none;border:0}
+.ruas-pin svg{display:block;overflow:visible;filter:drop-shadow(0 2px 2px rgba(0,0,0,.42));transform-origin:50% 100%;transition:transform .12s}
+.ruas-pin .pin-body{fill:var(--status-exec);stroke:#fff;stroke-width:1.5;stroke-linejoin:round}
+.ruas-pin .pin-dot{fill:#fff}
+.ruas-pin text{fill:#fff;font-family:Montserrat,sans-serif;font-size:12px;font-weight:700}
+.ruas-pin.s-exec .pin-body{fill:var(--status-exec)}
+.ruas-pin.s-ok .pin-body{fill:var(--status-ok)}
+.ruas-pin.s-wait .pin-body{fill:var(--status-wait)}
+.ruas-pin.s-wait text{fill:#241800}
+.ruas-pin.s-wait .pin-dot{fill:#241800}
+.ruas-pin.s-stop .pin-body{fill:var(--status-stop)}
+.ruas-pin.hist .pin-body{fill:var(--text-dim);opacity:.85}
+.ruas-pin.s-sel .pin-body{fill:var(--ng)}
+.leaflet-marker-icon.ruas-pin:hover svg,.leaflet-marker-icon.ruas-pin:focus-visible svg{transform:scale(1.14);filter:drop-shadow(0 0 3px rgba(var(--ng-rgb),.75)) drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.leaflet-marker-icon.ruas-pin:focus-visible{outline:none}
 
 .ruas-popup .leaflet-popup-content-wrapper{background:var(--bg-modal);color:var(--text-base);border-radius:12px;border:1px solid var(--card-border)}
 .ruas-popup .leaflet-popup-tip{background:var(--bg-modal)}
@@ -2318,7 +2323,7 @@ body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet
   border:1px solid var(--card-border);border-radius:10px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:500;color:var(--text-base)}
 .ruas-resumo b{color:var(--text-brightest);font-weight:700}
 .ruas-leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--text-dim)}
-.ruas-dot{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:50%;vertical-align:-1px;background:var(--status-exec)}
+.ruas-dot{display:inline-block;width:10px;height:10px;margin:0 8px 0 2px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);vertical-align:-1px;background:var(--status-exec)}
 .ruas-dot.s-exec{background:var(--status-exec)}.ruas-dot.s-wait{background:var(--status-wait)}
 .ruas-dot.s-stop{background:var(--status-stop)}.ruas-dot.hist{background:var(--text-dim)}
 .ruas-aviso{font-size:12px;color:var(--status-stop-text)}

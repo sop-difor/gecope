@@ -2,12 +2,16 @@
 
 Entregue em 09/10/2026. O botão **Ruas e rotas** do módulo Contratos põe o mapa de ruas do OpenStreetMap por
 baixo do mapa, nos três níveis (estado, distrito e município). Cada obra pode ter um ponto (latitude/longitude):
-com um município aberto ele aparece como pino, e o ponto é cadastrado no cartão **Localização da obra** da Ficha.
+com um distrito ou um município aberto ele aparece como pino, e o ponto é cadastrado no cartão **Localização da obra** da Ficha.
 
 ## Mapa de ruas e rotas
 
 - Estado e distrito: os contornos ficam com preenchimento leve (proporcional ao número de obras) e os rótulos
   com as contagens continuam. Município: só o contorno e os pinos.
+- Distrito aberto (14/10/2026): todas as obras localizadas do distrito aparecem, e pontos a menos de 38 px na
+  tela viram um pino com a contagem (`ruasAglomera`); clicar aproxima até separá-los, e ao dar zoom o
+  agrupamento se refaz. O painel do distrito mostra "N no mapa · M sem localização"; a lista para cadastrar
+  continua só no painel do município. No nível estado só os contornos e as contagens.
 - Peso (medido em 09/10/2026): Ceará inteiro ≈ 40 blocos ≈ 235 KB; um zoom acima ≈ 840 KB. Nada é pedido
   antes de ligar o botão; o navegador guarda os blocos em cache.
 - O mapa mostra rodovias e ruas, mas **não calcula trajeto**. O botão **Rota**, ao lado das abas Ficha Obra e
@@ -78,7 +82,7 @@ parecem coordenadas UTM, não graus. Uma coordenada veio em graus/minutos/segund
 
 - O mapa de ruas usa os tiles públicos do OpenStreetMap (gratuito, uso leve, atribuição visível). Se o uso
   crescer, trocar `OSM_URL` em `assets/js/mapa-obras.js` por um provedor com chave.
-- Sem cluster de marcadores: o maior município tem 662 obras no histórico completo e o Leaflet comporta.
-  Reavaliar só se houver lentidão medida.
+- Agrupamento próprio, só no nível distrito, por grade de pixels (sem biblioteca). No município não agrupa:
+  o maior tem 662 obras no histórico completo e o Leaflet comporta. Reavaliar só se houver lentidão medida.
 - Edição por qualquer papel é decisão do usuário (09/10/2026). Se aparecer ponto errado recorrente, a
   alternativa é restringir a escrita a admin/gerente na policy `obra_localizacao_update`.
