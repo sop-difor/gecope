@@ -17,6 +17,13 @@
 //
 // -> 1 invocação de Edge Function por rodada (as consultas ao SUITE são fetch de saída = egress).
 //
+// REVISÃO 14/10/2026 (Log Ingestion alto): o hash `chave_evento` incluía `permanency` (tempo
+// acumulado na unidade, que cresce a cada consulta ao SUITE), então o evento mais recente de
+// cada processo ganhava uma linha nova por rodada (75% de `historico_suite_eventos` era
+// duplicata) e o PATCH em `processos` rodava toda hora por comparar datas como texto. Agora a
+// deduplicação usa a identidade lógica do evento (chaveLogicaEvento) e as datas são comparadas
+// por instante (mesmoInstante).
+//
 // Deploy:  supabase functions deploy sincronizar-suite --no-verify-jwt
 // Secret:  SYNC_SECRET  (supabase secrets set SYNC_SECRET=...)
 // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY já são injetados automaticamente.
@@ -51,6 +58,8 @@ const extrairSigla = (status: string) => {
   return status.toUpperCase()
 }
 
+// `permanency` NÃO entra na chave: é o tempo acumulado na unidade e muda a cada consulta ao
+// SUITE; com ele, a chave do evento mais recente mudava toda hora (ver cabeçalho).
 async function gerarChaveEvento(nup: string, evento: any) {
   const material = JSON.stringify({
     nup,
@@ -58,7 +67,6 @@ async function gerarChaveEvento(nup: string, evento: any) {
     status: evento?.status ?? null,
     date: evento?.date ?? null,
     capacity: evento?.capacity ?? null,
-    permanency: evento?.permanency ?? null,
     external_system_abbreviation:
       evento?.external_system_abbreviation ?? null,
   })
@@ -74,6 +82,33 @@ async function gerarChaveEvento(nup: string, evento: any) {
 function normalizarNumero(valor: unknown) {
   const numero = String(valor ?? "").replace(/\D/g, "")
   return numero || null
+}
+
+// Identidade lógica de um evento: é o que decide se ele já foi gravado. A data é comparada
+// por instante (epoch ms), não como texto: a API devolve "...Z" e o PostgREST "...+00:00".
+function chaveLogicaEvento(
+  nome: unknown,
+  status: unknown,
+  data: unknown,
+  capacity: unknown,
+) {
+  const t = data ? Date.parse(String(data)) : NaN
+  const cap =
+    capacity === null || capacity === undefined
+      ? ""
+      : String(Number(capacity))
+
+  return `${nome ?? ""}|${status ?? ""}|${Number.isNaN(t) ? "" : t}|${cap}`
+}
+
+// Compara dois timestamps pelo instante, tolerando formatos de texto diferentes.
+function mesmoInstante(a: unknown, b: unknown) {
+  if (a === b) return true
+
+  const ta = a ? Date.parse(String(a)) : NaN
+  const tb = b ? Date.parse(String(b)) : NaN
+
+  return !Number.isNaN(ta) && ta === tb
 }
 
 // ---------- consulta SUITE ----------
@@ -153,12 +188,21 @@ async function salvarHistoricoSuite(
     ),
   )
 
+  const logicas = historia.map((evento: any) =>
+    chaveLogicaEvento(
+      evento?.name,
+      evento?.status,
+      evento?.date,
+      evento?.capacity,
+    ),
+  )
+
   const {
     data: existentes,
     error: erroExistentes,
   } = await supabase
     .from("historico_suite_eventos")
-    .select("chave_evento")
+    .select("nome, status, data_evento, capacity")
     .eq("processo_id", processoId)
 
   if (erroExistentes) {
@@ -171,20 +215,39 @@ async function salvarHistoricoSuite(
   }
 
   const conjuntoExistentes = new Set(
-    (existentes || []).map(
-      (row: any) => row.chave_evento,
+    (existentes || []).map((row: any) =>
+      chaveLogicaEvento(
+        row.nome,
+        row.status,
+        row.data_evento,
+        row.capacity,
+      ),
     ),
   )
+
+  // Também deduplica dentro da própria resposta do SUITE: sem `permanency` na chave, dois
+  // eventos idênticos no mesmo histórico colidiriam no UNIQUE(chave_evento) e derrubariam
+  // o insert inteiro.
+  const vistos = new Set<string>()
 
   const novos = historia
     .map((evento: any, index: number) => ({
       evento,
       index,
     }))
-    .filter(
-      ({ index }) =>
-        !conjuntoExistentes.has(chaves[index]),
-    )
+    .filter(({ index }) => {
+      const logica = logicas[index]
+
+      if (
+        conjuntoExistentes.has(logica) ||
+        vistos.has(logica)
+      ) {
+        return false
+      }
+
+      vistos.add(logica)
+      return true
+    })
     .map(({ evento, index }) => ({
       processo_id: processoId,
       nup,
@@ -497,19 +560,15 @@ serve(async (req) => {
         return
       }
 
-      // Só entra para atualização de tempo
-      // depois de uma consulta SUITE bem-sucedida.
-      processosParaAtualizarTempo.add(
-        p.id,
-      )
-
-      // Grava o histórico completo uma única vez.
-      eventosGravados +=
+      // Grava só os eventos que ainda não existem (identidade lógica).
+      const novosEventos =
         await salvarHistoricoSuite(
           p.id,
           String(p.processo),
           info.historia || [],
         )
+
+      eventosGravados += novosEventos
 
       const siglaSuite =
         String(info.sigla || "")
@@ -535,8 +594,10 @@ serve(async (req) => {
       // Atualiza a data de chegada.
       if (
         info.data_chegada_unidade &&
-        info.data_chegada_unidade !==
-          p.suite_data_chegada
+        !mesmoInstante(
+          info.data_chegada_unidade,
+          p.suite_data_chegada,
+        )
       ) {
         patch.suite_data_chegada =
           info.data_chegada_unidade
@@ -595,6 +656,23 @@ serve(async (req) => {
               p.status
           }
         }
+      }
+
+      // O tempo no SUITE usa now() no período aberto, então processo ativo é recalculado a
+      // cada rodada. Arquivado só quando algo mudou de fato: a rechecagem diária dele grava
+      // `arquivado_check_em`, o que não altera o tempo.
+      const mudouTempo =
+        novosEventos > 0 ||
+        patch.suite !== undefined ||
+        patch.suite_data_chegada !== undefined ||
+        patch.status !== undefined
+
+      // Só entra para atualização de tempo
+      // depois de uma consulta SUITE bem-sucedida.
+      if (!eraArquivado || mudouTempo) {
+        processosParaAtualizarTempo.add(
+          p.id,
+        )
       }
 
       // Nenhuma alteração nos campos
