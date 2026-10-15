@@ -1025,7 +1025,7 @@ const st={metric:'obras',level:1,group:null,city:null,hoverGroup:null,dataScope:
   // abaixo, que é de contratos e fica intacto na troca de modo). Ver FILTER_DEFS_RP.
   rp:{metrica:'tempo', periodo:'6m', fiscaisAberto:false, filtro:{q:'', situacao:new Set(), prazo:new Set()}},
   sel:null, // Ctrl+clique em vários distritos/municípios: {kind:'group'|'city', ids:Set}
-  ruas:false, // modo "Ruas e bairros" (só no nível município; ver o bloco LOCALIZAÇÃO DAS OBRAS)
+  ruas:false, // modo "Ruas e rotas" (pinos nos níveis distrito e município; ver o bloco LOCALIZAÇÃO DAS OBRAS)
   // Etapa C: chaves novas declaradas já como Set (as defs em FILTER_DEFS e a UI
   // entram no Bloco 2 — até lá ficam vazias e inertes).
   f:{ano:new Set(),status:new Set(),contratada:new Set(),contratante:new Set(),fiscal:new Set(),
@@ -2962,9 +2962,10 @@ function obrasCards(ids){
    Decisões:
    - Sem biblioteca nova: o mapa já é Leaflet. O botão "Ruas e rotas" vale nos três níveis (estado,
      distrito e município) e só carrega tiles do OpenStreetMap depois do clique; os pinos das obras
-     aparecem com um município aberto. O mapa mostra rodovias e ruas, mas NÃO calcula trajeto:
+     aparecem com um distrito (agrupados por proximidade na tela, ver ruasAglomera) ou um município
+     aberto; no estado só os contornos com as contagens. O mapa mostra rodovias e ruas, mas NÃO calcula trajeto:
      o botão "Rota" da Ficha abre o Google Maps com o destino.
-   - Marcadores saem de obrasOf(st.city): os filtros e a busca valem sozinhos. Sem cluster — o
+   - Marcadores saem de obrasOf() dos municípios do recorte (ruasIds): os filtros e a busca valem sozinhos. Sem cluster — o
      município com mais obras tem 662 no histórico completo, e o Leaflet desenha isso sem esforço.
    - Obras na mesma coordenada (arredondada a ~1 m) viram UM marcador com a lista delas.
    - Coordenada que não confere (fora do Ceará ou a mais de 2 km do município da obra) NÃO é
@@ -3101,6 +3102,7 @@ function ruasAtivo(){ return !!st.ruas && !modoReplan(); }
 // contorno com preenchimento leve (t = 0..1 pela métrica do nível) para o mapa de ruas aparecer por baixo
 function ruasEstilo(t){ return {fillColor:BASE,color:TOKENS.ng,weight:1.4,fillOpacity:.03+.2*t,opacity:.9}; }
 function novoTileOSM(){ return L.tileLayer(OSM_URL,{maxZoom:19,attribution:OSM_ATTR}); }
+map.createPane('pinosObras').style.zIndex=620; // acima dos rótulos de cidade (markerPane = 600), abaixo de tooltip/popup
 // a atribuição do OSM é obrigatória; o controle existe sempre e o CSS só o mostra com body.modo-ruas
 L.control.attribution({prefix:false,position:'bottomleft'}).addTo(map);
 {
@@ -3113,10 +3115,12 @@ L.control.attribution({prefix:false,position:'bottomleft'}).addTo(map);
   }});
   new Ctl().addTo(map);
 }
-// Agrupa as obras do município por ponto e separa as que não vão para o mapa.
-function ruasClassifica(id){
+// Municípios cujas obras vão para o mapa: o aberto (nível 3) ou todos os do distrito aberto (nível 2).
+function ruasIds(){ return st.level===2?idsOfGroup(st.group):[st.city]; }
+// Agrupa as obras dos municípios por ponto e separa as que não vão para o mapa.
+function ruasClassifica(ids){
   const grupos=new Map(), semLoc=[], invalidas=[];
-  for(const o of obrasOf(id)){
+  for(const id of ids) for(const o of obrasOf(id)){
     if(!o.loc){ semLoc.push(o); continue; }
     const s=locStatus(o);
     if(!s.ok){ invalidas.push(o); continue; }
@@ -3144,27 +3148,70 @@ function ruasPopupGrupo(g){ // DOM, não innerHTML: o texto vem do banco
   }
   return box;
 }
+// Nível distrito: um ponto por obra espalharia dezenas de pinos num zoom em que nem se distinguem
+// (só Fortaleza concentra muitos). Pontos a menos de RUAS_CELULA_PX na tela viram um pino com a
+// contagem; ele se desfaz sozinho ao aproximar (redesenhado a cada zoomend). No município não agrupa.
+const RUAS_CELULA_PX=38;
+// Pino fino em gota (SVG): cabeça pequena e haste estreita; a PONTA fica exatamente sobre a coordenada da obra.
+// A cor é a da situação (CSS por classe) e a cabeça traz a contagem quando o pino reúne várias obras.
+// O viewBox tem o tamanho real em px (a fonte da contagem fica em 12px). iconAnchor na ponta.
+function ruasPinIcon(cls,n){
+  const multi=n>1;
+  // single: cabeça r=8 em (10,9), ponta em (10,29.5); multi: cabeça r=13 em (16,15), ponta em (16,41)
+  const w=multi?32:20, h=multi?42:30;
+  const forma=multi
+    ? '<path class="pin-body" d="M16 41L12 27.4A13 13 0 1 1 20 27.4Z"/><text x="16" y="19.3" text-anchor="middle">'+n+'</text>'
+    : '<path class="pin-body" d="M10 29.5L6.8 16.3A8 8 0 1 1 13.2 16.3Z"/><circle class="pin-dot" cx="10" cy="9" r="2.8"/>';
+  return L.divIcon({className:'ruas-pin '+cls+(multi?' multi':''),
+    html:'<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" aria-hidden="true" focusable="false">'+forma+'</svg>',
+    iconSize:[w,h],iconAnchor:[w/2,h],popupAnchor:[0,-h+6],tooltipAnchor:[0,-h+8]});
+}
+function ruasAglomera(grupos){
+  const z=map.getZoom(), cel=new Map();
+  for(const g of grupos){
+    const p=map.project([g.lat,g.lng],z);
+    const k=Math.floor(p.x/RUAS_CELULA_PX)+':'+Math.floor(p.y/RUAS_CELULA_PX);
+    let c=cel.get(k); if(!c){ c=[]; cel.set(k,c); } c.push(g);
+  }
+  return [...cel.values()];
+}
+function ruasPinoGrupo(g,nivelDistrito){ // ponto único: uma obra ou várias na mesma coordenada
+  const n=g.obras.length, cls=ruasClasseGrupo(g);
+  const icon=ruasPinIcon(cls,n);
+  const mk=L.marker([g.lat,g.lng],{icon,pane:'pinosObras',riseOnHover:true,keyboard:true,title:n>1?`${n} obras neste ponto`:(g.obras[0].codigo_obra||'')});
+  if(n>1){
+    mk.bindPopup(ruasPopupGrupo(g),{className:'ruas-popup',maxWidth:340,minWidth:240,autoPanPadding:[30,30]});
+    mk.bindTooltip(escHtml(`${n} obras neste ponto — clique para ver`),{direction:'top'});
+  } else {
+    const o=g.obras[0];
+    mk.bindTooltip(`<b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><br>${escHtml(o.objeto.length>110?o.objeto.slice(0,107)+'…':o.objeto)}<br>${nivelDistrito&&o.municipioTxt?escHtml(o.municipioTxt)+' · ':''}${escHtml(o.statusObra)}`,{direction:'top'});
+    mk.on('click',()=>openModal(o));
+  }
+  return mk;
+}
+function ruasPinoAglomerado(gs){ // vários pontos próximos: contagem de obras; clique aproxima ou, sem mais zoom possível, lista
+  const obras=gs.flatMap(g=>g.obras), n=obras.length, cls=ruasClasseGrupo({obras});
+  const b=L.latLngBounds(gs.map(g=>[g.lat,g.lng])), c=b.getCenter();
+  const icon=ruasPinIcon(cls,n);
+  const mk=L.marker(c,{icon,pane:'pinosObras',riseOnHover:true,keyboard:true,title:`${n} obras nesta área`});
+  mk.bindTooltip(escHtml(`${n} obras nesta área — clique para aproximar`),{direction:'top'});
+  mk.on('click',()=>{
+    const z=map.getBoundsZoom(b,false,L.point(60,60));
+    if(z>map.getZoom()+.01) map.fitBounds(b,{...fitPad(60),maxZoom:map.getMaxZoom()});
+    else mk.unbindTooltip().bindPopup(ruasPopupGrupo({obras}),{className:'ruas-popup',maxWidth:340,minWidth:240,autoPanPadding:[30,30]}).openPopup();
+  });
+  return mk;
+}
 function desenhaMarcadoresRuas(){
-  const id=st.city, obras=obrasOf(id);
-  const sig=id+'|'+obras.map(o=>o.id_obra+(o.loc?':'+o.loc.lat+','+o.loc.lng:'')).join(';');
+  const ids=ruasIds(), nivelDistrito=st.level===2, obras=ids.flatMap(id=>obrasOf(id));
+  const sig=st.level+'|'+(nivelDistrito?st.group+'|'+map.getZoom():st.city)+'|'+obras.map(o=>o.id_obra+(o.loc?':'+o.loc.lat+','+o.loc.lng:'')).join(';');
   if(sig===_ruasSig&&_ruasResumo) return;
   _ruasSig=sig;
-  _ruasResumo=ruasClassifica(id);
+  _ruasResumo=ruasClassifica(ids);
   if(!ruasLayer) ruasLayer=L.layerGroup().addTo(map); else ruasLayer.clearLayers();
-  for(const g of _ruasResumo.grupos){
-    const n=g.obras.length, cls=ruasClasseGrupo(g);
-    const icon=L.divIcon({className:'ruas-pin '+cls+(n>1?' multi':''),html:n>1?`<b>${n}</b>`:'',iconSize:n>1?[28,28]:[20,20],iconAnchor:n>1?[14,14]:[10,10]});
-    const mk=L.marker([g.lat,g.lng],{icon,riseOnHover:true,keyboard:true,title:n>1?`${n} obras neste ponto`:(g.obras[0].codigo_obra||'')});
-    if(n>1){
-      mk.bindPopup(ruasPopupGrupo(g),{className:'ruas-popup',maxWidth:340,minWidth:240,autoPanPadding:[30,30]});
-      mk.bindTooltip(escHtml(`${n} obras neste ponto — clique para ver`),{direction:'top',offset:[0,-12]});
-    } else {
-      const o=g.obras[0];
-      mk.bindTooltip(`<b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><br>${escHtml(o.objeto.length>110?o.objeto.slice(0,107)+'…':o.objeto)}<br>${escHtml(o.statusObra)}`,{direction:'top',offset:[0,-12]});
-      mk.on('click',()=>openModal(o));
-    }
-    mk.addTo(ruasLayer);
-  }
+  if(nivelDistrito){
+    for(const gs of ruasAglomera(_ruasResumo.grupos)) (gs.length>1?ruasPinoAglomerado(gs):ruasPinoGrupo(gs[0],true)).addTo(ruasLayer);
+  } else for(const g of _ruasResumo.grupos) ruasPinoGrupo(g,false).addTo(ruasLayer);
 }
 function fitRuas(instant){
   const pts=_ruasResumo?_ruasResumo.grupos:[];
@@ -3199,7 +3246,7 @@ function syncRuas(){
   const mudou=on!==_ruasOn; _ruasOn=on;
   if(mudou&&on) entraRuas();
   if(on){
-    if(st.level===3){ desenhaMarcadoresRuas(); if(mudou) fitRuas(); } // pinos só com um município aberto
+    if(st.level>=2){ desenhaMarcadoresRuas(); if(mudou&&st.level===3) fitRuas(); } // pinos com distrito ou município aberto
     else limpaMarcadoresRuas();
   }
   else if(mudou) saiRuas();
@@ -3207,7 +3254,7 @@ function syncRuas(){
 // bloco do painel lateral (nível município com o modo ligado)
 function ruasPainelHtml(){
   if(!ruasAtivo()||!_ruasResumo) return '';
-  const {grupos,semLoc,invalidas}=_ruasResumo;
+  const {grupos,semLoc,invalidas}=_ruasResumo, distrito=st.level===2;
   const plot=grupos.reduce((s,g)=>s+g.obras.length,0);
   const leg=[['s-exec','Em execução'],['s-wait','Aguardando OS'],['s-stop','Paralisada'],['hist','Encerrada']]
     .map(([c,t])=>`<span class="ruas-leg-i"><i class="ruas-dot ${c}"></i>${t}</span>`).join('');
@@ -3217,8 +3264,9 @@ function ruasPainelHtml(){
   return `<div class="ruas-resumo"><div><b>${NUM.format(plot)}</b> no mapa · <b>${NUM.format(semLoc.length)}</b> sem localização${invalidas.length?` · <b>${NUM.format(invalidas.length)}</b> com coordenada que não confere`:''}</div>`
     +`<div class="ruas-leg">${leg}</div>`
     +(LOC_ERRO?`<div class="ruas-aviso">Não foi possível carregar as localizações agora; recarregue a página para tentar de novo.</div>`:'')
+    +(distrito?`<div class="fc-hnote">Os pinos se agrupam conforme o zoom. Para cadastrar ou corrigir a localização de uma obra, abra o município dela.</div>`:'')
     +`</div>`
-    +lista(invalidas,'Coordenada não confere (não plotada)')+lista(semLoc,podeLocalizar()?'Sem localização — clique para cadastrar':'Sem localização');
+    +(distrito?'':lista(invalidas,'Coordenada não confere (não plotada)')+lista(semLoc,podeLocalizar()?'Sem localização — clique para cadastrar':'Sem localização'));
 }
 function obraPorIdObra(idObra){
   const m=DB.municipios[st.city]; if(!m) return null;
@@ -3309,7 +3357,7 @@ function iniciaLocMini(o){
 function colocaMarcadorLoc(lat,lng){
   const L_=_locMini; if(!L_) return;
   if(L_.marker){ L_.marker.setLatLng([lat,lng]); return; }
-  const icon=L.divIcon({className:'ruas-pin s-sel',html:'',iconSize:[22,22],iconAnchor:[11,11]});
+  const icon=ruasPinIcon('s-sel',1);
   L_.marker=L.marker([lat,lng],{icon,draggable:true,keyboard:false}).addTo(L_.map);
   L_.marker.on('dragend',()=>{ const p=L_.marker.getLatLng(); locDefine(p.lat,p.lng,'mapa'); });
 }
@@ -3399,7 +3447,7 @@ function abreVerNoMapa(o){
   const feat=GEO.features.find(f=>String(f.properties.id)===String(o.munId));
   if(feat) L.geoJSON(feat,{interactive:false,style:{fill:false,color:TOKENS.ng,weight:2.2,opacity:.95,dashArray:'7 5'}}).addTo(m);
   const cls=ruasClasseGrupo({obras:[o]});
-  const icon=L.divIcon({className:'ruas-pin '+cls,html:'',iconSize:[22,22],iconAnchor:[11,11]});
+  const icon=ruasPinIcon(cls,1);
   const mk=L.marker([o.loc.lat,o.loc.lng],{icon,keyboard:false,interactive:false}).addTo(m);
   m.setView([o.loc.lat,o.loc.lng],16);
   _locMini={map:m,marker:mk,sel:null,o};
@@ -6198,6 +6246,7 @@ function renderPanel(){
     scope.innerHTML=`Distrito selecionado${resultsSuffix(ids)}`;
     const ents=cityEntries(ids);
     body.innerHTML=`<div style="font-family:'Montserrat',sans-serif;font-size:17px;font-weight:700;color:${TOKENS.textBrightest};text-shadow:0 0 20px rgba(${TOKENS.ngRgb},.22)">${g.nome}</div>`
+      +ruasPainelHtml()
       +`<div class="sec-h"><span>Cidades (${ents.length})</span><span>clique p/ abrir</span></div>`+rankRows(ents,'city')
       +`<div class="sec-h" style="margin-top:20px"><span>Contratos do distrito</span></div>`+obrasCards(ids);
   } else {
@@ -7347,6 +7396,7 @@ map.on('zoomend',()=>{ layer.setStyle(styleFeature);
     if(_hoverGroupLayer && st.hoverGroup!=null) _hoverGroupLayer.setStyle(groupHover()); }
   updateLabelsSoon(); });
 map.on('moveend',updateLabelsSoon);
+map.on('zoomend',()=>{ if(ruasAtivo()&&st.level===2) desenhaMarcadoresRuas(); }); // o agrupamento dos pinos depende do zoom
 // clicar em espaço vazio do mapa (fora de qualquer distrito/região/município)
 // limpa a seleção combinada — caminho alternativo ao Esc que funciona igual
 // dentro e fora de tela cheia, sem depender do navegador (ver histórico de
