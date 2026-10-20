@@ -90,9 +90,18 @@ async function deletarRegistroGenerico(table, bucket, id, path, callback) {
     if (!confirm("️ TEM CERTEZA?\n\nIsso apagará permanentemente o registro e o arquivo associado.")) return;
     document.body.style.cursor = 'wait';
     try {
-        if (path) await sbClient.storage.from(bucket).remove([path]);
-        const { error } = await sbClient.from(table).delete().eq('id', id);
+        // Apaga a linha ANTES do arquivo e confere se alguma linha saiu de fato: o RLS de DELETE nega
+        // sem erro (0 linhas), e a ordem antiga removia o arquivo do Storage primeiro e depois mostrava
+        // "Excluído com sucesso!" mesmo com a linha intacta — deixando o registro sem o arquivo.
+        const { data: apagados, error } = await sbClient.from(table).delete().eq('id', id).select('id');
         if (error) throw error;
+        if (!apagados || apagados.length === 0) {
+            throw new Error('Você não tem permissão para excluir este item (ou ele já foi excluído).');
+        }
+        if (path) {
+            const { error: removeError } = await sbClient.storage.from(bucket).remove([path]);
+            if (removeError) console.error('Registro excluído, mas o arquivo ficou no Storage:', removeError);
+        }
         alert(" Excluído com sucesso!");
         if (callback) callback();
     } catch (err) {

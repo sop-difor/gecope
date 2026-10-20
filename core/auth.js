@@ -529,29 +529,24 @@ function temAutorizacao(chave) {
  * @returns {boolean} - True se o usuário é o dono
  */
 function isItemOwner(item) {
-    const userEmail = getCurrentUserEmail();
-    const currentUserName = (sessionStorage.getItem('sop_user_name') || '').toUpperCase();
-    const currentFiscalName = (sessionStorage.getItem('sop_fiscal_name') || '').toUpperCase();
-
-    // Para composições, verifica criador
-    const criador = item.criador_email || item.criado_por || item.created_by || '';
-    const autorV1 = item.historico_versoes?.[0]?.autor || criador || item.criador_nome || item.autor || '';
-
-    if (userEmail && autorV1.toUpperCase().includes(userEmail.toUpperCase())) return true;
-    if (currentUserName && autorV1.toUpperCase().includes(currentUserName)) return true;
-    if (currentFiscalName && autorV1.toUpperCase().includes(currentFiscalName)) return true;
-    return false;
+    // Mesma regra do banco: as políticas/trigger de composicoes_biblioteca (UPDATE pelo dono e DELETE)
+    // comparam `criador_email` com o e-mail do JWT — nada além disso vale. Antes a tela adivinhava o
+    // dono pelo NOME no histórico de versões e mostrava lápis/lixeira que o banco recusava (a
+    // exclusão chegava a mostrar "Excluído com sucesso!" sem apagar nada).
+    const userEmail = getCurrentUserEmail().trim().toLowerCase();
+    const criador = String(item.criador_email || '').trim().toLowerCase();
+    return !!userEmail && !!criador && userEmail === criador;
 }
 
 /**
  * Verifica se o usuário pode editar uma composição
- * Regra: Admin e Gerente podem editar todas. Fiscal/Externo podem editar apenas as próprias
+ * Regra: Admin e Gerente podem editar todas. Fiscal/Externo/Elétrica podem editar apenas as próprias
  */
 function canEditComposition(item) {
     const role = getCurrentUserRole();
     if (role === 'admin' || role === 'gerente') return true;
     if (temAutorizacao('composicoes_editar_terceiros')) return true;
-    if (['fiscal', 'externo'].includes(role)) {
+    if (['fiscal', 'externo', 'eletrica'].includes(role)) {
         return isItemOwner(item);
     }
     return false;
@@ -559,14 +554,14 @@ function canEditComposition(item) {
 
 /**
  * Verifica se o usuário pode deletar uma composição
- * Regra: Admin e Gerente podem deletar todas. Fiscal/Externo podem deletar apenas as próprias
+ * Regra: Admin e Gerente podem deletar todas. Fiscal/Externo/Elétrica podem deletar apenas as próprias
  * (ou qualquer uma, se tiverem a autorização especial "composicoes_editar_terceiros")
  */
 function canDeleteComposition(item) {
     const role = getCurrentUserRole();
     if (role === 'admin' || role === 'gerente') return true;
     if (temAutorizacao('composicoes_editar_terceiros')) return true;
-    if (['fiscal', 'externo'].includes(role)) {
+    if (['fiscal', 'externo', 'eletrica'].includes(role)) {
         return isItemOwner(item);
     }
     return false;

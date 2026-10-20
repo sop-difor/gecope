@@ -31,10 +31,37 @@ async function deletarComposicao(id, path) {
 }
 
 /* ==========================================================================
-   LGICA DAS NOVAS ABAS: COMPOSIÇÕES E TABELAS
+   LÓGICA DAS NOVAS ABAS: COMPOSIÇÕES E TABELAS
    ========================================================================== */
 
-/* --- 1. LGICA DE COMPOSIÇÕES (IDNTICA A ORAMENTOS) --- */
+/* --- 1. LÓGICA DE COMPOSIÇÕES (IDÊNTICA A ORÇAMENTOS) --- */
+
+// Traduz erros do banco em mensagens que o usuário entende. Antes, "Erro ao salvar: new row
+// violates row-level security policy..." ou "duplicate key value violates unique constraint
+// codigo_unico" iam crus para o alert — e ninguém sabia o que fazer com eles.
+function mensagemErroComposicao(err) {
+    const msg = String((err && err.message) || err || '');
+    const code = err && err.code;
+    if (code === '23505' || msg.includes('codigo_unico')) {
+        return 'Já existe uma composição com esse código. Escolha outro código.';
+    }
+    if (code === '42501' || /row-level security/i.test(msg)) {
+        return 'Seu usuário não tem permissão para gravar esta composição. Saia e entre de novo no sistema; se continuar, avise o administrador.';
+    }
+    return msg || 'Erro desconhecido.';
+}
+
+// E-mail da sessão — é com ele que as políticas de RLS de composicoes_biblioteca comparam
+// `criador_email` (INSERT, UPDATE pelo dono e DELETE pelo dono).
+async function obterEmailSessao() {
+    let email = '';
+    try {
+        const { data } = await sbClient.auth.getSession();
+        email = (data && data.session && data.session.user && data.session.user.email) || '';
+    } catch (e) { /* cai no sessionStorage */ }
+    if (!email) email = sessionStorage.getItem('sop_user') || '';
+    return String(email).trim().toLowerCase();
+}
 
 // 1.1 SALVAR NOVA COMPOSIÇÃO
 async function salvarNovaComposicao() {
@@ -117,7 +144,7 @@ async function salvarNovaComposicao() {
 
     } catch (error) {
         console.error(error);
-        alert("Erro ao salvar: " + error.message);
+        alert("Erro ao salvar: " + mensagemErroComposicao(error));
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
     }
@@ -218,7 +245,7 @@ async function enviarNovaVersaoComposicao() {
 
         bootstrap.Modal.getInstance(document.getElementById('modalNovaVersaoComposicao')).hide();
         carregarComposicoes({ forceRefresh: true });
-    } catch (err) { alert("Erro: " + err.message); } finally { btn.disabled = false; btn.innerText = txtOrig; }
+    } catch (err) { alert("Erro: " + mensagemErroComposicao(err)); } finally { btn.disabled = false; btn.innerText = txtOrig; }
 }
 
 // 1.4 COMENTÁRIOS COMPOSIÇÃO
@@ -341,7 +368,7 @@ async function deletarItemHistoricoComposicao(id, index) {
 
         let payloadUpdate = { comentarios_revisao: historico };
 
-        // --- LGICA DE STATUS DINMICO ---
+        // --- LÓGICA DE STATUS DINÂMICO ---
         const temPendentes = historico.some(c => c.decisao === 'pendente');
         if (temPendentes) {
             payloadUpdate.status = 'Em Revisão';
@@ -579,7 +606,7 @@ async function renderizarComposicoes() {
                             clSt = 'status-atendido'; bD = `<span class="badge-decision badge-atendido"><i class="bi bi-check-lg"></i> ATENDIDO</span>`;
                             if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-success"><strong>Resposta:</strong> ${escapeHTML(c.resp_admin)}</div>`;
                         } else if (c.decisao === 'recusado') {
-                            clSt = 'status-recusado'; bD = `<span class="badge-decision badge-recusado"><i class="bi bi-x-lg"></i> NO ACATADO</span>`;
+                            clSt = 'status-recusado'; bD = `<span class="badge-decision badge-recusado"><i class="bi bi-x-lg"></i> NÃO ACATADO</span>`;
                             if (c.resp_admin) rA = `<div class="mt-2 pt-2 border-top small text-danger"><strong>Motivo:</strong> ${escapeHTML(c.resp_admin)}</div>`;
                         } else if (isAdmin && !clSt.includes('system')) {
                             bAA = `<div class="admin-decision-actions"><button class="btn btn-sm btn-outline-success" onclick="abrirModalAtenderComposicao(${obra.id}, ${idx})"><i class="bi bi-check-lg"></i> Atender</button><button class="btn btn-sm btn-outline-danger" onclick="abrirModalRecusarComposicao(${obra.id}, ${idx})"><i class="bi bi-x-lg"></i> Não Acatar</button></div>`;
@@ -1526,13 +1553,25 @@ async function salvarComposicaoAnalitica() {
         const categoriaFinal = (userName || 'OUTROS').toUpperCase();
         const subcategoriaFinal = 'COMPOSIÇÕES PRÓPRIAS';
 
+        // `codigo` é UNIQUE na tabela inteira (inclui as ~2.800 da SOP): em branco caía em 'S/C' e a
+        // segunda composição sem código já estourava o banco. Agora o código é obrigatório e
+        // conferido antes de gravar.
+        const codigo = String(formData.get('codigo') || '').trim();
+        if (!codigo) throw new Error('Informe o código da composição.');
+
+        const idEdicao = document.getElementById('edit-id-composicao').value;
+
+        const { data: codigoEmUso, error: codigoErro } = await sbClient.from('composicoes_biblioteca')
+            .select('id').eq('codigo', codigo).limit(1);
+        if (codigoErro) throw codigoErro;
+        if (codigoEmUso && codigoEmUso.length && String(codigoEmUso[0].id) !== String(idEdicao)) {
+            throw new Error(`Já existe uma composição com o código "${codigo}". Escolha outro código.`);
+        }
+
         const payload = {
             descricao: nomeObra,
-            usuario: categoriaFinal,
-            subcategoria: subcategoriaFinal,
-            codigo: formData.get('codigo') || 'S/C',
+            codigo,
             unidade: formData.get('unidade') || '-',
-            fonte: 'PRPRIA',
             data_base: formData.get('data_base') || '',
             bdi: formData.get('bdi') || '0,00',
             desconto: formData.get('desconto') || '0,00',
@@ -1540,10 +1579,12 @@ async function salvarComposicaoAnalitica() {
             status: 'Em Revisão'
         };
 
-        const idEdicao = document.getElementById('edit-id-composicao').value;
         let res;
 
         if (idEdicao) {
+            // Edição NÃO reescreve dono (usuario/subcategoria), fonte nem criador_*: antes o payload
+            // comum trocava `usuario` pelo nome de quem editava, então um admin que corrigisse uma
+            // composição de outra pessoa (ou da SOP) a "roubava" para a própria pasta.
             const { data: current } = await sbClient.from('composicoes_biblioteca').select('historico_versoes').eq('id', idEdicao).single();
             const hist = current ? (current.historico_versoes || []) : [];
             hist.push({
@@ -1553,8 +1594,22 @@ async function salvarComposicaoAnalitica() {
                 autor: userName || userEmail
             });
             payload.historico_versoes = hist;
-            res = await sbClient.from('composicoes_biblioteca').update(payload).eq('id', idEdicao);
+            // .select('id'): o RLS de UPDATE nega sem erro (0 linhas) quando a linha não é visível/permitida.
+            res = await sbClient.from('composicoes_biblioteca').update(payload).eq('id', idEdicao).select('id');
+            if (!res.error && !(res.data && res.data.length)) {
+                throw new Error('Nada foi alterado: você não tem permissão para editar esta composição.');
+            }
         } else {
+            // A política composicoes_insert exige criador_email = e-mail do JWT; sem ele o INSERT
+            // era recusado para TODOS os papéis (incluindo admin) — ver sql/fix_composicoes_criador_email.sql.
+            const criadorEmail = await obterEmailSessao();
+            if (!criadorEmail.includes('@')) throw new Error('Sessão expirada. Saia e entre de novo no sistema.');
+            payload.usuario = categoriaFinal;
+            payload.subcategoria = subcategoriaFinal;
+            payload.fonte = 'PRÓPRIA';
+            payload.criador_email = criadorEmail;
+            payload.criador_nome = userName || null;
+            payload.criador_role = sessionStorage.getItem('sop_role') || null;
             payload.versao_atual = 'V1';
             payload.historico_versoes = [{
                 versao: 'V1',
@@ -1565,7 +1620,7 @@ async function salvarComposicaoAnalitica() {
             res = await sbClient.from('composicoes_biblioteca').insert([payload]);
         }
 
-        if (res.error) throw new Error(res.error.message);
+        if (res.error) throw res.error;
 
         // Log de Atividade
         registrarAtividade('COMPOSICAO', `${idEdicao ? 'editou' : 'criou manualmente'} a composição analítica: ${nomeObra}`, '', nomeObra);
@@ -1579,13 +1634,13 @@ async function salvarComposicaoAnalitica() {
 
     } catch (error) {
         console.error(error);
-        alert("Erro ao salvar: " + error.message);
+        alert("Erro ao salvar: " + mensagemErroComposicao(error));
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
     }
 }
 
-// --- LGICA EXPORTAO E TABELAS ---
+// --- LÓGICA EXPORTAÇÃO E TABELAS ---
 // currentTabelaData já declarado globalmente
 let compositionDataToExport = null;
 window.exportarComposicao = exportarComposicao;
@@ -1686,7 +1741,7 @@ const formatarVersao = (texto) => {
         'SET': 'Set', 'OUT': 'Out', 'NOV': 'Nov', 'DEZ': 'Dez'
     };
 
-    // Primeiro tenta meses completos (para não casar "MAR" em "MARO")
+    // Primeiro tenta meses completos (para não casar "MAR" em "MARÇO")
     for (let mes in mesesMap) {
         if (txt.includes(mes)) {
             const anoMatch = txt.match(/\d{4}/);
@@ -1744,7 +1799,7 @@ const normalizarItemParaPDF = (item) => {
     // Fallbacks para Código e Descrição
     const codigo = item.codigo_insumo || item.codigo_item || item.codigo || item.cod || '-';
     const descricao = item.descricao_insumo || item.descricao_item || item.descricao || item.desc || '-';
-    const fonte = item.origem || item.fonte || item.fonte_insumo || item.tabela || (item.retroativo ? 'COTAO' : '-');
+    const fonte = item.origem || item.fonte || item.fonte_insumo || item.tabela || (item.retroativo ? 'COTAÇÃO' : '-');
 
     return {
         origem: fonte,
@@ -1762,7 +1817,7 @@ const normalizarItemParaPDF = (item) => {
 };
 
 // --------------------------------------------------------------
-// FUNO GERAR PDF (MANTIDA COMO FALLBACK SE NECESSÁRIO)
+// FUNÇÃO GERAR PDF (MANTIDA COMO FALLBACK SE NECESSÁRIO)
 // --------------------------------------------------------------
 async function gerarPDF_Profissional(rawInput) {
     if (!rawInput) return;
@@ -1795,7 +1850,7 @@ async function gerarPDF_Profissional(rawInput) {
         doc.setTextColor(60, 60, 60); doc.setFontSize(7); doc.text("SUPERINTENDÊNCIA DE OBRAS PÚBLICAS", 38, 18);
 
         doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.text("COMPOSIÇÃO ANALÍTICA", 196, 14, { align: "right" });
-        doc.setTextColor(...cinzaTexto); doc.setFontSize(6); doc.text("GEROA - GERÊNCIA DE ORAMENTOS E AVALIAO DE IMVEIS", 196, 18, { align: "right" });
+        doc.setTextColor(...cinzaTexto); doc.setFontSize(6); doc.text("GEROA - GERÊNCIA DE ORÇAMENTOS E AVALIAÇÃO DE IMÓVEIS", 196, 18, { align: "right" });
 
         doc.setDrawColor(200); doc.line(14, 22, 196, 22);
 
@@ -1807,7 +1862,7 @@ async function gerarPDF_Profissional(rawInput) {
         doc.line(182, 25, 182, 42); // Barra 3 (Mínimo Unit)
 
         doc.setFontSize(5); doc.setTextColor(150); doc.setFont("helvetica", "bold");
-        doc.text("CDIGO / VERSO", 15.5, 29);
+        doc.text("CÓDIGO / VERSÃO", 15.5, 29);
         doc.text("DESCRIÇÃO DA COMPOSIÇÃO", 36, 29);
         doc.text("UNID:", 171, 29);
 
@@ -1938,7 +1993,7 @@ async function gerarPDF_Profissional(rawInput) {
         if (retroativos.length > 0) {
             doc.addPage();
             doc.setTextColor(...verdeSOP); doc.setFontSize(12); doc.setFont("helvetica", "bold");
-            doc.text("METODOLOGIA DE CÁLCULO (RETROAO DE PREOS)", 14, 20);
+            doc.text("METODOLOGIA DE CÁLCULO (RETROAÇÃO DE PREÇOS)", 14, 20);
 
             doc.setTextColor(80, 80, 80); doc.setFontSize(8); doc.setFont("helvetica", "normal");
             const intro = "Os custos obtidos via cotação de mercado foram retroagidos financeiramente para a Data-Base do orçamento, garantindo a homogeneidade temporal dos preços.";
