@@ -34,23 +34,21 @@ BEGIN;
 
 ALTER TABLE public.composicoes_biblioteca DISABLE TRIGGER trg_composicoes_pode_atualizar;
 
-CREATE TEMP TABLE _map_criadores (usuario text PRIMARY KEY, email text NOT NULL) ON COMMIT DROP;
-
--- `usuario` aqui já com espaços normalizados (a comparação abaixo também normaliza: há uma linha
--- gravada como 'FRANCISCO  TALES', com dois espaços).
-INSERT INTO _map_criadores (usuario, email) VALUES
-  ('FRANCISCO TALES',                           'francisco.tales@sop.ce.gov.br'),
-  ('FRANCISCO TALES GOMES PEREIRA',             'francisco.tales@sop.ce.gov.br'),
-  ('JOSÉ LEONÉZIO',                             'jose.vasconcelos@sop.ce.gov.br'),
-  ('JOSÉ LEONÉZIO LOPES DE VASCONCELOS FILHO',  'jose.vasconcelos@sop.ce.gov.br'),
-  ('NILDENO ARAGÃO',                            'nildeno.aragao@sop.ce.gov.br'),
-  ('TATHIANE ANDRADE',                          'tathiane.andrade@sop.ce.gov.br');
-
+-- Mapa inline (sem tabela temporária: o SQL Editor do Supabase não a manteve entre os comandos e
+-- deu "relation _map_criadores does not exist"). `usuario` aqui já com espaços normalizados — a
+-- comparação abaixo também normaliza: há uma linha gravada como 'FRANCISCO  TALES', com dois espaços.
 UPDATE public.composicoes_biblioteca c
    SET criador_email = lower(u.email),
        criador_nome  = COALESCE(c.criador_nome, u.full_name),
        criador_role  = COALESCE(c.criador_role, u.role)
-  FROM _map_criadores m
+  FROM (VALUES
+          ('FRANCISCO TALES',                           'francisco.tales@sop.ce.gov.br'),
+          ('FRANCISCO TALES GOMES PEREIRA',             'francisco.tales@sop.ce.gov.br'),
+          ('JOSÉ LEONÉZIO',                             'jose.vasconcelos@sop.ce.gov.br'),
+          ('JOSÉ LEONÉZIO LOPES DE VASCONCELOS FILHO',  'jose.vasconcelos@sop.ce.gov.br'),
+          ('NILDENO ARAGÃO',                            'nildeno.aragao@sop.ce.gov.br'),
+          ('TATHIANE ANDRADE',                          'tathiane.andrade@sop.ce.gov.br')
+       ) AS m(usuario, email)
   JOIN public.app_users u ON lower(u.email) = lower(m.email)
  WHERE c.usuario <> 'SOP'
    AND c.criador_email IS NULL
