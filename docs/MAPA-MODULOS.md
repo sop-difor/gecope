@@ -65,7 +65,7 @@
 | `modules/curva-abc/curva_abc_processo.js` | Integra a Curva ABC ao processo: resumo, histórico de versões, exclusão e abertura de relatórios a partir de Gerenciar Processo. |
 | `modules/financeiro/financeiro.js` | Painel financeiro com filtros, KPIs, gráficos Plotly e drill-down, comparando dados de Fiscalização e GECOPE. Usa dados mapeados de processos e `shared/multiselect.js`. |
 | `modules/orcamentos/orcamentos.js` | Biblioteca de orçamentos com upload, Storage, versionamento, comentários, decisões de revisão, atividades e notificações. |
-| `modules/composicoes/composicoes.js` | Biblioteca analítica de composições: cadastro, versões, referências, cálculos, comentários e relatórios. Usa CRUD genérico, Storage e WhatsApp. |
+| `modules/composicoes/composicoes.js` | Biblioteca analítica de composições: cadastro, versões, referências, cálculos, comentários e relatórios. Usa CRUD genérico, Storage e WhatsApp. Todo INSERT precisa enviar `criador_email` (= e-mail do JWT): o RLS de `composicoes_biblioteca` o exige e o dono é decidido só por ele (`isItemOwner` em `core/auth.js`). `codigo` é UNIQUE na tabela toda (inclui a SOP). |
 | `modules/composicoes/app.js` | Integra a Edge Function `get-economic-indices` para consultar índices econômicos e atualizar cálculos de preço retroativo. |
 | `modules/tabelas/tabelas.js` | Consulta e detalhamento de referências SINAPI, SEINFRA e ORSE, com filtros, BDI/desconto e links/relatórios de referência. |
 | `modules/administracao/admin.js` | Administração de usuários: aprovação, papéis, autorizações especiais, notificações e cadastro de fiscais. |
