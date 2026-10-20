@@ -6348,3 +6348,434 @@
                 top: -1px;
             }
         }
+
+
+        /* ── JANELA "DEFINIR META" (processos.js › abrirModalMeta) ───────────────
+           Cabeçalho com ícone, meta atual + resumo no topo, histórico em tabela de
+           colunas fixas (nada quebra em "REGIST/RO"), rodapé com a ação destrutiva à
+           esquerda e Cancelar/Salvar à direita. Só variáveis do design system, então
+           acompanha o tema escuro. ─────────────────────────────────────────────── */
+        .swal2-popup.meta-modal {
+            padding: 0 !important;
+            max-width: 94vw;
+            border-radius: 16px;
+            background: var(--sop-white);
+            color: var(--text-heading);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .swal2-popup.meta-modal .swal2-title.meta-title {
+            display: block;
+            margin: 0;
+            padding: 22px 28px 18px;
+            text-align: left;
+            border-bottom: 1px solid var(--sop-slate-200);
+        }
+
+        .meta-head {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .meta-head-icon {
+            flex: none;
+            display: grid;
+            place-items: center;
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            background: var(--gc-acao-suave, #e6f4ea);
+            color: var(--sop-green);
+            font-size: 1.4rem;
+        }
+
+        .meta-head-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text-heading);
+        }
+
+        .meta-head-sub {
+            margin-top: 3px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .meta-head-proc {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 1px 8px;
+            border-radius: 6px;
+            background: var(--sop-slate-100);
+            color: var(--text-heading);
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 0.8125rem;
+            font-weight: 600;
+        }
+
+        .swal2-popup.meta-modal .swal2-html-container.meta-html {
+            margin: 0;
+            padding: 22px 28px 24px;
+            text-align: left;
+            overflow: visible;
+        }
+
+        .meta-top {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+            column-gap: 20px;
+            row-gap: 0;
+            align-items: start;
+        }
+
+        /* Rótulo, campo e dica entram direto na grade do .meta-top: assim os cartões
+           ficam na MESMA linha do campo de data (topo e altura iguais), sem depender
+           da altura do rótulo. */
+        .meta-field { display: contents; }
+        .meta-label { grid-column: 1; grid-row: 1; }
+        .meta-date { grid-column: 1; grid-row: 2; }
+        .meta-hint { grid-column: 1; grid-row: 3; }
+
+        .meta-label,
+        .meta-stat-label {
+            display: block;
+            font-size: var(--gc-fs-rotulo, 0.75rem);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .meta-label {
+            margin-bottom: 6px;
+        }
+
+        .meta-stat-label {
+            white-space: nowrap;
+        }
+
+        .meta-date {
+            width: 100%;
+            height: 52px;
+            padding: 0 14px;
+            border: 1.5px solid var(--sop-slate-200);
+            border-radius: 10px;
+            background: var(--sop-white);
+            color: var(--text-heading);
+            font-size: 1.125rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .meta-date:focus {
+            outline: none;
+            border-color: var(--sop-green);
+            box-shadow: 0 0 0 3px rgba(0, 143, 61, 0.18);
+        }
+
+        .meta-date:disabled {
+            background: var(--sop-slate-50);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .meta-hint {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+        }
+
+        .meta-hint.is-ok { color: #0b6b32; }
+        .meta-hint.is-alerta { color: #a15c07; }
+        .meta-hint.is-atraso { color: #c62828; }
+        .meta-hint.is-vazia { color: var(--text-muted); }
+
+        .meta-stats {
+            display: grid;
+            grid-template-columns: 1.25fr 1fr;
+            gap: 10px;
+            grid-column: 2;
+            grid-row: 2;
+            height: 52px;
+        }
+
+        .meta-stat {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 2px;
+            height: 52px;
+            padding: 0 14px;
+            overflow: hidden;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 12px;
+            background: var(--sop-slate-50);
+        }
+
+        .meta-stat b {
+            font-size: 1.25rem;
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--text-heading);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .meta-stat small {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .meta-hist {
+            margin-top: 24px;
+        }
+
+        .meta-hist-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9375rem;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+
+        .meta-hist-head i {
+            margin-right: 6px;
+            color: var(--text-muted);
+        }
+
+        .meta-hist-wrap {
+            max-height: min(300px, 36vh);
+            overflow: auto;
+            border: 1px solid var(--sop-slate-200);
+            border-radius: 12px;
+            background: var(--sop-white);
+        }
+
+        .meta-hist-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .swal2-popup.meta-modal .meta-hist-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding: 10px 14px !important;
+            background: var(--sop-slate-50) !important;
+            border-bottom: 1px solid var(--sop-slate-200) !important;
+            color: var(--text-muted) !important;
+            font-size: 0.75rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .swal2-popup.meta-modal .meta-hist-table td {
+            padding: 10px 14px !important;
+            border-bottom: 1px solid var(--sop-slate-100) !important;
+            color: var(--text-heading) !important;
+            font-size: 0.875rem !important;
+            vertical-align: middle;
+        }
+
+        .swal2-popup.meta-modal .meta-hist-table tbody tr:last-child td {
+            border-bottom: 0 !important;
+        }
+
+        .meta-hist-table tbody tr:hover td {
+            background: var(--sop-slate-50);
+        }
+
+        .meta-col-reg,
+        .meta-col-dias {
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .meta-col-dias {
+            text-align: center;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+
+        /* Autor em uma linha só, peso normal; o que não couber vira reticências (o nome
+           inteiro fica no title da célula). */
+        .swal2-popup.meta-modal .meta-hist-table td.meta-col-autor {
+            font-weight: 400;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .meta-pill {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .meta-pill-ok {
+            background: #e6f4ea;
+            color: #0b6b32;
+            border: 1px solid #c3e6cb;
+        }
+
+        .meta-pill-zero {
+            background: #fce8e6;
+            color: #b3261e;
+            border: 1px solid #f5c6cb;
+        }
+
+        .swal-hist-del {
+            display: inline-grid;
+            place-items: center;
+            min-width: 34px;
+            height: 34px;
+            padding: 0;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .swal-hist-del:hover,
+        .swal-hist-del:focus-visible {
+            background: #fce8e6;
+            color: #c62828;
+            outline: none;
+        }
+
+        .swal-hist-del.is-armado {
+            padding: 0 10px;
+            background: #c62828;
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .meta-hist-msg {
+            margin-top: 8px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #c62828;
+        }
+
+        .meta-hist-msg:empty {
+            display: none;
+        }
+
+        .meta-hist-msg.is-neutra {
+            color: var(--text-muted);
+        }
+
+        .meta-hist-vazio {
+            padding: 18px 16px;
+            border: 1px dashed var(--sop-slate-200);
+            border-radius: 12px;
+            background: var(--sop-slate-50);
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .meta-hist-vazio.is-erro {
+            color: #c62828;
+        }
+
+        .swal2-popup.meta-modal .swal2-actions.meta-actions {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+            width: 100%;
+            margin: 0;
+            padding: 16px 28px;
+            box-sizing: border-box;
+            border-top: 1px solid var(--sop-slate-200);
+            background: var(--sop-slate-50);
+        }
+
+        .meta-btn {
+            height: 44px;
+            padding: 0 20px;
+            border-radius: 10px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .meta-btn:focus-visible {
+            outline: 2px solid var(--sop-green);
+            outline-offset: 2px;
+        }
+
+        .meta-btn-primary {
+            order: 3;
+            border: 1px solid var(--sop-green);
+            background: var(--sop-green);
+            color: #fff;
+        }
+
+        .meta-btn-primary:hover {
+            background: var(--sop-green-dark);
+            border-color: var(--sop-green-dark);
+        }
+
+        .meta-btn-ghost {
+            order: 2;
+            border: 1px solid var(--sop-slate-200);
+            background: var(--sop-white);
+            color: var(--text-heading);
+        }
+
+        .meta-btn-ghost:hover {
+            background: var(--sop-slate-100);
+        }
+
+        .meta-btn-danger {
+            order: 1;
+            margin-right: auto;
+            border: 1px solid transparent;
+            background: transparent;
+            color: #c62828;
+        }
+
+        .meta-btn-danger:hover {
+            background: #fce8e6;
+        }
+
+        body.theme-dark .meta-hint.is-ok { color: #5fd38d; }
+        body.theme-dark .meta-hint.is-alerta { color: #fbbf24; }
+        body.theme-dark .meta-hint.is-atraso { color: #ff8a80; }
+        body.theme-dark .meta-pill-ok { background: rgba(95, 211, 141, 0.14); color: #5fd38d; border-color: rgba(95, 211, 141, 0.35); }
+        body.theme-dark .meta-pill-zero { background: rgba(255, 138, 128, 0.14); color: #ff8a80; border-color: rgba(255, 138, 128, 0.35); }
+        body.theme-dark .meta-btn-danger { color: #ff8a80; }
+        body.theme-dark .meta-btn-danger:hover,
+        body.theme-dark .swal-hist-del:hover { background: rgba(255, 138, 128, 0.14); color: #ff8a80; }
+
+        @media (max-width: 600px) {
+            .swal2-popup.meta-modal .swal2-title.meta-title { padding: 18px 18px 14px; }
+            .swal2-popup.meta-modal .swal2-html-container.meta-html { padding: 18px; }
+            .swal2-popup.meta-modal .swal2-actions.meta-actions { padding: 14px 18px; }
+            .meta-top { grid-template-columns: 1fr; }
+            .meta-stats { grid-column: 1; grid-row: 4; margin-top: 14px; }
+            .meta-btn-danger { order: 4; margin-right: 0; width: 100%; }
+        }

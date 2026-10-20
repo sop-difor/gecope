@@ -5096,7 +5096,7 @@ async function salvaMetaProcesso(p,iso){
       if(!autor){ const {data:s}=await window.sbClient.auth.getSession(); autor=(s&&s.session&&s.session.user&&s.session.user.email)||'Usuário'; }
       const {error:eh}=await window.sbClient.from('historico_metas').upsert([{
         processo_id:p.id, registros:hojeISOLocal(), dias_estipulados:iso?diasAteMeta(iso):null, meta:iso||null, autor
-      }],{onConflict:'processo_id,registros,meta,dias_estipulados,autor',ignoreDuplicates:true});
+      }],{onConflict:'processo_id,registros,meta,dias_estipulados',ignoreDuplicates:true});
       if(eh) console.error('Falha ao registrar o histórico da meta:',eh.message);
       const acao=iso?`definiu a meta para ${iso.split('-').reverse().join('/')}`:'removeu a meta';
       const {error:ea}=await window.sbClient.from('app_atividades').insert([{

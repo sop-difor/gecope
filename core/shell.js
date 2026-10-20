@@ -465,6 +465,8 @@ function wireEvents() {
     fin.clear.addEventListener("click", (e) => { e.preventDefault(); clearFinanceiro(); });
     fin.diffMetric.addEventListener("change", updateFinanceiro);
     mt.meta.addEventListener("change", updateReuniao); mt.prioritario.addEventListener("change", updateReuniao); mt.fiscal.addEventListener("change", updateReuniao); mt.status.addEventListener("change", updateReuniao);
+    // Distrito primeiro refaz a lista de fiscais (cascata) e só então redesenha a tabela.
+    if (mt.distrito) mt.distrito.addEventListener("change", () => { sincronizarFiscaisComDistrito(); updateReuniao(); });
     mt.contratante.addEventListener("change", updateReuniao); mt.contratada.addEventListener("change", updateReuniao);
     // Debounce no search de reunião
     mt.search.addEventListener("input", debounce(updateReuniao, 300));
@@ -472,7 +474,7 @@ function wireEvents() {
     document.getElementById("btn-reuniao-clear").addEventListener("click", (e) => {
         e.preventDefault();
         if (mt && mt.search) mt.search.value = "";
-        [mt.meta, mt.prioritario, mt.fiscal, mt.status, mt.contratante, mt.contratada].forEach(el => {
+        [mt.meta, mt.prioritario, mt.distrito, mt.fiscal, mt.status, mt.contratante, mt.contratada].forEach(el => {
             if (!el) return;
             if (el.multiple) {
                 Array.from(el.options).forEach(o => { if (o.value) o.selected = true; });
@@ -482,6 +484,8 @@ function wireEvents() {
                 el.value = "";
             }
         });
+        // Com Distrito em "Todos", a lista de fiscais volta a ter todo mundo.
+        if (typeof sincronizarFiscaisComDistrito === 'function') sincronizarFiscaisComDistrito();
         currentSort = []; updateReuniao();
     });
 

@@ -2143,6 +2143,13 @@
                                     <label class="proc-toolbar-label" for="meetingStatusSelect">Status</label>
                                     <select class="form-select" id="meetingStatusSelect"></select>
                                 </div>
+                                <!-- Distrito Operacional: multisseleção em cascata com Fiscal — ao escolher um distrito,
+                                     a lista de fiscais mostra só quem tem processo nele (modules/processos/processos.js,
+                                     sincronizarFiscaisComDistrito). -->
+                                <div class="proc-toolbar-field">
+                                    <label class="proc-toolbar-label" for="meetingDistritoSelect">Distrito</label>
+                                    <select class="form-select" id="meetingDistritoSelect"></select>
+                                </div>
                                 <div class="proc-toolbar-field">
                                     <label class="proc-toolbar-label" for="meetingFiscalSelect">Fiscal</label>
                                     <select class="form-select" id="meetingFiscalSelect"></select>

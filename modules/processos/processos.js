@@ -1710,11 +1710,13 @@ async function _carregarDadosSupabaseInterno() {
                             autor: 'Sistema'
                         };
                     });
-                    // upsert idempotente: a constraint historico_metas_dedupe_key
-                    // (processo_id, registros, meta, dias_estipulados, autor) impede
-                    // a reinserção da mesma linha numa recarga/corrida.
+                    // upsert idempotente: o índice historico_metas_conteudo_key
+                    // (processo_id, registros, meta, dias_estipulados — SEM autor) impede a
+                    // reinserção da mesma meta numa recarga/corrida e também a repetição dela
+                    // por outro autor (o "Sistema" e quem salvou o processo gravavam a mesma
+                    // meta automática duas vezes). Ver sql/fix_historico_metas_duplicatas_e_exclusao.sql.
                     await sbClient.from('historico_metas').upsert(logs, {
-                        onConflict: 'processo_id,registros,meta,dias_estipulados,autor',
+                        onConflict: 'processo_id,registros,meta,dias_estipulados',
                         ignoreDuplicates: true
                     });
                 } catch (errBatch) {
@@ -1923,7 +1925,7 @@ async function enviarParaPlanilha() {
                         dias_estipulados: dias,
                         meta: iso,
                         autor: 'Sistema'
-                    }], { onConflict: 'processo_id,registros,meta,dias_estipulados,autor', ignoreDuplicates: true });
+                    }], { onConflict: 'processo_id,registros,meta,dias_estipulados', ignoreDuplicates: true });
                     if (errHist) console.error('[ERRO] Falha ao registrar log de meta inicial:', errHist.message);
                 }
             }
@@ -2938,7 +2940,7 @@ async function executarAcaoDetalhes(actionType) {
                     dias_estipulados: dias,
                     meta: dataLimiteNova,
                     autor: autor
-                }], { onConflict: 'processo_id,registros,meta,dias_estipulados,autor', ignoreDuplicates: true }).then(({ error: errHist }) => {
+                }], { onConflict: 'processo_id,registros,meta,dias_estipulados', ignoreDuplicates: true }).then(({ error: errHist }) => {
                     if (errHist) console.error('[ERRO] Falha ao registrar log no historico_metas (Edição):', errHist.message);
                 });
             }
@@ -3056,7 +3058,7 @@ function calcularRepercussao() {
 // Dashboard/UI helpers moved to dashboard.js
 
 // LOGIC: REUNIO
-const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: document.getElementById("meetingPrioritarioSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), contratante: document.getElementById("meetingContratanteSelect"), contratada: document.getElementById("meetingContratadaSelect"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
+const mt = { meta: document.getElementById("meetingMetaSelect"), prioritario: document.getElementById("meetingPrioritarioSelect"), distrito: document.getElementById("meetingDistritoSelect"), fiscal: document.getElementById("meetingFiscalSelect"), status: document.getElementById("meetingStatusSelect"), contratante: document.getElementById("meetingContratanteSelect"), contratada: document.getElementById("meetingContratadaSelect"), search: document.getElementById("meetingSearch"), body: document.getElementById("meetingTableBody"), note: document.getElementById("meetingFooterNote") };
 let mtBase = [];
 window.currentProcessesTab = 'ativos';
 
@@ -3094,6 +3096,9 @@ function switchProcessTab(tab) {
             if (mt.status && typeof fillSelect === 'function' && Array.isArray(window.allData)) {
                 fillSelect(mt.status, window.allData.map(d => d.status));
             }
+            if (mt.distrito && typeof fillSelect === 'function' && Array.isArray(window.allData)) {
+                fillSelect(mt.distrito, entidadesDoFiltro('distritoOperacional', window.allData));
+            }
             if (mt.fiscal && typeof fillSelect === 'function' && Array.isArray(window.allData)) {
                 fillSelect(mt.fiscal, window.allData.map(d => d.fiscal));
             }
@@ -3121,6 +3126,17 @@ function switchProcessTab(tab) {
     }
 
     updateReuniao();
+}
+
+// Data do "registro" no histórico de metas. A coluna é `date` ('2026-06-18'): `new Date()` nela
+// lê meia-noite UTC e, em Fortaleza (UTC-3), mostrava o dia anterior (17/06). Valor só-data é
+// formatado direto; timestamp completo (created_at do processo) continua indo pelo fuso local.
+function _fmtDiaHistoricoMeta(v) {
+    if (!v) return '-';
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function getMetaDate(row, setD) {
@@ -3191,7 +3207,7 @@ function getMetaDate(row, setD) {
                             dias_estipulados: dias,
                             meta: valSupabase,
                             autor: autor
-                        }], { onConflict: 'processo_id,registros,meta,dias_estipulados,autor', ignoreDuplicates: true }).then(({ error: errHist }) => {
+                        }], { onConflict: 'processo_id,registros,meta,dias_estipulados', ignoreDuplicates: true }).then(({ error: errHist }) => {
                             if (errHist) console.error('[ERRO] Falha ao registrar log no historico_metas:', errHist.message);
                         });
                     } catch (e) {
@@ -3765,7 +3781,10 @@ function _updateReuniaoInterno() {
 
     // `fs` só é usado dentro do if logo abaixo — construir e ordenar a lista de fiscais a
     // cada render, para descartá-la na maioria das vezes, era trabalho puro. — 22/09/2026
-    if (mt.fiscal.options.length <= 1) {
+    if (mt.distrito && mt.distrito.options.length === 0 && mtBase.length) fillSelect(mt.distrito, entidadesDoFiltro('distritoOperacional', mtBase));
+    // Com Distrito filtrado a lista de fiscais é um recorte de propósito (pode ter 1 só): não refazer.
+    const distritoTodos = !mt.distrito || _selecaoMultiProcessos(mt.distrito).todas || mt.distrito.options.length === 0;
+    if (distritoTodos && mt.fiscal.options.length <= 1) {
         const fs = Array.from(new Set(mtBase.map(d => d.fiscal).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
         fillSelect(mt.fiscal, fs);
     }
@@ -3880,6 +3899,7 @@ function _updateReuniaoInterno() {
     const priorFilt = getSelectedValues(mt.prioritario);
     const ctte = getSelectedValues(mt.contratante);
     const ctda = getSelectedValues(mt.contratada);
+    const dis = mt.distrito ? getSelectedValues(mt.distrito) : [];
     const qRaw = mt.search.value.trim();
 
     const totalF = mt.fiscal.options.length;
@@ -3896,12 +3916,16 @@ function _updateReuniaoInterno() {
     const allP = mt.prioritario.querySelectorAll('option:checked').length === totalP;
     const allCte = mt.contratante.querySelectorAll('option:checked').length === totalCte;
     const allCda = mt.contratada.querySelectorAll('option:checked').length === totalCda;
+    const allDis = !mt.distrito || mt.distrito.querySelectorAll('option:checked').length === mt.distrito.options.length;
 
     // Aplica os filtros do painel. `comStatus=false` ignora o filtro de status: a faixa de
     // números (Todos / Com o fiscal / ...) precisa contar sem ele, senão filtrar por uma
     // situação zeraria as outras.
     const aplicarFiltros = (base, comStatus) => {
         let rows = base;
+        if (dis.length > 0 && !allDis) {
+            rows = rows.filter(d => dis.includes(rotuloEntidade('distritoOperacional', d.distritoOperacional)));
+        }
         if (f.length > 0 && !allF) {
             rows = rows.filter(d => f.includes(d.fiscal || "Não informado"));
         }
@@ -4224,6 +4248,7 @@ function _updateReuniaoInterno() {
         const isAdmin = canMarkDateAsMeta();
 
         let historicoHTML = '';
+        let resumoHist = { dias: 0, n: 0 };
         try {
             // Revisão 22/09/2026 — aqui havia uma ida à rede só para descobrir o `id` do
             // processo, que já está carregado em window.allData (e era buscado localmente duas
@@ -4241,6 +4266,7 @@ function _updateReuniaoInterno() {
                 const historico = [];
                 if (rawHistorico) {
                     const chavesVistas = new Set();
+                    const conteudosVistos = new Set();
                     for (const h of rawHistorico) {
                         let estDate = h.registros;
                         if (h.autor === 'Sistema' && pRow && !h.registros) {
@@ -4258,33 +4284,41 @@ function _updateReuniaoInterno() {
                         const diaEst = estDate ? new Date(estDate).toISOString().substring(0, 10) : '';
                         const chave = h.autor === 'Sistema' ? `sistema_${diaEst}` : `manual_${h.meta}_${h.dias_estipulados}`;
 
-                        if (!chavesVistas.has(chave)) {
+                        // Mesmo registro + dias + meta gravado por autores diferentes é UM registro só
+                        // (o banco passa a barrar isso; aqui cobre o que já estava gravado).
+                        const conteudo = `${diaEst}|${h.dias_estipulados ?? ''}|${h.meta ?? ''}`;
+                        if (!chavesVistas.has(chave) && !conteudosVistos.has(conteudo)) {
                             historico.push(h);
                             chavesVistas.add(chave);
+                            conteudosVistos.add(conteudo);
                         }
                     }
                 }
 
                 if (historico && historico.length > 0) {
                     const totalDiasAcumulado = historico.reduce((sum, h) => sum + (h.dias_estipulados || 0), 0);
+                    resumoHist = { dias: totalDiasAcumulado, n: historico.length };
                     // PERFORMANCE: pRow não depende de `h` — é o mesmo processo para toda
                     // linha do histórico, então é calculado 1x aqui em vez de refazer o
                     // find() em window.allData a cada iteração do .map() abaixo.
                     const pRowHistorico = (window.allData || []).find(r => r.processo === processo);
                     historicoHTML = `
-                        <div class="mt-4 text-start">
-                            <label class="form-label text-muted fw-bold d-flex justify-content-between align-items-center w-100" style="font-size: 0.85rem;">
-                                <span><i class="bi bi-clock-history me-1"></i> Histórico de Metas</span>
-                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1" style="font-size: 0.75rem; background-color: #e6f4ea !important; color: #008F3D !important; border: 1px solid #c3e6cb !important;">Acumulado: ${totalDiasAcumulado} dias</span>
-                            </label>
-                            <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">
-                                <table class="table table-sm table-hover mb-0">
-                                    <thead class="table-light sticky-top" style="z-index: 1;">
+                        <section class="meta-hist" aria-label="Histórico de metas">
+                            <div class="meta-hist-head">
+                                <span><i class="bi bi-clock-history" aria-hidden="true"></i> Histórico de metas</span>
+                            </div>
+                            <div class="meta-hist-wrap">
+                                <table class="meta-hist-table">
+                                    <colgroup>
+                                        <col style="width: 108px;"><col style="width: 64px;"><col style="width: 124px;"><col>${isAdmin ? '<col style="width: 56px;">' : ''}
+                                    </colgroup>
+                                    <thead>
                                         <tr>
-                                            <th>REGISTRO</th>
-                                            <th class="text-center">DIAS</th>
-                                            <th>META</th>
-                                            <th>AUTOR</th>
+                                            <th scope="col">Registro</th>
+                                            <th scope="col" class="text-center">Dias</th>
+                                            <th scope="col">Meta</th>
+                                            <th scope="col">Autor</th>
+                                            ${isAdmin ? '<th scope="col" class="text-center"><span class="visually-hidden">Excluir</span></th>' : ''}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -4300,7 +4334,7 @@ function _updateReuniaoInterno() {
                                 estDate = pRow.created_at;
                             }
                         }
-                        const dtEst = estDate ? new Date(estDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+                        const dtEst = _fmtDiaHistoricoMeta(estDate);
                         // Calcula meta exibida: usa h.meta se existir, senão tenta calcular a partir de registros + dias_estipulados
                         let metaVal = h.meta || null;
                         if (!metaVal) {
@@ -4320,55 +4354,75 @@ function _updateReuniaoInterno() {
                         const dias = h.dias_estipulados !== null && h.dias_estipulados !== undefined ? h.dias_estipulados : '-';
                         const autor = h.autor || 'Sistema';
                         return `
-                                                <tr style="vertical-align: middle;">
-                                                    <td>${dtEst}</td>
-                                                    <td class="text-center font-monospace">${dias}</td>
-                                                    <td>
-                                                        ${h.meta ?
-                                `<span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">${dtLim}</span>` :
-                                `<span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-0.5" style="font-size: 0.75rem;">Zerada</span>`
-                            }
-                                                    </td>
-                                                    <td class="fw-semibold">${escapeHTML(autor)}</td>
+                                                <tr data-hid="${escapeHTML(String(h.id))}" data-dias="${Number(h.dias_estipulados) || 0}">
+                                                    <td class="meta-col-reg">${dtEst}</td>
+                                                    <td class="meta-col-dias">${dias}</td>
+                                                    <td>${h.meta
+                                ? `<span class="meta-pill meta-pill-ok">${dtLim}</span>`
+                                : `<span class="meta-pill meta-pill-zero">Zerada</span>`}</td>
+                                                    <td class="meta-col-autor" title="${escapeHTML(autor)}">${escapeHTML(autor)}</td>
+                                                    ${isAdmin ? `<td class="text-center"><button type="button" class="swal-hist-del" data-hid="${escapeHTML(String(h.id))}" title="Excluir este registro do histórico" aria-label="Excluir o registro de ${escapeHTML(dtEst)} (${escapeHTML(String(dias))} dias) do histórico"><i class="bi bi-trash"></i></button></td>` : ''}
                                                 </tr>
                                             `;
                     }).join('')}
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                            <div id="swal-hist-msg" class="meta-hist-msg" role="alert" aria-live="polite"></div>
+                        </section>
                     `;
                 } else {
                     historicoHTML = `
-                        <div class="mt-4 text-start text-muted py-2 text-center" style="font-size: 0.8rem; border: 1px dashed #dee2e6; border-radius: 8px; background-color: #f8f9fa;">
-                            <i class="bi bi-info-circle me-1"></i> Nenhum histórico de meta registrado para este processo.
-                        </div>
+                        <section class="meta-hist" aria-label="Histórico de metas">
+                            <div class="meta-hist-head"><span><i class="bi bi-clock-history" aria-hidden="true"></i> Histórico de metas</span></div>
+                            <div class="meta-hist-vazio"><i class="bi bi-info-circle me-1" aria-hidden="true"></i> Nenhum histórico de meta registrado para este processo.</div>
+                        </section>
                     `;
                 }
             }
         } catch (errHist) {
             console.error('Erro ao buscar histórico de metas:', errHist);
             historicoHTML = `
-                <div class="mt-4 text-start text-danger py-2 text-center" style="font-size: 0.8rem; border: 1px dashed #f8d7da; border-radius: 8px;">
-                    <i class="bi bi-exclamation-triangle me-1"></i> Não foi possível carregar o histórico de metas.
-                </div>
+                <section class="meta-hist" aria-label="Histórico de metas">
+                    <div class="meta-hist-head"><span><i class="bi bi-clock-history" aria-hidden="true"></i> Histórico de metas</span></div>
+                    <div class="meta-hist-vazio is-erro" role="alert"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i> Não foi possível carregar o histórico de metas.</div>
+                </section>
             `;
         }
 
         const inputDisabled = isAdmin ? '' : 'disabled';
-        const inputBg = isAdmin ? '' : 'background-color: #f8f9fa; color: #666; cursor: not-allowed;';
+
+        // Situação da meta ATUAL (a salva no processo), em linguagem de prazo.
+        const hintMeta = (() => {
+            const partes = String(dataAtual || '').split('-').map(Number);
+            if (partes.length !== 3 || !partes[0]) return { cls: 'is-vazia', ico: 'bi-dash-circle', txt: 'Nenhuma meta definida' };
+            const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+            const dif = Math.round((new Date(partes[0], partes[1] - 1, partes[2]) - hoje) / 86400000);
+            const dd = n => `${n} dia${n === 1 ? '' : 's'}`;
+            if (dif < 0) return { cls: 'is-atraso', ico: 'bi-exclamation-circle-fill', txt: `Meta atual atrasada há ${dd(-dif)}` };
+            if (dif === 0) return { cls: 'is-alerta', ico: 'bi-hourglass-split', txt: 'Meta atual vence hoje' };
+            return { cls: 'is-ok', ico: 'bi-check-circle-fill', txt: `Meta atual vence em ${dd(dif)}` };
+        })();
 
         const htmlContent = `
-                        <div class="mt-2 text-start">
-                            <label for="swal-input-date" class="form-label text-muted fw-bold" style="font-size: 0.85rem;">Selecione a data máxima esperada</label>
-                            <input id="swal-input-date" type="date" class="form-control form-control-lg" value="${dataAtual}" ${inputDisabled} style="border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1rem; color: #333; box-shadow: none; ${inputBg}">
+                        <div class="meta-top">
+                            <div class="meta-field">
+                                <label for="swal-input-date" class="meta-label">${isAdmin ? 'Data máxima esperada' : 'Data máxima definida'}</label>
+                                <input id="swal-input-date" type="date" class="meta-date" value="${dataAtual}" ${inputDisabled}>
+                                <div class="meta-hint ${hintMeta.cls}"><i class="bi ${hintMeta.ico}" aria-hidden="true"></i> ${hintMeta.txt}</div>
+                            </div>
+                            <div class="meta-stats">
+                                <div class="meta-stat"><span class="meta-stat-label">Acumulado</span><b><span id="swal-hist-total">${resumoHist.dias}</span> <small>dias</small></b></div>
+                                <div class="meta-stat"><span class="meta-stat-label">Registros</span><b id="swal-hist-count">${resumoHist.n}</b></div>
+                            </div>
                         </div>
                         ${historicoHTML}
                     `;
 
         const { value: formValues, isConfirmed, isDenied } = await Swal.fire({
-            title: `<div style="font-size: 1.3rem; font-weight: 700; color: #1B5E20; display: flex; align-items: center;"><i class="bi bi-calendar-check text-success me-2" style="font-size: 1.5rem;"></i> ${isAdmin ? 'Definir Meta' : 'Visualizar Meta'}</div><div style="font-size: 0.9rem; color: #666; margin-top: 6px; font-weight: 500;">Processo: <span class="text-dark fw-bold">${escapeHTML(processo)}</span></div>`,
+            title: `<div class="meta-head"><span class="meta-head-icon" aria-hidden="true"><i class="bi bi-calendar-check"></i></span><div><div class="meta-head-title">${isAdmin ? 'Definir meta' : 'Visualizar meta'}</div><div class="meta-head-sub">Processo <span class="meta-head-proc">${escapeHTML(processo)}</span></div></div></div>`,
             html: htmlContent,
+            width: '44rem',
             showCancelButton: true,
             showConfirmButton: isAdmin,
             showDenyButton: isAdmin && !!dataAtual, // Apenas mostra o botão Remover se já existir uma meta e for admin
@@ -4377,17 +4431,73 @@ function _updateReuniaoInterno() {
             cancelButtonColor: '#f4f4f4',
             confirmButtonText: '<i class="bi bi-check2-circle me-1"></i>Salvar',
             cancelButtonText: isAdmin ? 'Cancelar' : 'Fechar',
-            denyButtonText: '<i class="bi bi-trash me-1"></i>Remover',
+            // "Zerar meta" limpa a meta ATUAL do processo; excluir um registro do histórico é a
+            // lixeira de cada linha da tabela acima (não confundir os dois).
+            denyButtonText: '<i class="bi bi-x-circle me-1"></i>Zerar meta',
             customClass: {
-                popup: 'rounded-4 shadow-lg border-0',
-                title: 'text-start border-bottom pb-3 mb-2',
-                actions: 'w-100 px-4 pb-3 justify-content-between',
-                confirmButton: 'btn btn-success px-4 py-2 fw-bold text-white',
-                cancelButton: 'btn btn-light px-3 py-2 text-secondary fw-semibold border',
-                denyButton: 'btn px-3 py-2 text-danger fw-semibold'
+                popup: 'meta-modal',
+                title: 'meta-title',
+                htmlContainer: 'meta-html',
+                actions: 'meta-actions',
+                confirmButton: 'meta-btn meta-btn-primary',
+                cancelButton: 'meta-btn meta-btn-ghost',
+                denyButton: 'meta-btn meta-btn-danger'
             },
             buttonsStyling: false,
             focusConfirm: false,
+            didOpen: (popup) => {
+                // Lixeira por linha do histórico (só admin). Dois cliques: o primeiro arma
+                // ("Excluir?"), o segundo exclui — sem abrir outro modal por cima deste.
+                const msg = popup.querySelector('#swal-hist-msg');
+                let armado = null, timer = null;
+                const desarmar = () => {
+                    clearTimeout(timer);
+                    if (armado) { armado.innerHTML = '<i class="bi bi-trash"></i>'; armado.classList.remove('is-armado'); }
+                    armado = null;
+                };
+                popup.addEventListener('click', async (ev) => {
+                    const btn = ev.target.closest('.swal-hist-del');
+                    if (!btn) { desarmar(); return; }
+                    if (msg) msg.textContent = '';
+                    if (armado !== btn) {
+                        desarmar();
+                        armado = btn;
+                        btn.innerHTML = 'Excluir?';
+                        btn.classList.add('is-armado');
+                        timer = setTimeout(desarmar, 4000);
+                        return;
+                    }
+                    clearTimeout(timer);
+                    btn.disabled = true;
+                    const tr = btn.closest('tr');
+                    const pRowDel = (window.allData || []).find(r => r.processo === processo);
+                    try {
+                        const { data: apagados, error } = await sbClient.from('historico_metas')
+                            .delete()
+                            .eq('id', btn.dataset.hid)
+                            .eq('processo_id', pRowDel ? pRowDel.id : '')
+                            .select('id');
+                        if (error) throw error;
+                        if (!apagados || apagados.length === 0) throw new Error('o banco não removeu nenhuma linha (falta a permissão de exclusão?)');
+                        const resumo = tr ? Array.from(tr.children).slice(0, 3).map(td => td.textContent.trim().replace(/\s+/g, ' ')).join(' · ') : '';
+                        try { registrarAtividade('PROCESSO', `Usuário excluiu um registro do histórico de metas (${resumo}) do processo Nº ${processo}`, processo, (pRowDel && pRowDel.descricao) || '', (pRowDel && pRowDel.fiscal) || ''); } catch (e) { /* o log é acessório */ }
+                        armado = null;
+                        if (tr) tr.remove();
+                        const restantes = Array.from(popup.querySelectorAll('tr[data-hid]'));
+                        const total = popup.querySelector('#swal-hist-total');
+                        if (total) total.textContent = String(restantes.reduce((s, r) => s + (Number(r.dataset.dias) || 0), 0));
+                        const qtd = popup.querySelector('#swal-hist-count');
+                        if (qtd) qtd.textContent = String(restantes.length);
+                        if (restantes.length === 0 && msg) { msg.className = 'meta-hist-msg is-neutra'; msg.textContent = 'Nenhum registro restante no histórico.'; }
+                    } catch (e) {
+                        btn.disabled = false;
+                        armado = null;
+                        btn.innerHTML = '<i class="bi bi-trash"></i>';
+                        btn.classList.remove('is-armado');
+                        if (msg) msg.textContent = 'Não foi possível excluir o registro: ' + (e && e.message ? e.message : e);
+                    }
+                });
+            },
             preConfirm: () => {
                 return document.getElementById('swal-input-date').value;
             }
@@ -4486,11 +4596,11 @@ function atualizarTabelaSuite(rows) {
 function _chaveEntidade(v) {
     return String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 }
-const _entidadesCache = { ref: null, n: -1, contratante: null, contratada: null };
+const _entidadesCache = { ref: null, n: -1, contratante: null, contratada: null, distritoOperacional: null };
 function _rotulosEntidade(campo, base, refazer) {
     if (refazer || _entidadesCache.ref !== base || _entidadesCache.n !== base.length) {
         _entidadesCache.ref = base; _entidadesCache.n = base.length;
-        _entidadesCache.contratante = null; _entidadesCache.contratada = null;
+        _entidadesCache.contratante = null; _entidadesCache.contratada = null; _entidadesCache.distritoOperacional = null;
     }
     if (!_entidadesCache[campo]) {
         const grafias = new Map();   // chave -> Map(grafia -> quantidade)
@@ -4530,6 +4640,9 @@ function fillCommonStatusFilters() {
             if (mt && mt.status) fillSelect(mt.status, statuses);
             if (mt && mt.contratante) fillSelect(mt.contratante, entidadesDoFiltro('contratante', window.allData || []));
             if (mt && mt.contratada) fillSelect(mt.contratada, entidadesDoFiltro('contratada', window.allData || []));
+            if (mt && mt.distrito) fillSelect(mt.distrito, entidadesDoFiltro('distritoOperacional', window.allData || []));
+            // Distrito voltou a "Todos": a lista de fiscais precisa voltar a ter todo mundo.
+            if (mt && mt.distrito && mt.fiscal) sincronizarFiscaisComDistrito();
         }
     } catch (e) { console.warn('fillCommonStatusFilters error', e); }
 }
@@ -4676,10 +4789,36 @@ function _rotuloMulti(marcadas) {
     return nomes.length <= 2 ? nomes.join(', ') : `${nomes.length} selecionados`;
 }
 
+// Cascata Distrito -> Fiscal: com distritos filtrados, a lista de fiscais passa a ter só quem
+// tem processo neles. Quem já estava marcado e continua na lista continua marcado; se o fiscal
+// estava em "Todos", segue em "Todos" (inclusive ao voltar o distrito para "Todos"). Se nenhum
+// dos marcados sobrar, volta a todos — nunca deixa o usuário com a lista vazia sem explicação.
+function sincronizarFiscaisComDistrito() {
+    if (!mt.distrito || !mt.fiscal || typeof fillSelect !== 'function') return;
+    const base = Array.isArray(window.allData) && window.allData.length ? window.allData : (mtBase || []);
+    const dist = _selecaoMultiProcessos(mt.distrito);
+    const recorte = dist.todas || dist.opcoes.length === 0
+        ? base
+        : base.filter(d => dist.marcadas.some(o => o.value === rotuloEntidade('distritoOperacional', d.distritoOperacional)));
+
+    const antes = _selecaoMultiProcessos(mt.fiscal);
+    const marcadosAntes = new Set(antes.marcadas.map(o => o.value));
+    const eraTodos = antes.todas || antes.opcoes.length === 0;
+
+    fillSelect(mt.fiscal, recorte.map(d => d.fiscal));  // volta tudo marcado
+    if (eraTodos) return;
+    const agora = Array.from(mt.fiscal.options).filter(o => o.value);
+    if (!agora.some(o => marcadosAntes.has(o.value))) return;
+    agora.forEach(o => { o.selected = marcadosAntes.has(o.value); });
+    if (typeof renderMultiSelectUI === 'function') renderMultiSelectUI(mt.fiscal);
+}
+window.sincronizarFiscaisComDistrito = sincronizarFiscaisComDistrito;
+
 // Chips dos filtros ativos, estado da faixa de números e do botão "Mais filtros".
 function atualizarEstadoFiltrosProcessos() {
     const el = id => document.getElementById(id);
     const status = _selecaoMultiProcessos(el('meetingStatusSelect'));
+    const distrito = _selecaoMultiProcessos(el('meetingDistritoSelect'));
     const fiscal = _selecaoMultiProcessos(el('meetingFiscalSelect'));
     const contratante = _selecaoMultiProcessos(el('meetingContratanteSelect'));
     const contratada = _selecaoMultiProcessos(el('meetingContratadaSelect'));
@@ -4706,6 +4845,7 @@ function atualizarEstadoFiltrosProcessos() {
     // 2) Chips.
     const chips = [];
     if (!status.todas && status.opcoes.length) chips.push(['status', `Status: ${_rotuloMulti(status.marcadas)}`]);
+    if (!distrito.todas && distrito.opcoes.length) chips.push(['distrito', `Distrito: ${_rotuloMulti(distrito.marcadas)}`]);
     if (fiscalVisivel && !fiscal.todas && fiscal.opcoes.length) chips.push(['fiscal', `Fiscal: ${_rotuloMulti(fiscal.marcadas)}`]);
     if (meta && meta.value) chips.push(['meta', `Meta: ${meta.options[meta.selectedIndex]?.text || meta.value}`]);
     if (prior && prior.value) chips.push(['prior', `Prioritário: ${prior.options[prior.selectedIndex]?.text || prior.value}`]);
@@ -4738,6 +4878,7 @@ function removerFiltroProcessos(chave) {
         if (typeof renderMultiSelectUI === 'function') renderMultiSelectUI(s);
     };
     if (chave === 'status') marcarTodas(sel('meetingStatusSelect'));
+    else if (chave === 'distrito') { marcarTodas(sel('meetingDistritoSelect')); sincronizarFiscaisComDistrito(); }
     else if (chave === 'fiscal') marcarTodas(sel('meetingFiscalSelect'));
     else if (chave === 'contratante') marcarTodas(sel('meetingContratanteSelect'));
     else if (chave === 'contratada') marcarTodas(sel('meetingContratadaSelect'));

@@ -79,7 +79,12 @@
 
         const btnSpan = container.querySelector('button span');
         const menu = container.querySelector('.dropdown-menu');
-        const oldSearchValue = menu.querySelector('input')?.value || '';
+        // O texto digitado só sobrevive ao redesenho se o menu está aberto (a pessoa está
+        // digitando e o redesenho veio de um clique numa opção). Com o menu fechado o redesenho
+        // vem de um reset programático ("Limpar filtros", troca de aba, recarga) e o texto antigo
+        // ficava na caixa com a seleção já zerada.
+        const menuAberto = menu.classList.contains('show') || container.querySelector('button')?.classList.contains('show');
+        const oldSearchValue = menuAberto ? (menu.querySelector('input')?.value || '') : '';
         menu.innerHTML = '';
 
         const searchInput = document.createElement('input');
@@ -89,13 +94,14 @@
         searchInput.style.width = 'calc(100% - 16px)';
         searchInput.value = oldSearchValue;
         searchInput.onclick = (e) => e.stopPropagation();
-        searchInput.oninput = (e) => {
-            const term = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const aplicarBusca = () => {
+            const term = searchInput.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             menu.querySelectorAll('.multiselect-option').forEach(opt => {
                 const text = opt.textContent.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                 opt.style.display = text.includes(term) ? '' : 'none';
             });
         };
+        searchInput.oninput = aplicarBusca;
         menu.appendChild(searchInput);
 
         const actionsDiv = document.createElement('div');
@@ -144,6 +150,9 @@
                     }
                 });
             }
+            // "Limpar" também esvazia a caixa de busca e volta a mostrar todas as opções.
+            searchInput.value = '';
+            aplicarBusca();
             updateLabel();
             selectEl.dispatchEvent(new Event('change'));
         };
@@ -175,6 +184,9 @@
             menu.appendChild(div);
         });
 
+        // Texto preservado do redesenho: aplica o mesmo recorte nas opções recém-criadas.
+        if (oldSearchValue) aplicarBusca();
+
         function updateLabel() {
             const selecteds = Array.from(selectEl.options).filter(o => o.selected && o.value);
             const totalOpts = Array.from(selectEl.options).filter(o => o.value).length;
@@ -198,7 +210,8 @@
         selectEl.multiple = true;
         const normalizedList = list.map(v => (v === null || v === undefined || String(v).trim() === "") ? "Não informado" : v);
         const values = Array.from(new Set(normalizedList));
-        values.sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+        // numeric: "2º D.O" vem antes de "10º D.O" (ordem alfabética pura dava 10º, 11º, 1º, 2º...).
+        values.sort((a, b) => String(a).localeCompare(String(b), 'pt-BR', { numeric: true }));
 
         let options = '';
         // O `value` já ia escapado, mas o RÓTULO não — e ele vem de `processos.status`, texto
