@@ -12,6 +12,8 @@
    - o mapa abre plano; rotação e inclinação ficam travadas e só o botão 3D as libera (inclina ~60°, liga o
      relevo do AWS Terrain Tiles com exagero 1,5× e sombreamento leve; os prédios vêm do OpenStreetMap e o
      estilo já os extruda a partir do zoom 14, então só mostram altura com o mapa inclinado);
+   - o 3D só existe no modo Mapa: no satélite a imagem desenhada sobre o relevo (SRTM, que traz prédios e árvores
+     embutidos) ondula nas cidades, e o resultado não ficou bom nem com o exagero reduzido (pedido de 21/10/2026);
    - o mapa é claro nos dois temas; só os controles e popups seguem o tema (CSS em mapa-obras.css). */
 (function(){
 'use strict';
@@ -30,9 +32,6 @@ const SOMEM_NO_SATELITE=/shield|one_way|^poi_|^airport/; // camadas de ícone do
 const DEM_TILES='https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 const DEM_ATTR='Relevo: Mapzen e AWS Terrain Tiles';
 const EXAGERO=1.5, PITCH_3D=60, PITCH_MAX=70;
-// No satélite o exagero cai com o zoom: o DEM (SRTM) leva prédios e árvores embutidos e, de perto, a imagem desenhada
-// sobre ele ondula nas cidades. De longe (serras, litoral) o relevo cheio fica ótimo.
-const EXAGERO_SAT_PERTO=0.5, ZOOM_EXAGERO=[12,15];
 const AVISO_MS=7000;
 const LOCALE={
   'NavigationControl.ZoomIn':'Aproximar','NavigationControl.ZoomOut':'Afastar','NavigationControl.ResetBearing':'Voltar ao norte',
@@ -136,7 +135,7 @@ function criar(host,cfg){
       const b=document.createElement('button');
       b.type='button'; b.textContent='3D'; b.title='Visão 3D: inclinar e girar o mapa'; b.setAttribute('aria-pressed','false');
       b.addEventListener('click',()=>define3D(!tres));
-      d.appendChild(b); this._d=d; btn3d=b; return d;
+      d.appendChild(b); this._d=d; btn3d=b; marca3D(); return d;
     }
     onRemove(){ this._d.remove(); }
   }
@@ -182,13 +181,15 @@ function criar(host,cfg){
   function definirBase(k){
     base=k==='satelite'?'satelite':'mapa';
     try{ localStorage.setItem(PREF_BASE,base); }catch(_){}
-    marcaBase(); aplicaBase(); aplicaExagero();
+    marcaBase(); aplicaBase();
+    if(base==='satelite') define3D(false); // o 3D é só do modo Mapa
+    marca3D();
   }
 
   // ---- 3D: inclinação, relevo e prédios ----
   // Abre sempre plano; só o botão liga. O relevo é o terreno do mapa (setTerrain) mais um sombreamento leve; os
   // prédios do OpenStreetMap já vêm extrudados no estilo (camada building-3d, zoom 14+) e só mostram altura com
-  // o mapa inclinado. No satélite o 3D mostra só o relevo (a imagem é desenhada sobre o terreno).
+  // o mapa inclinado. No satélite o botão fica desativado.
   function liberaGestos(on){
     if(on){
       map.setMaxPitch(PITCH_MAX); map.dragRotate.enable(); map.touchPitch.enable(); map.touchZoomRotate.enableRotation();
@@ -196,42 +197,29 @@ function criar(host,cfg){
       map.dragRotate.disable(); map.touchPitch.disable(); map.touchZoomRotate.disableRotation(); map.setMaxPitch(0);
     }
   }
-  let exagAtual=EXAGERO;
-  function exageroDoZoom(){
-    if(base!=='satelite') return EXAGERO;
-    const z=map.getZoom(), a=ZOOM_EXAGERO[0], b=ZOOM_EXAGERO[1];
-    const e=z<=a?EXAGERO:z>=b?EXAGERO_SAT_PERTO:EXAGERO+(EXAGERO_SAT_PERTO-EXAGERO)*(z-a)/(b-a);
-    return Math.round(e*20)/20; // passos de 0,05: não refaz o terreno a cada fração de zoom
-  }
-  function aplicaExagero(){
-    if(!tres||!pronto) return;
-    const e=exageroDoZoom();
-    if(e===exagAtual) return;
-    exagAtual=e; map.setTerrain({source:'gc-dem',exaggeration:e});
-  }
-  map.on('zoom',aplicaExagero);
   function marca3D(){
     el.classList.toggle('gc-3d',tres);
-    if(btn3d){ btn3d.classList.toggle('on',tres); btn3d.setAttribute('aria-pressed',String(tres)); }
+    if(!btn3d) return;
+    const sat=base==='satelite';
+    btn3d.disabled=sat;
+    btn3d.title=sat?'O 3D só está disponível no modo Mapa':'Visão 3D: inclinar e girar o mapa';
+    btn3d.classList.toggle('on',tres); btn3d.setAttribute('aria-pressed',String(tres));
   }
   function escondeAviso(){ clearTimeout(avisoT); if(aviso){ aviso.remove(); aviso=null; } }
   function mostraAviso(){
     escondeAviso();
     aviso=document.createElement('div');
     aviso.className='gc-gl-aviso'; aviso.setAttribute('role','status');
-    aviso.textContent=base==='satelite'
-      ?'No satélite, o 3D mostra só o relevo. Arraste com o botão direito para inclinar e girar.'
-      :'Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Arraste com o botão direito para inclinar e girar.';
+    aviso.textContent='Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Arraste com o botão direito para inclinar e girar.';
     el.appendChild(aviso);
     avisoT=setTimeout(escondeAviso,AVISO_MS);
   }
   function define3D(on){
-    if(!pronto||on===tres) return;
+    if(!pronto||on===tres||(on&&base==='satelite')) return;
     tres=on; marca3D();
     if(on){
       liberaGestos(true);
-      exagAtual=exageroDoZoom();
-      map.setTerrain({source:'gc-dem',exaggeration:exagAtual});
+      map.setTerrain({source:'gc-dem',exaggeration:EXAGERO});
       map.setLayoutProperty('gc-relevo','visibility','visible');
       map.easeTo({pitch:PITCH_3D,duration:900});
       mostraAviso();
@@ -353,7 +341,7 @@ function criar(host,cfg){
     }catch(e){ falhar((e&&e.message)||'erro ao montar as camadas'); }
   });
 
-  return {el,mapa:map,exagero:()=>exagAtual,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
+  return {el,mapa:map,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
 }
 
 window.MapaRuasGL={suportado,carregar,criar};
