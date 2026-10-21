@@ -30,6 +30,9 @@ const SOMEM_NO_SATELITE=/shield|one_way|^poi_|^airport/; // camadas de ícone do
 const DEM_TILES='https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 const DEM_ATTR='Relevo: Mapzen e AWS Terrain Tiles';
 const EXAGERO=1.5, PITCH_3D=60, PITCH_MAX=70;
+// No satélite o exagero cai com o zoom: o DEM (SRTM) leva prédios e árvores embutidos e, de perto, a imagem desenhada
+// sobre ele ondula nas cidades. De longe (serras, litoral) o relevo cheio fica ótimo.
+const EXAGERO_SAT_PERTO=0.5, ZOOM_EXAGERO=[12,15];
 const AVISO_MS=7000;
 const LOCALE={
   'NavigationControl.ZoomIn':'Aproximar','NavigationControl.ZoomOut':'Afastar','NavigationControl.ResetBearing':'Voltar ao norte',
@@ -179,7 +182,7 @@ function criar(host,cfg){
   function definirBase(k){
     base=k==='satelite'?'satelite':'mapa';
     try{ localStorage.setItem(PREF_BASE,base); }catch(_){}
-    marcaBase(); aplicaBase();
+    marcaBase(); aplicaBase(); aplicaExagero();
   }
 
   // ---- 3D: inclinação, relevo e prédios ----
@@ -193,6 +196,20 @@ function criar(host,cfg){
       map.dragRotate.disable(); map.touchPitch.disable(); map.touchZoomRotate.disableRotation(); map.setMaxPitch(0);
     }
   }
+  let exagAtual=EXAGERO;
+  function exageroDoZoom(){
+    if(base!=='satelite') return EXAGERO;
+    const z=map.getZoom(), a=ZOOM_EXAGERO[0], b=ZOOM_EXAGERO[1];
+    const e=z<=a?EXAGERO:z>=b?EXAGERO_SAT_PERTO:EXAGERO+(EXAGERO_SAT_PERTO-EXAGERO)*(z-a)/(b-a);
+    return Math.round(e*20)/20; // passos de 0,05: não refaz o terreno a cada fração de zoom
+  }
+  function aplicaExagero(){
+    if(!tres||!pronto) return;
+    const e=exageroDoZoom();
+    if(e===exagAtual) return;
+    exagAtual=e; map.setTerrain({source:'gc-dem',exaggeration:e});
+  }
+  map.on('zoom',aplicaExagero);
   function marca3D(){
     el.classList.toggle('gc-3d',tres);
     if(btn3d){ btn3d.classList.toggle('on',tres); btn3d.setAttribute('aria-pressed',String(tres)); }
@@ -213,7 +230,8 @@ function criar(host,cfg){
     tres=on; marca3D();
     if(on){
       liberaGestos(true);
-      map.setTerrain({source:'gc-dem',exaggeration:EXAGERO});
+      exagAtual=exageroDoZoom();
+      map.setTerrain({source:'gc-dem',exaggeration:exagAtual});
       map.setLayoutProperty('gc-relevo','visibility','visible');
       map.easeTo({pitch:PITCH_3D,duration:900});
       mostraAviso();
@@ -335,7 +353,7 @@ function criar(host,cfg){
     }catch(e){ falhar((e&&e.message)||'erro ao montar as camadas'); }
   });
 
-  return {el,mapa:map,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
+  return {el,mapa:map,exagero:()=>exagAtual,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
 }
 
 window.MapaRuasGL={suportado,carregar,criar};
