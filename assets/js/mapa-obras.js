@@ -3237,7 +3237,6 @@ function saiRuas(){
   map.setMaxZoom(11);
   refit(); // o zoom pode ter passado de 11 com o mapa de ruas: volta ao enquadramento do nível
 }
-// chamada por render(): liga/desliga o modo e mantém os marcadores em dia com filtros e cadastro
 // ---- mapa de ruas em MapLibre (E1 do mapa 3D) ----
 // Nos níveis distrito e município o modo ruas é desenhado pelo MapLibre (assets/js/mapa-ruas-gl.js), carregado
 // só no primeiro clique. O Leaflet segue por baixo, intacto, e assume sozinho no nível Estado e sempre que o
@@ -3279,6 +3278,10 @@ const glNorm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g
 function glBuscaObras(q){
   const tk=glNorm(q).split(/\s+/).filter(Boolean); if(!tk.length) return [];
   const res=[];
+  for(const id of allIds){ // o município em si, para "Sobral" abrir Sobral e não a primeira obra de lá
+    const m=DB.municipios[id], n=m?obrasOf(id).length:0, nome=m&&m.nome;
+    if(n&&nome&&tk.every(t=>glNorm(nome).includes(t))) res.push({peso:-1,titulo:nome,sub:`Município · ${n} ${n===1?'obra':'obras'}`,semLoc:false,mun:id});
+  }
   for(const id of allIds) for(const o of obrasOf(id)){
     const mun=o.municipioTxt||((DB.municipios[id]||{}).nome)||'', obj=o.objeto||'';
     const cod=glNorm((o.codigo_obra||'')+' '+(o.contrato||'')), m=glNorm(mun), tudo=cod+' '+m+' '+glNorm(obj);
@@ -3290,6 +3293,7 @@ function glBuscaObras(q){
   return res.sort((a,b)=>a.peso-b.peso).slice(0,8);
 }
 function glEscolheObra(it){
+  if(it.mun!=null){ goCity(it.mun); return; }
   const o=it.obra; if(!o||!glCtl) return;
   if(!(st.level===3&&st.city===o.munId)) goCity(o.munId); // abre o município da obra; o mapa enquadra os pontos dele
   if(it.semLoc){ glCtl.avisar('Esta obra ainda não tem localização no mapa; abri o município dela.'); return; }
@@ -3333,6 +3337,7 @@ function glSync(usa){
   }
   const entrou=!_glOn;
   if(entrou){ tip.remove(); glCtl.mostrar(); _glOn=true; }
+  glCtl.definirCores(TOKENS.ng,BASE); // a troca de tema re-deriva as duas (repaintTheme)
   const ids=ruasIds(), obras=ids.flatMap(id=>obrasOf(id));
   const sig=st.level+'|'+(st.level===2?st.group:st.city)+'|'+obras.map(o=>o.id_obra+(o.loc?':'+o.loc.lat+','+o.loc.lng:'')).join(';');
   if(sig!==_glSig||!_ruasResumo){

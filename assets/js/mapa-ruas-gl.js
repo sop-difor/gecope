@@ -28,6 +28,8 @@ const ESTILO='https://tiles.openfreemap.org/styles/liberty';
 const ESRI_TILES='https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=';
 const ESRI_ATTR='Imagens © Esri, Vantor, Earthstar Geographics e a comunidade GIS';
 const SAT_ERROS_MAX=3; // tiles do satélite que falham sem nenhum ter chegado: chave inválida ou serviço fora
+const VEC_ERROS_MAX=6; // idem para os tiles vetoriais do mapa: sem nenhum, o mapa ficaria em branco e o Leaflet assume
+const CONTEXTO_PERDIDO_MS=4000; // contexto WebGL que não volta neste prazo: o Leaflet assume
 const PREF_BASE='gecope_mapa_base';
 const CELULA_PX=38;        // pontos a menos disto na tela viram um pino com a contagem (nível distrito)
 const TIMEOUT_MS=15000;    // estilo que não chega neste prazo = falha, e o Leaflet assume
@@ -98,6 +100,7 @@ function criar(host,cfg){
   map.touchZoomRotate.disableRotation();
 
   const temSat=!!cfg.chaveEsri;
+  let vecErros=0, vecOk=false, perdidoT=null;
   let satErros=0, satOk=false, satFora=false; // satFora: o satélite não respondeu e foi desativado nesta sessão
   let base=temSat?lerBase():'mapa', pronto=false, visivel=false, carregou=false, tres=false, aviso=null, avisoT=null;
   let spec=null, marcadores=[], fc={type:'FeatureCollection',features:[]};
@@ -112,8 +115,15 @@ function criar(host,cfg){
     // erro de tile ou de fonte não derruba o mapa; só o estilo que nem veio
     if(!carregou&&e&&!e.sourceId&&!e.tile) falhar((e.error&&e.error.message)||'erro no estilo');
     if(e&&e.sourceId==='gc-satelite'&&!satOk&&!satFora&&++satErros>=SAT_ERROS_MAX) satIndisponivel();
+    if(e&&e.sourceId==='openmaptiles'&&!vecOk&&++vecErros>=VEC_ERROS_MAX) falhar('tiles do mapa não chegam');
   });
-  map.on('data',e=>{ if(e.dataType==='source'&&e.sourceId==='gc-satelite'&&e.tile) satOk=true; });
+  map.on('data',e=>{
+    if(e.dataType!=='source'||!e.tile) return;
+    if(e.sourceId==='gc-satelite') satOk=true; else if(e.sourceId==='openmaptiles') vecOk=true;
+  });
+  const cv=map.getCanvas();
+  cv.addEventListener('webglcontextlost',()=>{ clearTimeout(perdidoT); perdidoT=setTimeout(()=>falhar('contexto WebGL perdido'),CONTEXTO_PERDIDO_MS); });
+  cv.addEventListener('webglcontextrestored',()=>clearTimeout(perdidoT));
   // com o satélite ligado o desenho do mapa fica apagado: se a imagem não chega, volta ao mapa em vez de ficar em branco
   function satIndisponivel(){
     satFora=true;
@@ -174,13 +184,15 @@ function criar(host,cfg){
     const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),10000);
     try{
       const c=cfg.caixa||{latMin:-7.95,latMax:-2.70,lngMin:-41.50,lngMax:-37.20};
-      const url=NOMINATIM+'?format=jsonv2&limit=6&countrycodes=br&bounded=1&accept-language=pt-BR&viewbox='
+      const url=NOMINATIM+'?format=jsonv2&limit=6&countrycodes=br&bounded=1&addressdetails=1&accept-language=pt-BR&viewbox='
         +[c.lngMin,c.latMax,c.lngMax,c.latMin].join(',')+'&q='+encodeURIComponent(q);
       const r=await fetch(url,{signal:ctl.signal});
       if(!r.ok) throw new Error('HTTP '+r.status);
       const js=await r.json();
       if(buscaInp.value.trim()!==q) return; // o usuário já mudou o texto
-      const rows=(Array.isArray(js)?js:[]).filter(x=>isFinite(+x.lat)&&isFinite(+x.lon)).map(x=>({tipo:'lugar',
+      // a caixa do Ceará é retangular e pega trechos de RN, PB, PE e PI: o resultado precisa ser do estado
+      const doCeara=x=>!x.address||x.address['ISO3166-2-lvl4']==='BR-CE'||x.address.state==='Ceará';
+      const rows=(Array.isArray(js)?js:[]).filter(x=>isFinite(+x.lat)&&isFinite(+x.lon)&&doCeara(x)).map(x=>({tipo:'lugar',
         titulo:x.name||String(x.display_name||'').split(',')[0],sub:x.display_name,ref:{lat:+x.lat,lng:+x.lon,nome:x.display_name,bbox:x.boundingbox}}));
       mostraLista(rows.length?rows:[{tipo:'msg',titulo:'Nenhum lugar encontrado no Ceará.'}]);
     }catch(e){
@@ -381,6 +393,13 @@ function criar(host,cfg){
     if(!pronto) return;
     const s=map.getSource('gc-contorno'); if(s) s.setData(fc);
   }
+  // as cores vêm dos tokens do tema e mudam na troca claro/escuro: quem chama repassa a cada render
+  function definirCores(linha,preench){
+    if(linha===cfg.corLinha&&preench===cfg.corPreench) return;
+    cfg.corLinha=linha; cfg.corPreench=preench;
+    if(!pronto) return;
+    map.setPaintProperty('gc-contorno-line','line-color',linha); map.setPaintProperty('gc-contorno-fill','fill-color',preench);
+  }
   function definirContornos(f){ fc=f||{type:'FeatureCollection',features:[]}; aplicaContorno(); }
 
   // ---- pinos ----
@@ -461,7 +480,7 @@ function criar(host,cfg){
   }
   function ocultar(){ reset3D(); visivel=false; el.classList.remove('on'); limpaPinos(); limpaLugar(); fechaLista(); }
   function redimensionar(){ if(visivel) map.resize(); }
-  function destruir(){ clearTimeout(prazo); escondeAviso(); limpaPinos(); limpaLugar(); map.remove(); el.remove(); }
+  function destruir(){ clearTimeout(prazo); clearTimeout(perdidoT); escondeAviso(); limpaPinos(); limpaLugar(); map.remove(); el.remove(); }
 
   // ---- estilo carregado: camadas próprias ----
   map.once('load',()=>{
@@ -492,7 +511,7 @@ function criar(host,cfg){
     }catch(e){ falhar((e&&e.message)||'erro ao montar as camadas'); }
   });
 
-  return {el,mapa:map,irPara,avisar:mostraAviso,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
+  return {el,mapa:map,definirCores,irPara,avisar:mostraAviso,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
 }
 
 window.MapaRuasGL={suportado,carregar,criar};

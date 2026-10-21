@@ -20,14 +20,14 @@ pelo MapLibre GL.
   estilo, zoom 14+): no interior do Ceará há pouco cadastro. O 3D nunca fica lembrado.
 - **Satélite** (Esri World Imagery) é uma alternativa ao Mapa, sem 3D (a imagem sobre o relevo SRTM ondula nas cidades).
   A escolha Mapa/Satélite fica em `localStorage` `gecope_mapa_base`.
-- **Busca**: digitar lista as obras que passam pelos filtros (contrato, código, município, objeto); obras sem ponto no
-  mapa vão por último e abrem só o município. O endereço só vai ao Nominatim (restrito ao Ceará, no máximo 1 consulta
+- **Busca**: digitar lista o município (se o nome casar) e as obras que passam pelos filtros (contrato, código, município, objeto); obras sem ponto no
+  mapa vão por último e abrem só o município. O endereço só vai ao Nominatim (restrito ao Ceará pela caixa do estado e pelo filtro `BR-CE` do resultado, no máximo 1 consulta
   por segundo, sem autocomplete) pelo Enter sem obra correspondente ou pela última linha da lista.
 - **Como chegar**: link do Google Maps (mesmo destino do botão "Rota" da Ficha) no tooltip do pino único e no popup de
   obras no mesmo ponto. No celular, sem hover, o caminho é o botão "Rota" da Ficha.
 - **Minha posição**: botão de geolocalização (o iframe do módulo já libera `geolocation`).
-- **Queda automática para o Leaflet**: sem WebGL2, script do MapLibre que não chega ou estilo que não carrega o
-  mapa de hoje assume, sem erro. No nível Estado o Leaflet sempre desenha.
+- **Queda automática para o Leaflet**: sem WebGL2, script do MapLibre que não chega, estilo que não carrega, tiles do
+  mapa que não chegam (6 erros sem nenhum tile) ou contexto WebGL perdido por mais de 4 s: o mapa de hoje assume, sem erro. No nível Estado o Leaflet sempre desenha.
 - **Mapa claro nos dois temas.** O mapa de ruas antigo escurecia os tiles por filtro no tema escuro; o novo não.
   Só controles e popups seguem o tema (decisão confirmada em 21/10/2026).
 

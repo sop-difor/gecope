@@ -2387,7 +2387,6 @@ body.modo-gl .ruas-btn.on{background:rgba(var(--panel-rgb),.96);border-color:rgb
   padding:12px 28px 12px 14px;font-family:Montserrat,sans-serif;box-shadow:0 10px 28px rgba(var(--shadow-rgb),.4)}
 .gc-gl .ruas-popup .maplibregl-popup-close-button{color:var(--text-dim);font-size:18px;padding:2px 8px}
 .gc-gl .ruas-popup .maplibregl-popup-close-button:hover{background:transparent;color:var(--text-brightest)}
-.gc-gl .ruas-tip{pointer-events:none}
 .gc-gl .ruas-tip .maplibregl-popup-content{background:var(--bg-panel);color:var(--text-bright);border:1px solid rgba(var(--ng-rgb),.3);border-radius:6px;
   padding:6px 10px;font-family:Montserrat,sans-serif;font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
 .gc-gl .ruas-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
