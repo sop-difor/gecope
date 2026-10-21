@@ -2318,6 +2318,88 @@ body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet
 .ruas-pop-i b{color:var(--text-brightest);font-weight:700}
 .ruas-pop-i span{color:var(--text-dim);font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
+/* ---- mapa de ruas em MapLibre (assets/js/mapa-ruas-gl.js) ----
+   Mora dentro do #map do Leaflet: acima dos painéis dele (z 400) e abaixo dos controles (z 1000), assim o botão
+   "Ruas e rotas" continua à mão. O mapa é claro nos dois temas; só os controles e popups seguem o tema. */
+.leaflet-container .gc-gl{position:absolute;inset:0;z-index:500;display:none;background:var(--map-field)}
+.leaflet-container .gc-gl.on{display:block}
+body.modo-gl .leaflet-control-zoom,body.modo-gl .leaflet-control-attribution{display:none!important}
+/* o botão "Painel" do Leaflet ocupa o canto superior direito do mapa: os controles descem abaixo dele */
+.gc-gl .maplibregl-ctrl-top-right{top:52px}
+/* sobre o satélite (escuro) o botão translúcido perderia o contraste */
+body.modo-gl .ruas-btn.on{background:rgba(var(--panel-rgb),.96);border-color:rgba(var(--ng-rgb),.6)}
+.gc-gl .maplibregl-ctrl-group{background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);border:1px solid rgba(var(--raise-rgb),.12);
+  border-radius:11px;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);overflow:hidden}
+.gc-gl .maplibregl-ctrl-group button+button{border-top:1px solid var(--card-border)}
+.gc-gl .maplibregl-ctrl-group button:not(:disabled):hover{background:rgba(var(--ng-rgb),.1)}
+.gc-gl .maplibregl-ctrl-group button:focus-visible{outline:2px solid var(--ng);outline-offset:-2px;box-shadow:none}
+.theme-dark .gc-gl .maplibregl-ctrl-icon{filter:invert(1)}
+.gc-gl .gc-gl-base{display:flex}
+.gc-gl .gc-gl-base button{width:auto;height:34px;padding:0 13px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600;color:var(--text-base)}
+.gc-gl .gc-gl-base button+button{border-top:0;border-left:1px solid var(--card-border)}
+.gc-gl .gc-gl-base button.on{background:rgba(var(--ng-rgb),.16);color:var(--text-brightest)}
+/* botão 3D, bússola (só no 3D) e aviso do OpenStreetMap */
+.gc-gl .gc-gl-3d button{width:auto;height:34px;padding:0 13px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:700;color:var(--text-base)}
+.gc-gl .gc-gl-3d button.on{background:rgba(var(--ng-rgb),.16);color:var(--text-brightest)}
+.gc-gl .gc-gl-3d button:disabled{opacity:.5}
+.gc-gl:not(.gc-3d) .maplibregl-ctrl-compass{display:none}
+.gc-gl .gc-gl-aviso{position:absolute;left:0;right:0;bottom:52px;margin:0 auto;width:fit-content;z-index:2;max-width:min(520px,calc(100% - 32px));padding:8px 14px;background:rgba(var(--panel-rgb),.96);border:1px solid rgba(var(--raise-rgb),.12);border-radius:10px;color:var(--text-base);font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;line-height:1.4;text-align:center;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);pointer-events:none}
+/* busca (canto superior esquerdo, abaixo do botão Filtros), link "Como chegar" e marcador de endereço */
+.gc-gl .maplibregl-ctrl-top-left{top:52px;z-index:3} /* acima dos controles da direita: a lista da busca passa por cima deles */
+.gc-gl .gc-gl-busca{position:relative;width:min(340px,calc(100vw - 32px))}
+.gc-gl .gc-gl-busca input{width:100%;height:34px;box-sizing:border-box;padding:0 12px 0 34px;background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);
+  border:1px solid rgba(var(--raise-rgb),.12);border-radius:11px;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);color:var(--text-base);
+  font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600}
+.gc-gl .gc-gl-busca input::placeholder{color:var(--text-dim);font-weight:500}
+.gc-gl .gc-gl-busca input:focus-visible{outline:2px solid var(--ng);outline-offset:1px}
+.gc-gl .gc-busca-lupa{position:absolute;left:11px;top:9px;display:flex;color:var(--ng-light);pointer-events:none;z-index:1}
+.theme-dark .gc-gl .gc-gl-busca input::-webkit-search-cancel-button{filter:invert(1) brightness(1.6)}
+.gc-gl .gc-busca-lista{position:absolute;top:40px;left:0;right:0;max-height:min(340px,50vh);overflow:auto;padding:4px;background:var(--bg-modal);
+  border:1px solid var(--card-border);border-radius:12px;box-shadow:0 10px 28px rgba(var(--shadow-rgb),.4)}
+.gc-gl .gc-busca-lista[hidden]{display:none}
+.gc-gl .gc-busca-i{display:flex;flex-direction:column;gap:2px;width:100%;padding:8px 10px;text-align:left;cursor:pointer;background:transparent;border:0;
+  border-radius:8px;color:var(--text-base);font-family:Montserrat,sans-serif;font-size:12px}
+.gc-gl .gc-busca-i:hover,.gc-gl .gc-busca-i.sel{background:rgba(var(--ng-rgb),.14)}
+.gc-gl .gc-busca-i b{color:var(--text-brightest);font-weight:700}
+.gc-gl .gc-busca-i span{color:var(--text-dim);font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gc-gl .gc-busca-i em{font-style:normal;font-weight:600;color:var(--text-label)}
+.gc-gl .gc-busca-i.acao{margin-top:4px;border-top:1px solid var(--card-border);border-radius:0 0 8px 8px}
+.gc-gl .gc-busca-i.msg{cursor:default;color:var(--text-dim)}
+.gc-gl .ruas-rota{display:inline-block;margin-top:6px;color:var(--ng-light);font-weight:700;text-decoration:none}
+.gc-gl .ruas-rota:hover,.gc-gl .ruas-rota:focus-visible{text-decoration:underline}
+.gc-gl .ruas-tip:not(.com-rota) .maplibregl-popup-content{pointer-events:none}
+.gc-gl .ruas-tip.com-rota{pointer-events:auto}
+.gc-gl-lugar{width:18px;height:18px;border-radius:50%;background:var(--ng);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer}
+/* celular: a busca ocupa a linha inteira e os controles descem abaixo dela */
+@media (max-width:600px){
+  .gc-gl .maplibregl-ctrl-top-left{right:0}
+  .gc-gl .gc-gl-busca{width:calc(100vw - 20px)}
+  .gc-gl .maplibregl-ctrl-top-right{top:96px}
+  .gc-gl .gc-gl-base button,.gc-gl .gc-gl-3d button{padding:0 10px}
+  .gc-gl .gc-gl-aviso{bottom:56px;font-size:12px}
+}
+.gc-gl .maplibregl-ctrl-attrib{background:rgba(var(--panel-rgb),.9);font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-muted)}
+.gc-gl .maplibregl-ctrl-attrib a{color:var(--ng-light)}
+.maplibregl-marker.ruas-pin{cursor:pointer}
+.maplibregl-marker.ruas-pin:hover svg,.maplibregl-marker.ruas-pin:focus-visible svg{transform:scale(1.14);filter:drop-shadow(0 0 3px rgba(var(--ng-rgb),.75)) drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.maplibregl-marker.ruas-pin:focus-visible{outline:none}
+.gc-gl .ruas-popup .maplibregl-popup-content{background:var(--bg-modal);color:var(--text-base);border:1px solid var(--card-border);border-radius:12px;
+  padding:12px 28px 12px 14px;font-family:Montserrat,sans-serif;box-shadow:0 10px 28px rgba(var(--shadow-rgb),.4)}
+.gc-gl .ruas-popup .maplibregl-popup-close-button{color:var(--text-dim);font-size:18px;padding:2px 8px}
+.gc-gl .ruas-popup .maplibregl-popup-close-button:hover{background:transparent;color:var(--text-brightest)}
+.gc-gl .ruas-tip .maplibregl-popup-content{background:var(--bg-panel);color:var(--text-bright);border:1px solid rgba(var(--ng-rgb),.3);border-radius:6px;
+  padding:6px 10px;font-family:Montserrat,sans-serif;font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:var(--bg-modal)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,.gc-gl .ruas-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.gc-gl .ruas-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--bg-modal)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--bg-modal)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--bg-modal)}
+.gc-gl .ruas-tip.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.gc-gl .ruas-tip.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.gc-gl .ruas-tip.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:var(--bg-panel)}
+.gc-gl .ruas-tip.maplibregl-popup-anchor-top .maplibregl-popup-tip,.gc-gl .ruas-tip.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.gc-gl .ruas-tip.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--bg-panel)}
+
 /* painel lateral, nível município com o mapa de ruas ligado */
 .ruas-resumo{margin-top:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:var(--card-bg-2);
   border:1px solid var(--card-border);border-radius:10px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:500;color:var(--text-base)}

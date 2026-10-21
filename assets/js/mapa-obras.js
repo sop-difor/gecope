@@ -3136,14 +3136,15 @@ function ruasClasseGrupo(g){ // cor do pino: a situação mais urgente entre as 
   if(!ativas.length) return 'hist';
   return 's-'+ativas.map(o=>o.stBucket).sort((a,b)=>(RUAS_PRIO[a]??9)-(RUAS_PRIO[b]??9))[0];
 }
-function ruasPopupGrupo(g){ // DOM, não innerHTML: o texto vem do banco
+function ruasPopupGrupo(g,fechar){ // DOM, não innerHTML: o texto vem do banco
+  fechar=fechar||(()=>map.closePopup()); // o mapa em MapLibre passa o próprio fechar
   const box=document.createElement('div'); box.className='ruas-pop';
   const h=document.createElement('div'); h.className='ruas-pop-h'; h.textContent=`${g.obras.length} obras neste ponto`; box.appendChild(h);
   for(const o of g.obras){
     const b=document.createElement('button'); b.type='button'; b.className='ruas-pop-i';
     const c=document.createElement('b'); c.textContent=o.codigo_obra||('#'+o.id_obra);
     const t=document.createElement('span'); t.textContent=o.objeto;
-    b.append(c,t); b.addEventListener('click',()=>{ map.closePopup(); openModal(o); });
+    b.append(c,t); b.addEventListener('click',()=>{ fechar(); openModal(o); });
     box.appendChild(b);
   }
   return box;
@@ -3155,15 +3156,18 @@ const RUAS_CELULA_PX=38;
 // Pino fino em gota (SVG): cabeça pequena e haste estreita; a PONTA fica exatamente sobre a coordenada da obra.
 // A cor é a da situação (CSS por classe) e a cabeça traz a contagem quando o pino reúne várias obras.
 // O viewBox tem o tamanho real em px (a fonte da contagem fica em 12px). iconAnchor na ponta.
-function ruasPinIcon(cls,n){
+function ruasPinSvg(n){ // {html,w,h}: o mesmo desenho serve ao pino do Leaflet e ao do MapLibre
   const multi=n>1;
   // single: cabeça r=8 em (10,9), ponta em (10,29.5); multi: cabeça r=13 em (16,15), ponta em (16,41)
   const w=multi?32:20, h=multi?42:30;
   const forma=multi
     ? '<path class="pin-body" d="M16 41L12 27.4A13 13 0 1 1 20 27.4Z"/><text x="16" y="19.3" text-anchor="middle">'+n+'</text>'
     : '<path class="pin-body" d="M10 29.5L6.8 16.3A8 8 0 1 1 13.2 16.3Z"/><circle class="pin-dot" cx="10" cy="9" r="2.8"/>';
-  return L.divIcon({className:'ruas-pin '+cls+(multi?' multi':''),
-    html:'<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" aria-hidden="true" focusable="false">'+forma+'</svg>',
+  return {w,h,html:'<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" aria-hidden="true" focusable="false">'+forma+'</svg>'};
+}
+function ruasPinIcon(cls,n){
+  const {w,h,html}=ruasPinSvg(n), multi=n>1;
+  return L.divIcon({className:'ruas-pin '+cls+(multi?' multi':''),html,
     iconSize:[w,h],iconAnchor:[w/2,h],popupAnchor:[0,-h+6],tooltipAnchor:[0,-h+8]});
 }
 function ruasAglomera(grupos){
@@ -3233,23 +3237,139 @@ function saiRuas(){
   map.setMaxZoom(11);
   refit(); // o zoom pode ter passado de 11 com o mapa de ruas: volta ao enquadramento do nível
 }
+// ---- mapa de ruas em MapLibre (E1 do mapa 3D) ----
+// Nos níveis distrito e município o modo ruas é desenhado pelo MapLibre (assets/js/mapa-ruas-gl.js), carregado
+// só no primeiro clique. O Leaflet segue por baixo, intacto, e assume sozinho no nível Estado e sempre que o
+// MapLibre não existir: sem WebGL2, script que não chega ou estilo que não carrega (GLST='falhou').
+let GLST='nao'; // 'nao' | 'carregando' | 'ok' | 'falhou'
+let glCtl=null, _glOn=false, _glSig='', _glNav='';
+function glIniciar(){
+  if(GLST!=='nao') return;
+  if(!window.MapaRuasGL||!MapaRuasGL.suportado()){ GLST='falhou'; return; }
+  GLST='carregando';
+  MapaRuasGL.carregar().then(()=>{
+    glCtl=MapaRuasGL.criar(map.getContainer(),{corLinha:TOKENS.ng,corPreench:BASE,chaveEsri:window.ESRI_API_KEY||'',aoFalhar:glFalhou,
+      buscar:glBuscaObras,aoEscolher:glEscolheObra,caixa:LOC_CE,rotaUrl:glRotaUrl});
+    // o painel do MapLibre fica dentro do contêiner do Leaflet: sem isto, arrastar e rolar moveriam o mapa escondido
+    L.DomEvent.disableClickPropagation(glCtl.el); L.DomEvent.disableScrollPropagation(glCtl.el);
+    GLST='ok';
+  }).catch(e=>{ console.warn('Mapa de ruas em MapLibre indisponível; usando o mapa de contornos:',(e&&e.message)||e); GLST='falhou'; })
+    .then(()=>render());
+}
+function glFalhou(motivo){
+  console.warn('Mapa de ruas em MapLibre falhou; usando o mapa de contornos:',motivo);
+  GLST='falhou'; _glOn=false; _glSig=''; _glNav=''; _ruasResumo=null;
+  const c=glCtl; glCtl=null;
+  if(c) setTimeout(()=>{ try{ c.destruir(); }catch(_){} },0);
+  render();
+}
+function glContornos(ids){
+  const set=new Set(ids.map(String));
+  return {type:'FeatureCollection',features:GEO.features.filter(f=>set.has(String(f.properties.id)))};
+}
+// mesmo destino do botão "Rota" da Ficha (locRotaHtml): o Google Maps abre a rota a partir de onde o usuário está
+const glRotaUrl=(lat,lng)=>`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+function glLinkRota(lat,lng){
+  const a=document.createElement('a'); a.className='ruas-rota'; a.href=glRotaUrl(lat,lng); a.target='_blank'; a.rel='noopener';
+  a.textContent='Como chegar'; return a;
+}
+// busca do mapa: as obras que passam pelos filtros (as mesmas do mapa), por contrato, código, município ou objeto
+const glNorm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function glBuscaObras(q){
+  const tk=glNorm(q).split(/\s+/).filter(Boolean); if(!tk.length) return [];
+  const res=[];
+  for(const id of allIds){ // o município em si, para "Sobral" abrir Sobral e não a primeira obra de lá
+    const m=DB.municipios[id], n=m?obrasOf(id).length:0, nome=m&&m.nome;
+    if(n&&nome&&tk.every(t=>glNorm(nome).includes(t))) res.push({peso:-1,titulo:nome,sub:`Município · ${n} ${n===1?'obra':'obras'}`,semLoc:false,mun:id});
+  }
+  for(const id of allIds) for(const o of obrasOf(id)){
+    const mun=o.municipioTxt||((DB.municipios[id]||{}).nome)||'', obj=o.objeto||'';
+    const cod=glNorm((o.codigo_obra||'')+' '+(o.contrato||'')), m=glNorm(mun), tudo=cod+' '+m+' '+glNorm(obj);
+    if(!tk.every(t=>tudo.includes(t))) continue;
+    const s=o.loc?locStatus(o):null, loc=!!(s&&s.ok);
+    const peso=(tk.some(t=>cod.startsWith(t))?0:tk.some(t=>cod.includes(t))?1:tk.some(t=>m.includes(t))?2:3)+(loc?0:10); // com ponto no mapa primeiro
+    res.push({peso,titulo:o.codigo_obra||String(o.contrato||('#'+o.id_obra)),sub:(mun?mun+' · ':'')+(obj.length>80?obj.slice(0,77)+'…':obj),semLoc:!loc,obra:o});
+  }
+  return res.sort((a,b)=>a.peso-b.peso).slice(0,8);
+}
+function glEscolheObra(it){
+  if(it.mun!=null){ goCity(it.mun); return; }
+  const o=it.obra; if(!o||!glCtl) return;
+  if(!(st.level===3&&st.city===o.munId)) goCity(o.munId); // abre o município da obra; o mapa enquadra os pontos dele
+  if(it.semLoc){ glCtl.avisar('Esta obra ainda não tem localização no mapa; abri o município dela.'); return; }
+  glCtl.irPara(o.loc.lng,o.loc.lat,17);
+}
+// modelo de um pino para o MapLibre: gs = grupos de obras que cabem no mesmo pino (vários = aglomerado)
+function glModeloPino(gs){
+  const obras=gs.flatMap(g=>g.obras), n=obras.length, sv=ruasPinSvg(n);
+  const m={n,cls:ruasClasseGrupo({obras}),svg:sv.html,h:sv.h};
+  if(gs.length>1){
+    const la=gs.map(g=>g.lat), ln=gs.map(g=>g.lng), s=Math.min(...la), nn=Math.max(...la), w=Math.min(...ln), e=Math.max(...ln);
+    return {...m,lat:(s+nn)/2,lng:(w+e)/2,bounds:[[w,s],[e,nn]],titulo:`${n} obras nesta área`,
+      tip:escHtml(`${n} obras nesta área — clique para aproximar`),popup:fechar=>ruasPopupGrupo({obras},fechar)};
+  }
+  const g=gs[0];
+  if(n>1) return {...m,lat:g.lat,lng:g.lng,titulo:`${n} obras neste ponto`,
+    tip:escHtml(`${n} obras neste ponto — clique para ver`),
+    popup:fechar=>{ const nd=ruasPopupGrupo(g,fechar); nd.insertBefore(glLinkRota(g.lat,g.lng),nd.children[1]||null); return nd; }};
+  const o=obras[0];
+  return {...m,lat:g.lat,lng:g.lng,titulo:o.codigo_obra||('#'+o.id_obra),abrir:()=>openModal(o),rota:true,
+    tip:`<b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><br>${escHtml(o.objeto.length>110?o.objeto.slice(0,107)+'…':o.objeto)}<br>${st.level===2&&o.municipioTxt?escHtml(o.municipioTxt)+' · ':''}${escHtml(o.statusObra)}<br><a class="ruas-rota" href="${glRotaUrl(g.lat,g.lng)}" target="_blank" rel="noopener">Como chegar</a>`};
+}
+// mesmo enquadramento do Leaflet: município com pontos = os pontos; sem pontos, ou distrito = o contorno
+function glFit(){
+  const pts=_ruasResumo?_ruasResumo.grupos:[];
+  let b, maxZoom;
+  if(st.level===3&&pts.length){
+    const la=pts.map(g=>g.lat), ln=pts.map(g=>g.lng);
+    b=[[Math.min(...ln),Math.min(...la)],[Math.max(...ln),Math.max(...la)]]; maxZoom=pts.length===1?16:17;
+  } else {
+    const lb=boundsOfIds(ruasIds());
+    b=lb?[[lb.getWest(),lb.getSouth()],[lb.getEast(),lb.getNorth()]]:null; maxZoom=st.level===3?13:18;
+  }
+  glCtl.ajustar(b,{maxZoom,padding:{top:60,bottom:60,right:60,left:60+ctrlOverlayWidth()}});
+}
+function glSync(usa){
+  if(!glCtl) return;
+  if(!usa){
+    if(_glOn){ glCtl.ocultar(); _glOn=false; _glSig=''; _glNav=''; _ruasResumo=null; refit(true); } // o Leaflet volta ao enquadramento do nível
+    return;
+  }
+  const entrou=!_glOn;
+  if(entrou){ tip.remove(); glCtl.mostrar(); _glOn=true; }
+  glCtl.definirCores(TOKENS.ng,BASE); // a troca de tema re-deriva as duas (repaintTheme)
+  const ids=ruasIds(), obras=ids.flatMap(id=>obrasOf(id));
+  const sig=st.level+'|'+(st.level===2?st.group:st.city)+'|'+obras.map(o=>o.id_obra+(o.loc?':'+o.loc.lat+','+o.loc.lng:'')).join(';');
+  if(sig!==_glSig||!_ruasResumo){
+    _glSig=sig; _ruasResumo=ruasClassifica(ids); // o painel lateral lê este resumo
+    glCtl.definirContornos(glContornos(ids));
+    glCtl.definirPinos({grupos:_ruasResumo.grupos,agrupar:st.level===2,fabrica:glModeloPino});
+  }
+  const nav=st.level+'|'+(st.level===2?st.group:st.city);
+  if(entrou||nav!==_glNav){ _glNav=nav; glFit(); }
+}
 // chamada por render(): liga/desliga o modo e mantém os marcadores em dia com filtros e cadastro
 function syncRuas(){
   const on=ruasAtivo();
+  if(on&&st.level>=2&&GLST==='nao') glIniciar(); // pode virar 'falhou' na hora (sem WebGL2)
+  const gl=on&&st.level>=2&&GLST!=='falhou';     // distrito/município: quem desenha é o MapLibre
+  const usaGL=gl&&GLST==='ok', leafOn=on&&!gl;   // Estado, ou sem MapLibre: Leaflet com os tiles do OSM
   if(ruasBtn){
     ruasBtn.hidden=modoReplan();
     ruasBtn.classList.toggle('on',on); ruasBtn.setAttribute('aria-pressed',String(on));
-    ruasBtn.querySelector('span').textContent=on?'Ocultar ruas e rotas':'Ruas e rotas';
+    ruasBtn.querySelector('span').textContent=!on?'Ruas e rotas':(gl&&GLST==='carregando'?'Carregando mapa…':'Ocultar ruas e rotas');
   }
   document.body.classList.toggle('modo-ruas',on);
+  document.body.classList.toggle('modo-gl',usaGL);
   document.body.dataset.ruasNivel=on?String(st.level):''; // o CSS esconde os rótulos só no município
-  const mudou=on!==_ruasOn; _ruasOn=on;
-  if(mudou&&on) entraRuas();
-  if(on){
+  const mudou=leafOn!==_ruasOn; _ruasOn=leafOn;
+  if(mudou&&leafOn) entraRuas();
+  if(leafOn){
     if(st.level>=2){ desenhaMarcadoresRuas(); if(mudou&&st.level===3) fitRuas(); } // pinos com distrito ou município aberto
     else limpaMarcadoresRuas();
   }
   else if(mudou) saiRuas();
+  glSync(usaGL);
 }
 // bloco do painel lateral (nível município com o modo ligado)
 function ruasPainelHtml(){
@@ -3473,7 +3593,7 @@ function locAtualizaTela(o,msg,tipo){
   const c=document.getElementById('locCardCorpo'); if(c){ c.innerHTML=locCorpoHtml(o); wireLocalizacao(o); }
   const rp=document.getElementById('locRotaSlot'); if(rp) rp.innerHTML=locRotaHtml(o);
   if(msg) locCardMsg(msg,tipo);
-  _ruasSig=''; if(ruasAtivo()) render(); // marcadores e contagens do painel
+  _ruasSig=''; _glSig=''; if(ruasAtivo()) render(); // marcadores e contagens do painel
 }
 async function salvaLocalizacao(o){
   const s=_locMini&&_locMini.sel; if(!s) return;
@@ -7396,7 +7516,7 @@ map.on('zoomend',()=>{ layer.setStyle(styleFeature);
     if(_hoverGroupLayer && st.hoverGroup!=null) _hoverGroupLayer.setStyle(groupHover()); }
   updateLabelsSoon(); });
 map.on('moveend',updateLabelsSoon);
-map.on('zoomend',()=>{ if(ruasAtivo()&&st.level===2) desenhaMarcadoresRuas(); }); // o agrupamento dos pinos depende do zoom
+map.on('zoomend',()=>{ if(_ruasOn&&st.level===2) desenhaMarcadoresRuas(); }); // o agrupamento dos pinos depende do zoom
 // clicar em espaço vazio do mapa (fora de qualquer distrito/região/município)
 // limpa a seleção combinada — caminho alternativo ao Esc que funciona igual
 // dentro e fora de tela cheia, sem depender do navegador (ver histórico de
@@ -7473,6 +7593,7 @@ function refit(instant){ if(st.level>=3) fitCity(instant); else if(st.level===2)
 let _ensureSz='';
 function ensureSize(){
   map.invalidateSize(false);
+  if(glCtl) glCtl.redimensionar();
   const z=map.getSize(), k=z.x+'x'+z.y;
   if(k===_ensureSz) return;
   _ensureSz=k; refit(true);
