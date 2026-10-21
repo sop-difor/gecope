@@ -2953,7 +2953,11 @@ async function executarAcaoDetalhes(actionType) {
                     NUP_PROCESSO: processoNome,
                     NOME_OBRA: registroOriginal.descricao,
                     NOVO_STATUS: updates.status,
-                    NOME_FISCAL: registroOriginal.fiscal || 'Fiscal',
+                    // Matrícula primeiro: casar o fiscal só pelo nome falhava quando o acento diferia
+                    // entre processos.fiscal e app_users (JOSE×JOSÉ, TULIO×TÚLIO). E o destinatário é o
+                    // fiscal que ficou no formulário, não o anterior, se ele foi trocado no mesmo salvamento.
+                    MATRICULA_FISCAL: updates.fiscal_matricula || registroOriginal.fiscalMatricula || null,
+                    NOME_FISCAL: updates.fiscal || registroOriginal.fiscal || 'Fiscal',
                     DATA_META: metaFormatada
                 });
             }
