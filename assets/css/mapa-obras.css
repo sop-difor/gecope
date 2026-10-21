@@ -2318,6 +2318,49 @@ body.modo-ruas .leaflet-container .leaflet-control-attribution,.loc-mapa.leaflet
 .ruas-pop-i b{color:var(--text-brightest);font-weight:700}
 .ruas-pop-i span{color:var(--text-dim);font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
+/* ---- mapa de ruas em MapLibre (assets/js/mapa-ruas-gl.js) ----
+   Mora dentro do #map do Leaflet: acima dos painéis dele (z 400) e abaixo dos controles (z 1000), assim o botão
+   "Ruas e rotas" continua à mão. O mapa é claro nos dois temas; só os controles e popups seguem o tema. */
+.leaflet-container .gc-gl{position:absolute;inset:0;z-index:500;display:none;background:var(--map-field)}
+.leaflet-container .gc-gl.on{display:block}
+body.modo-gl .leaflet-control-zoom,body.modo-gl .leaflet-control-attribution{display:none!important}
+/* o botão "Painel" do Leaflet ocupa o canto superior direito do mapa: os controles descem abaixo dele */
+.gc-gl .maplibregl-ctrl-top-right{top:52px}
+/* sobre o satélite (escuro) o botão translúcido perderia o contraste */
+body.modo-gl .ruas-btn.on{background:rgba(var(--panel-rgb),.96);border-color:rgba(var(--ng-rgb),.6)}
+.gc-gl .maplibregl-ctrl-group{background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);border:1px solid rgba(var(--raise-rgb),.12);
+  border-radius:11px;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);overflow:hidden}
+.gc-gl .maplibregl-ctrl-group button+button{border-top:1px solid var(--card-border)}
+.gc-gl .maplibregl-ctrl-group button:not(:disabled):hover{background:rgba(var(--ng-rgb),.1)}
+.gc-gl .maplibregl-ctrl-group button:focus-visible{outline:2px solid var(--ng);outline-offset:-2px;box-shadow:none}
+.theme-dark .gc-gl .maplibregl-ctrl-icon{filter:invert(1)}
+.gc-gl .gc-gl-base{display:flex}
+.gc-gl .gc-gl-base button{width:auto;height:34px;padding:0 13px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:600;color:var(--text-base)}
+.gc-gl .gc-gl-base button+button{border-top:0;border-left:1px solid var(--card-border)}
+.gc-gl .gc-gl-base button.on{background:rgba(var(--ng-rgb),.16);color:var(--text-brightest)}
+.gc-gl .maplibregl-ctrl-attrib{background:rgba(var(--panel-rgb),.9);font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-muted)}
+.gc-gl .maplibregl-ctrl-attrib a{color:var(--ng-light)}
+.maplibregl-marker.ruas-pin{cursor:pointer}
+.maplibregl-marker.ruas-pin:hover svg,.maplibregl-marker.ruas-pin:focus-visible svg{transform:scale(1.14);filter:drop-shadow(0 0 3px rgba(var(--ng-rgb),.75)) drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.maplibregl-marker.ruas-pin:focus-visible{outline:none}
+.gc-gl .ruas-popup .maplibregl-popup-content{background:var(--bg-modal);color:var(--text-base);border:1px solid var(--card-border);border-radius:12px;
+  padding:12px 28px 12px 14px;font-family:Montserrat,sans-serif;box-shadow:0 10px 28px rgba(var(--shadow-rgb),.4)}
+.gc-gl .ruas-popup .maplibregl-popup-close-button{color:var(--text-dim);font-size:18px;padding:2px 8px}
+.gc-gl .ruas-popup .maplibregl-popup-close-button:hover{background:transparent;color:var(--text-brightest)}
+.gc-gl .ruas-tip{pointer-events:none}
+.gc-gl .ruas-tip .maplibregl-popup-content{background:var(--bg-panel);color:var(--text-bright);border:1px solid rgba(var(--ng-rgb),.3);border-radius:6px;
+  padding:6px 10px;font-family:Montserrat,sans-serif;font-size:12px;line-height:1.4;box-shadow:0 4px 14px rgba(var(--shadow-rgb),.4)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.gc-gl .ruas-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:var(--bg-modal)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,.gc-gl .ruas-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.gc-gl .ruas-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--bg-modal)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--bg-modal)}
+.gc-gl .ruas-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--bg-modal)}
+.gc-gl .ruas-tip.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.gc-gl .ruas-tip.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.gc-gl .ruas-tip.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:var(--bg-panel)}
+.gc-gl .ruas-tip.maplibregl-popup-anchor-top .maplibregl-popup-tip,.gc-gl .ruas-tip.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.gc-gl .ruas-tip.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--bg-panel)}
+
 /* painel lateral, nível município com o mapa de ruas ligado */
 .ruas-resumo{margin-top:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:var(--card-bg-2);
   border:1px solid var(--card-border);border-radius:10px;font-family:Montserrat,sans-serif;font-size:12.5px;font-weight:500;color:var(--text-base)}
