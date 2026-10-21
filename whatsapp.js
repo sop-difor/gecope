@@ -30,6 +30,30 @@
                                                                         // e-mail interno (contato_fulano_de_tal@..., criado em savePhoneForUser) —
                                                                         // serve de fallback para quando full_name está vazio no banco (caso real de
                                                                         // todos os contatos fantasma hoje, ver processarNotificacao e prepareDirectMsg).
+                                                                        // Chave de comparação de nomes: sem acento, caixa alta, espaços aparados. O casamento do
+                                                                        // fiscal por nome falhava quando processos.fiscal e app_users divergiam só no acento
+                                                                        // (JOSE MICHELL × JOSÉ MICHELL, TULIO × TÚLIO) — a notificação saía sem destinatário,
+                                                                        // sem nenhum aviso.
+                                                                        function normalizarNomeBusca(texto) {
+                                                                            return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+                                                                        }
+
+                                                                        // Última linha de defesa: o destinatário não foi encontrado, então nada será enviado.
+                                                                        // Antes isso era um `return` mudo (e os logs de falha costumam ser apagados), o que
+                                                                        // deixava "a mensagem não saiu" sem nenhuma pista do motivo.
+                                                                        function avisarSemDestinatario(eventoGatilho, dados) {
+                                                                            const quem = dados.NOME_FISCAL || dados.ANALISTA || dados.FISCAL || dados.NOME_USUARIO || dados.AUTOR || 'destinatário';
+                                                                            const nup = dados.NUP_PROCESSO ? ` (processo ${dados.NUP_PROCESSO})` : '';
+                                                                            console.warn(`[WhatsApp] Evento "${eventoGatilho}"${nup}: nenhum telefone encontrado para "${quem}" — mensagem NÃO enviada.`);
+                                                                            if (typeof Swal !== 'undefined') {
+                                                                                Swal.fire({
+                                                                                    toast: true, position: 'top-end', icon: 'warning', showConfirmButton: false, timer: 8000, timerProgressBar: true,
+                                                                                    title: 'WhatsApp não enviado',
+                                                                                    text: `Não há telefone cadastrado para ${quem}${nup}.`
+                                                                                });
+                                                                            }
+                                                                        }
+
                                                                         function nomeDeContatoFantasma(email) {
                                                                             return (email || '')
                                                                                 .replace(/@sop-ghost\.internal$/i, '')
@@ -688,7 +712,7 @@
                                                                                             .not('telefone_whatsapp', 'is', null);
 
                                                                                         if (users && users.length > 0) {
-                                                                                            const search = nomeBusca.toUpperCase().trim();
+                                                                                            const search = normalizarNomeBusca(nomeBusca);
 
                                                                                             // Prioriza usuários reais sobre ghost users
                                                                                             const realUsers = users.filter(u => !u.email.includes('@sop-ghost.internal'));
@@ -704,14 +728,14 @@
                                                                                             // acima no arquivo) tenta recuperar o nome de verdade a partir do e-mail
                                                                                             // interno, então o match volta a funcionar mesmo sem rodar um reparo de dados.
                                                                                             let found = realUsers.find(u => {
-                                                                                                const dbName = (`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '').toUpperCase();
+                                                                                                const dbName = normalizarNomeBusca(`${u.nome || ''} ${u.sobrenome || ''}`.trim() || u.full_name || '');
                                                                                                 if (!dbName) return false;
                                                                                                 return dbName === search || dbName.includes(search) || search.includes(dbName);
                                                                                             });
 
                                                                                             if (!found) {
                                                                                                 found = ghostUsers.find(u => {
-                                                                                                    const dbName = (u.full_name || nomeDeContatoFantasma(u.email) || '').toUpperCase();
+                                                                                                    const dbName = normalizarNomeBusca(u.full_name || nomeDeContatoFantasma(u.email) || '');
                                                                                                     if (!dbName) return false;
                                                                                                     return dbName === search || dbName.includes(search) || search.includes(dbName);
                                                                                                 });
@@ -727,6 +751,8 @@
                                                                                         telefonesAlvo.push(dadosDinamicos.TELEFONE_ALVO);
                                                                                     }
                                                                                 }
+
+                                                                                if (telefonesAlvo.length === 0) avisarSemDestinatario(eventoGatilho, dadosDinamicos);
 
                                                                                 if (telefonesAlvo.length > 0) {
                                                                                     console.log(`[WhatsApp] Analisando ${telefonesAlvo.length} possíveis destinatários.`);
