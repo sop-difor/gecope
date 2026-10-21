@@ -13,4 +13,6 @@ window.WHATSAPP_PROXY_URL = 'https://137-131-228-120.sslip.io';
 // Satélite do mapa de obras (Esri World Imagery). A licença do Esri exige conta: crie uma chave gratuita no ArcGIS Location
 // Platform (developers.arcgis.com > Dashboard > API keys, permissão "Location services > Basemaps > Static basemap tiles")
 // e RESTRINJA a chave ao domínio do GECOPE nos referrers dela; assim ela pode ficar neste arquivo público. Vazia = sem satélite.
-window.ESRI_API_KEY = '';
+// Chave criada em 21/10/2026 no portal sopdifor (ArcGIS Location Platform), aplicativo público, privilégios só de mapa base,
+// referrer https://sop-difor.github.io. VENCE EM 20/10/2027: gerar uma nova no item "GECOPE mapa de obras (satélite)" e colar aqui.
+window.ESRI_API_KEY = 'AAPTaVRLS9uVnDg5pIrwccr_cpw..Tuwu5My9h_Qg8hAQtnKigCM0WIl304MgP8iECGhoGWDa1t1rSrMrY4oTbB6mE1Ar-VtuJ3OYx4JSifSUuzVlcuqylllZMbOyNWgtW0eT0KHz55jy85OkO4BnBmzpynx5BXogH5fogPw69uqk2NjTJarzCiJIs8NSRJj7HYyngmSSIsuHeZgoqhmvKO4PRFVGOuKsb5m6PF3OCYgFU2zUkQYMh7GMI3JtLZVrhh9YzdoQizLyNH7-7ZI.AT1_m4nd146g';

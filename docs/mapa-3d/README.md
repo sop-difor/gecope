@@ -40,22 +40,27 @@ pelo MapLibre GL.
 | Busca de endereço | Nominatim (OpenStreetMap) | não |
 | Satélite | Esri World Imagery via `ibasemaps-api.arcgis.com` | **sim** (gratuita) |
 
-## Pendência: chave do satélite
+## Chave do satélite (Esri)
 
 A licença do item World Imagery é o *Esri Master License Agreement*: não há permissão clara para usar os tiles em app
-próprio sem conta, e o endereço antigo sem chave (`server.arcgisonline.com`) deixou de ser usado. **Sem chave, o botão
-Satélite não aparece** (nada é pedido ao Esri). Para ligar:
+próprio sem conta, e o endereço antigo sem chave (`server.arcgisonline.com`) deixou de ser usado. Por isso o satélite usa
+uma chave gratuita do ArcGIS Location Platform, em `window.ESRI_API_KEY` no `config.js`. **Sem chave o botão Satélite
+não aparece** (nada é pedido ao Esri).
 
-1. Criar conta gratuita em developers.arcgis.com (ArcGIS Location Platform; o plano gratuito inclui 2 milhões de tiles
-   de mapa base por mês, conferir em location.arcgis.com/pricing).
-2. Dashboard > API keys > criar chave com a permissão "Location services > Basemaps > Static basemap tiles".
-3. **Restringir a chave por referrer** ao domínio do GECOPE (e `http://localhost` para testes). Assim ela pode ficar
-   no `config.js`, que é público.
-4. Colar a chave em `window.ESRI_API_KEY` no `config.js`.
-
-Se os tiles do satélite falharem (chave inválida, serviço fora), o mapa volta sozinho para "Mapa", desativa o botão
-Satélite na sessão e avisa. Observação de 21/10/2026: o serviço respondeu com imagens mesmo com um token falso, ou
-seja, ele não conferia o token naquele dia; isso não substitui a licença.
+- **Criada em 21/10/2026 e VENCE EM 20/10/2027.** Depois disso o satélite para (o mapa volta sozinho ao modo Mapa e
+  avisa) até a chave ser trocada.
+- Onde: conta do ArcGIS Location Platform, portal `sopdifor` (sopdifor.maps.arcgis.com), item de credencial "GECOPE mapa
+  de obras (satélite)": aplicativo público, privilégios só **Serviço de estilos de mapa base** e **Mosaicos de mapa base
+  estáticos**, referrer `https://sop-difor.github.io`.
+- **Como renovar:** abrir o item > gerar uma chave nova (a chave só aparece uma vez) > colar em `config.js`. Mudar o
+  referrer também exige gerar chave nova.
+- **Sem cartão e sem "Pagamento por uso"**: o plano é o gratuito (2 milhões de tiles por mês, conferir em
+  location.arcgis.com/pricing). Se passar do limite, o serviço só para até o próximo ciclo e o mapa volta ao modo Mapa.
+  Não cadastrar cartão nem ligar o pagamento por uso.
+- **Observação de 21/10/2026:** o endereço de tiles (`ibasemaps-api.arcgis.com`) exige que o parâmetro `token` exista,
+  mas não validava o valor nem o referrer (um token falso e um domínio errado também recebiam imagem). A restrição por
+  domínio está configurada, mas não dá para comprovar de fora; a chave serve para colocar o uso na licença da conta, não
+  como barreira. Conferir na aba **Uso** do painel (location.arcgis.com) se os tiles aparecem contados.
 
 ## Testar logado
 
