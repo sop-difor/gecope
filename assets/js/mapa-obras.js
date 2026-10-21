@@ -3249,7 +3249,8 @@ function glIniciar(){
   if(!window.MapaRuasGL||!MapaRuasGL.suportado()){ GLST='falhou'; return; }
   GLST='carregando';
   MapaRuasGL.carregar().then(()=>{
-    glCtl=MapaRuasGL.criar(map.getContainer(),{corLinha:TOKENS.ng,corPreench:BASE,aoFalhar:glFalhou});
+    glCtl=MapaRuasGL.criar(map.getContainer(),{corLinha:TOKENS.ng,corPreench:BASE,aoFalhar:glFalhou,
+      buscar:glBuscaObras,aoEscolher:glEscolheObra,caixa:LOC_CE,rotaUrl:glRotaUrl});
     // o painel do MapLibre fica dentro do contêiner do Leaflet: sem isto, arrastar e rolar moveriam o mapa escondido
     L.DomEvent.disableClickPropagation(glCtl.el); L.DomEvent.disableScrollPropagation(glCtl.el);
     GLST='ok';
@@ -3267,6 +3268,33 @@ function glContornos(ids){
   const set=new Set(ids.map(String));
   return {type:'FeatureCollection',features:GEO.features.filter(f=>set.has(String(f.properties.id)))};
 }
+// mesmo destino do botão "Rota" da Ficha (locRotaHtml): o Google Maps abre a rota a partir de onde o usuário está
+const glRotaUrl=(lat,lng)=>`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+function glLinkRota(lat,lng){
+  const a=document.createElement('a'); a.className='ruas-rota'; a.href=glRotaUrl(lat,lng); a.target='_blank'; a.rel='noopener';
+  a.textContent='Como chegar'; return a;
+}
+// busca do mapa: as obras que passam pelos filtros (as mesmas do mapa), por contrato, código, município ou objeto
+const glNorm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function glBuscaObras(q){
+  const tk=glNorm(q).split(/\s+/).filter(Boolean); if(!tk.length) return [];
+  const res=[];
+  for(const id of allIds) for(const o of obrasOf(id)){
+    const mun=o.municipioTxt||((DB.municipios[id]||{}).nome)||'', obj=o.objeto||'';
+    const cod=glNorm((o.codigo_obra||'')+' '+(o.contrato||'')), m=glNorm(mun), tudo=cod+' '+m+' '+glNorm(obj);
+    if(!tk.every(t=>tudo.includes(t))) continue;
+    const s=o.loc?locStatus(o):null, loc=!!(s&&s.ok);
+    const peso=(tk.some(t=>cod.startsWith(t))?0:tk.some(t=>cod.includes(t))?1:tk.some(t=>m.includes(t))?2:3)+(loc?0:10); // com ponto no mapa primeiro
+    res.push({peso,titulo:o.codigo_obra||String(o.contrato||('#'+o.id_obra)),sub:(mun?mun+' · ':'')+(obj.length>80?obj.slice(0,77)+'…':obj),semLoc:!loc,obra:o});
+  }
+  return res.sort((a,b)=>a.peso-b.peso).slice(0,8);
+}
+function glEscolheObra(it){
+  const o=it.obra; if(!o||!glCtl) return;
+  if(!(st.level===3&&st.city===o.munId)) goCity(o.munId); // abre o município da obra; o mapa enquadra os pontos dele
+  if(it.semLoc){ glCtl.avisar('Esta obra ainda não tem localização no mapa; abri o município dela.'); return; }
+  glCtl.irPara(o.loc.lng,o.loc.lat,17);
+}
 // modelo de um pino para o MapLibre: gs = grupos de obras que cabem no mesmo pino (vários = aglomerado)
 function glModeloPino(gs){
   const obras=gs.flatMap(g=>g.obras), n=obras.length, sv=ruasPinSvg(n);
@@ -3278,10 +3306,11 @@ function glModeloPino(gs){
   }
   const g=gs[0];
   if(n>1) return {...m,lat:g.lat,lng:g.lng,titulo:`${n} obras neste ponto`,
-    tip:escHtml(`${n} obras neste ponto — clique para ver`),popup:fechar=>ruasPopupGrupo(g,fechar)};
+    tip:escHtml(`${n} obras neste ponto — clique para ver`),
+    popup:fechar=>{ const nd=ruasPopupGrupo(g,fechar); nd.insertBefore(glLinkRota(g.lat,g.lng),nd.children[1]||null); return nd; }};
   const o=obras[0];
-  return {...m,lat:g.lat,lng:g.lng,titulo:o.codigo_obra||('#'+o.id_obra),abrir:()=>openModal(o),
-    tip:`<b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><br>${escHtml(o.objeto.length>110?o.objeto.slice(0,107)+'…':o.objeto)}<br>${st.level===2&&o.municipioTxt?escHtml(o.municipioTxt)+' · ':''}${escHtml(o.statusObra)}`};
+  return {...m,lat:g.lat,lng:g.lng,titulo:o.codigo_obra||('#'+o.id_obra),abrir:()=>openModal(o),rota:true,
+    tip:`<b>${escHtml(o.codigo_obra||('#'+o.id_obra))}</b><br>${escHtml(o.objeto.length>110?o.objeto.slice(0,107)+'…':o.objeto)}<br>${st.level===2&&o.municipioTxt?escHtml(o.municipioTxt)+' · ':''}${escHtml(o.statusObra)}<br><a class="ruas-rota" href="${glRotaUrl(g.lat,g.lng)}" target="_blank" rel="noopener">Como chegar</a>`};
 }
 // mesmo enquadramento do Leaflet: município com pontos = os pontos; sem pontos, ou distrito = o contorno
 function glFit(){

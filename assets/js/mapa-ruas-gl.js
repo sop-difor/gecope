@@ -33,6 +33,9 @@ const DEM_TILES='https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}
 const DEM_ATTR='Relevo: Mapzen e AWS Terrain Tiles';
 const EXAGERO=1.5, PITCH_3D=60, PITCH_MAX=70;
 const AVISO_MS=7000;
+const NOMINATIM='https://nominatim.openstreetmap.org/search';
+const NOMINATIM_GAP_MS=1100; // a política de uso do Nominatim pede no máximo 1 consulta por segundo e sem autocomplete
+const BUSCA_MIN=2;
 const LOCALE={
   'NavigationControl.ZoomIn':'Aproximar','NavigationControl.ZoomOut':'Afastar','NavigationControl.ResetBearing':'Voltar ao norte',
   'AttributionControl.ToggleAttribution':'Mostrar créditos','AttributionControl.MapFeedback':'Sugerir correção no mapa',
@@ -74,7 +77,7 @@ function lerBase(){
   try{ return localStorage.getItem(PREF_BASE)==='satelite'?'satelite':'mapa'; }catch(_){ return 'mapa'; }
 }
 
-// cfg: {corLinha, corPreench, aoFalhar(motivo)}
+// cfg: {corLinha, corPreench, aoFalhar(motivo), buscar(texto)→[{titulo,sub,semLoc,...}], aoEscolher(item), caixa:{latMin,latMax,lngMin,lngMax}}
 function criar(host,cfg){
   const ml=window.maplibregl;
   cfg=cfg||{};
@@ -92,7 +95,7 @@ function criar(host,cfg){
 
   let base=lerBase(), pronto=false, visivel=false, carregou=false, tres=false, aviso=null, avisoT=null;
   let spec=null, marcadores=[], fc={type:'FeatureCollection',features:[]};
-  let tip=null, pop=null, ajustePend=null;
+  let tip=null, tipT=null, pop=null, ajustePend=null;
   const visOrig=new Map(), rotOrig=new Map(), comIcone=new Set();
 
   // ---- falha: estilo que não chega ----
@@ -103,6 +106,120 @@ function criar(host,cfg){
     // erro de tile ou de fonte não derruba o mapa; só o estilo que nem veio
     if(!carregou&&e&&!e.sourceId&&!e.tile) falhar((e.error&&e.error.message)||'erro no estilo');
   });
+
+  // ---- busca: obras primeiro, endereço só quando o usuário pede ----
+  // Digitar lista as obras (cfg.buscar, local e instantâneo). O endereço só é consultado no Nominatim (OpenStreetMap,
+  // restrito ao Ceará) pelo Enter sem obra correspondente ou pelo clique na última linha da lista.
+  let buscaInp=null, buscaLista=null, buscaRows=[], buscaSel=-1, buscaUlt=0, buscaPend=false, buscaQ='', lugarMk=null;
+  const LUPA='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>';
+  function fechaLista(){
+    if(!buscaLista) return;
+    buscaLista.hidden=true; buscaRows=[]; buscaSel=-1;
+    buscaInp.setAttribute('aria-expanded','false'); buscaInp.removeAttribute('aria-activedescendant');
+  }
+  function marcaSel(i){
+    buscaSel=i;
+    buscaLista.querySelectorAll('.gc-busca-i').forEach((b,k)=>b.classList.toggle('sel',k===i));
+    if(i>=0){ buscaInp.setAttribute('aria-activedescendant','gc-busca-i'+i); const b=buscaLista.children[i]; if(b&&b.scrollIntoView) b.scrollIntoView({block:'nearest'}); }
+    else buscaInp.removeAttribute('aria-activedescendant');
+  }
+  // rows: {tipo:'obra'|'lugar'|'acao'|'msg', titulo, sub?, semLoc?, ref?}; o texto vem do banco ou da rede: sempre textContent
+  function mostraLista(rows){
+    buscaRows=rows; buscaSel=-1; buscaLista.textContent='';
+    rows.forEach((r,i)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.id='gc-busca-i'+i; b.className='gc-busca-i'+(r.tipo==='msg'?' msg':'')+(r.tipo==='acao'?' acao':'');
+      b.setAttribute('role','option');
+      const t=document.createElement('b'); t.textContent=r.titulo; b.appendChild(t);
+      if(r.sub){ const u=document.createElement('span'); u.textContent=r.sub; b.appendChild(u); }
+      if(r.semLoc){ const u=document.createElement('em'); u.textContent='sem localização no mapa'; b.appendChild(u); }
+      if(r.tipo==='msg') b.disabled=true; else b.addEventListener('click',()=>escolhe(r));
+      buscaLista.appendChild(b);
+    });
+    buscaLista.hidden=false; buscaInp.setAttribute('aria-expanded','true');
+  }
+  function aoDigitar(){
+    buscaQ=buscaInp.value.trim();
+    if(buscaQ.length<BUSCA_MIN){ fechaLista(); return; }
+    const locais=(cfg.buscar?cfg.buscar(buscaQ):[]).map(it=>({tipo:'obra',titulo:it.titulo,sub:it.sub,semLoc:it.semLoc,ref:it}));
+    locais.push({tipo:'acao',titulo:'Buscar “'+buscaQ+'” como endereço ou lugar',sub:'Consulta o OpenStreetMap, só no Ceará'});
+    mostraLista(locais);
+  }
+  function escolhe(r){
+    if(r.tipo==='obra'){ fechaLista(); buscaInp.value=r.titulo; buscaInp.blur(); if(cfg.aoEscolher) cfg.aoEscolher(r.ref); }
+    else if(r.tipo==='lugar'){ fechaLista(); buscaInp.value=r.titulo; buscaInp.blur(); voaLugar(r.ref); }
+    else if(r.tipo==='acao') buscaEndereco(buscaQ);
+  }
+  async function buscaEndereco(q){
+    if(buscaPend) return;
+    buscaPend=true; mostraLista([{tipo:'msg',titulo:'Buscando…'}]);
+    const espera=Math.max(0,NOMINATIM_GAP_MS-(Date.now()-buscaUlt));
+    if(espera) await new Promise(ok=>setTimeout(ok,espera));
+    buscaUlt=Date.now();
+    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),10000);
+    try{
+      const c=cfg.caixa||{latMin:-7.95,latMax:-2.70,lngMin:-41.50,lngMax:-37.20};
+      const url=NOMINATIM+'?format=jsonv2&limit=6&countrycodes=br&bounded=1&accept-language=pt-BR&viewbox='
+        +[c.lngMin,c.latMax,c.lngMax,c.latMin].join(',')+'&q='+encodeURIComponent(q);
+      const r=await fetch(url,{signal:ctl.signal});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const js=await r.json();
+      if(buscaInp.value.trim()!==q) return; // o usuário já mudou o texto
+      const rows=(Array.isArray(js)?js:[]).filter(x=>isFinite(+x.lat)&&isFinite(+x.lon)).map(x=>({tipo:'lugar',
+        titulo:x.name||String(x.display_name||'').split(',')[0],sub:x.display_name,ref:{lat:+x.lat,lng:+x.lon,nome:x.display_name,bbox:x.boundingbox}}));
+      mostraLista(rows.length?rows:[{tipo:'msg',titulo:'Nenhum lugar encontrado no Ceará.'}]);
+    }catch(e){
+      if(buscaInp.value.trim()===q) mostraLista([{tipo:'msg',titulo:'Não foi possível buscar o endereço agora. Tente de novo em instantes.'}]);
+    }finally{ clearTimeout(t); buscaPend=false; }
+  }
+  function limpaLugar(){ if(lugarMk){ lugarMk.remove(); lugarMk=null; } }
+  function voaLugar(r){
+    limpaLugar();
+    const e=document.createElement('div'); e.className='gc-gl-lugar';
+    const box=document.createElement('div'); box.className='ruas-pop';
+    const h=document.createElement('div'); h.className='ruas-pop-h'; h.textContent=r.nome; box.appendChild(h);
+    if(cfg.rotaUrl){
+      const a=document.createElement('a'); a.className='ruas-rota'; a.href=cfg.rotaUrl(r.lat,r.lng); a.target='_blank'; a.rel='noopener';
+      a.textContent='Como chegar'; box.appendChild(a);
+    }
+    const pp=new ml.Popup({className:'ruas-popup',offset:14,maxWidth:'320px'}).setDOMContent(box);
+    lugarMk=new ml.Marker({element:e}).setLngLat([r.lng,r.lat]).setPopup(pp).addTo(map);
+    const b=r.bbox&&r.bbox.length===4?r.bbox.map(Number):null; // [sul, norte, oeste, leste]
+    if(b&&b.every(isFinite)&&(b[1]-b[0]>.0008||b[3]-b[2]>.0008)) map.fitBounds([[b[2],b[0]],[b[3],b[1]]],{padding:80,maxZoom:17,duration:900});
+    else map.flyTo({center:[r.lng,r.lat],zoom:16.5,duration:900});
+    map.once('moveend',()=>{ if(lugarMk&&!lugarMk.getPopup().isOpen()) lugarMk.togglePopup(); });
+  }
+  function irPara(lng,lat,zoom){ map.flyTo({center:[lng,lat],zoom:zoom||17,duration:900}); }
+  class BuscaCtl{
+    onAdd(){
+      const d=document.createElement('div'); d.className='maplibregl-ctrl gc-gl-busca';
+      const l=document.createElement('span'); l.className='gc-busca-lupa'; l.innerHTML=LUPA; d.appendChild(l);
+      const i=document.createElement('input');
+      i.type='search'; i.placeholder='Buscar obra, município ou endereço'; i.autocomplete='off'; i.spellcheck=false;
+      i.setAttribute('role','combobox'); i.setAttribute('aria-label','Buscar obra, município ou endereço');
+      i.setAttribute('aria-autocomplete','list'); i.setAttribute('aria-expanded','false'); i.setAttribute('aria-controls','gc-busca-lista');
+      const u=document.createElement('div'); u.id='gc-busca-lista'; u.className='gc-busca-lista'; u.setAttribute('role','listbox'); u.hidden=true;
+      d.append(i,u);
+      buscaInp=i; buscaLista=u;
+      i.addEventListener('input',aoDigitar);
+      i.addEventListener('focus',()=>{ if(i.value.trim().length>=BUSCA_MIN&&!buscaRows.length) aoDigitar(); });
+      i.addEventListener('keydown',ev=>{
+        const n=buscaRows.length;
+        if(ev.key==='ArrowDown'&&n){ ev.preventDefault(); marcaSel((buscaSel+1)%n); }
+        else if(ev.key==='ArrowUp'&&n){ ev.preventDefault(); marcaSel((buscaSel-1+n)%n); }
+        else if(ev.key==='Enter'){
+          ev.preventDefault();
+          const r=buscaRows[buscaSel>=0?buscaSel:0]; // sem seleção: o primeiro resultado (uma obra, ou a busca de endereço)
+          if(r) escolhe(r); else if(i.value.trim().length>=BUSCA_MIN) aoDigitar();
+        }
+        else if(ev.key==='Escape'){ if(!buscaLista.hidden) fechaLista(); else i.blur(); }
+      });
+      this._fora=ev=>{ if(!d.contains(ev.target)) fechaLista(); };
+      document.addEventListener('mousedown',this._fora);
+      this._d=d; return d;
+    }
+    onRemove(){ document.removeEventListener('mousedown',this._fora); this._d.remove(); }
+  }
 
   // ---- controles ----
   class BaseCtl{
@@ -139,6 +256,7 @@ function criar(host,cfg){
     }
     onRemove(){ this._d.remove(); }
   }
+  map.addControl(new BuscaCtl(),'top-left');
   map.addControl(new BaseCtl(),'top-right');
   map.addControl(new Ctl3D(),'top-right');
   // a bússola só aparece no 3D (CSS: .gc-gl:not(.gc-3d)); clicar nela volta ao norte
@@ -206,11 +324,12 @@ function criar(host,cfg){
     btn3d.classList.toggle('on',tres); btn3d.setAttribute('aria-pressed',String(tres));
   }
   function escondeAviso(){ clearTimeout(avisoT); if(aviso){ aviso.remove(); aviso=null; } }
-  function mostraAviso(){
+  const AVISO_3D='Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Arraste com o botão direito para inclinar e girar.';
+  function mostraAviso(texto){
     escondeAviso();
     aviso=document.createElement('div');
     aviso.className='gc-gl-aviso'; aviso.setAttribute('role','status');
-    aviso.textContent='Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Arraste com o botão direito para inclinar e girar.';
+    aviso.textContent=texto||AVISO_3D;
     el.appendChild(aviso);
     avisoT=setTimeout(escondeAviso,AVISO_MS);
   }
@@ -247,12 +366,19 @@ function criar(host,cfg){
 
   // ---- pinos ----
   function fechaPop(){ if(pop){ pop.remove(); pop=null; } }
-  function escondeTip(){ if(tip){ tip.remove(); tip=null; } }
+  function escondeTip(){ clearTimeout(tipT); if(tip){ tip.remove(); tip=null; } }
+  // o tooltip de um pino com "Como chegar" é clicável: fecha com uma pequena folga, para o mouse alcançar o link
+  function agendaFechaTip(){ clearTimeout(tipT); tipT=setTimeout(escondeTip,250); }
   function mostraTip(m){
+    clearTimeout(tipT);
     if(pop||!m.tip) return;
     escondeTip();
-    tip=new ml.Popup({closeButton:false,closeOnClick:false,focusAfterOpen:false,className:'ruas-tip',maxWidth:'320px',offset:[0,-m.h+8]})
+    tip=new ml.Popup({closeButton:false,closeOnClick:false,focusAfterOpen:false,className:'ruas-tip'+(m.rota?' com-rota':''),maxWidth:'320px',offset:[0,-m.h+8]})
       .setLngLat([m.lng,m.lat]).setHTML(m.tip).addTo(map);
+    if(m.rota){
+      const pe=tip.getElement();
+      pe.addEventListener('mouseenter',()=>clearTimeout(tipT)); pe.addEventListener('mouseleave',agendaFechaTip);
+    }
   }
   function abrePop(m){
     escondeTip(); fechaPop();
@@ -275,7 +401,7 @@ function criar(host,cfg){
     e.className='ruas-pin '+m.cls+(m.n>1?' multi':'');
     e.innerHTML=m.svg; e.tabIndex=0; e.setAttribute('role','button'); e.setAttribute('aria-label',m.titulo);
     e.addEventListener('mouseenter',()=>mostraTip(m));
-    e.addEventListener('mouseleave',escondeTip);
+    e.addEventListener('mouseleave',()=>{ if(m.rota) agendaFechaTip(); else escondeTip(); });
     e.addEventListener('focus',()=>mostraTip(m));
     e.addEventListener('blur',escondeTip);
     e.addEventListener('click',ev=>{ ev.stopPropagation(); ativa(m); });
@@ -314,9 +440,9 @@ function criar(host,cfg){
     if(ajustePend){ const f=ajustePend; ajustePend=null; f(); }
     if(spec&&spec.agrupar) redesenha();
   }
-  function ocultar(){ reset3D(); visivel=false; el.classList.remove('on'); limpaPinos(); }
+  function ocultar(){ reset3D(); visivel=false; el.classList.remove('on'); limpaPinos(); limpaLugar(); fechaLista(); }
   function redimensionar(){ if(visivel) map.resize(); }
-  function destruir(){ clearTimeout(prazo); escondeAviso(); limpaPinos(); map.remove(); el.remove(); }
+  function destruir(){ clearTimeout(prazo); escondeAviso(); limpaPinos(); limpaLugar(); map.remove(); el.remove(); }
 
   // ---- estilo carregado: camadas próprias ----
   map.once('load',()=>{
@@ -341,7 +467,7 @@ function criar(host,cfg){
     }catch(e){ falhar((e&&e.message)||'erro ao montar as camadas'); }
   });
 
-  return {el,mapa:map,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
+  return {el,mapa:map,irPara,avisar:mostraAviso,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
 }
 
 window.MapaRuasGL={suportado,carregar,criar};
