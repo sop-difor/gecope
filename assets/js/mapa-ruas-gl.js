@@ -8,7 +8,9 @@
    falha (sem WebGL2, script ou estilo que não chega) vira rejeição/aoFalhar e o chamador volta ao Leaflet.
 
    Decisões (grilling de 21/10/2026):
-   - só provedores gratuitos e sem chave (OpenFreeMap, Esri World Imagery);
+   - só provedores gratuitos (OpenFreeMap e AWS Terrain Tiles sem chave; Esri World Imagery com a chave gratuita do
+     ArcGIS Location Platform em window.ESRI_API_KEY, porque a licença do Esri não cobre o uso sem conta; sem chave o
+     satélite simplesmente não existe);
    - o mapa abre plano; rotação e inclinação ficam travadas e só o botão 3D as libera (inclina ~60°, liga o
      relevo do AWS Terrain Tiles com exagero 1,5× e sombreamento leve; os prédios vêm do OpenStreetMap e o
      estilo já os extruda a partir do zoom 14, então só mostram altura com o mapa inclinado);
@@ -23,8 +25,9 @@ const ML_JS_SRI='sha384-Blts4zGbI8Hh/NvhcxTYsF2uLBbYIwHXEhPMxN3XpadJCDgstyLfJA3o
 const ML_CSS='https://cdn.jsdelivr.net/npm/maplibre-gl@5.7.0/dist/maplibre-gl.css';
 const ML_CSS_SRI='sha384-gNYNsUmuZqDYiT3gbirWTV5K7rt71RoveS/yXAaU09d4ZUmeDVTD3XoqB6uJAIFR';
 const ESTILO='https://tiles.openfreemap.org/styles/liberty';
-const ESRI_TILES='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const ESRI_ATTR='Imagens © Esri, Maxar, Earthstar Geographics e a comunidade GIS';
+const ESRI_TILES='https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=';
+const ESRI_ATTR='Imagens © Esri, Vantor, Earthstar Geographics e a comunidade GIS';
+const SAT_ERROS_MAX=3; // tiles do satélite que falham sem nenhum ter chegado: chave inválida ou serviço fora
 const PREF_BASE='gecope_mapa_base';
 const CELULA_PX=38;        // pontos a menos disto na tela viram um pino com a contagem (nível distrito)
 const TIMEOUT_MS=15000;    // estilo que não chega neste prazo = falha, e o Leaflet assume
@@ -39,7 +42,8 @@ const BUSCA_MIN=2;
 const LOCALE={
   'NavigationControl.ZoomIn':'Aproximar','NavigationControl.ZoomOut':'Afastar','NavigationControl.ResetBearing':'Voltar ao norte',
   'AttributionControl.ToggleAttribution':'Mostrar créditos','AttributionControl.MapFeedback':'Sugerir correção no mapa',
-  'FullscreenControl.Enter':'Tela cheia','FullscreenControl.Exit':'Sair da tela cheia'
+  'FullscreenControl.Enter':'Tela cheia','FullscreenControl.Exit':'Sair da tela cheia',
+  'GeolocateControl.FindMyLocation':'Minha posição','GeolocateControl.LocationNotAvailable':'Localização indisponível'
 };
 
 let _webgl2=null, _promessa=null;
@@ -77,7 +81,7 @@ function lerBase(){
   try{ return localStorage.getItem(PREF_BASE)==='satelite'?'satelite':'mapa'; }catch(_){ return 'mapa'; }
 }
 
-// cfg: {corLinha, corPreench, aoFalhar(motivo), buscar(texto)→[{titulo,sub,semLoc,...}], aoEscolher(item), caixa:{latMin,latMax,lngMin,lngMax}}
+// cfg: {corLinha, corPreench, chaveEsri, aoFalhar(motivo), buscar(texto)→[{titulo,sub,semLoc,...}], aoEscolher(item), caixa:{latMin,latMax,lngMin,lngMax}}
 function criar(host,cfg){
   const ml=window.maplibregl;
   cfg=cfg||{};
@@ -93,7 +97,9 @@ function criar(host,cfg){
   });
   map.touchZoomRotate.disableRotation();
 
-  let base=lerBase(), pronto=false, visivel=false, carregou=false, tres=false, aviso=null, avisoT=null;
+  const temSat=!!cfg.chaveEsri;
+  let satErros=0, satOk=false, satFora=false; // satFora: o satélite não respondeu e foi desativado nesta sessão
+  let base=temSat?lerBase():'mapa', pronto=false, visivel=false, carregou=false, tres=false, aviso=null, avisoT=null;
   let spec=null, marcadores=[], fc={type:'FeatureCollection',features:[]};
   let tip=null, tipT=null, pop=null, ajustePend=null;
   const visOrig=new Map(), rotOrig=new Map(), comIcone=new Set();
@@ -105,7 +111,16 @@ function criar(host,cfg){
   map.on('error',e=>{
     // erro de tile ou de fonte não derruba o mapa; só o estilo que nem veio
     if(!carregou&&e&&!e.sourceId&&!e.tile) falhar((e.error&&e.error.message)||'erro no estilo');
+    if(e&&e.sourceId==='gc-satelite'&&!satOk&&!satFora&&++satErros>=SAT_ERROS_MAX) satIndisponivel();
   });
+  map.on('data',e=>{ if(e.dataType==='source'&&e.sourceId==='gc-satelite'&&e.tile) satOk=true; });
+  // com o satélite ligado o desenho do mapa fica apagado: se a imagem não chega, volta ao mapa em vez de ficar em branco
+  function satIndisponivel(){
+    satFora=true;
+    if(base==='satelite') definirBase('mapa');
+    marcaBase();
+    mostraAviso('O satélite não respondeu agora; voltei ao mapa.');
+  }
 
   // ---- busca: obras primeiro, endereço só quando o usuário pede ----
   // Digitar lista as obras (cfg.buscar, local e instantâneo). O endereço só é consultado no Nominatim (OpenStreetMap,
@@ -242,6 +257,7 @@ function criar(host,cfg){
     if(!baseEl) return;
     baseEl.querySelectorAll('button').forEach(b=>{
       const on=b.dataset.base===base; b.classList.toggle('on',on); b.setAttribute('aria-pressed',String(on));
+      if(b.dataset.base==='satelite'){ b.disabled=satFora; b.title=satFora?'Satélite indisponível agora':''; }
     });
   }
   let btn3d=null;
@@ -257,10 +273,13 @@ function criar(host,cfg){
     onRemove(){ this._d.remove(); }
   }
   map.addControl(new BuscaCtl(),'top-left');
-  map.addControl(new BaseCtl(),'top-right');
+  if(temSat) map.addControl(new BaseCtl(),'top-right');
   map.addControl(new Ctl3D(),'top-right');
   // a bússola só aparece no 3D (CSS: .gc-gl:not(.gc-3d)); clicar nela volta ao norte
   map.addControl(new ml.NavigationControl({showCompass:true,visualizePitch:true}),'top-right');
+  // "minha posição": pede a localização do aparelho uma vez e centra nela (o iframe do módulo já libera geolocation)
+  map.addControl(new ml.GeolocateControl({positionOptions:{enableHighAccuracy:true,timeout:15000},trackUserLocation:false,
+    showAccuracyCircle:false,fitBoundsOptions:{maxZoom:16}}),'top-right');
   map.addControl(new ml.AttributionControl({compact:true}),'bottom-left');
 
   // ---- base: mapa x satélite ----
@@ -324,7 +343,7 @@ function criar(host,cfg){
     btn3d.classList.toggle('on',tres); btn3d.setAttribute('aria-pressed',String(tres));
   }
   function escondeAviso(){ clearTimeout(avisoT); if(aviso){ aviso.remove(); aviso=null; } }
-  const AVISO_3D='Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Arraste com o botão direito para inclinar e girar.';
+  const AVISO_3D='Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Para inclinar e girar: botão direito do mouse, ou dois dedos no celular.';
   function mostraAviso(texto){
     escondeAviso();
     aviso=document.createElement('div');
@@ -451,8 +470,10 @@ function criar(host,cfg){
       guardaOriginais();
       const antes=map.getStyle().layers.find(l=>l.type==='symbol'); // satélite e contorno ficam sob os rótulos
       const antesId=antes&&antes.id;
-      map.addSource('gc-satelite',{type:'raster',tiles:[ESRI_TILES],tileSize:256,maxzoom:19,attribution:ESRI_ATTR});
-      map.addLayer({id:'gc-satelite',type:'raster',source:'gc-satelite',layout:{visibility:'none'}},antesId);
+      if(temSat){
+        map.addSource('gc-satelite',{type:'raster',tiles:[ESRI_TILES+encodeURIComponent(cfg.chaveEsri)],tileSize:256,maxzoom:19,attribution:ESRI_ATTR});
+        map.addLayer({id:'gc-satelite',type:'raster',source:'gc-satelite',layout:{visibility:'none'}},antesId);
+      }
       map.addSource('gc-dem',{type:'raster-dem',tiles:[DEM_TILES],encoding:'terrarium',tileSize:256,maxzoom:15,attribution:DEM_ATTR});
       // o sombreamento fica sob a camada de água do estilo: o DEM traz a batimetria e, por cima da água, o mar
       // ganharia manchas escuras. Sob o satélite ele some junto com o resto do desenho do mapa.
@@ -463,6 +484,10 @@ function criar(host,cfg){
         paint:{'fill-color':cfg.corPreench||'#007233','fill-opacity':.07}},antesId);
       map.addLayer({id:'gc-contorno-line',type:'line',source:'gc-contorno',
         layout:{'line-join':'round'},paint:{'line-color':cfg.corLinha||'#007233','line-width':1.8,'line-opacity':.9}},antesId);
+      // no celular a atribuição abre recolhida (só o "i"): expandida ela cobre o botão "Ocultar ruas e rotas"
+      if(window.matchMedia&&window.matchMedia('(max-width:600px)').matches){
+        const at=el.querySelector('.maplibregl-ctrl-attrib'); if(at) at.classList.remove('maplibregl-compact-show');
+      }
       pronto=true; aplicaBase();
     }catch(e){ falhar((e&&e.message)||'erro ao montar as camadas'); }
   });

@@ -3249,7 +3249,7 @@ function glIniciar(){
   if(!window.MapaRuasGL||!MapaRuasGL.suportado()){ GLST='falhou'; return; }
   GLST='carregando';
   MapaRuasGL.carregar().then(()=>{
-    glCtl=MapaRuasGL.criar(map.getContainer(),{corLinha:TOKENS.ng,corPreench:BASE,aoFalhar:glFalhou,
+    glCtl=MapaRuasGL.criar(map.getContainer(),{corLinha:TOKENS.ng,corPreench:BASE,chaveEsri:window.ESRI_API_KEY||'',aoFalhar:glFalhou,
       buscar:glBuscaObras,aoEscolher:glEscolheObra,caixa:LOC_CE,rotaUrl:glRotaUrl});
     // o painel do MapLibre fica dentro do contêiner do Leaflet: sem isto, arrastar e rolar moveriam o mapa escondido
     L.DomEvent.disableClickPropagation(glCtl.el); L.DomEvent.disableScrollPropagation(glCtl.el);

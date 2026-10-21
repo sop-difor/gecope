@@ -10,3 +10,7 @@ window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // Preencher com a URL do domínio configurado no deploy (ver server/whatsapp-proxy/DEPLOY.md).
 // Deixar em branco mantém o disparo pausado, com erro amigável (ver fetchComTimeout).
 window.WHATSAPP_PROXY_URL = 'https://137-131-228-120.sslip.io';
+// Satélite do mapa de obras (Esri World Imagery). A licença do Esri exige conta: crie uma chave gratuita no ArcGIS Location
+// Platform (developers.arcgis.com > Dashboard > API keys, permissão "Location services > Basemaps > Static basemap tiles")
+// e RESTRINJA a chave ao domínio do GECOPE nos referrers dela; assim ela pode ficar neste arquivo público. Vazia = sem satélite.
+window.ESRI_API_KEY = '';

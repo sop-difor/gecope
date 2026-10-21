@@ -2343,9 +2343,9 @@ body.modo-gl .ruas-btn.on{background:rgba(var(--panel-rgb),.96);border-color:rgb
 .gc-gl .gc-gl-3d button.on{background:rgba(var(--ng-rgb),.16);color:var(--text-brightest)}
 .gc-gl .gc-gl-3d button:disabled{opacity:.5}
 .gc-gl:not(.gc-3d) .maplibregl-ctrl-compass{display:none}
-.gc-gl .gc-gl-aviso{position:absolute;left:50%;bottom:52px;transform:translateX(-50%);z-index:2;max-width:min(520px,calc(100% - 32px));padding:8px 14px;background:rgba(var(--panel-rgb),.96);border:1px solid rgba(var(--raise-rgb),.12);border-radius:10px;color:var(--text-base);font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;line-height:1.4;text-align:center;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);pointer-events:none}
+.gc-gl .gc-gl-aviso{position:absolute;left:0;right:0;bottom:52px;margin:0 auto;width:fit-content;z-index:2;max-width:min(520px,calc(100% - 32px));padding:8px 14px;background:rgba(var(--panel-rgb),.96);border:1px solid rgba(var(--raise-rgb),.12);border-radius:10px;color:var(--text-base);font-family:Montserrat,sans-serif;font-size:12px;font-weight:500;line-height:1.4;text-align:center;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);pointer-events:none}
 /* busca (canto superior esquerdo, abaixo do botão Filtros), link "Como chegar" e marcador de endereço */
-.gc-gl .maplibregl-ctrl-top-left{top:52px}
+.gc-gl .maplibregl-ctrl-top-left{top:52px;z-index:3} /* acima dos controles da direita: a lista da busca passa por cima deles */
 .gc-gl .gc-gl-busca{position:relative;width:min(340px,calc(100vw - 32px))}
 .gc-gl .gc-gl-busca input{width:100%;height:34px;box-sizing:border-box;padding:0 12px 0 34px;background:rgba(var(--panel-rgb),.94);backdrop-filter:blur(9px);
   border:1px solid rgba(var(--raise-rgb),.12);border-radius:11px;box-shadow:0 6px 18px rgba(var(--shadow-rgb),.3);color:var(--text-base);
@@ -2370,6 +2370,14 @@ body.modo-gl .ruas-btn.on{background:rgba(var(--panel-rgb),.96);border-color:rgb
 .gc-gl .ruas-tip:not(.com-rota) .maplibregl-popup-content{pointer-events:none}
 .gc-gl .ruas-tip.com-rota{pointer-events:auto}
 .gc-gl-lugar{width:18px;height:18px;border-radius:50%;background:var(--ng);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer}
+/* celular: a busca ocupa a linha inteira e os controles descem abaixo dela */
+@media (max-width:600px){
+  .gc-gl .maplibregl-ctrl-top-left{right:0}
+  .gc-gl .gc-gl-busca{width:calc(100vw - 20px)}
+  .gc-gl .maplibregl-ctrl-top-right{top:96px}
+  .gc-gl .gc-gl-base button,.gc-gl .gc-gl-3d button{padding:0 10px}
+  .gc-gl .gc-gl-aviso{bottom:56px;font-size:12px}
+}
 .gc-gl .maplibregl-ctrl-attrib{background:rgba(var(--panel-rgb),.9);font-family:Montserrat,sans-serif;font-size:12px;color:var(--text-muted)}
 .gc-gl .maplibregl-ctrl-attrib a{color:var(--ng-light)}
 .maplibregl-marker.ruas-pin{cursor:pointer}
