@@ -1,4 +1,4 @@
-# Mapa de ruas em MapLibre (3D, satélite, busca)
+# Mapa de ruas em MapLibre (satélite, busca)
 
 Decidido em grilling de 21/10/2026 e implementado na branch `feat/mapa-3d-maplibre` (E1–E4). O mapa de contornos
 (Estado > Região > Município) continua em Leaflet; só o modo "Ruas e rotas" dos níveis distrito e município é desenhado
@@ -8,18 +8,27 @@ pelo MapLibre GL.
 
 | Parte | Arquivo |
 |---|---|
-| Módulo do mapa (carga sob demanda, controles, pinos, 3D, busca) | `assets/js/mapa-ruas-gl.js` (`window.MapaRuasGL`) |
+| Módulo do mapa (carga sob demanda, controles, pinos, busca) | `assets/js/mapa-ruas-gl.js` (`window.MapaRuasGL`) |
 | Integração (quando usar o GL, dados dos pinos, busca de obras) | `assets/js/mapa-obras.js`, bloco "mapa de ruas em MapLibre" (`GLST`, `glIniciar`, `glSync`, `glModeloPino`, `glBuscaObras`, `syncRuas`) |
 | Estilo | `assets/css/mapa-obras.css`, classes `.gc-gl*` |
 | Chave do satélite | `config.js`, `window.ESRI_API_KEY` |
 
 ## Comportamento
 
-- **Abre plano e em "Mapa".** O botão **3D** (só no modo Mapa) inclina ~60°, liga o relevo (AWS Terrain Tiles, exagero
-  1,5×, sombreamento leve sob a água) e libera girar/inclinar. Os prédios vêm do OpenStreetMap (camada `building-3d` do
-  estilo, zoom 14+): no interior do Ceará há pouco cadastro. O 3D nunca fica lembrado.
-- **Satélite** (Esri World Imagery) é uma alternativa ao Mapa, sem 3D (a imagem sobre o relevo SRTM ondula nas cidades).
-  A escolha Mapa/Satélite fica em `localStorage` `gecope_mapa_base`.
+- **Só Mapa e Satélite, sempre plano.** A visão 3D (inclinação, relevo AWS Terrain Tiles, prédios extrudados) foi
+  **removida em 27/10/2026**: deixava o carregamento do mapa pesado. Rotação e inclinação ficam travadas (mouse, toque e
+  teclado) e não há bússola. O estilo Liberty traz os prédios como `fill-extrusion` (`building-3d`); ao carregar, o módulo
+  troca essa camada por um polígono plano (`predios-planos`, mesma fonte, filtro e cor, zoom 14+).
+- **Satélite** (Esri World Imagery) é uma alternativa ao Mapa. A escolha Mapa/Satélite fica em `localStorage`
+  `gecope_mapa_base`.
+- **Carregamento do satélite** (ajustes de 27/10/2026): (1) o desenho do mapa só é apagado depois que a imagem chegou
+  (`idle`), então a tela nunca fica em branco esperando a rede; (2) ponteiro, foco ou toque no botão Satélite ligam a
+  camada com opacidade 0 e já baixam os tiles (`preaquece`; desliga em 6 s sem clique); (3) `preconnect` ao Esri na
+  criação quando o satélite é a base lembrada e no primeiro `preaquece`; (4) fonte com `maxzoom` 18: o Esri só tem imagem
+  até o zoom 17 em boa parte do Ceará (18 em várias cidades, como Fortaleza, Juazeiro, Crato e Iguatu; 404 em Sobral,
+  Quixadá, Itapipoca, Camocim), e com tiles de 256 px o mapa pede um nível acima do zoom da tela, então o teto 19 só
+  gerava 404. Onde falta o nível, o MapLibre amplia o de baixo (imagem mais mole, nunca vazia); o 404 ainda aparece no
+  console ao aproximar nessas cidades.
 - **Busca**: digitar lista o município (se o nome casar) e as obras que passam pelos filtros (contrato, código, município, objeto); obras sem ponto no
   mapa vão por último e abrem só o município. O endereço só vai ao Nominatim (restrito ao Ceará pela caixa do estado e pelo filtro `BR-CE` do resultado, no máximo 1 consulta
   por segundo, sem autocomplete) pelo Enter sem obra correspondente ou pela última linha da lista.
@@ -36,7 +45,6 @@ pelo MapLibre GL.
 | Uso | Provedor | Chave |
 |---|---|---|
 | Mapa vetorial | OpenFreeMap (estilo Liberty) | não |
-| Relevo | AWS Terrain Tiles (Terrarium) | não |
 | Busca de endereço | Nominatim (OpenStreetMap) | não |
 | Satélite | Esri World Imagery via `ibasemaps-api.arcgis.com` | **sim** (gratuita) |
 

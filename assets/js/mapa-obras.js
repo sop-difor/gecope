@@ -3237,7 +3237,7 @@ function saiRuas(){
   map.setMaxZoom(11);
   refit(); // o zoom pode ter passado de 11 com o mapa de ruas: volta ao enquadramento do nível
 }
-// ---- mapa de ruas em MapLibre (E1 do mapa 3D) ----
+// ---- mapa de ruas em MapLibre ----
 // Nos níveis distrito e município o modo ruas é desenhado pelo MapLibre (assets/js/mapa-ruas-gl.js), carregado
 // só no primeiro clique. O Leaflet segue por baixo, intacto, e assume sozinho no nível Estado e sempre que o
 // MapLibre não existir: sem WebGL2, script que não chega ou estilo que não carrega (GLST='falhou').

@@ -1,4 +1,4 @@
-/* Mapa de ruas em MapLibre GL — modo "Ruas e rotas" nos níveis distrito e município (E1 do mapa 3D).
+/* Mapa de ruas em MapLibre GL — modo "Ruas e rotas" nos níveis distrito e município.
    O mapa de contornos (Estado > Região > Município) continua em Leaflet; este arquivo só desenha o que
    fica por cima dele quando o modo ruas está ligado: base vetorial (OpenFreeMap) ou satélite (Esri),
    o contorno da área aberta e os pinos das obras. Os dados e o conteúdo dos pinos vêm de mapa-obras.js;
@@ -8,14 +8,12 @@
    falha (sem WebGL2, script ou estilo que não chega) vira rejeição/aoFalhar e o chamador volta ao Leaflet.
 
    Decisões (grilling de 21/10/2026):
-   - só provedores gratuitos (OpenFreeMap e AWS Terrain Tiles sem chave; Esri World Imagery com a chave gratuita do
+   - só provedores gratuitos (OpenFreeMap sem chave; Esri World Imagery com a chave gratuita do
      ArcGIS Location Platform em window.ESRI_API_KEY, porque a licença do Esri não cobre o uso sem conta; sem chave o
      satélite simplesmente não existe);
-   - o mapa abre plano; rotação e inclinação ficam travadas e só o botão 3D as libera (inclina ~60°, liga o
-     relevo do AWS Terrain Tiles com exagero 1,5× e sombreamento leve; os prédios vêm do OpenStreetMap e o
-     estilo já os extruda a partir do zoom 14, então só mostram altura com o mapa inclinado);
-   - o 3D só existe no modo Mapa: no satélite a imagem desenhada sobre o relevo (SRTM, que traz prédios e árvores
-     embutidos) ondula nas cidades, e o resultado não ficou bom nem com o exagero reduzido (pedido de 21/10/2026);
+   - o mapa é sempre plano: rotação e inclinação ficam travadas. A visão 3D (relevo, prédios extrudados) existiu e foi
+     removida em 27/10/2026 porque deixava o carregamento do mapa pesado; sem ela, os prédios do estilo viram polígonos
+     planos (camada predios-planos) e não há fonte de relevo;
    - o mapa é claro nos dois temas; só os controles e popups seguem o tema (CSS em mapa-obras.css). */
 (function(){
 'use strict';
@@ -26,6 +24,12 @@ const ML_CSS='https://cdn.jsdelivr.net/npm/maplibre-gl@5.7.0/dist/maplibre-gl.cs
 const ML_CSS_SRI='sha384-gNYNsUmuZqDYiT3gbirWTV5K7rt71RoveS/yXAaU09d4ZUmeDVTD3XoqB6uJAIFR';
 const ESTILO='https://tiles.openfreemap.org/styles/liberty';
 const ESRI_TILES='https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=';
+const ESRI_ORIGEM='https://ibasemaps-api.arcgis.com';
+// O Esri só tem imagem até o zoom 17 em boa parte do Ceará (18 em várias cidades, 19 quase só na capital) e responde 404
+// além disso. O mapa usa tiles de 256 px, que são pedidos um nível acima do zoom da tela: o teto 18 evita os pedidos do
+// 19 (404 e console cheio); onde falta o 18 o MapLibre amplia o nível de baixo.
+const ESRI_MAXZOOM=18;
+const AQUECE_MS=6000; // quanto tempo o satélite pré-carregado (opacidade 0) fica ligado se o clique não vier
 const ESRI_ATTR='Imagens © Esri, Vantor, Earthstar Geographics e a comunidade GIS';
 const SAT_ERROS_MAX=3; // tiles do satélite que falham sem nenhum ter chegado: chave inválida ou serviço fora
 const VEC_ERROS_MAX=6; // idem para os tiles vetoriais do mapa: sem nenhum, o mapa ficaria em branco e o Leaflet assume
@@ -34,15 +38,12 @@ const PREF_BASE='gecope_mapa_base';
 const CELULA_PX=38;        // pontos a menos disto na tela viram um pino com a contagem (nível distrito)
 const TIMEOUT_MS=15000;    // estilo que não chega neste prazo = falha, e o Leaflet assume
 const SOMEM_NO_SATELITE=/shield|one_way|^poi_|^airport/; // camadas de ícone do estilo Liberty que atrapalham sobre a imagem
-const DEM_TILES='https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
-const DEM_ATTR='Relevo: Mapzen e AWS Terrain Tiles';
-const EXAGERO=1.5, PITCH_3D=60, PITCH_MAX=70;
 const AVISO_MS=7000;
 const NOMINATIM='https://nominatim.openstreetmap.org/search';
 const NOMINATIM_GAP_MS=1100; // a política de uso do Nominatim pede no máximo 1 consulta por segundo e sem autocomplete
 const BUSCA_MIN=2;
 const LOCALE={
-  'NavigationControl.ZoomIn':'Aproximar','NavigationControl.ZoomOut':'Afastar','NavigationControl.ResetBearing':'Voltar ao norte',
+  'NavigationControl.ZoomIn':'Aproximar','NavigationControl.ZoomOut':'Afastar',
   'AttributionControl.ToggleAttribution':'Mostrar créditos','AttributionControl.MapFeedback':'Sugerir correção no mapa',
   'FullscreenControl.Enter':'Tela cheia','FullscreenControl.Exit':'Sair da tela cheia',
   'GeolocateControl.FindMyLocation':'Minha posição','GeolocateControl.LocationNotAvailable':'Localização indisponível'
@@ -94,15 +95,19 @@ function criar(host,cfg){
   const map=new ml.Map({
     container:el, style:ESTILO, center:[-39.3,-5.2], zoom:6.5, minZoom:5, maxZoom:18,
     attributionControl:false, renderWorldCopies:false, locale:LOCALE,
-    // plano de saída: sem rotação nem inclinação até o botão 3D (liberaGestos)
-    dragRotate:false, pitchWithRotate:true, touchPitch:false, maxPitch:0
+    // sempre plano: sem rotação nem inclinação
+    dragRotate:false, pitchWithRotate:false, touchPitch:false, maxPitch:0
   });
   map.touchZoomRotate.disableRotation();
+  map.keyboard.disableRotation(); // Shift+setas também giram/inclinam
 
   const temSat=!!cfg.chaveEsri;
+  if(temSat&&lerBase()==='satelite') preconectaEsri();
   let vecErros=0, vecOk=false, perdidoT=null;
   let satErros=0, satOk=false, satFora=false; // satFora: o satélite não respondeu e foi desativado nesta sessão
-  let base=temSat?lerBase():'mapa', pronto=false, visivel=false, carregou=false, tres=false, aviso=null, avisoT=null;
+  let satPronto=false; // a imagem já cobre a tela: só então o desenho do mapa por baixo é apagado
+  let aqueceT=null;
+  let base=temSat?lerBase():'mapa', pronto=false, visivel=false, carregou=false, aviso=null, avisoT=null;
   let spec=null, marcadores=[], fc={type:'FeatureCollection',features:[]};
   let tip=null, tipT=null, pop=null, ajustePend=null;
   const visOrig=new Map(), rotOrig=new Map(), comIcone=new Set();
@@ -258,6 +263,8 @@ function criar(host,cfg){
         const b=document.createElement('button');
         b.type='button'; b.textContent=t; b.dataset.base=k;
         b.addEventListener('click',()=>definirBase(k));
+        // ponteiro, foco ou toque no botão já começam a baixar a imagem: quando o clique vem, ela está a caminho ou pronta
+        if(k==='satelite') for(const ev of ['pointerenter','focus','touchstart']) b.addEventListener(ev,preaquece,{passive:true});
         d.appendChild(b);
       }
       this._d=baseEl=d; marcaBase(); return d;
@@ -272,27 +279,26 @@ function criar(host,cfg){
       if(b.dataset.base==='satelite'){ b.disabled=satFora; b.title=satFora?'Satélite indisponível agora':''; }
     });
   }
-  let btn3d=null;
-  class Ctl3D{
-    onAdd(){
-      const d=document.createElement('div');
-      d.className='maplibregl-ctrl maplibregl-ctrl-group gc-gl-3d';
-      const b=document.createElement('button');
-      b.type='button'; b.textContent='3D'; b.title='Visão 3D: inclinar e girar o mapa'; b.setAttribute('aria-pressed','false');
-      b.addEventListener('click',()=>define3D(!tres));
-      d.appendChild(b); this._d=d; btn3d=b; marca3D(); return d;
-    }
-    onRemove(){ this._d.remove(); }
-  }
   map.addControl(new BuscaCtl(),'top-left');
   if(temSat) map.addControl(new BaseCtl(),'top-right');
-  map.addControl(new Ctl3D(),'top-right');
-  // a bússola só aparece no 3D (CSS: .gc-gl:not(.gc-3d)); clicar nela volta ao norte
-  map.addControl(new ml.NavigationControl({showCompass:true,visualizePitch:true}),'top-right');
+  map.addControl(new ml.NavigationControl({showCompass:false}),'top-right'); // só aproximar/afastar: o mapa não gira
   // "minha posição": pede a localização do aparelho uma vez e centra nela (o iframe do módulo já libera geolocation)
   map.addControl(new ml.GeolocateControl({positionOptions:{enableHighAccuracy:true,timeout:15000},trackUserLocation:false,
     showAccuracyCircle:false,fitBoundsOptions:{maxZoom:16}}),'top-right');
   map.addControl(new ml.AttributionControl({compact:true}),'bottom-left');
+
+  // O estilo Liberty desenha os prédios como fill-extrusion (building-3d), que custa GPU e não rende nada num mapa
+  // que não inclina. Troca por polígonos planos, com a mesma fonte e filtro; a cor é a do estilo Liberty (v. ESTILO),
+  // copiada à mão: se o OpenFreeMap mudar o estilo, ajustar aqui.
+  function achataPredios(){
+    const ant=map.getLayer('building-3d'); if(!ant) return;
+    const ls=map.getStyle().layers, i=ls.findIndex(l=>l.id==='building-3d');
+    const depois=ls[i+1]&&ls[i+1].id;
+    map.addLayer({id:'predios-planos',type:'fill',source:ant.source,'source-layer':ant.sourceLayer,minzoom:14,
+      filter:map.getFilter('building-3d'),
+      paint:{'fill-color':'hsl(35,8%,85%)','fill-outline-color':'hsl(35,6%,79%)','fill-opacity':.8}},depois);
+    map.removeLayer('building-3d');
+  }
 
   // ---- base: mapa x satélite ----
   // Uma só folha de estilo. No satélite apagam-se as camadas de desenho do mapa (terra, água, ruas,
@@ -308,10 +314,36 @@ function criar(host,cfg){
       }
     }
   }
+  function preconectaEsri(){
+    if(document.querySelector('link[data-gc-esri]')) return;
+    const l=document.createElement('link');
+    l.rel='preconnect'; l.href=ESRI_ORIGEM; l.crossOrigin='anonymous'; l.dataset.gcEsri='1';
+    document.head.appendChild(l);
+  }
+  // Liga o satélite com opacidade 0: a camada visível faz o MapLibre pedir os tiles, mas nada aparece. Sem clique, desliga.
+  function preaquece(){
+    if(!pronto||satFora||base==='satelite'||!map.getLayer('gc-satelite')) return;
+    preconectaEsri();
+    clearTimeout(aqueceT);
+    map.setPaintProperty('gc-satelite','raster-opacity',0);
+    map.setLayoutProperty('gc-satelite','visibility','visible');
+    aqueceT=setTimeout(()=>{ if(base!=='satelite'&&map.getLayer('gc-satelite')) map.setLayoutProperty('gc-satelite','visibility','none'); },AQUECE_MS);
+  }
+  // O desenho do mapa só some depois que a imagem chegou (idle = tiles e transições concluídos): até lá ele aparece
+  // por baixo e o satélite entra por cima, em vez de a tela ficar em branco esperando a rede.
   function aplicaBase(){
     if(!pronto) return;
     const sat=base==='satelite';
-    if(map.getLayer('gc-satelite')) map.setLayoutProperty('gc-satelite','visibility',sat?'visible':'none');
+    satPronto=false; clearTimeout(aqueceT);
+    if(map.getLayer('gc-satelite')){
+      map.setPaintProperty('gc-satelite','raster-opacity',1);
+      map.setLayoutProperty('gc-satelite','visibility',sat?'visible':'none');
+    }
+    aplicaDesenho();
+    if(sat) map.once('idle',()=>{ if(base==='satelite'&&!satPronto){ satPronto=true; aplicaDesenho(); } });
+  }
+  function aplicaDesenho(){
+    const sat=base==='satelite', apaga=sat&&satPronto;
     for(const [id,vis] of visOrig){
       if(!map.getLayer(id)) continue;
       const tipo=map.getLayer(id).type;
@@ -324,68 +356,24 @@ function criar(host,cfg){
         map.setPaintProperty(id,'text-halo-color',sat?'rgba(0,0,0,.75)':r.h);
         continue;
       }
-      map.setLayoutProperty(id,'visibility',sat?'none':vis);
+      map.setLayoutProperty(id,'visibility',apaga?'none':vis);
     }
   }
   function definirBase(k){
     base=k==='satelite'?'satelite':'mapa';
     try{ localStorage.setItem(PREF_BASE,base); }catch(_){}
     marcaBase(); aplicaBase();
-    if(base==='satelite') define3D(false); // o 3D é só do modo Mapa
-    marca3D();
   }
 
-  // ---- 3D: inclinação, relevo e prédios ----
-  // Abre sempre plano; só o botão liga. O relevo é o terreno do mapa (setTerrain) mais um sombreamento leve; os
-  // prédios do OpenStreetMap já vêm extrudados no estilo (camada building-3d, zoom 14+) e só mostram altura com
-  // o mapa inclinado. No satélite o botão fica desativado.
-  function liberaGestos(on){
-    if(on){
-      map.setMaxPitch(PITCH_MAX); map.dragRotate.enable(); map.touchPitch.enable(); map.touchZoomRotate.enableRotation();
-    } else {
-      map.dragRotate.disable(); map.touchPitch.disable(); map.touchZoomRotate.disableRotation(); map.setMaxPitch(0);
-    }
-  }
-  function marca3D(){
-    el.classList.toggle('gc-3d',tres);
-    if(!btn3d) return;
-    const sat=base==='satelite';
-    btn3d.disabled=sat;
-    btn3d.title=sat?'O 3D só está disponível no modo Mapa':'Visão 3D: inclinar e girar o mapa';
-    btn3d.classList.toggle('on',tres); btn3d.setAttribute('aria-pressed',String(tres));
-  }
+  // ---- aviso temporário sobre o mapa ----
   function escondeAviso(){ clearTimeout(avisoT); if(aviso){ aviso.remove(); aviso=null; } }
-  const AVISO_3D='Prédios 3D dependem do OpenStreetMap e podem faltar em cidades menores. Para inclinar e girar: botão direito do mouse, ou dois dedos no celular.';
   function mostraAviso(texto){
     escondeAviso();
     aviso=document.createElement('div');
     aviso.className='gc-gl-aviso'; aviso.setAttribute('role','status');
-    aviso.textContent=texto||AVISO_3D;
+    aviso.textContent=texto;
     el.appendChild(aviso);
     avisoT=setTimeout(escondeAviso,AVISO_MS);
-  }
-  function define3D(on){
-    if(!pronto||on===tres||(on&&base==='satelite')) return;
-    tres=on; marca3D();
-    if(on){
-      liberaGestos(true);
-      map.setTerrain({source:'gc-dem',exaggeration:EXAGERO});
-      map.setLayoutProperty('gc-relevo','visibility','visible');
-      map.easeTo({pitch:PITCH_3D,duration:900});
-      mostraAviso();
-    } else {
-      escondeAviso();
-      map.setLayoutProperty('gc-relevo','visibility','none');
-      map.easeTo({pitch:0,bearing:0,duration:700});
-      map.once('moveend',()=>{ if(tres) return; map.setTerrain(null); liberaGestos(false); });
-    }
-  }
-  // volta ao plano na hora (ao fechar o modo ruas): sem animação, nada fica ligado por baixo
-  function reset3D(){
-    if(!tres) return;
-    tres=false; marca3D(); escondeAviso();
-    if(pronto){ map.setLayoutProperty('gc-relevo','visibility','none'); map.setTerrain(null); }
-    map.jumpTo({pitch:0,bearing:0}); liberaGestos(false);
   }
 
   // ---- contorno da área aberta ----
@@ -478,26 +466,24 @@ function criar(host,cfg){
     if(ajustePend){ const f=ajustePend; ajustePend=null; f(); }
     if(spec&&spec.agrupar) redesenha();
   }
-  function ocultar(){ reset3D(); visivel=false; el.classList.remove('on'); limpaPinos(); limpaLugar(); fechaLista(); }
+  function ocultar(){ escondeAviso(); visivel=false; el.classList.remove('on'); limpaPinos(); limpaLugar(); fechaLista(); }
   function redimensionar(){ if(visivel) map.resize(); }
-  function destruir(){ clearTimeout(prazo); clearTimeout(perdidoT); escondeAviso(); limpaPinos(); limpaLugar(); map.remove(); el.remove(); }
+  function destruir(){ clearTimeout(prazo); clearTimeout(perdidoT); clearTimeout(aqueceT); escondeAviso(); limpaPinos(); limpaLugar(); map.remove(); el.remove(); }
 
   // ---- estilo carregado: camadas próprias ----
   map.once('load',()=>{
     carregou=true; clearTimeout(prazo);
     try{
+      // antes de guardaOriginais: a camada nova entra na troca mapa/satélite como as do estilo. É só desempenho:
+      // se o estilo mudar e a troca falhar, o mapa segue com os prédios do estilo em vez de cair para o Leaflet
+      try{ achataPredios(); }catch(e){ console.warn('Prédios planos indisponíveis; mantido o estilo original:',(e&&e.message)||e); }
       guardaOriginais();
       const antes=map.getStyle().layers.find(l=>l.type==='symbol'); // satélite e contorno ficam sob os rótulos
       const antesId=antes&&antes.id;
       if(temSat){
-        map.addSource('gc-satelite',{type:'raster',tiles:[ESRI_TILES+encodeURIComponent(cfg.chaveEsri)],tileSize:256,maxzoom:19,attribution:ESRI_ATTR});
+        map.addSource('gc-satelite',{type:'raster',tiles:[ESRI_TILES+encodeURIComponent(cfg.chaveEsri)],tileSize:256,maxzoom:ESRI_MAXZOOM,attribution:ESRI_ATTR});
         map.addLayer({id:'gc-satelite',type:'raster',source:'gc-satelite',layout:{visibility:'none'}},antesId);
       }
-      map.addSource('gc-dem',{type:'raster-dem',tiles:[DEM_TILES],encoding:'terrarium',tileSize:256,maxzoom:15,attribution:DEM_ATTR});
-      // o sombreamento fica sob a camada de água do estilo: o DEM traz a batimetria e, por cima da água, o mar
-      // ganharia manchas escuras. Sob o satélite ele some junto com o resto do desenho do mapa.
-      map.addLayer({id:'gc-relevo',type:'hillshade',source:'gc-dem',layout:{visibility:'none'},
-        paint:{'hillshade-exaggeration':.3}},map.getLayer('water')?'water':antesId);
       map.addSource('gc-contorno',{type:'geojson',data:fc});
       map.addLayer({id:'gc-contorno-fill',type:'fill',source:'gc-contorno',
         paint:{'fill-color':cfg.corPreench||'#007233','fill-opacity':.07}},antesId);
@@ -511,7 +497,7 @@ function criar(host,cfg){
     }catch(e){ falhar((e&&e.message)||'erro ao montar as camadas'); }
   });
 
-  return {el,mapa:map,definirCores,irPara,avisar:mostraAviso,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base,em3D:()=>tres,define3D};
+  return {el,mapa:map,definirCores,irPara,avisar:mostraAviso,mostrar,ocultar,definirPinos,definirContornos,ajustar,redimensionar,destruir,base:()=>base};
 }
 
 window.MapaRuasGL={suportado,carregar,criar};
