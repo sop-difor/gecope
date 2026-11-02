@@ -37,3 +37,7 @@ sql/reestruturacao_tabelas/**/*.xlsx
 
 # Saídas de diagnóstico do banco (metadados de RLS) — ficam só na máquina local
 resultados_diagnostico_*/
+
+# Planilhas de trabalho (orcamentos e rascunhos de replanilhamento), so locais
+planilhas/
+~$*
