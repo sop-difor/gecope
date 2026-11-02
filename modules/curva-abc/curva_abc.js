@@ -133,6 +133,7 @@
     if (!aoa || aoa.length < 2) { erro("<b>Planilha vazia.</b> Nenhuma linha de dados encontrada."); return; }
     state.versaoCarregadaDb = null; /* upload novo: ainda não foi salvo como versão de nenhum processo */
     state.aoaAprovado = aoa;
+    cvConfLimpar();
     var h = acharLinhaCabecalho(aoa);
     state.headerRow = h;
     var head = aoa[h] || [];
@@ -478,7 +479,7 @@
     var colunas = montarColunasTabela();
     var header = '<tr>' + colunas.filter(function (col) { return col.mostrar; }).map(function (col) {
       return '<th class="' + col.cls + '">' + col.title + '</th>';
-    }).join("") + (state.processoVinculado ? '<th class="cv-col-analise cv-center">Análise</th><th class="cv-col-analise cv-col-comentario cv-center">Comentário</th>' : "") + '</tr>';
+    }).join("") + (cvConfAtiva() ? '<th class="cv-col-conf cv-center" title="Resultado da conferência orçamentária. Passe o mouse ou clique no símbolo para ver a explicação.">Conferência</th>' : "") + (state.processoVinculado ? '<th class="cv-col-analise cv-center">Análise</th><th class="cv-col-analise cv-col-comentario cv-center">Comentário</th>' : "") + '</tr>';
     $("cv-thead").innerHTML = header;
   }
 
@@ -489,7 +490,7 @@
       : it.slice(0, state.limite);
     var colunas = montarColunasTabela();
     var colunasVisiveis = colunas.filter(function (col) { return col.mostrar; });
-    var numCols = colunasVisiveis.length + (state.processoVinculado ? 2 : 0);
+    var numCols = colunasVisiveis.length + (state.processoVinculado ? 2 : 0) + (cvConfAtiva() ? 1 : 0);
     var rows = [], ultimo = null;
     renderCabecalhoTabela();
     for (var i = 0; i < lista.length; i++) {
@@ -502,7 +503,7 @@
         ? (x.statusAnalise === "ok" ? "cv-row-ok" : (x.statusAnalise === "inconsistencia" ? "cv-row-inc" : ""))
         : "";
       var celulas = colunasVisiveis.map(function (col) { return col.render(x); }).join("");
-      rows.push('<tr class="' + linhaClasse + '">' + celulas + (state.processoVinculado ? colunasAnalise(x) : "") + '</tr>');
+      rows.push('<tr class="' + linhaClasse + '">' + celulas + (cvConfAtiva() ? window.CvConferencia.celula(x.conta) : "") + (state.processoVinculado ? colunasAnalise(x) : "") + '</tr>');
     }
     if (!rows.length) rows.push('<tr><td colspan="' + numCols + '" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca.</td></tr>');
     $("cv-tbody").innerHTML = rows.join("");
@@ -526,6 +527,8 @@
     state.aoaAprovado = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null, blankrows: false });
     return state.aoaAprovado;
   }
+  function cvConfAtiva() { return !!(window.CvConferencia && window.CvConferencia.ativa()); }
+  function cvConfLimpar() { if (window.CvConferencia) window.CvConferencia.limpar(); }
   function cvIrParaTermo(termo) {
     $("cv-busca").value = termo;
     desenhaTabela();
@@ -539,7 +542,8 @@
       textoReferencia: state.fileName + " " + (state.processoVinculado ? state.processoVinculado.descricao : ""),
       itensCurva: function () { return state.curva; },
       obterAoaAprovado: cvObterAoaAprovado,
-      verNaCurva: cvIrParaTermo
+      verNaCurva: cvIrParaTermo,
+      aoAtualizar: function () { if (state.curva && state.curva.length) desenhaTabela(); }
     });
   }
 
@@ -677,6 +681,7 @@
     });
 
     state.cols = []; state.dados = []; state.arquivoOriginal = null; state.aoaAprovado = null;
+    cvConfLimpar();
     state.curva = itens;
     state.total = Number(versaoRegistro.total_valor) || itens.reduce(function (s, x) { return s + x.ord; }, 0);
     state.fA = Number(versaoRegistro.criterio_a) || 80;
@@ -713,6 +718,7 @@
       var e = $(id); if (e) e.classList.remove("on");
     });
     $("cv-btnConf").style.display = "none";
+    cvConfLimpar();
     $("cv-tbody").innerHTML = "";
     $("cv-chart").innerHTML = "";
     var busca = $("cv-busca"); if (busca) busca.value = "";
@@ -1013,6 +1019,10 @@
   $("cv-qtdCustom").addEventListener("change", calcular);
   $("cv-qtdCustom").addEventListener("input", calcular);
   $("cv-btnConf").addEventListener("click", cvAbrirConferencia);
+  $("cv-tbody").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-conf-conta]");
+    if (b && window.CvConferencia) window.CvConferencia.detalhe(b.getAttribute("data-conf-conta"));
+  });
   $("cv-btnXlsx").addEventListener("click", baixarXlsx);
   $("cv-btnPrint").addEventListener("click", function () { window.print(); });
 

@@ -32,7 +32,7 @@
   var st = {
     ctx: null, orcamentos: null, orcSel: null, aprovado: [], revisado: [], resultado: [], equiv: [],
     infoAprovado: "", infoRevisado: "", avisos: [], erro: "", ocupado: false,
-    filtro: "todos", ocultarOk: false, busca: "", ordem: "curva", expandidos: {}, rotulos: {}
+    filtro: "todos", ocultarOk: false, busca: "", ordem: "curva", porConta: {}
   };
   var cacheRevisado = {};   /* arquivo_path -> { itens, abas } (o arquivo é versionado, nunca muda) */
   var tela = null;
@@ -162,7 +162,7 @@
     var sel = tela.querySelector("#cf-sel");
     var orc = (st.orcamentos || []).filter(function (o) { return String(o.id) === sel.value; })[0];
     if (!orc) { alerta("Escolha o orçamento revisado", "Selecione na lista o orçamento revisado da SOP que servirá de referência.", "info"); return; }
-    st.ocupado = true; st.erro = ""; st.avisos = []; st.resultado = []; st.expandidos = {};
+    st.ocupado = true; st.erro = ""; st.avisos = []; st.resultado = [];
     st.orcSel = orc;
     marcarOcupado(true, "Lendo os orçamentos…");
     try {
@@ -189,10 +189,16 @@
       st.ocupado = false;
       marcarOcupado(false);
       render();
+      if (!st.resultado.length) { st.porConta = {}; notificar(); }
     }
   }
   function recalcular() {
     st.resultado = M.cruzar(st.aprovado, st.revisado, { equivalencias: st.equiv });
+    st.porConta = {};
+    st.resultado.forEach(function (r, i) {
+      if (r.fisc) r.fisc.linhas.forEach(function (l) { st.porConta[l.conta] = i; });
+    });
+    notificar();
   }
 
   /* ---------- tela ---------- */
@@ -236,8 +242,8 @@
     window.scrollTo(0, 0);
     var sub = ctx.processo ? "Processo " + esc(ctx.processo.processo) : "Curva ABC sem processo vinculado — as equivalências confirmadas valem só nesta tela";
     tela.querySelector("#cf-sub").innerHTML = sub + " · piloto: escolas (abas SINTÉTICO e QUADRA)";
-    st.resultado = []; st.erro = ""; st.avisos = []; st.infoAprovado = "";
-    st.filtro = "todos"; st.busca = ""; st.ocultarOk = false; st.ordem = "curva"; st.expandidos = {};
+    st.erro = "";
+    st.filtro = "todos"; st.busca = ""; st.ocultarOk = false; st.ordem = "curva";
     tela.querySelector("#cf-msgs").innerHTML = "";
     render();
     try {
@@ -261,7 +267,8 @@
       sel.appendChild(og);
     });
     var sug = sugerirOrcamento();
-    if (sug) {
+    if (st.resultado.length && st.orcSel) sel.value = String(st.orcSel.id);
+    else if (sug) {
       sel.value = sug.id;
       if (sug.lembrado) executar();
       else tela.querySelector("#cf-msgs").innerHTML = '<div class="cf-aviso"><b>Sugestão:</b> escolhi o orçamento pelo número de salas do arquivo. Confira se é o correto antes de conferir.</div>';
@@ -361,38 +368,135 @@
     else if (r.status === "incerta" || r.status === "sem_correspondencia") acoes += '<button type="button" class="cf-ghost" data-acao="vincular" data-i="' + i + '">Vincular…</button>';
     else if (r.status === "nao_localizado") acoes += '<button type="button" class="cf-ghost" data-acao="vincular-rev" data-i="' + i + '">Vincular a serviço da fiscalização…</button>';
     if (f && curvaDoGrupo(f).length) acoes += '<button type="button" class="cf-ghost" data-acao="curva" data-i="' + i + '" title="Abrir este serviço na Curva ABC para registrar a decisão">Ver na Curva</button>';
-    var aberto = !!st.expandidos[i];
     return '<tr class="cf-linha ' + r.status + '" data-i="' + i + '">'
-      + '<td><button type="button" class="cf-seta" data-acao="detalhe" data-i="' + i + '" aria-expanded="' + aberto + '" aria-label="Detalhes do serviço"><i class="bi ' + (aberto ? "bi-chevron-down" : "bi-chevron-right") + '"></i></button></td>'
+      + '<td><button type="button" class="cf-seta" data-acao="detalhe" data-i="' + i + '" title="Ver a explicação desta linha" aria-label="Ver a explicação desta linha"><i class="bi bi-info-circle"></i></button></td>'
       + '<td class="desc">' + esc(ref.desc) + (sub ? '<span class="sub">' + sub + "</span>" : "") + "</td>"
       + '<td class="cod">' + esc(cod) + "</td><td>" + esc(ref.un) + "</td>"
       + '<td class="num">' + (f ? fmt(f.qtd) : "—") + '</td><td class="num">' + (r.qtdRev != null ? fmt(r.qtdRev) : "—") + "</td>"
       + '<td class="num">' + fmtSinal(r.dif) + '</td><td class="num">' + fmtPct(r.pct) + "</td>"
       + '<td><span class="cf-sit ' + r.status + '"><i class="bi ' + s.ico + '" aria-hidden="true"></i>' + s.rot + "</span></td>"
-      + "<td>" + celulaCurva(r) + '</td><td><div class="cf-acoes">' + acoes + "</div></td></tr>"
-      + (aberto ? detalheHtml(r, i) : "");
+      + "<td>" + celulaCurva(r) + '</td><td><div class="cf-acoes">' + acoes + "</div></td></tr>";
   }
 
-  function tabelaLinhas(linhas) {
-    return '<table><thead><tr><th>Aba / planilha</th><th>Item</th><th class="num">Qtd.</th></tr></thead><tbody>'
-      + linhas.map(function (l) {
-        return "<tr><td>" + (l.origem === "APROVADO" ? "Fiscalização" : (l.origem === "QUADRA" ? "QUADRA" : "SINTÉTICO")) + "</td><td>" + esc(l.conta) + '</td><td class="num">' + fmt(l.qtd) + "</td></tr>";
-      }).join("") + "</tbody></table>";
+  /* ---------- janela de explicação (usada pela tela e pela coluna na Curva ABC) ---------- */
+  function tituloCurto(r) {
+    var t = SITUACAO[r.status].rot;
+    if (r.fisc && r.qtdRev != null) t += ": fiscalização " + fmt(r.fisc.qtd) + " × revisada " + fmt(r.qtdRev) + (r.pct != null ? " (" + fmtPct(r.pct) + ")" : "");
+    return t;
   }
-  function detalheHtml(r, i) {
-    var col1 = r.fisc ? "<div><h4>Orçamento da fiscalização</h4>" + tabelaLinhas(r.fisc.linhas) + "</div>" : "";
-    var col2 = r.rev.length ? "<div><h4>Planilha revisada</h4>" + r.rev.map(function (g) {
-      return '<div style="margin-bottom:6px"><b style="font-size:12px">' + esc(g.codigo || "(sem código)") + " · " + esc(g.desc) + "</b>" + tabelaLinhas(g.linhas) + "</div>";
-    }).join("") + "</div>" : "";
-    var col3 = "";
-    if (r.candidatos && r.candidatos.length) {
-      col3 = "<div><h4>Candidatos da revisada (não confirmados)</h4>" + r.candidatos.map(function (c, k) {
-        return '<div class="cf-cand"><div class="t"><b>' + esc(c.codigo || "(sem código)") + "</b> · " + esc(c.desc) + "<br>" + esc(c.un) + " · " + fmt(c.qtd)
-          + (c.score < 1 ? " · semelhança " + Math.round(c.score * 100) + "%" : "") + "</div>"
-          + '<button type="button" class="cf-ghost" data-acao="confirmar" data-i="' + i + '" data-k="' + k + '">É o mesmo serviço</button></div>';
-      }).join("") + "</div>";
+  function unidade(r) { return (r.fisc || r.rev[0]).un; }
+  function explicacao(r) {
+    var un = esc(unidade(r)), f = r.fisc ? fmt(r.fisc.qtd) : "", rv = r.qtdRev != null ? fmt(r.qtdRev) : "";
+    var lado = r.dif > 0 ? "acima" : "abaixo";
+    switch (r.status) {
+      case "acima":
+      case "abaixo":
+        return "A fiscalização aprovou <b>" + f + " " + un + "</b> no total e a planilha revisada da SOP prevê <b>" + rv + " " + un + "</b>. "
+          + "A quantidade aprovada está <b>" + fmt(Math.abs(r.dif)) + " " + un + (r.pct != null ? " (" + fmt(Math.abs(r.pct)) + "%)" : "") + " " + lado + "</b> da referência."
+          + (r.pct == null ? " Como a revisada prevê zero, não há percentual." : "");
+      case "compativel":
+        return "A quantidade aprovada pela fiscalização (<b>" + f + " " + un + "</b>) é igual à prevista na planilha revisada (até a 2ª casa decimal).";
+      case "sem_correspondencia":
+        return "Este serviço consta no orçamento da fiscalização, mas <b>não foi localizado na planilha revisada</b>. Pode ter mudado de código ou de descrição. Se você souber qual serviço da revisada corresponde a ele, use <i>Vincular…</i>.";
+      case "nao_localizado":
+        return "Este serviço consta na planilha revisada (<b>" + rv + " " + un + "</b>), mas <b>não foi identificado no orçamento da fiscalização</b>.";
+      default:
+        return "O sistema <b>não conseguiu garantir</b> que este serviço equivale ao da planilha revisada. " + esc(r.motivo || "") + " Confira e, se for o mesmo serviço, confirme abaixo; a comparação passa a valer em seguida.";
     }
-    return '<tr class="cf-det"><td colspan="11"><div class="cf-det-grade">' + col1 + col2 + col3 + "</div></td></tr>";
+  }
+  function comoFoiCasado(r) {
+    if (!r.rev.length) return "";
+    var f = r.fisc, g = r.rev[0];
+    if (r.via === "manual") return "Equivalência confirmada por um analista" + (r.rev.length > 1 ? " (soma de " + r.rev.length + " serviços da revisada)." : ".");
+    if (r.via === "descricao") return "O serviço não tem código válido; foi casado pela <b>descrição idêntica e mesma unidade</b> (" + esc(g.un) + ").";
+    if (r.via === "codigo_na_descricao") return "O código <b>" + esc((f && f.codigo) || g.codigo) + "</b> estava escrito na descrição do serviço e coincide com o da planilha revisada.";
+    return "Mesmo código (<b>" + esc(g.codigo) + "</b>) e mesma unidade (" + esc(g.un) + "). Quando o serviço aparece em mais de um item, as quantidades são somadas nos dois lados.";
+  }
+  function tabelaLinhas(linhas, destaque) {
+    var total = linhas.reduce(function (s, l) { return s + l.qtd; }, 0);
+    return '<table><thead><tr><th>Origem</th><th>Item</th><th class="n">Qtd.</th></tr></thead><tbody>'
+      + linhas.map(function (l) {
+        var cls = destaque && l.conta === destaque ? ' class="dest"' : "";
+        return "<tr" + cls + "><td>" + (l.origem === "APROVADO" ? "Fiscalização" : (l.origem === "QUADRA" ? "Aba QUADRA" : "Aba SINTÉTICO")) + "</td><td>" + esc(l.conta) + '</td><td class="n">' + fmt(l.qtd) + "</td></tr>";
+      }).join("")
+      + (linhas.length > 1 ? '<tr class="tot"><td colspan="2">Total</td><td class="n">' + fmt(total) + "</td></tr>" : "")
+      + "</tbody></table>";
+  }
+  function dialogoHtml(r, i, contaDestaque) {
+    var s = SITUACAO[r.status], ref = r.fisc || r.rev[0];
+    var h = '<div class="cf-pop">'
+      + '<div class="pop-sit ' + r.status + '"><i class="bi ' + s.ico + '" aria-hidden="true"></i>' + s.rot + "</div>"
+      + '<div class="pop-srv"><b>' + esc(ref.codigo || "(sem código)") + "</b> · " + esc(ref.desc) + ' <span class="un">' + esc(ref.un) + "</span></div>";
+    if (r.fisc || r.qtdRev != null) {
+      h += '<div class="pop-num">'
+        + '<div><small>Fiscalização</small><b>' + (r.fisc ? fmt(r.fisc.qtd) : "—") + "</b></div>"
+        + '<div><small>Planilha revisada</small><b>' + (r.qtdRev != null ? fmt(r.qtdRev) : "—") + "</b></div>"
+        + '<div class="d ' + r.status + '"><small>Diferença</small><b>' + (r.dif != null ? fmtSinal(r.dif) : "—") + "</b><em>" + (r.pct != null ? fmtPct(r.pct) : "") + "</em></div></div>";
+    }
+    h += '<p class="pop-expl">' + explicacao(r) + "</p>";
+    var como = comoFoiCasado(r);
+    if (como) h += '<p class="pop-como"><i class="bi bi-link-45deg" aria-hidden="true"></i> ' + como + "</p>";
+    if (r.fisc || r.rev.length) {
+      h += '<div class="pop-grade">';
+      if (r.fisc) h += "<div><h4>Orçamento da fiscalização</h4>" + tabelaLinhas(r.fisc.linhas, contaDestaque) + "</div>";
+      if (r.rev.length) h += "<div><h4>Planilha revisada (SOP)</h4>" + r.rev.map(function (g) {
+        return (r.rev.length > 1 ? '<div class="pop-g">' + esc(g.codigo || "(sem código)") + " · " + esc(g.desc) + "</div>" : "") + tabelaLinhas(g.linhas);
+      }).join("") + "</div>";
+      h += "</div>";
+    }
+    if (r.candidatos && r.candidatos.length) {
+      h += "<h4>Candidatos da revisada (não confirmados)</h4>" + r.candidatos.map(function (c, k) {
+        return '<div class="pop-cand"><div><b>' + esc(c.codigo || "(sem código)") + "</b> · " + esc(c.desc) + "<br><small>" + esc(c.un) + " · " + fmt(c.qtd)
+          + (c.score < 1 ? " · semelhança " + Math.round(c.score * 100) + "%" : "") + "</small></div>"
+          + '<button type="button" data-pop="confirmar" data-k="' + k + '">É o mesmo serviço</button></div>';
+      }).join("");
+    }
+    var acoes = "";
+    if (r.via === "manual") acoes = '<button type="button" data-pop="desfazer">Desfazer equivalência</button>';
+    else if (r.status === "incerta" || r.status === "sem_correspondencia") acoes = '<button type="button" data-pop="vincular">Vincular a outro serviço…</button>';
+    else if (r.status === "nao_localizado") acoes = '<button type="button" data-pop="vincular-rev">Vincular a serviço da fiscalização…</button>';
+    if (acoes) h += '<div class="pop-acoes">' + acoes + "</div>";
+    h += '<p class="pop-nota">Esta conferência só aponta diferenças. A decisão (OK ou inconsistência) e o comentário são seus, registrados na Curva ABC.</p></div>';
+    return h;
+  }
+  async function abrirDialogo(i, contaDestaque) {
+    var r = st.resultado[i];
+    if (!r || typeof Swal === "undefined") return;
+    var acao = null;
+    await Swal.fire({
+      title: "Conferência orçamentária", html: dialogoHtml(r, i, contaDestaque), width: 820, showConfirmButton: false, showCloseButton: true,
+      customClass: { popup: "cf-swal" }, focusConfirm: false,
+      didOpen: function (el) {
+        el.addEventListener("click", function (e) {
+          var b = e.target.closest("[data-pop]");
+          if (!b) return;
+          acao = { nome: b.getAttribute("data-pop"), k: parseInt(b.getAttribute("data-k"), 10) };
+          Swal.close();
+        });
+      }
+    });
+    if (!acao) return;
+    if (acao.nome === "confirmar") await confirmarCandidato(r, acao.k);
+    else if (acao.nome === "vincular") await vincular(r);
+    else if (acao.nome === "vincular-rev") await vincularDeRevisada(r);
+    else if (acao.nome === "desfazer") await desfazer(r);
+  }
+
+  /* ---------- coluna "Conferência" na tabela da Curva ABC ---------- */
+  function ativa() { return st.resultado.length > 0; }
+  function celulaDaConta(conta) {
+    var i = st.porConta[conta];
+    if (i == null || !st.resultado[i]) return '<td class="cv-col-conf cv-center"></td>';
+    var r = st.resultado[i], s = SITUACAO[r.status], t = tituloCurto(r);
+    return '<td class="cv-col-conf cv-center"><button type="button" class="cv-conf-ico ' + r.status + '" data-conf-conta="' + esc(conta) + '" title="' + esc(t + " — clique para ver a explicação") + '" aria-label="' + esc(t + ". Clique para ver a explicação.") + '"><i class="bi ' + s.ico + '" aria-hidden="true"></i></button></td>';
+  }
+  function limpar() { st.resultado = []; st.porConta = {}; }
+  function detalheDaConta(conta) {
+    var i = st.porConta[conta];
+    if (i != null && st.resultado[i]) abrirDialogo(i, conta);
+  }
+  function notificar() {
+    if (st.ctx && typeof st.ctx.aoAtualizar === "function") st.ctx.aoAtualizar();
   }
 
   /* Ordem da Curva ABC: pela posição do serviço na curva (A, depois B, depois C); depois os
@@ -439,7 +543,7 @@
     if (!b) return;
     var i = parseInt(b.getAttribute("data-i"), 10), r = st.resultado[i], acao = b.getAttribute("data-acao");
     if (!r) return;
-    if (acao === "detalhe") { st.expandidos[i] = !st.expandidos[i]; renderTabela(); }
+    if (acao === "detalhe") abrirDialogo(i, null);
     else if (acao === "curva") verNaCurva(r);
     else if (acao === "confirmar") confirmarCandidato(r, parseInt(b.getAttribute("data-k"), 10));
     else if (acao === "vincular") vincular(r);
@@ -565,5 +669,5 @@
     return r.isConfirmed ? r.value : null;
   }
 
-  window.CvConferencia = { abrir: abrir, fechar: fechar };
+  window.CvConferencia = { abrir: abrir, fechar: fechar, ativa: ativa, celula: celulaDaConta, detalhe: detalheDaConta, limpar: limpar };
 })();
