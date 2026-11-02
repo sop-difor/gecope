@@ -175,3 +175,22 @@ test('validação: cabeçalho ausente e repetição entre abas', () => {
   const av = M.validar([{}], r);
   assert.ok(av.some(x => /entre SINTÉTICO e QUADRA/.test(x.texto)));
 });
+
+test('tipo da planilha: completa tem grupos e serviços inalterados; filtrada só tem alterados', () => {
+  const completa = aprovado(['1.1', 'C1', 'PISO', 'M2', 10], ['1.2', 'C2', 'TUBO', 'M', 5, 2, null, 7]);
+  assert.deepEqual({ ...M.tipoPlanilha(completa) }, { tipo: 'completa', servicos: 2, alterados: 1, grupos: 1 });
+  const filtrada = [CAB_APR, ['', '1.2', 'C2', 'TUBO', 'M', 5, 0, 2, null, 7], ['', '3.1', 'C3', 'CABO', 'M', 0, 0, 4, null, 4]];
+  assert.deepEqual({ ...M.tipoPlanilha(filtrada) }, { tipo: 'alteracoes', servicos: 2, alterados: 2, grupos: 0 });
+  assert.equal(M.tipoPlanilha([['x', 'y']]).tipo, null);
+});
+
+test('equivalência com vários serviços só vale se a revisada tem todos (vale entre processos)', () => {
+  const a = M.lerAprovado(aprovado(['1', 'C1', 'TUBO', 'M', 100])).itens;
+  const eq = [{ fisc: 'C|C1|m', rev: ['C|C2|m', 'C|C3|m'] }];
+  const completa = M.lerRevisado(revisada(['1', 'C2', 'TUBO A', 'M', 60], ['2', 'C3', 'TUBO B', 'M', 40]), 'SINTETICO').itens;
+  assert.equal(M.cruzar(a, completa, { equivalencias: eq })[0].via, 'manual');
+  const parcial = M.lerRevisado(revisada(['1', 'C2', 'TUBO A', 'M', 60]), 'SINTETICO').itens;
+  const r = M.cruzar(a, parcial, { equivalencias: eq })[0];
+  assert.notEqual(r.via, 'manual');
+  assert.notEqual(r.status, 'abaixo');
+});

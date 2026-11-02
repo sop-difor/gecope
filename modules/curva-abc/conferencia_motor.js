@@ -92,11 +92,12 @@
   function lerAprovado(aoa) {
     var cab = mapearCabecalho(aoa || [], CAMPOS_APROVADO);
     if (!cab) return { erro: "Não achei as colunas Descrição, UN, Qtd. e Replan. no orçamento aprovado.", itens: [] };
-    var itens = [];
+    var itens = [], grupos = 0;
     for (var i = cab.linhaCabecalho + 1; i < aoa.length; i++) {
       var r = aoa[i] || [];
       var un = txt(r[cab.un]), desc = txt(r[cab.desc]);
-      if (!un || !desc) continue;
+      if (!desc) continue;
+      if (!un) { grupos++; continue; }
       var qtd = num(r[cab.qtd]), replan = num(r[cab.replan]);
       var acresc = cab.acresc == null ? NaN : num(r[cab.acresc]);
       var supr = cab.supr == null ? NaN : num(r[cab.supr]);
@@ -109,7 +110,21 @@
       it.alterado = isFinite(replan) || isFinite(acresc) || isFinite(supr);
       itens.push(it);
     }
-    return { itens: itens };
+    return { itens: itens, grupos: grupos };
+  }
+
+  /* Planilha de replanilhamento COMPLETA (com os serviços que a fiscalização não alterou e as
+     linhas de grupo) ou só de ALTERAÇÕES (exportação filtrada do SUITE: só serviços com
+     Acresc./Suprim./Replan.). A conferência precisa da completa: na filtrada, tudo o que a
+     revisada tem e o aprovado não alterou viraria "não localizado" e os serviços repetidos
+     teriam a quantidade somada pela metade. Sem as colunas do replanilhamento: tipo null. */
+  function tipoPlanilha(aoa) {
+    var apr = lerAprovado(aoa);
+    if (apr.erro) return { tipo: null, servicos: 0, alterados: 0, grupos: 0 };
+    var servicos = apr.itens.length, grupos = apr.grupos;
+    var alterados = apr.itens.filter(function (it) { return it.alterado; }).length;
+    var soAlteracoes = servicos > 0 && alterados === servicos && grupos === 0;
+    return { tipo: soAlteracoes ? "alteracoes" : "completa", servicos: servicos, alterados: alterados, grupos: grupos };
   }
 
   /* Revisado: uma aba por chamada. Serviço = linha com código e unidade. */
@@ -243,7 +258,9 @@
     (opcoes.equivalencias || []).forEach(function (e) {
       var f = gF.filter(function (g) { return g.chave === e.fisc; })[0];
       var rs = (e.rev || []).map(function (k) { return porChaveR[k]; }).filter(Boolean);
-      if (f && rs.length && !linhas[f.chave]) fechar(f, rs, "manual");
+      /* tudo ou nada: a equivalência vale para qualquer processo; se este orçamento revisado não
+         tem todos os serviços dela, somar só uma parte daria uma comparação falsa */
+      if (f && rs.length && rs.length === (e.rev || []).length && !linhas[f.chave]) fechar(f, rs, "manual");
     });
 
     /* 2) mesmo código real e mesma unidade */
@@ -311,7 +328,7 @@
   }
 
   raiz.ConferenciaMotor = {
-    lerAprovado: lerAprovado, lerRevisado: lerRevisado, escolherAbas: escolherAbas, validar: validar,
+    lerAprovado: lerAprovado, tipoPlanilha: tipoPlanilha, lerRevisado: lerRevisado, escolherAbas: escolherAbas, validar: validar,
     cruzar: cruzar, resumir: resumir, comparar: comparar,
     _interno: { normDesc: normDesc, normUn: normUn, codigoPlaceholder: codigoPlaceholder, agrupar: agrupar }
   };
