@@ -32,7 +32,7 @@
   var st = {
     ctx: null, orcamentos: null, orcSel: null, aprovado: [], revisado: [], resultado: [], equiv: [],
     infoAprovado: "", infoRevisado: "", avisos: [], erro: "", ocupado: false,
-    filtro: "todos", ocultarOk: false, busca: "", ordem: "planilha", expandidos: {}, rotulos: {}
+    filtro: "todos", ocultarOk: false, busca: "", ordem: "curva", expandidos: {}, rotulos: {}
   };
   var cacheRevisado = {};   /* arquivo_path -> { itens, abas } (o arquivo é versionado, nunca muda) */
   var tela = null;
@@ -124,7 +124,7 @@
     if (!pid) return;
     var r = await sbClient.from("curva_abc_equivalencias").select("fisc_chave,rev_chaves").eq("processo_id", pid);
     if (r.error) {
-      st.avisos.push({ nivel: "aviso", texto: "As equivalências confirmadas não puderam ser carregadas (" + esc(r.error.message) + "). A conferência segue sem elas." });
+      st.avisos.push({ nivel: "aviso", texto: "As equivalências confirmadas não puderam ser carregadas (" + r.error.message + "). A conferência segue sem elas." });
       return;
     }
     st.equiv = (r.data || []).map(function (x) {
@@ -237,7 +237,7 @@
     var sub = ctx.processo ? "Processo " + esc(ctx.processo.processo) : "Curva ABC sem processo vinculado — as equivalências confirmadas valem só nesta tela";
     tela.querySelector("#cf-sub").innerHTML = sub + " · piloto: escolas (abas SINTÉTICO e QUADRA)";
     st.resultado = []; st.erro = ""; st.avisos = []; st.infoAprovado = "";
-    st.filtro = "todos"; st.busca = ""; st.ocultarOk = false; st.ordem = "planilha"; st.expandidos = {};
+    st.filtro = "todos"; st.busca = ""; st.ocultarOk = false; st.ordem = "curva"; st.expandidos = {};
     tela.querySelector("#cf-msgs").innerHTML = "";
     render();
     try {
@@ -278,7 +278,7 @@
     var msgs = "";
     if (st.erro) msgs += '<div class="cf-aviso erro" role="alert"><b>Não foi possível conferir.</b> ' + esc(st.erro) + "</div>";
     st.avisos.forEach(function (a) {
-      msgs += '<div class="cf-aviso ' + (a.nivel === "erro" ? "erro" : (a.nivel === "aviso" ? "aviso" : "")) + '">' + (a.nivel === "erro" ? "<b>Erro:</b> " : "") + (a.texto.indexOf("<") > -1 ? a.texto : esc(a.texto)) + "</div>";
+      msgs += '<div class="cf-aviso ' + (a.nivel === "erro" ? "erro" : (a.nivel === "aviso" ? "aviso" : "")) + '">' + (a.nivel === "erro" ? "<b>Erro:</b> " : "") + esc(a.texto) + "</div>";
     });
     if (st.infoAprovado) {
       msgs = '<div class="cf-aviso"><b>Aprovado pela fiscalização:</b> ' + esc(st.infoAprovado) + "<br><b>Revisado pela SOP:</b> " + st.infoRevisado + "</div>" + msgs;
@@ -303,7 +303,8 @@
       + "</div>"
       + '<div class="cf-card"><div class="cf-barra">'
       + '<input type="text" id="cf-busca" placeholder="Filtrar por descrição ou código" value="' + esc(st.busca) + '" aria-label="Filtrar serviços">'
-      + '<select id="cf-ordem" aria-label="Ordenação"><option value="planilha"' + (st.ordem === "planilha" ? " selected" : "") + '>Ordem da planilha</option>'
+      + '<select id="cf-ordem" aria-label="Ordenação"><option value="curva"' + (st.ordem === "curva" ? " selected" : "") + '>Ordem da Curva ABC (A, B, C)</option>'
+      + '<option value="planilha"' + (st.ordem === "planilha" ? " selected" : "") + '>Ordem da planilha</option>'
       + '<option value="diferenca"' + (st.ordem === "diferenca" ? " selected" : "") + '>Maior diferença primeiro</option></select>'
       + '<label class="cf-chk"><input type="checkbox" id="cf-ocultar"' + (st.ocultarOk ? " checked" : "") + '> Ocultar compatíveis</label>'
       + '<span class="cf-n" id="cf-n"></span></div>'
@@ -394,7 +395,21 @@
     return '<tr class="cf-det"><td colspan="11"><div class="cf-det-grade">' + col1 + col2 + col3 + "</div></td></tr>";
   }
 
+  /* Ordem da Curva ABC: pela posição do serviço na curva (A, depois B, depois C); depois os
+     serviços da fiscalização que ficaram fora da curva (inalterados), na ordem da planilha;
+     por último o que só existe na revisada. Empates mantêm a ordem original. */
+  function ordenarPorCurva(lista) {
+    function chave(x) {
+      if (!x.r.fisc) return 2e9;
+      var pos = curvaDoGrupo(x.r.fisc).map(function (it) { return Number(it.pos); }).filter(isFinite);
+      return pos.length ? Math.min.apply(null, pos) : 1e9;
+    }
+    return lista.map(function (x) { return { x: x, k: chave(x) }; })
+      .sort(function (a, b) { return (a.k - b.k) || (a.x.i - b.x.i); })
+      .map(function (o) { return o.x; });
+  }
   function ordenar(lista) {
+    if (st.ordem === "curva") return ordenarPorCurva(lista);
     if (st.ordem !== "diferenca") return lista;
     function peso(x) {
       if (x.r.status === "incerta") return 1e9;
