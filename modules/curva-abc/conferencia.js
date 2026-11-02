@@ -412,69 +412,92 @@
     if (r.via === "codigo_na_descricao") return "O código <b>" + esc((f && f.codigo) || g.codigo) + "</b> estava escrito na descrição do serviço e coincide com o da planilha revisada.";
     return "Mesmo código (<b>" + esc(g.codigo) + "</b>) e mesma unidade (" + esc(g.un) + "). Quando o serviço aparece em mais de um item, as quantidades são somadas nos dois lados.";
   }
-  function tabelaLinhas(linhas, destaque) {
+  /* Listas em <div>, não <table>: o style.css do app redesenha qualquer tabela dentro de janelas
+     do SweetAlert (cores e !important que mudam com o tema). */
+  function listaLinhas(linhas, destaque) {
     var total = linhas.reduce(function (s, l) { return s + l.qtd; }, 0);
-    return '<table><thead><tr><th>Origem</th><th>Item</th><th class="n">Qtd.</th></tr></thead><tbody>'
+    return '<div class="cfm-lista"><div class="cfm-lh"><span>Origem</span><span>Item</span><span class="n">Qtd.</span></div>'
       + linhas.map(function (l) {
-        var cls = destaque && l.conta === destaque ? ' class="dest"' : "";
-        return "<tr" + cls + "><td>" + (l.origem === "APROVADO" ? "Fiscalização" : (l.origem === "QUADRA" ? "Aba QUADRA" : "Aba SINTÉTICO")) + "</td><td>" + esc(l.conta) + '</td><td class="n">' + fmt(l.qtd) + "</td></tr>";
+        return '<div class="cfm-lr' + (destaque && l.conta === destaque ? " dest" : "") + '"><span>'
+          + (l.origem === "APROVADO" ? "Fiscalização" : (l.origem === "QUADRA" ? "Aba QUADRA" : "Aba SINTÉTICO")) + "</span><span>" + esc(l.conta) + '</span><span class="n">' + fmt(l.qtd) + "</span></div>";
       }).join("")
-      + (linhas.length > 1 ? '<tr class="tot"><td colspan="2">Total</td><td class="n">' + fmt(total) + "</td></tr>" : "")
-      + "</tbody></table>";
+      + (linhas.length > 1 ? '<div class="cfm-lr tot"><span>Total</span><span></span><span class="n">' + fmt(total) + "</span></div>" : "")
+      + "</div>";
   }
   function dialogoHtml(r, i, contaDestaque) {
     var s = SITUACAO[r.status], ref = r.fisc || r.rev[0];
-    var h = '<div class="cf-pop">'
-      + '<div class="pop-sit ' + r.status + '"><i class="bi ' + s.ico + '" aria-hidden="true"></i>' + s.rot + "</div>"
-      + '<div class="pop-srv"><b>' + esc(ref.codigo || "(sem código)") + "</b> · " + esc(ref.desc) + ' <span class="un">' + esc(ref.un) + "</span></div>";
+    var h = '<div class="cfm-sit ' + r.status + '"><i class="bi ' + s.ico + '" aria-hidden="true"></i>' + s.rot + "</div>"
+      + '<div class="cfm-srv"><b>' + esc(ref.codigo || "(sem código)") + "</b> · " + esc(ref.desc) + ' <span class="un">' + esc(ref.un) + "</span></div>";
     if (r.fisc || r.qtdRev != null) {
-      h += '<div class="pop-num">'
+      h += '<div class="cfm-num">'
         + '<div><small>Fiscalização</small><b>' + (r.fisc ? fmt(r.fisc.qtd) : "—") + "</b></div>"
         + '<div><small>Planilha revisada</small><b>' + (r.qtdRev != null ? fmt(r.qtdRev) : "—") + "</b></div>"
-        + '<div class="d ' + r.status + '"><small>Diferença</small><b>' + (r.dif != null ? fmtSinal(r.dif) : "—") + "</b><em>" + (r.pct != null ? fmtPct(r.pct) : "") + "</em></div></div>";
+        + '<div class="d ' + r.status + '"><small>Diferença</small><b>' + (r.dif != null ? fmtSinal(r.dif) : "—") + "</b><em>" + (r.pct != null ? fmtPct(r.pct) : "&nbsp;") + "</em></div></div>";
     }
-    h += '<p class="pop-expl">' + explicacao(r) + "</p>";
+    h += '<p class="cfm-expl">' + explicacao(r) + "</p>";
     var como = comoFoiCasado(r);
-    if (como) h += '<p class="pop-como"><i class="bi bi-link-45deg" aria-hidden="true"></i> ' + como + "</p>";
+    if (como) h += '<p class="cfm-como">' + como + "</p>";
     if (r.fisc || r.rev.length) {
-      h += '<div class="pop-grade">';
-      if (r.fisc) h += "<div><h4>Orçamento da fiscalização</h4>" + tabelaLinhas(r.fisc.linhas, contaDestaque) + "</div>";
+      h += '<div class="cfm-grade">';
+      if (r.fisc) h += "<div><h4>Orçamento da fiscalização</h4>" + listaLinhas(r.fisc.linhas, contaDestaque) + "</div>";
       if (r.rev.length) h += "<div><h4>Planilha revisada (SOP)</h4>" + r.rev.map(function (g) {
-        return (r.rev.length > 1 ? '<div class="pop-g">' + esc(g.codigo || "(sem código)") + " · " + esc(g.desc) + "</div>" : "") + tabelaLinhas(g.linhas);
+        return (r.rev.length > 1 ? '<div class="cfm-g">' + esc(g.codigo || "(sem código)") + " · " + esc(g.desc) + "</div>" : "") + listaLinhas(g.linhas);
       }).join("") + "</div>";
       h += "</div>";
     }
     if (r.candidatos && r.candidatos.length) {
       h += "<h4>Candidatos da revisada (não confirmados)</h4>" + r.candidatos.map(function (c, k) {
-        return '<div class="pop-cand"><div><b>' + esc(c.codigo || "(sem código)") + "</b> · " + esc(c.desc) + "<br><small>" + esc(c.un) + " · " + fmt(c.qtd)
+        return '<div class="cfm-cand"><div><b>' + esc(c.codigo || "(sem código)") + "</b> · " + esc(c.desc) + "<small>" + esc(c.un) + " · " + fmt(c.qtd)
           + (c.score < 1 ? " · semelhança " + Math.round(c.score * 100) + "%" : "") + "</small></div>"
-          + '<button type="button" data-pop="confirmar" data-k="' + k + '">É o mesmo serviço</button></div>';
+          + '<button type="button" class="cfm-btn" data-pop="confirmar" data-k="' + k + '">É o mesmo serviço</button></div>';
       }).join("");
     }
     var acoes = "";
-    if (r.via === "manual") acoes = '<button type="button" data-pop="desfazer">Desfazer equivalência</button>';
-    else if (r.status === "incerta" || r.status === "sem_correspondencia") acoes = '<button type="button" data-pop="vincular">Vincular a outro serviço…</button>';
-    else if (r.status === "nao_localizado") acoes = '<button type="button" data-pop="vincular-rev">Vincular a serviço da fiscalização…</button>';
-    if (acoes) h += '<div class="pop-acoes">' + acoes + "</div>";
-    h += '<p class="pop-nota">Esta conferência só aponta diferenças. A decisão (OK ou inconsistência) e o comentário são seus, registrados na Curva ABC.</p></div>';
+    if (r.via === "manual") acoes = '<button type="button" class="cfm-btn sec" data-pop="desfazer">Desfazer equivalência</button>';
+    else if (r.status === "incerta" || r.status === "sem_correspondencia") acoes = '<button type="button" class="cfm-btn sec" data-pop="vincular">Vincular a outro serviço…</button>';
+    else if (r.status === "nao_localizado") acoes = '<button type="button" class="cfm-btn sec" data-pop="vincular-rev">Vincular a serviço da fiscalização…</button>';
+    if (acoes) h += '<div class="cfm-acoes">' + acoes + "</div>";
+    h += '<p class="cfm-nota">Esta conferência só aponta diferenças. A decisão (OK ou inconsistência) e o comentário são seus, registrados na Curva ABC.</p>';
     return h;
+  }
+  /* Diálogo próprio (fora do SweetAlert): Esc, clique fora e o botão fecham; o foco volta para
+     quem abriu. Resolve com a ação escolhida pelo analista, ou null. */
+  function mostrarDialogo(html) {
+    return new Promise(function (resolve) {
+      var anterior = document.activeElement, overflow = document.body.style.overflow;
+      var fundo = document.createElement("div");
+      fundo.className = "cfm-fundo"; fundo.setAttribute("role", "dialog"); fundo.setAttribute("aria-modal", "true"); fundo.setAttribute("aria-labelledby", "cfm-titulo");
+      fundo.innerHTML = '<div class="cfm"><button type="button" class="cfm-x" data-pop="fechar" aria-label="Fechar">&times;</button>'
+        + '<h3 id="cfm-titulo">Conferência orçamentária</h3>' + html + "</div>";
+      function fechar(acao) {
+        document.removeEventListener("keydown", tecla, true);
+        fundo.remove(); document.body.style.overflow = overflow;
+        if (anterior && anterior.focus) anterior.focus();
+        resolve(acao);
+      }
+      function tecla(e) {
+        if (e.key === "Escape") { e.stopPropagation(); fechar(null); return; }
+        if (e.key !== "Tab") return;
+        var foco = fundo.querySelectorAll("button"); if (!foco.length) return;
+        var primeiro = foco[0], ultimo = foco[foco.length - 1];
+        if (e.shiftKey && document.activeElement === primeiro) { e.preventDefault(); ultimo.focus(); }
+        else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
+      }
+      fundo.addEventListener("click", function (e) {
+        if (e.target === fundo) { fechar(null); return; }
+        var b = e.target.closest("[data-pop]"); if (!b) return;
+        var nome = b.getAttribute("data-pop");
+        fechar(nome === "fechar" ? null : { nome: nome, k: parseInt(b.getAttribute("data-k"), 10) });
+      });
+      document.addEventListener("keydown", tecla, true);
+      document.body.appendChild(fundo); document.body.style.overflow = "hidden";
+      fundo.querySelector(".cfm-x").focus();
+    });
   }
   async function abrirDialogo(i, contaDestaque) {
     var r = st.resultado[i];
-    if (!r || typeof Swal === "undefined") return;
-    var acao = null;
-    await Swal.fire({
-      title: "Conferência orçamentária", html: dialogoHtml(r, i, contaDestaque), width: 820, showConfirmButton: false, showCloseButton: true,
-      customClass: { popup: "cf-swal" }, focusConfirm: false,
-      didOpen: function (el) {
-        el.addEventListener("click", function (e) {
-          var b = e.target.closest("[data-pop]");
-          if (!b) return;
-          acao = { nome: b.getAttribute("data-pop"), k: parseInt(b.getAttribute("data-k"), 10) };
-          Swal.close();
-        });
-      }
-    });
+    if (!r) return;
+    var acao = await mostrarDialogo(dialogoHtml(r, i, contaDestaque));
     if (!acao) return;
     if (acao.nome === "confirmar") await confirmarCandidato(r, acao.k);
     else if (acao.nome === "vincular") await vincular(r);
