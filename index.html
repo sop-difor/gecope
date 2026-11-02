@@ -20,6 +20,7 @@
 
     <!-- NOSSO NOVO ARQUIVO DE ESTILOS MODULARIZADO (A Mágica acontece aqui!) -->
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="modules/curva-abc/conferencia.css">
 
     <!-- Scripts Críticos e Bibliotecas (Mantidos) -->
     <link rel="preconnect" href="https://qexdnxqmiaarzwwwrcor.supabase.co" crossorigin>
@@ -1957,6 +1958,10 @@
                                     </div>
                                 </div>
                                 <span class="cv-spacer"></span>
+                                <button class="cv-ghost" id="cv-btnConf" type="button" style="display:none"
+                                    title="Compara as quantidades aprovadas pela fiscalização com o orçamento revisado pela SOP (piloto: escolas)">
+                                    <i class="bi bi-intersect"></i> Conferência orçamentária
+                                </button>
                                 <button class="cv-ghost" id="cv-btnXlsx" type="button">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round">
@@ -5081,6 +5086,8 @@
                                                                     <script src="shared/multiselect.js"></script>
                                                                     <script src="modules/financeiro/financeiro.js"></script>
                                                                     <script src="modules/administracao/admin.js"></script>
+                                                                    <script src="modules/curva-abc/conferencia_motor.js"></script>
+                                                                    <script src="modules/curva-abc/conferencia.js"></script>
                                                                     <script src="modules/curva-abc/curva_abc.js"></script>
                                                                     <script src="modules/curva-abc/curva_abc_processo.js"></script>
                                                                     <script src="modules/tabelas/tabelas.js"></script>

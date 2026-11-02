@@ -11,6 +11,8 @@
   var state = {
     rows: [], cols: [], headerRow: 0, fileName: "", valueIdx: null, curva: [], total: 0, limite: 0,
     arquivoOriginal: null,
+    aoaAprovado: null, /* matriz completa da planilha enviada (serviços inalterados incluídos) — usada na Conferência Orçamentária */
+    tipoPlanilha: null, avisoPlanilha: "", /* "completa" | "alteracoes" | null (ConferenciaMotor.tipoPlanilha) */
     /* vínculo com um processo (Gerenciar Processo): curva_abc_versoes/curva_abc_itens */
     processoVinculado: null, versaoCarregadaDb: null, versaoMaisRecenteDoVinculo: null, somenteLeitura: false
   };
@@ -131,6 +133,9 @@
   function processarAoa(aoa) {
     if (!aoa || aoa.length < 2) { erro("<b>Planilha vazia.</b> Nenhuma linha de dados encontrada."); return; }
     state.versaoCarregadaDb = null; /* upload novo: ainda não foi salvo como versão de nenhum processo */
+    state.aoaAprovado = aoa;
+    cvConfLimpar();
+    cvClassificarPlanilha(aoa);
     var h = acharLinhaCabecalho(aoa);
     state.headerRow = h;
     var head = aoa[h] || [];
@@ -203,6 +208,7 @@
   /* ---------- cálculo da curva ---------- */
   function calcular() {
     limpaErro();
+    if (state.avisoPlanilha) erro(state.avisoPlanilha);
     var vIdx = parseInt($("cv-selCol").value, 10);
     var vCol = state.cols.filter(function (c) { return c.idx === vIdx; })[0];
     if (!vCol) return;
@@ -231,6 +237,9 @@
       var desc = iDesc == null ? "" : String(r[iDesc] == null ? "" : r[iDesc]).trim();
       var conta = iConta == null ? "" : String(r[iConta] == null ? "" : r[iConta]).trim();
       if (!desc && !conta) return;
+      /* linhas de grupo (sem Comp. e sem UN) já somam o acréscimo dos serviços de dentro: contá-las de novo infla a curva */
+      if (state.tipoPlanilha === "completa" && !(iComp != null && String(r[iComp] == null ? "" : r[iComp]).trim()) &&
+        !(iUn != null && String(r[iUn] == null ? "" : r[iUn]).trim())) return;
       var v = toNum(r[vIdx]);
       if (!isFinite(v) || v === 0) return;
       itens.push({
@@ -326,6 +335,7 @@
     });
     $("cv-kpis").innerHTML = html;
     $("cv-kpis").classList.add("on");
+    $("cv-btnConf").style.display = "";
 
     desenhaGrafico();
     desenhaTabela();
@@ -475,7 +485,7 @@
     var colunas = montarColunasTabela();
     var header = '<tr>' + colunas.filter(function (col) { return col.mostrar; }).map(function (col) {
       return '<th class="' + col.cls + '">' + col.title + '</th>';
-    }).join("") + (state.processoVinculado ? '<th class="cv-col-analise cv-center">Análise</th><th class="cv-col-analise cv-col-comentario cv-center">Comentário</th>' : "") + '</tr>';
+    }).join("") + (cvConfAtiva() ? '<th class="cv-col-conf cv-center" title="Resultado da conferência orçamentária. Passe o mouse ou clique no símbolo para ver a explicação.">Conferência</th>' : "") + (state.processoVinculado ? '<th class="cv-col-analise cv-center">Análise</th><th class="cv-col-analise cv-col-comentario cv-center">Comentário</th>' : "") + '</tr>';
     $("cv-thead").innerHTML = header;
   }
 
@@ -486,7 +496,7 @@
       : it.slice(0, state.limite);
     var colunas = montarColunasTabela();
     var colunasVisiveis = colunas.filter(function (col) { return col.mostrar; });
-    var numCols = colunasVisiveis.length + (state.processoVinculado ? 2 : 0);
+    var numCols = colunasVisiveis.length + (state.processoVinculado ? 2 : 0) + (cvConfAtiva() ? 1 : 0);
     var rows = [], ultimo = null;
     renderCabecalhoTabela();
     for (var i = 0; i < lista.length; i++) {
@@ -499,13 +509,57 @@
         ? (x.statusAnalise === "ok" ? "cv-row-ok" : (x.statusAnalise === "inconsistencia" ? "cv-row-inc" : ""))
         : "";
       var celulas = colunasVisiveis.map(function (col) { return col.render(x); }).join("");
-      rows.push('<tr class="' + linhaClasse + '">' + celulas + (state.processoVinculado ? colunasAnalise(x) : "") + '</tr>');
+      rows.push('<tr class="' + linhaClasse + '">' + celulas + (cvConfAtiva() ? window.CvConferencia.celula(x.conta) : "") + (state.processoVinculado ? colunasAnalise(x) : "") + '</tr>');
     }
     if (!rows.length) rows.push('<tr><td colspan="' + numCols + '" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca.</td></tr>');
     $("cv-tbody").innerHTML = rows.join("");
     $("cv-tblN").textContent = f
       ? lista.length + " item(ns) encontrado(s) na busca"
       : (lista.length < it.length ? "exibindo os " + lista.length + " maiores de " + it.length : it.length + " itens");
+  }
+
+  /* ---------- Conferência Orçamentária (coluna na tabela + janelas: modules/curva-abc/conferencia.js) ---------- */
+  function cvMsgSoAlteracoes(n) {
+    return "<b>Esta planilha só tem os " + n + " serviços alterados pela fiscalização.</b> A conferência cruza o orçamento inteiro com o revisado: "
+      + "sem os serviços inalterados, quase tudo apareceria como \"não localizado\" e os serviços repetidos teriam a quantidade somada pela metade. "
+      + "Exporte do SUITE a planilha <b>completa</b> do replanilhamento (não a filtrada por alterações) e envie de novo.";
+  }
+  /* guarda o tipo da planilha enviada e prepara o aviso da tela; devolve o tipo */
+  function cvClassificarPlanilha(aoa) {
+    var tp = window.ConferenciaMotor && window.ConferenciaMotor.tipoPlanilha ? window.ConferenciaMotor.tipoPlanilha(aoa) : null;
+    state.tipoPlanilha = tp ? tp.tipo : null;
+    state.avisoPlanilha = state.tipoPlanilha === "alteracoes" ? cvMsgSoAlteracoes(tp.servicos) : "";
+    return state.tipoPlanilha;
+  }
+  /* A Curva ABC só guarda os serviços com valor na coluna escolhida; a conferência precisa do
+     orçamento aprovado inteiro (inclusive o que a fiscalização não alterou). Logo após o
+     upload ele está em memória; numa versão salva, vem do .xlsx original no Storage. */
+  async function cvObterAoaAprovado() {
+    if (state.aoaAprovado) return state.aoaAprovado;
+    var v = state.versaoCarregadaDb;
+    if (!v || !v.arquivo_url) throw new Error("O arquivo original desta versão não está disponível. Envie a planilha do replanilhamento novamente.");
+    await window.carregarBiblioteca("xlsx");
+    var resp = await fetch(v.arquivo_url);
+    if (!resp.ok) throw new Error("Não consegui baixar o arquivo desta versão (HTTP " + resp.status + ").");
+    var wb = XLSX.read(new Uint8Array(await resp.arrayBuffer()), { type: "array", cellDates: false });
+    var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null, blankrows: false });
+    if (cvClassificarPlanilha(aoa) === "alteracoes") throw new Error(cvTextoSemHtml(state.avisoPlanilha));
+    state.aoaAprovado = aoa;
+    return state.aoaAprovado;
+  }
+  function cvConfAtiva() { return !!(window.CvConferencia && window.CvConferencia.ativa()); }
+  function cvConfLimpar() { if (window.CvConferencia) window.CvConferencia.limpar(); }
+  function cvAbrirConferencia() {
+    if (!window.CvConferencia) { cvAlerta("Conferência indisponível", "O módulo da conferência não carregou. Recarregue a página.", "info"); return; }
+    if (state.tipoPlanilha === "alteracoes") { cvAlerta("Planilha incompleta para a conferência", state.avisoPlanilha, "info"); return; }
+    window.CvConferencia.abrir({
+      processo: state.processoVinculado,
+      podeEscrever: cvPodeEscrever(),
+      textoReferencia: state.fileName + " " + (state.processoVinculado ? state.processoVinculado.descricao : ""),
+      itensCurva: function () { return state.curva; },
+      obterAoaAprovado: cvObterAoaAprovado,
+      aoAtualizar: function () { if (state.curva && state.curva.length) desenhaTabela(); }
+    });
   }
 
   /* ---------- exportações ---------- */
@@ -641,7 +695,9 @@
       };
     });
 
-    state.cols = []; state.dados = []; state.arquivoOriginal = null;
+    state.cols = []; state.dados = []; state.arquivoOriginal = null; state.aoaAprovado = null;
+    state.tipoPlanilha = null; state.avisoPlanilha = "";
+    cvConfLimpar();
     state.curva = itens;
     state.total = Number(versaoRegistro.total_valor) || itens.reduce(function (s, x) { return s + x.ord; }, 0);
     state.fA = Number(versaoRegistro.criterio_a) || 80;
@@ -673,10 +729,13 @@
 
   function resetVisualizacao() {
     state.curva = []; state.total = 0; state.cols = []; state.dados = [];
-    state.arquivoOriginal = null; state.fileName = ""; state.limite = 0;
+    state.arquivoOriginal = null; state.aoaAprovado = null; state.fileName = ""; state.limite = 0;
+    state.tipoPlanilha = null; state.avisoPlanilha = "";
     ["cv-kpis", "cv-chartbox", "cv-tablebox"].forEach(function (id) {
       var e = $(id); if (e) e.classList.remove("on");
     });
+    $("cv-btnConf").style.display = "none";
+    cvConfLimpar();
     $("cv-tbody").innerHTML = "";
     $("cv-chart").innerHTML = "";
     var busca = $("cv-busca"); if (busca) busca.value = "";
@@ -976,6 +1035,11 @@
   });
   $("cv-qtdCustom").addEventListener("change", calcular);
   $("cv-qtdCustom").addEventListener("input", calcular);
+  $("cv-btnConf").addEventListener("click", cvAbrirConferencia);
+  $("cv-tbody").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-conf-conta]");
+    if (b && window.CvConferencia) window.CvConferencia.detalhe(b.getAttribute("data-conf-conta"));
+  });
   $("cv-btnXlsx").addEventListener("click", baixarXlsx);
   $("cv-btnPrint").addEventListener("click", function () { window.print(); });
 
