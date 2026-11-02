@@ -1,0 +1,554 @@
+/* Conferência Orçamentária — tela complementar da Curva ABC (piloto: escolas).
+   Cruza o orçamento aprovado pela fiscalização (a planilha da Curva ABC) com o orçamento
+   revisado pela SOP, escolhido na biblioteca de Orçamentos (abas SINTÉTICO e QUADRA).
+   O cálculo está em conferencia_motor.js; aqui ficam só leitura dos arquivos, tela e as
+   equivalências confirmadas (tabela curva_abc_equivalencias). Nada é aprovado ou reprovado
+   automaticamente: a decisão continua nos botões de check e comentário da Curva ABC.
+   Aberta por curva_abc.js: window.CvConferencia.abrir(contexto). */
+(function () {
+  "use strict";
+
+  var pane = document.getElementById("pane-curva-abc");
+  var M = window.ConferenciaMotor;
+  if (!pane || !M) return;
+
+  var SITUACAO = {
+    acima: { rot: "Quantidade acima da referência", ico: "bi-arrow-up-circle-fill" },
+    compativel: { rot: "Quantidade compatível", ico: "bi-check-circle-fill" },
+    abaixo: { rot: "Quantidade abaixo da referência", ico: "bi-arrow-down-circle-fill" },
+    sem_correspondencia: { rot: "Sem correspondência na planilha revisada", ico: "bi-question-circle-fill" },
+    nao_localizado: { rot: "Não localizado no orçamento da fiscalização", ico: "bi-dash-circle-fill" },
+    incerta: { rot: "Correspondência incerta", ico: "bi-exclamation-triangle-fill" }
+  };
+  var VIA = { descricao: "casado por descrição", codigo_na_descricao: "código lido da descrição", manual: "equivalência confirmada" };
+  var FILTROS = {
+    todos: null,
+    dif: ["acima", "abaixo"],
+    sem: ["sem_correspondencia", "nao_localizado"],
+    conf: ["incerta"],
+    ok: ["compativel"]
+  };
+
+  var st = {
+    ctx: null, orcamentos: null, orcSel: null, aprovado: [], revisado: [], resultado: [], equiv: [],
+    infoAprovado: "", infoRevisado: "", avisos: [], erro: "", ocupado: false,
+    filtro: "todos", ocultarOk: false, busca: "", ordem: "planilha", expandidos: {}, rotulos: {}
+  };
+  var cacheRevisado = {};   /* arquivo_path -> { itens, abas } (o arquivo é versionado, nunca muda) */
+  var tela = null;
+
+  /* ---------- utilidades ---------- */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmt(v) {
+    return (v == null || !isFinite(v)) ? "—" : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtSinal(v) {
+    if (v == null || !isFinite(v)) return "—";
+    return (v > 0 ? "+" : "") + fmt(v);
+  }
+  function fmtPct(v) { return (v == null || !isFinite(v)) ? "—" : (v > 0 ? "+" : "") + fmt(v) + "%"; }
+  function norm(s) {
+    return String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage bloqueado: só não lembra */ } }
+  function alerta(titulo, texto, icone) {
+    if (typeof Swal === "undefined") { alert(texto ? titulo + "\n\n" + texto : titulo); return; }
+    Swal.fire({ icon: icone || "error", title: titulo, html: texto || undefined, confirmButtonColor: "#007233" });
+  }
+  function processoId() { return st.ctx && st.ctx.processo ? String(st.ctx.processo.id) : null; }
+
+  /* ---------- leitura dos arquivos (SheetJS sob demanda) ---------- */
+  function lerWorkbook(buffer, opcoes) {
+    return XLSX.read(new Uint8Array(buffer), Object.assign(
+      { type: "array", cellFormula: false, cellStyles: false, cellHTML: false, cellNF: false, cellText: false }, opcoes || {}));
+  }
+  function aoaDaAba(wb, nome) {
+    return XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, raw: true, defval: null, blankrows: true });
+  }
+
+  /* Revisada: abre só SINTÉTICO e QUADRA. O arquivo completo tem ~14 abas (uma com 20 MB de
+     XML); pedir só as duas evita ler o resto. O download é cacheado pelo navegador (o caminho
+     tem a versão e o Storage serve com cache de 1 ano). */
+  async function lerRevisado(orc) {
+    if (cacheRevisado[orc.arquivo_path]) return cacheRevisado[orc.arquivo_path];
+    await window.carregarBiblioteca("xlsx");
+    var resp = await fetch(orc.arquivo_url);
+    if (!resp.ok) throw new Error("Não consegui baixar o orçamento revisado (HTTP " + resp.status + ").");
+    var buf = await resp.arrayBuffer();
+    var nomes = lerWorkbook(buf, { bookSheets: true }).SheetNames;
+    var abas = M.escolherAbas(nomes);
+    if (!abas.SINTETICO) throw new Error("A aba SINTÉTICO não foi encontrada neste arquivo. Abas existentes: " + nomes.join(", ") + ".");
+    var pedir = [abas.SINTETICO].concat(abas.QUADRA ? [abas.QUADRA] : []);
+    var wb = lerWorkbook(buf, { sheets: pedir });
+    var sint = M.lerRevisado(aoaDaAba(wb, abas.SINTETICO), "SINTETICO");
+    if (sint.erro) throw new Error(sint.erro);
+    var quad = abas.QUADRA ? M.lerRevisado(aoaDaAba(wb, abas.QUADRA), "QUADRA") : { itens: [] };
+    if (quad.erro) throw new Error(quad.erro);
+    var r = { itens: sint.itens.concat(quad.itens), sintetico: sint.itens.length, quadra: quad.itens.length, temQuadra: !!abas.QUADRA };
+    cacheRevisado[orc.arquivo_path] = r;
+    return r;
+  }
+
+  /* ---------- biblioteca de orçamentos ---------- */
+  async function carregarOrcamentos() {
+    if (st.orcamentos) return st.orcamentos;
+    var r = await sbClient.from("orcamentos_biblioteca")
+      .select("id,nome_obra,categoria,subcategoria,versao_atual,status,arquivo_url,arquivo_path")
+      .eq("categoria", "ESCOLAS").order("subcategoria").order("nome_obra");
+    if (r.error) throw r.error;
+    st.orcamentos = (r.data || []).filter(function (o) { return o.arquivo_url && /\.xls/i.test(o.arquivo_path || ""); });
+    return st.orcamentos;
+  }
+  function sugerirOrcamento() {
+    var lista = st.orcamentos || [], pid = processoId();
+    var lembrado = pid ? lsGet("cf_orc:" + pid) : null;
+    if (lembrado && lista.some(function (o) { return String(o.id) === lembrado; })) return { id: lembrado, lembrado: true };
+    var ref = (st.ctx && st.ctx.textoReferencia) || "";
+    var m = /(\d+)\s*salas/i.exec(ref);
+    if (m) {
+      var achou = lista.filter(function (o) { return new RegExp("(^|\\D)" + m[1] + "\\s*salas", "i").test(o.nome_obra || ""); })[0];
+      if (achou) return { id: String(achou.id), lembrado: false };
+    }
+    return null;
+  }
+
+  /* ---------- equivalências confirmadas (banco) ---------- */
+  async function carregarEquivalencias() {
+    st.equiv = [];
+    var pid = processoId();
+    if (!pid) return;
+    var r = await sbClient.from("curva_abc_equivalencias").select("fisc_chave,rev_chaves").eq("processo_id", pid);
+    if (r.error) {
+      st.avisos.push({ nivel: "aviso", texto: "As equivalências confirmadas não puderam ser carregadas (" + esc(r.error.message) + "). A conferência segue sem elas." });
+      return;
+    }
+    st.equiv = (r.data || []).map(function (x) {
+      return { fisc: x.fisc_chave, rev: (x.rev_chaves || []).map(function (c) { return c.chave; }), salvo: true };
+    });
+  }
+  async function salvarEquivalencia(fisc, revGrupos) {
+    var existente = st.equiv.filter(function (e) { return e.fisc === fisc.chave; })[0];
+    var chaves = revGrupos.map(function (g) { return g.chave; });
+    if (existente) existente.rev = chaves; else st.equiv.push({ fisc: fisc.chave, rev: chaves, salvo: false });
+    var pid = processoId();
+    if (!pid || !st.ctx.podeEscrever) return { local: true };
+    var payload = {
+      processo_id: pid, fisc_chave: fisc.chave, fisc_codigo: fisc.codigo || null, fisc_descricao: fisc.desc,
+      rev_chaves: revGrupos.map(function (g) { return { chave: g.chave, codigo: g.codigo, descricao: g.desc, un: g.un }; }),
+      orcamento_id: st.orcSel ? st.orcSel.id : null,
+      autor_nome: sessionStorage.getItem("sop_user_name") || "Usuário",
+      autor_email: (typeof getCurrentUserEmail === "function") ? getCurrentUserEmail() : ""
+    };
+    var r = await sbClient.from("curva_abc_equivalencias").upsert([payload], { onConflict: "processo_id,fisc_chave" });
+    if (r.error) throw r.error;
+    return { local: false };
+  }
+  async function removerEquivalencia(chaveFisc) {
+    st.equiv = st.equiv.filter(function (e) { return e.fisc !== chaveFisc; });
+    var pid = processoId();
+    if (!pid || !st.ctx.podeEscrever) return;
+    var r = await sbClient.from("curva_abc_equivalencias").delete().eq("processo_id", pid).eq("fisc_chave", chaveFisc);
+    if (r.error) throw r.error;
+  }
+
+  /* ---------- execução ---------- */
+  async function executar() {
+    if (st.ocupado) return;
+    var sel = tela.querySelector("#cf-sel");
+    var orc = (st.orcamentos || []).filter(function (o) { return String(o.id) === sel.value; })[0];
+    if (!orc) { alerta("Escolha o orçamento revisado", "Selecione na lista o orçamento revisado da SOP que servirá de referência.", "info"); return; }
+    st.ocupado = true; st.erro = ""; st.avisos = []; st.resultado = []; st.expandidos = {};
+    st.orcSel = orc;
+    marcarOcupado(true, "Lendo os orçamentos…");
+    try {
+      var aoa = await st.ctx.obterAoaAprovado();
+      var apr = M.lerAprovado(aoa);
+      if (apr.erro) throw new Error(apr.erro);
+      st.aprovado = apr.itens;
+      var rev = await lerRevisado(orc);
+      st.revisado = rev.itens;
+      var alt = apr.itens.filter(function (x) { return x.alterado; }).length;
+      st.infoAprovado = apr.itens.length + " serviços (" + alt + " alterados pela fiscalização, " + (apr.itens.length - alt) + " inalterados)";
+      st.infoRevisado = esc(orc.nome_obra) + " · " + esc(orc.versao_atual || "") + " · SINTÉTICO " + rev.sintetico + " serviços"
+        + (rev.temQuadra ? " · QUADRA " + rev.quadra + " serviços" : " · sem aba QUADRA");
+      st.avisos = M.validar(apr.itens, rev.itens);
+      if (!rev.temQuadra) st.avisos.push({ nivel: "aviso", texto: "Este arquivo não tem aba QUADRA. Os serviços da quadra, se houver, aparecerão como sem correspondência." });
+      var pid = processoId();
+      if (pid) lsSet("cf_orc:" + pid, String(orc.id));
+      await carregarEquivalencias();
+      if (!st.avisos.some(function (a) { return a.nivel === "erro"; })) recalcular();
+    } catch (ex) {
+      console.error("Conferência orçamentária:", ex);
+      st.erro = ex && ex.message ? ex.message : String(ex);
+    } finally {
+      st.ocupado = false;
+      marcarOcupado(false);
+      render();
+    }
+  }
+  function recalcular() {
+    st.resultado = M.cruzar(st.aprovado, st.revisado, { equivalencias: st.equiv });
+  }
+
+  /* ---------- tela ---------- */
+  function criarTela() {
+    if (tela) return;
+    tela = document.createElement("div");
+    tela.id = "cf-tela";
+    tela.innerHTML =
+      '<div class="cf-topo">'
+      + '<button type="button" class="cf-ghost" id="cf-voltar"><i class="bi bi-arrow-left"></i> Voltar à Curva ABC</button>'
+      + '<div><h2>Conferência Orçamentária</h2><div class="cf-sub" id="cf-sub"></div></div>'
+      + '<span class="cf-grow"></span></div>'
+      + '<div class="cf-card"><div class="cf-card-b">'
+      + '<div class="cf-ref"><div class="cf-ctl"><label for="cf-sel">Orçamento revisado pela SOP (biblioteca de Orçamentos)</label>'
+      + '<select id="cf-sel"><option value="">Carregando…</option></select></div>'
+      + '<button type="button" class="cf-primario" id="cf-exec"><i class="bi bi-intersect"></i> Conferir</button></div>'
+      + '<div id="cf-msgs"></div></div></div>'
+      + '<div id="cf-corpo"></div>';
+    pane.appendChild(tela);
+    tela.querySelector("#cf-voltar").addEventListener("click", fechar);
+    tela.querySelector("#cf-exec").addEventListener("click", executar);
+    tela.addEventListener("click", aoClicar);
+    tela.addEventListener("input", function (e) {
+      if (e.target.id === "cf-busca") { st.busca = e.target.value; clearTimeout(criarTela._t); criarTela._t = setTimeout(renderTabela, 200); }
+    });
+    tela.addEventListener("change", function (e) {
+      if (e.target.id === "cf-ordem") { st.ordem = e.target.value; renderTabela(); }
+      if (e.target.id === "cf-ocultar") { st.ocultarOk = e.target.checked; renderTabela(); }
+    });
+  }
+  function marcarOcupado(on, texto) {
+    var b = tela.querySelector("#cf-exec");
+    b.disabled = on;
+    b.innerHTML = on ? esc(texto || "Aguarde…") : '<i class="bi bi-intersect"></i> Conferir';
+  }
+
+  async function abrir(ctx) {
+    st.ctx = ctx;
+    criarTela();
+    pane.classList.add("cf-aberta");
+    window.scrollTo(0, 0);
+    var sub = ctx.processo ? "Processo " + esc(ctx.processo.processo) : "Curva ABC sem processo vinculado — as equivalências confirmadas valem só nesta tela";
+    tela.querySelector("#cf-sub").innerHTML = sub + " · piloto: escolas (abas SINTÉTICO e QUADRA)";
+    st.resultado = []; st.erro = ""; st.avisos = []; st.infoAprovado = "";
+    st.filtro = "todos"; st.busca = ""; st.ocultarOk = false; st.ordem = "planilha"; st.expandidos = {};
+    tela.querySelector("#cf-msgs").innerHTML = "";
+    render();
+    try {
+      await carregarOrcamentos();
+    } catch (ex) {
+      st.erro = "Não consegui carregar a biblioteca de orçamentos: " + (ex.message || ex);
+      render();
+      return;
+    }
+    var sel = tela.querySelector("#cf-sel");
+    sel.innerHTML = '<option value="">Selecione o orçamento revisado…</option>';
+    var grupos = {};
+    st.orcamentos.forEach(function (o) { (grupos[o.subcategoria || "Outros"] = grupos[o.subcategoria || "Outros"] || []).push(o); });
+    Object.keys(grupos).forEach(function (g) {
+      var og = document.createElement("optgroup"); og.label = g;
+      grupos[g].forEach(function (o) {
+        var op = document.createElement("option"); op.value = o.id;
+        op.textContent = o.nome_obra + " — " + (o.versao_atual || "") + (o.status ? " (" + o.status + ")" : "");
+        og.appendChild(op);
+      });
+      sel.appendChild(og);
+    });
+    var sug = sugerirOrcamento();
+    if (sug) {
+      sel.value = sug.id;
+      if (sug.lembrado) executar();
+      else tela.querySelector("#cf-msgs").innerHTML = '<div class="cf-aviso"><b>Sugestão:</b> escolhi o orçamento pelo número de salas do arquivo. Confira se é o correto antes de conferir.</div>';
+    }
+    if (!st.orcamentos.length) st.erro = "Não há orçamentos de escolas na biblioteca de Orçamentos.";
+    render();
+  }
+  function fechar() {
+    pane.classList.remove("cf-aberta");
+  }
+
+  /* ---------- renderização ---------- */
+  function render() {
+    var msgs = "";
+    if (st.erro) msgs += '<div class="cf-aviso erro" role="alert"><b>Não foi possível conferir.</b> ' + esc(st.erro) + "</div>";
+    st.avisos.forEach(function (a) {
+      msgs += '<div class="cf-aviso ' + (a.nivel === "erro" ? "erro" : (a.nivel === "aviso" ? "aviso" : "")) + '">' + (a.nivel === "erro" ? "<b>Erro:</b> " : "") + (a.texto.indexOf("<") > -1 ? a.texto : esc(a.texto)) + "</div>";
+    });
+    if (st.infoAprovado) {
+      msgs = '<div class="cf-aviso"><b>Aprovado pela fiscalização:</b> ' + esc(st.infoAprovado) + "<br><b>Revisado pela SOP:</b> " + st.infoRevisado + "</div>" + msgs;
+    }
+    var m = tela.querySelector("#cf-msgs");
+    if (st.infoAprovado || st.erro || st.avisos.length) m.innerHTML = msgs;
+
+    var corpo = tela.querySelector("#cf-corpo");
+    if (!st.resultado.length) { corpo.innerHTML = ""; return; }
+    var r = M.resumir(st.resultado);
+    function kpi(chave, cls, n, rot) {
+      return '<button type="button" class="cf-kpi ' + cls + '" data-filtro="' + chave + '" aria-pressed="' + (st.filtro === chave) + '">'
+        + '<span class="n">' + n + '</span><span class="r">' + rot + "</span></button>";
+    }
+    corpo.innerHTML =
+      '<div class="cf-resumo">'
+      + kpi("todos", "k-todos", r.analisados, "serviços analisados" + (r.nao_localizado ? " (+" + r.nao_localizado + " só na revisada)" : ""))
+      + kpi("dif", "k-dif", r.comDiferenca, "com diferença (" + r.acima + " acima · " + r.abaixo + " abaixo)")
+      + kpi("sem", "k-sem", r.semCorrespondencia, "sem correspondência (" + r.sem_correspondencia + " só na fiscalização · " + r.nao_localizado + " só na revisada)")
+      + kpi("conf", "k-conf", r.conferir, "a conferir manualmente")
+      + kpi("ok", "k-ok", r.compativel, "quantidade compatível")
+      + "</div>"
+      + '<div class="cf-card"><div class="cf-barra">'
+      + '<input type="text" id="cf-busca" placeholder="Filtrar por descrição ou código" value="' + esc(st.busca) + '" aria-label="Filtrar serviços">'
+      + '<select id="cf-ordem" aria-label="Ordenação"><option value="planilha"' + (st.ordem === "planilha" ? " selected" : "") + '>Ordem da planilha</option>'
+      + '<option value="diferenca"' + (st.ordem === "diferenca" ? " selected" : "") + '>Maior diferença primeiro</option></select>'
+      + '<label class="cf-chk"><input type="checkbox" id="cf-ocultar"' + (st.ocultarOk ? " checked" : "") + '> Ocultar compatíveis</label>'
+      + '<span class="cf-n" id="cf-n"></span></div>'
+      + '<div class="cf-scroll"><table><thead><tr><th></th><th>Serviço</th><th>Código</th><th>UN</th>'
+      + '<th class="num">Qtd. fiscalização</th><th class="num">Qtd. revisada</th><th class="num">Diferença</th><th class="num">Dif. %</th>'
+      + '<th>Situação</th><th>Na Curva ABC</th><th>Ações</th></tr></thead><tbody id="cf-tbody"></tbody></table></div></div>';
+    renderTabela();
+  }
+
+  function dentroDoFiltro(r) {
+    var lista = FILTROS[st.filtro];
+    if (lista && lista.indexOf(r.status) < 0) return false;
+    if (st.ocultarOk && r.status === "compativel") return false;
+    if (st.busca) {
+      var g = r.fisc || r.rev[0];
+      var alvo = norm(g.desc + " " + g.codigo + " " + r.rev.map(function (x) { return x.codigo + " " + x.desc; }).join(" "));
+      if (alvo.indexOf(norm(st.busca)) < 0) return false;
+    }
+    return true;
+  }
+
+  function curvaDoGrupo(f) {
+    if (!f || !st.ctx) return [];
+    var contas = {};
+    f.linhas.forEach(function (l) { contas[l.conta] = true; });
+    return (st.ctx.itensCurva() || []).filter(function (it) { return contas[it.conta]; });
+  }
+  function celulaCurva(r) {
+    if (!r.fisc) return '<span class="cf-sub">—</span>';
+    var itens = curvaDoGrupo(r.fisc);
+    if (!itens.length) return '<span style="color:var(--cv-muted);font-size:12px">fora da curva</span>';
+    var it = itens[0];
+    var stt = it.statusAnalise === "ok" ? '<i class="bi bi-check-lg st-ok" title="Marcado OK na Curva ABC"></i>'
+      : (it.statusAnalise === "inconsistencia" ? '<i class="bi bi-x-lg st-inc" title="Marcado como inconsistência na Curva ABC"></i>' : "");
+    return '<span class="cf-curva"><span class="cv-chip ' + esc(it.classe) + '" title="Classe ' + esc(it.classe) + '">' + esc(it.classe) + "</span>"
+      + "<span>#" + esc(it.pos) + "</span>" + stt
+      + (itens.length > 1 ? '<span style="font-size:12px;color:var(--cv-muted)">+' + (itens.length - 1) + "</span>" : "") + "</span>";
+  }
+
+  function linhaHtml(r, i) {
+    var f = r.fisc, ref = f || r.rev[0], s = SITUACAO[r.status];
+    var cod = f ? (f.codigo || "(sem código)") : (r.rev[0].codigo || "(sem código)");
+    var codRev = r.rev.map(function (g) { return g.codigo || "(sem código)"; });
+    var sub = "";
+    if (r.via && VIA[r.via]) sub += '<span class="cf-selo">' + VIA[r.via] + "</span>";
+    if (f && r.rev.length && codRev.join() !== cod) sub += "revisada: " + esc(codRev.join(", "));
+    if (r.motivo) sub += (sub ? "<br>" : "") + esc(r.motivo);
+    if (r.status === "nao_localizado") {
+      sub += "Consta só na planilha revisada (" + esc(r.rev[0].linhas.map(function (l) { return (l.origem === "QUADRA" ? "QUADRA " : "SINTÉTICO ") + l.conta; }).slice(0, 3).join(", ")) + (r.rev[0].linhas.length > 3 ? "…" : "") + ")";
+      if (r.possivelParDe && r.possivelParDe.length) sub += "<br>Possível par na fiscalização: ver serviços com correspondência incerta.";
+    }
+    var acoes = "";
+    if (r.via === "manual") acoes += '<button type="button" class="cf-ghost" data-acao="desfazer" data-i="' + i + '">Desfazer equivalência</button>';
+    else if (r.status === "incerta" || r.status === "sem_correspondencia") acoes += '<button type="button" class="cf-ghost" data-acao="vincular" data-i="' + i + '">Vincular…</button>';
+    else if (r.status === "nao_localizado") acoes += '<button type="button" class="cf-ghost" data-acao="vincular-rev" data-i="' + i + '">Vincular a serviço da fiscalização…</button>';
+    if (f && curvaDoGrupo(f).length) acoes += '<button type="button" class="cf-ghost" data-acao="curva" data-i="' + i + '" title="Abrir este serviço na Curva ABC para registrar a decisão">Ver na Curva</button>';
+    var aberto = !!st.expandidos[i];
+    return '<tr class="cf-linha ' + r.status + '" data-i="' + i + '">'
+      + '<td><button type="button" class="cf-seta" data-acao="detalhe" data-i="' + i + '" aria-expanded="' + aberto + '" aria-label="Detalhes do serviço"><i class="bi ' + (aberto ? "bi-chevron-down" : "bi-chevron-right") + '"></i></button></td>'
+      + '<td class="desc">' + esc(ref.desc) + (sub ? '<span class="sub">' + sub + "</span>" : "") + "</td>"
+      + '<td class="cod">' + esc(cod) + "</td><td>" + esc(ref.un) + "</td>"
+      + '<td class="num">' + (f ? fmt(f.qtd) : "—") + '</td><td class="num">' + (r.qtdRev != null ? fmt(r.qtdRev) : "—") + "</td>"
+      + '<td class="num">' + fmtSinal(r.dif) + '</td><td class="num">' + fmtPct(r.pct) + "</td>"
+      + '<td><span class="cf-sit ' + r.status + '"><i class="bi ' + s.ico + '" aria-hidden="true"></i>' + s.rot + "</span></td>"
+      + "<td>" + celulaCurva(r) + '</td><td><div class="cf-acoes">' + acoes + "</div></td></tr>"
+      + (aberto ? detalheHtml(r, i) : "");
+  }
+
+  function tabelaLinhas(linhas) {
+    return '<table><thead><tr><th>Aba / planilha</th><th>Item</th><th class="num">Qtd.</th></tr></thead><tbody>'
+      + linhas.map(function (l) {
+        return "<tr><td>" + (l.origem === "APROVADO" ? "Fiscalização" : (l.origem === "QUADRA" ? "QUADRA" : "SINTÉTICO")) + "</td><td>" + esc(l.conta) + '</td><td class="num">' + fmt(l.qtd) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+  function detalheHtml(r, i) {
+    var col1 = r.fisc ? "<div><h4>Orçamento da fiscalização</h4>" + tabelaLinhas(r.fisc.linhas) + "</div>" : "";
+    var col2 = r.rev.length ? "<div><h4>Planilha revisada</h4>" + r.rev.map(function (g) {
+      return '<div style="margin-bottom:6px"><b style="font-size:12px">' + esc(g.codigo || "(sem código)") + " · " + esc(g.desc) + "</b>" + tabelaLinhas(g.linhas) + "</div>";
+    }).join("") + "</div>" : "";
+    var col3 = "";
+    if (r.candidatos && r.candidatos.length) {
+      col3 = "<div><h4>Candidatos da revisada (não confirmados)</h4>" + r.candidatos.map(function (c, k) {
+        return '<div class="cf-cand"><div class="t"><b>' + esc(c.codigo || "(sem código)") + "</b> · " + esc(c.desc) + "<br>" + esc(c.un) + " · " + fmt(c.qtd)
+          + (c.score < 1 ? " · semelhança " + Math.round(c.score * 100) + "%" : "") + "</div>"
+          + '<button type="button" class="cf-ghost" data-acao="confirmar" data-i="' + i + '" data-k="' + k + '">É o mesmo serviço</button></div>';
+      }).join("") + "</div>";
+    }
+    return '<tr class="cf-det"><td colspan="11"><div class="cf-det-grade">' + col1 + col2 + col3 + "</div></td></tr>";
+  }
+
+  function ordenar(lista) {
+    if (st.ordem !== "diferenca") return lista;
+    function peso(x) {
+      if (x.r.status === "incerta") return 1e9;
+      if (x.r.dif == null) return -1;
+      if (x.r.pct == null) return 1e8 + Math.abs(x.r.dif);
+      return Math.abs(x.r.pct);
+    }
+    return lista.slice().sort(function (a, b) { return peso(b) - peso(a); });
+  }
+  function renderTabela() {
+    var tb = tela.querySelector("#cf-tbody");
+    if (!tb) return;
+    var vis = [];
+    st.resultado.forEach(function (r, i) { if (dentroDoFiltro(r)) vis.push({ r: r, i: i }); });
+    vis = ordenar(vis);
+    tb.innerHTML = vis.length ? vis.map(function (x) { return linhaHtml(x.r, x.i); }).join("")
+      : '<tr><td colspan="11" class="cf-vazio">Nenhum serviço neste filtro.</td></tr>';
+    tela.querySelector("#cf-n").textContent = vis.length + " de " + st.resultado.length + " linhas";
+    tela.querySelectorAll(".cf-kpi").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-filtro") === st.filtro)); });
+  }
+
+  /* ---------- ações ---------- */
+  function aoClicar(e) {
+    var k = e.target.closest(".cf-kpi");
+    if (k) { st.filtro = k.getAttribute("data-filtro"); renderTabela(); return; }
+    var b = e.target.closest("[data-acao]");
+    if (!b) return;
+    var i = parseInt(b.getAttribute("data-i"), 10), r = st.resultado[i], acao = b.getAttribute("data-acao");
+    if (!r) return;
+    if (acao === "detalhe") { st.expandidos[i] = !st.expandidos[i]; renderTabela(); }
+    else if (acao === "curva") verNaCurva(r);
+    else if (acao === "confirmar") confirmarCandidato(r, parseInt(b.getAttribute("data-k"), 10));
+    else if (acao === "vincular") vincular(r);
+    else if (acao === "vincular-rev") vincularDeRevisada(r);
+    else if (acao === "desfazer") desfazer(r);
+  }
+
+  function verNaCurva(r) {
+    var g = r.fisc, itens = curvaDoGrupo(g);
+    if (!itens.length) return;
+    var it = itens[0];
+    fechar();
+    st.ctx.verNaCurva(it.comp && !/^CX/i.test(it.comp) ? it.comp : it.conta);
+  }
+
+  function grupoPorChave(chave) {
+    var achado = null;
+    st.resultado.forEach(function (r) { r.rev.forEach(function (g) { if (g.chave === chave) achado = g; }); r.candidatos.forEach(function (g) { if (g.chave === chave) achado = achado || g; }); });
+    return achado;
+  }
+  async function gravar(fisc, revGrupos) {
+    try {
+      var res = await salvarEquivalencia(fisc, revGrupos);
+      recalcular();
+      render();
+      if (res.local && processoId()) alerta("Equivalência só nesta tela", "Só o perfil de analista (admin/gerente) grava equivalências no processo. Ela vale até você fechar a Conferência.", "info");
+    } catch (ex) {
+      st.equiv = st.equiv.filter(function (e) { return e.fisc !== fisc.chave; });
+      alerta("Não consegui salvar a equivalência", esc(ex.message || ex) + (/curva_abc_equivalencias/.test(ex.message || "") ? "<br><br>A tabela <code>curva_abc_equivalencias</code> ainda não foi criada no banco (sql/curva_abc_conferencia_equivalencias.sql)." : ""));
+    }
+  }
+  async function confirmarCandidato(r, k) {
+    var c = r.candidatos[k];
+    if (!c) return;
+    var ok = await perguntar("Confirmar equivalência?",
+      "<b>Fiscalização:</b> " + esc(r.fisc.codigo || "(sem código)") + " · " + esc(r.fisc.desc) + "<br><b>Revisada:</b> " + esc(c.codigo || "(sem código)") + " · " + esc(c.desc)
+      + "<br><br>As quantidades dos dois serviços passarão a ser comparadas. Isso fica registrado em seu nome.");
+    if (!ok) return;
+    var g = grupoPorChave(c.chave);
+    await gravar(r.fisc, [g || c]);
+  }
+  async function desfazer(r) {
+    var ok = await perguntar("Desfazer equivalência?", "O serviço volta a ser tratado pelas regras automáticas.");
+    if (!ok) return;
+    try { await removerEquivalencia(r.fisc.chave); recalcular(); render(); }
+    catch (ex) { alerta("Não consegui desfazer", esc(ex.message || ex)); }
+  }
+
+  async function vincular(r) {
+    var un = M._interno.normUn(r.fisc.un);
+    var livres = [];
+    st.resultado.forEach(function (x) { if (x.status === "nao_localizado" && M._interno.normUn(x.rev[0].un) === un) livres.push(x.rev[0]); });
+    (r.candidatos || []).forEach(function (c) { if (!livres.some(function (g) { return g.chave === c.chave; }) && M._interno.normUn(c.un) === un) livres.push(grupoPorChave(c.chave) || c); });
+    if (!livres.length) { alerta("Nenhum serviço disponível", "Não há serviço sem par na planilha revisada com a unidade " + esc(r.fisc.un) + ".", "info"); return; }
+    var pref = {};
+    (r.candidatos || []).forEach(function (c) { pref[c.chave] = true; });
+    var escolhidos = await escolher({
+      titulo: "Vincular a serviço(s) da planilha revisada",
+      cabecalho: "<b>" + esc(r.fisc.codigo || "(sem código)") + "</b> · " + esc(r.fisc.desc) + " — " + fmt(r.fisc.qtd) + " " + esc(r.fisc.un),
+      itens: livres.map(function (g) { return { valor: g.chave, cod: g.codigo, desc: g.desc, un: g.un, qtd: g.qtd, destaque: !!pref[g.chave] }; }),
+      multiplo: true, refQtd: r.fisc.qtd
+    });
+    if (!escolhidos) return;
+    await gravar(r.fisc, escolhidos.map(function (ch) { return livres.filter(function (g) { return g.chave === ch; })[0]; }));
+  }
+  async function vincularDeRevisada(r) {
+    var g = r.rev[0], un = M._interno.normUn(g.un);
+    var alvos = st.resultado.filter(function (x) { return x.fisc && (x.status === "incerta" || x.status === "sem_correspondencia") && M._interno.normUn(x.fisc.un) === un; });
+    if (!alvos.length) { alerta("Nenhum serviço disponível", "Não há serviço da fiscalização sem par com a unidade " + esc(g.un) + ".", "info"); return; }
+    var escolhidos = await escolher({
+      titulo: "Vincular a serviço da fiscalização",
+      cabecalho: "Revisada: <b>" + esc(g.codigo || "(sem código)") + "</b> · " + esc(g.desc) + " — " + fmt(g.qtd) + " " + esc(g.un),
+      itens: alvos.map(function (x) { return { valor: x.fisc.chave, cod: x.fisc.codigo, desc: x.fisc.desc, un: x.fisc.un, qtd: x.fisc.qtd, destaque: (x.candidatos || []).some(function (c) { return c.chave === g.chave; }) }; }),
+      multiplo: false, refQtd: g.qtd
+    });
+    if (!escolhidos) return;
+    var alvo = alvos.filter(function (x) { return x.fisc.chave === escolhidos[0]; })[0];
+    var jaEscolhidos = (st.equiv.filter(function (e) { return e.fisc === alvo.fisc.chave; })[0] || { rev: [] }).rev.map(grupoPorChave).filter(Boolean);
+    await gravar(alvo.fisc, jaEscolhidos.concat([g]));
+  }
+
+  async function perguntar(titulo, html) {
+    if (typeof Swal === "undefined") return confirm(titulo);
+    var r = await Swal.fire({
+      icon: "question", title: titulo, html: html, showCancelButton: true, confirmButtonText: "Sim, confirmar",
+      cancelButtonText: "Cancelar", confirmButtonColor: "#007233", cancelButtonColor: "#64798c", reverseButtons: true
+    });
+    return r.isConfirmed;
+  }
+
+  /* Janela de escolha com busca; mostra a soma das quantidades selecionadas para o analista
+     ver, antes de confirmar, o que a equivalência vai comparar. */
+  async function escolher(o) {
+    if (typeof Swal === "undefined") return null;
+    var html = '<div class="cf-pick"><div style="margin-bottom:8px;font-size:13px">' + o.cabecalho + "</div>"
+      + '<input type="text" id="cf-pick-q" placeholder="Buscar por código ou descrição" aria-label="Buscar">'
+      + '<div class="lista" id="cf-pick-lista">'
+      + o.itens.sort(function (a, b) { return (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0); }).map(function (it) {
+        return '<label data-t="' + esc(norm(it.cod + " " + it.desc)) + '"><input type="' + (o.multiplo ? "checkbox" : "radio") + '" name="cf-pick" value="' + esc(it.valor) + '" data-q="' + it.qtd + '">'
+          + '<span><span class="c">' + esc(it.cod || "(sem código)") + "</span> · " + esc(it.desc) + (it.destaque ? " <b>(sugerido)</b>" : "") + '</span><span class="q">' + fmt(it.qtd) + " " + esc(it.un) + "</span></label>";
+      }).join("") + '</div><div class="tot" id="cf-pick-tot">Nada selecionado.</div></div>';
+    var r = await Swal.fire({
+      title: o.titulo, html: html, width: 760, showCancelButton: true, confirmButtonText: "Vincular", cancelButtonText: "Cancelar",
+      confirmButtonColor: "#007233", cancelButtonColor: "#64798c", reverseButtons: true,
+      didOpen: function (el) {
+        var q = el.querySelector("#cf-pick-q"), lista = el.querySelector("#cf-pick-lista"), tot = el.querySelector("#cf-pick-tot");
+        q.addEventListener("input", function () {
+          var t = norm(q.value);
+          lista.querySelectorAll("label").forEach(function (l) { l.style.display = l.getAttribute("data-t").indexOf(t) > -1 ? "" : "none"; });
+        });
+        lista.addEventListener("change", function () {
+          var soma = 0, n = 0;
+          lista.querySelectorAll("input:checked").forEach(function (i) { soma += parseFloat(i.getAttribute("data-q")) || 0; n++; });
+          tot.innerHTML = n ? n + " selecionado(s) · soma " + fmt(soma) + " (outro lado: " + fmt(o.refQtd) + ")" : "Nada selecionado.";
+        });
+      },
+      preConfirm: function () {
+        var marcados = Array.prototype.map.call(document.querySelectorAll("#cf-pick-lista input:checked"), function (i) { return i.value; });
+        if (!marcados.length) { Swal.showValidationMessage("Selecione ao menos um serviço."); return false; }
+        return marcados;
+      }
+    });
+    return r.isConfirmed ? r.value : null;
+  }
+
+  window.CvConferencia = { abrir: abrir, fechar: fechar };
+})();

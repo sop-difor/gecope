@@ -11,6 +11,7 @@
   var state = {
     rows: [], cols: [], headerRow: 0, fileName: "", valueIdx: null, curva: [], total: 0, limite: 0,
     arquivoOriginal: null,
+    aoaAprovado: null, /* matriz completa da planilha enviada (serviços inalterados incluídos) — usada na Conferência Orçamentária */
     /* vínculo com um processo (Gerenciar Processo): curva_abc_versoes/curva_abc_itens */
     processoVinculado: null, versaoCarregadaDb: null, versaoMaisRecenteDoVinculo: null, somenteLeitura: false
   };
@@ -131,6 +132,7 @@
   function processarAoa(aoa) {
     if (!aoa || aoa.length < 2) { erro("<b>Planilha vazia.</b> Nenhuma linha de dados encontrada."); return; }
     state.versaoCarregadaDb = null; /* upload novo: ainda não foi salvo como versão de nenhum processo */
+    state.aoaAprovado = aoa;
     var h = acharLinhaCabecalho(aoa);
     state.headerRow = h;
     var head = aoa[h] || [];
@@ -326,6 +328,7 @@
     });
     $("cv-kpis").innerHTML = html;
     $("cv-kpis").classList.add("on");
+    $("cv-btnConf").style.display = "";
 
     desenhaGrafico();
     desenhaTabela();
@@ -508,6 +511,38 @@
       : (lista.length < it.length ? "exibindo os " + lista.length + " maiores de " + it.length : it.length + " itens");
   }
 
+  /* ---------- Conferência Orçamentária (tela complementar: modules/curva-abc/conferencia.js) ---------- */
+  /* A Curva ABC só guarda os serviços com valor na coluna escolhida; a conferência precisa do
+     orçamento aprovado inteiro (inclusive o que a fiscalização não alterou). Logo após o
+     upload ele está em memória; numa versão salva, vem do .xlsx original no Storage. */
+  async function cvObterAoaAprovado() {
+    if (state.aoaAprovado) return state.aoaAprovado;
+    var v = state.versaoCarregadaDb;
+    if (!v || !v.arquivo_url) throw new Error("O arquivo original desta versão não está disponível. Envie a planilha do replanilhamento novamente.");
+    await window.carregarBiblioteca("xlsx");
+    var resp = await fetch(v.arquivo_url);
+    if (!resp.ok) throw new Error("Não consegui baixar o arquivo desta versão (HTTP " + resp.status + ").");
+    var wb = XLSX.read(new Uint8Array(await resp.arrayBuffer()), { type: "array", cellDates: false });
+    state.aoaAprovado = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null, blankrows: false });
+    return state.aoaAprovado;
+  }
+  function cvIrParaTermo(termo) {
+    $("cv-busca").value = termo;
+    desenhaTabela();
+    $("cv-tablebox").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function cvAbrirConferencia() {
+    if (!window.CvConferencia) { cvAlerta("Conferência indisponível", "O módulo da conferência não carregou. Recarregue a página.", "info"); return; }
+    window.CvConferencia.abrir({
+      processo: state.processoVinculado,
+      podeEscrever: cvPodeEscrever(),
+      textoReferencia: state.fileName + " " + (state.processoVinculado ? state.processoVinculado.descricao : ""),
+      itensCurva: function () { return state.curva; },
+      obterAoaAprovado: cvObterAoaAprovado,
+      verNaCurva: cvIrParaTermo
+    });
+  }
+
   /* ---------- exportações ---------- */
   function matriz() {
     var recorte = state.curva.slice(0, state.limite);
@@ -641,7 +676,7 @@
       };
     });
 
-    state.cols = []; state.dados = []; state.arquivoOriginal = null;
+    state.cols = []; state.dados = []; state.arquivoOriginal = null; state.aoaAprovado = null;
     state.curva = itens;
     state.total = Number(versaoRegistro.total_valor) || itens.reduce(function (s, x) { return s + x.ord; }, 0);
     state.fA = Number(versaoRegistro.criterio_a) || 80;
@@ -673,10 +708,11 @@
 
   function resetVisualizacao() {
     state.curva = []; state.total = 0; state.cols = []; state.dados = [];
-    state.arquivoOriginal = null; state.fileName = ""; state.limite = 0;
+    state.arquivoOriginal = null; state.aoaAprovado = null; state.fileName = ""; state.limite = 0;
     ["cv-kpis", "cv-chartbox", "cv-tablebox"].forEach(function (id) {
       var e = $(id); if (e) e.classList.remove("on");
     });
+    $("cv-btnConf").style.display = "none";
     $("cv-tbody").innerHTML = "";
     $("cv-chart").innerHTML = "";
     var busca = $("cv-busca"); if (busca) busca.value = "";
@@ -976,6 +1012,7 @@
   });
   $("cv-qtdCustom").addEventListener("change", calcular);
   $("cv-qtdCustom").addEventListener("input", calcular);
+  $("cv-btnConf").addEventListener("click", cvAbrirConferencia);
   $("cv-btnXlsx").addEventListener("click", baixarXlsx);
   $("cv-btnPrint").addEventListener("click", function () { window.print(); });
 
