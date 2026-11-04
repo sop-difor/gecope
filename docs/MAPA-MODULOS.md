@@ -7,6 +7,9 @@
 | Pedido | Comece por |
 |---|---|
 | Login, sessão, papel ou permissão | `core/auth.js` e `database.js` |
+| Login por matrícula e "Esqueci minha senha" | `core/auth.js` (`chamarLoginMatricula`) e `supabase/functions/login-matricula/`: o e-mail é resolvido no servidor e nunca chega ao navegador; limite de tentativas em `login_matricula_tentativas` (só service_role). A recuperação responde igual exista ou não a matrícula. WhatsApp do admin em `config.js` (`ADMIN_WHATSAPP`). A RPC antiga `app_users_lookup_by_matricula` não deve voltar a ser chamada sem login. |
+| Redefinir senha de usuário (admin) e troca obrigatória no primeiro acesso | `modules/administracao/admin.js` (`redefinirSenhaUsuario`, pedidos de recuperação na lista de pendentes e chave 🔑 na lista de usuários) e `supabase/functions/admin-redefinir-senha/` (confere admin no servidor, grava senha provisória e `user_metadata.trocar_senha`). A troca é forçada por `verificarTrocaSenhaObrigatoria` em `core/auth.js`. |
+| Abrir/baixar/ler arquivos dos buckets `orcamentos` e `composicoes_biblioteca` | `utils.js` (`urlAssinadaStorage`, `abrirArquivoStorage` e o clique global em `<a href>`): os buckets são privados e o link público gravado no banco é trocado por link assinado na hora. Nunca abrir `arquivo_url` direto com `fetch`/`window.open`. |
 | Navegação, abas, tema, tela cheia ou carregamento da aplicação | `core/shell.js` e `index.html` |
 | Processos, metas, fiscais ou acompanhamento | `modules/processos/processos.js` |
 | Contratos, aditivos ou checklist documental | `modules/contratos/contratos.js` |
