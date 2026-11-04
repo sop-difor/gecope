@@ -13,7 +13,7 @@ window.WHATSAPP_PROXY_URL = 'https://137-131-228-120.sslip.io';
 // WhatsApp do administrador que recebe os pedidos de "Esqueci minha senha" (botão "Chamar no
 // WhatsApp" da tela de login). Só dígitos, com 55 + DDD + número de 9 dígitos, ex.: '5585912345678'.
 // Fica visível no site: use um número institucional. Vazio = o botão não aparece.
-window.ADMIN_WHATSAPP = '';
+window.ADMIN_WHATSAPP = '5585920003389';
 // Satélite do mapa de obras (Esri World Imagery). A licença do Esri exige conta: crie uma chave gratuita no ArcGIS Location
 // Platform (developers.arcgis.com > Dashboard > API keys, permissão "Location services > Basemaps > Static basemap tiles")
 // e RESTRINJA a chave ao domínio do GECOPE nos referrers dela; assim ela pode ficar neste arquivo público. Vazia = sem satélite.
