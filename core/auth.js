@@ -255,9 +255,9 @@ async function verificarTrocaSenhaObrigatoria() {
             const r = await Swal.fire({
                 title: 'Crie sua nova senha',
                 html: `
-                    <div class="text-start small mb-2">Você entrou com uma senha provisória. Para continuar, crie uma senha nova (mínimo de 8 caracteres).</div>
-                    <input id="nova-senha-1" type="password" class="swal2-input" placeholder="Nova senha" autocomplete="new-password">
-                    <input id="nova-senha-2" type="password" class="swal2-input" placeholder="Repita a nova senha" autocomplete="new-password">`,
+                    <div style="text-align:left;font-size:.9rem;color:#374151;margin-bottom:6px">Você entrou com uma senha provisória. Para continuar, crie uma senha nova (mínimo de 8 caracteres).</div>
+                    <input id="nova-senha-1" type="password" class="swal2-input" style="color:#111827;background:#fff" placeholder="Nova senha" autocomplete="new-password">
+                    <input id="nova-senha-2" type="password" class="swal2-input" style="color:#111827;background:#fff" placeholder="Repita a nova senha" autocomplete="new-password">`,
                 icon: 'info',
                 allowOutsideClick: false,
                 allowEscapeKey: false,

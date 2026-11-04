@@ -550,14 +550,17 @@
 
             await Swal.fire({
                 title: 'Senha provisória gerada',
+                // Cores fixas: a janela do SweetAlert é sempre clara, mas no tema escuro as
+                // classes do Bootstrap (form-control, text-muted) pintam o texto de claro e a
+                // senha ficava invisível.
                 html: `
-                    <div class="text-start">
-                        <div class="mb-2">Usuário: <strong>${escapeHTML(r.nome || matricula)}</strong></div>
-                        <div class="input-group mb-2">
-                            <input id="senha-provisoria" class="form-control text-center fw-bold" style="font-family:monospace;font-size:1.1rem" readonly value="${escapeHTML(r.senha)}">
-                            <button class="btn btn-outline-secondary" type="button" id="btn-copiar-senha" title="Copiar"><i class="bi bi-clipboard"></i></button>
+                    <div style="text-align:left;color:#1f2937">
+                        <div style="margin-bottom:10px">Usuário: <strong>${escapeHTML(r.nome || matricula)}</strong></div>
+                        <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">
+                            <div id="senha-provisoria" style="flex:1;user-select:all;background:#f3f4f6;color:#111827;border:1px solid #d1d5db;border-radius:8px;padding:10px;text-align:center;font-family:Consolas,monospace;font-size:1.25rem;font-weight:700;letter-spacing:1px">${escapeHTML(r.senha)}</div>
+                            <button type="button" id="btn-copiar-senha" title="Copiar" style="background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:8px;padding:0 14px;cursor:pointer"><i class="bi bi-clipboard"></i> Copiar</button>
                         </div>
-                        <div class="small text-muted">Anote ou envie agora: esta senha não será mostrada de novo. No primeiro acesso o usuário vai criar uma senha nova.</div>
+                        <div style="font-size:.85rem;color:#4b5563">Anote ou envie agora: esta senha não será mostrada de novo. No primeiro acesso o usuário vai criar uma senha nova.</div>
                     </div>`,
                 icon: 'success',
                 showConfirmButton: temFone,
@@ -571,10 +574,11 @@
                     if (btn) btn.addEventListener('click', async () => {
                         try {
                             await navigator.clipboard.writeText(r.senha);
-                            btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                            btn.innerHTML = '<i class="bi bi-check-lg"></i> Copiada';
                         } catch (_) {
-                            const inp = document.getElementById('senha-provisoria');
-                            if (inp) { inp.select(); document.execCommand('copy'); }
+                            // Sem permissão de área de transferência: seleciona o texto para Ctrl+C.
+                            const el = document.getElementById('senha-provisoria');
+                            if (el) { const sel = window.getSelection(); const rg = document.createRange(); rg.selectNodeContents(el); sel.removeAllRanges(); sel.addRange(rg); }
                         }
                     });
                 }
