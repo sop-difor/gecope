@@ -726,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'modalCadastrarComposicao', 'modalNovaVersaoComposicao', 'modalAtenderComposicao',
         'modalRecusarComposicao', 'modalCriarComposicaoAnalitica', 'modalBuscarItemComposicao',
         'modalComentarioOrcamento', 'modalComentarioComposicao', 'modalExportarComposicao',
-        'modalNovaVersao', 'modalNovoOrcamento', 'modalLogin', 'modalVincularFiscal'
+        'modalNovaVersao', 'modalNovoOrcamento', 'modalVincularFiscal'
     ];
     modaisParaMover.forEach(id => {
         const el = document.getElementById(id);
@@ -1676,11 +1676,8 @@ async function prepararExportacaoComposicao(id, urlArquivo) {
 
         // 2. Se temos URL e NO termina em .json, é um arquivo direto (PDF/XLS) -> BAIXAR DIRETO
         if (urlArquivo && !urlArquivo.toLowerCase().includes('.json')) {
-            const link = document.createElement('a');
-            link.href = urlArquivo;
-            link.download = ''; // Sugere o nome original do arquivo
-            link.target = '_blank';
-            link.click();
+            // Bucket privado: abre por link assinado (utils.js).
+            window.abrirArquivoStorage(urlArquivo);
             return;
         }
 
@@ -1689,7 +1686,7 @@ async function prepararExportacaoComposicao(id, urlArquivo) {
             // Sem ?t=: o caminho já muda a cada nova versão (padrão V{n}_...), então não
             // há risco de conteúdo velho — e sem cache-bust o CDN/navegador pode reaproveitar
             // a resposta em vez de baixar de novo a cada clique (egress, 18/09/2026).
-            const response = await fetch(urlArquivo);
+            const response = await fetch(await window.urlAssinadaStorage(urlArquivo));
             if (!response.ok) throw new Error("Erro ao baixar dados da composição.");
             docData = await response.json();
         }
@@ -2098,7 +2095,7 @@ async function visualizarComposicao(id, url, options = {}) {
 
             // 2. Arquivos PDF/XLS Diretos
             if (url && !url.toLowerCase().includes('.json')) {
-                window.open(url, '_blank');
+                window.abrirArquivoStorage(url); // bucket privado: link assinado
                 return;
             }
 
@@ -2106,7 +2103,7 @@ async function visualizarComposicao(id, url, options = {}) {
             if (url && url.toLowerCase().includes('.json')) {
                 // Sem ?t= — ver comentário equivalente em prepararExportacaoComposicao
                 // (egress, 18/09/2026).
-                const response = await fetch(url);
+                const response = await fetch(await window.urlAssinadaStorage(url));
                 if (!response.ok) throw new Error("Erro ao baixar arquivo JSON.");
 
                 const json = await response.json();
@@ -2145,7 +2142,7 @@ async function visualizarComposicao(id, url, options = {}) {
                     renderizarRelatorioSOP_HTML(docData, modalBody);
                 } else {
                     // Caso não seja analítica (ex: apenas arquivo PDF/XLS arquivado)
-                    if (url) window.open(url, '_blank');
+                    if (url) window.abrirArquivoStorage(url);
                     else throw new Error("Documento não possui dados analíticos.");
                 }
             } else {

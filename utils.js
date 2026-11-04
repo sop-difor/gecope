@@ -86,6 +86,77 @@
         }
     }
 
+    // --- Arquivos de buckets PRIVADOS (revisão de segurança de 04/11/2026) ---
+    // orcamentos e composicoes_biblioteca deixaram de ser públicos: o link
+    // /storage/v1/object/public/... gravado no banco (arquivo_url, historico_versoes, anexos
+    // de comentário) não abre mais sozinho. Os links continuam gravados nesse formato; na
+    // hora de abrir ou ler, urlAssinadaStorage troca por um link assinado de curta duração
+    // (exige sessão com papel válido: policy storage_bibliotecas_select_papel_valido).
+    // Links <a href> para esses buckets em qualquer tela são tratados pelo clique global
+    // abaixo, sem precisar mexer em cada lugar que os desenha.
+    const BUCKETS_PRIVADOS = ['orcamentos', 'composicoes_biblioteca'];
+
+    function partesUrlStorage(url) {
+        if (!url || typeof url !== 'string') return null;
+        try {
+            const u = new URL(url, window.location.href);
+            const m = u.pathname.match(/\/storage\/v1\/object\/(public|sign|authenticated)\/([^/]+)\/(.+)$/);
+            if (!m) return null;
+            const path = m[3].split('/').map(s => decodeURIComponent(s)).join('/');
+            return { tipo: m[1], bucket: m[2], path };
+        } catch (e) { return null; }
+    }
+
+    // Só o link público antigo precisa de troca; um link já assinado (/sign/) abre direto.
+    function ehArquivoPrivado(url) {
+        const p = partesUrlStorage(url);
+        return !!(p && p.tipo !== 'sign' && BUCKETS_PRIVADOS.includes(p.bucket));
+    }
+
+    async function urlAssinadaStorage(url, segundos = 300) {
+        const p = partesUrlStorage(url);
+        if (!p || p.tipo === 'sign' || !BUCKETS_PRIVADOS.includes(p.bucket)) return url;
+        const { data, error } = await window.sbClient.storage.from(p.bucket).createSignedUrl(p.path, segundos);
+        if (error || !data || !data.signedUrl) {
+            throw new Error((error && error.message) || 'Não foi possível liberar o arquivo.');
+        }
+        return data.signedUrl;
+    }
+
+    // Abre numa aba nova. A aba é aberta antes da espera (ainda dentro do clique) para o
+    // navegador não bloquear como pop-up.
+    async function abrirArquivoStorage(url) {
+        if (!ehArquivoPrivado(url)) { window.open(url, '_blank', 'noopener'); return; }
+        const aba = window.open('', '_blank');
+        try {
+            const assinada = await urlAssinadaStorage(url);
+            if (aba) { aba.opener = null; aba.location.href = assinada; return; }
+            // Pop-up bloqueado (chamada fora de um clique direto): oferece o link para clicar,
+            // sem tirar o usuário da tela atual.
+            if (window.Swal) {
+                window.Swal.fire({
+                    title: 'Arquivo pronto',
+                    html: `<a href="${assinada.replace(/"/g, '&quot;')}" target="_blank" rel="noopener" class="btn btn-success">Abrir arquivo</a>`,
+                    showConfirmButton: false,
+                    showCloseButton: true
+                });
+            } else {
+                window.open(assinada, '_blank', 'noopener');
+            }
+        } catch (e) {
+            if (aba) aba.close();
+            console.error('[Storage] Falha ao abrir arquivo:', e);
+            alert('Não foi possível abrir o arquivo: ' + (e.message || e));
+        }
+    }
+
+    document.addEventListener('click', (ev) => {
+        const a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+        if (!a || !ehArquivoPrivado(a.getAttribute('href'))) return;
+        ev.preventDefault();
+        abrirArquivoStorage(a.href);
+    }, true);
+
     function dataParaISO(strData) {
         if (!strData) return null;
         if (strData.match(/^\d{4}-\d{2}-\d{2}$/)) return strData;
@@ -269,6 +340,8 @@
     window.mascaraProcesso = mascaraProcesso;
     window.sanitizarNomeArquivo = sanitizarNomeArquivo;
     window.extrairPathDoStorage = extrairPathDoStorage;
+    window.urlAssinadaStorage = urlAssinadaStorage;
+    window.abrirArquivoStorage = abrirArquivoStorage;
     window.dataParaISO = dataParaISO;
     window.moedaParaNumero = moedaParaNumero;
     window.isoParaDate = isoParaDate;

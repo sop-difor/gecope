@@ -69,7 +69,7 @@
   async function lerRevisado(orc) {
     if (cacheRevisado[orc.arquivo_path]) return cacheRevisado[orc.arquivo_path];
     await window.carregarBiblioteca("xlsx");
-    var resp = await fetch(orc.arquivo_url);
+    var resp = await fetch(await window.urlAssinadaStorage(orc.arquivo_url)); // bucket privado
     if (!resp.ok) throw new Error("Não consegui baixar o orçamento revisado (HTTP " + resp.status + ").");
     var buf = await resp.arrayBuffer();
     var nomes = lerWorkbook(buf, { bookSheets: true }).SheetNames;

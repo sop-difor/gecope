@@ -144,7 +144,11 @@ async function signInWithEmail(email, password, opts = {}) {
             }
         }
 
-        const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+        // opts.sessao: login por matrícula já autenticado no servidor (Edge Function
+        // login-matricula); aqui só se instala a sessão e segue o mesmo pós-login.
+        const { error } = opts.sessao
+            ? await sbClient.auth.setSession(opts.sessao)
+            : await sbClient.auth.signInWithPassword({ email, password });
 
         if (error) {
             console.error('[ERRO] Falha Auth:', error.message);
@@ -219,6 +223,7 @@ async function signInWithEmail(email, password, opts = {}) {
         // Sem o setTimeout de 500ms que havia aqui: signInWithPassword já resolveu e a sessão está
         // gravada; o atraso só empurrava a Início para depois.
         carregarDadosSupabase();
+        verificarTrocaSenhaObrigatoria();
         return true;
     } catch (err) {
         console.error('[ERRO] Exceção em signInWithEmail:', err);
@@ -228,6 +233,82 @@ async function signInWithEmail(email, password, opts = {}) {
         }
         return false;
     }
+}
+
+// Senha provisória (gerada pelo admin em Administração > Redefinir senha, Edge Function
+// admin-redefinir-senha) marca user_metadata.trocar_senha = true. Enquanto a marca existir,
+// esta janela não sai da frente: o usuário cria a senha nova ou sai do sistema. Roda depois
+// do login e também quando a aba é recarregada já logada (fim do DOMContentLoaded abaixo).
+let _trocaSenhaAberta = false;
+async function verificarTrocaSenhaObrigatoria() {
+    if (_trocaSenhaAberta || !sbClient) return;
+    let user = null;
+    try {
+        const { data } = await sbClient.auth.getUser();
+        user = data && data.user;
+    } catch (_) { return; }
+    if (!user || !(user.user_metadata && user.user_metadata.trocar_senha)) return;
+
+    _trocaSenhaAberta = true;
+    try {
+        while (true) {
+            const r = await Swal.fire({
+                title: 'Crie sua nova senha',
+                html: `
+                    <div style="text-align:left;font-size:.9rem;color:#374151;margin-bottom:6px">Você entrou com uma senha provisória. Para continuar, crie uma senha nova (mínimo de 8 caracteres).</div>
+                    <input id="nova-senha-1" type="password" class="swal2-input" style="color:#111827;background:#fff" placeholder="Nova senha" autocomplete="new-password">
+                    <input id="nova-senha-2" type="password" class="swal2-input" style="color:#111827;background:#fff" placeholder="Repita a nova senha" autocomplete="new-password">`,
+                icon: 'info',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showCancelButton: true,
+                confirmButtonText: 'Salvar nova senha',
+                cancelButtonText: 'Sair',
+                confirmButtonColor: 'var(--sop-green)',
+                preConfirm: () => {
+                    const s1 = document.getElementById('nova-senha-1').value;
+                    const s2 = document.getElementById('nova-senha-2').value;
+                    if (s1.length < 8) { Swal.showValidationMessage('A senha precisa ter pelo menos 8 caracteres.'); return false; }
+                    if (s1 !== s2) { Swal.showValidationMessage('As duas senhas não são iguais.'); return false; }
+                    return s1;
+                }
+            });
+            if (!r.isConfirmed) { await signOutUser(); return; }
+
+            Swal.fire({ title: 'Salvando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const { error } = await sbClient.auth.updateUser({ password: r.value, data: { trocar_senha: false } });
+            if (!error) {
+                await Swal.fire('Senha alterada', 'Sua nova senha já está valendo.', 'success');
+                return;
+            }
+            console.error('[ERRO] Troca de senha obrigatória:', error.message);
+            const vazada = /pwned|leaked|compromised|weak/i.test(error.message || '');
+            await Swal.fire('Não foi possível salvar',
+                vazada ? 'Essa senha é fraca ou já apareceu em vazamentos públicos. Escolha outra.'
+                       : 'Tente de novo. Se continuar, escolha uma senha diferente da provisória.',
+                'error');
+        }
+    } finally {
+        _trocaSenhaAberta = false;
+    }
+}
+
+// Edge Function login-matricula (supabase/functions/login-matricula): login e recuperação de
+// senha por matrícula sem o e-mail passar pelo navegador. Sempre responde JSON { ok, ... }.
+async function chamarLoginMatricula(corpo) {
+    const resp = await fetch(`${window.SUPABASE_URL}/functions/v1/login-matricula`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': window.SUPABASE_KEY,
+            'Authorization': `Bearer ${window.SUPABASE_KEY}`
+        },
+        body: JSON.stringify(corpo)
+    });
+    let json = null;
+    try { json = await resp.json(); } catch (_) { /* corpo não-JSON */ }
+    if (!json) throw new Error(`login-matricula respondeu ${resp.status}`);
+    return json;
 }
 
 async function signOutUser() {
@@ -727,22 +808,26 @@ document.addEventListener('DOMContentLoaded', () => {
             // Entrada já é um email
             await signInWithEmail(loginInput, password);
         } else {
-            // Entrada é matrícula: tenta gecope.app primeiro, depois busca email real no app_users
-            const emailGecopeApp = `${loginInput}@gecope.app`;
-            const result = await signInWithEmail(emailGecopeApp, password, { silent: true });
-            if (!result) {
-                // Busca email real cadastrado com essa matrícula — via função SECURITY DEFINER
-                // (app_users_lookup_by_matricula), não mais SELECT direto na tabela: antes deste
-                // login sequer acontecer, o usuário ainda não tem sessão, e a tabela app_users não
-                // é mais publicamente legível (só essa função, que devolve apenas id/nome/sobrenome/
-                // email de UMA matrícula, nunca telefone/role/a tabela inteira).
-                const { data: userRecord } = await sbClient.rpc('app_users_lookup_by_matricula', { p_matricula: loginInput }).maybeSingle();
-                if (userRecord?.email && userRecord.email !== emailGecopeApp) {
-                    await signInWithEmail(userRecord.email, password);
+            // Entrada é matrícula: o servidor (Edge Function login-matricula) descobre o e-mail,
+            // autentica e devolve só a sessão. Antes o navegador chamava, sem login, a RPC
+            // app_users_lookup_by_matricula, que entregava nome e e-mail de qualquer matrícula
+            // (revisão de segurança de 04/11/2026).
+            const feedback = document.getElementById('landing-feedback');
+            feedback.style.display = 'none';
+            try {
+                const r = await chamarLoginMatricula({ acao: 'login', matricula: loginInput, senha: password });
+                if (r.ok) {
+                    await signInWithEmail(r.email, null, {
+                        sessao: { access_token: r.access_token, refresh_token: r.refresh_token }
+                    });
                 } else {
-                    // Exibe o erro original (sem email alternativo encontrado)
-                    await signInWithEmail(emailGecopeApp, password);
+                    feedback.style.display = 'block';
+                    feedback.textContent = r.erro || 'Matrícula ou senha inválidas.';
                 }
+            } catch (err) {
+                console.error('[ERRO] login-matricula:', err);
+                feedback.style.display = 'block';
+                feedback.textContent = 'Não foi possível entrar agora. Tente novamente em instantes.';
             }
         }
     });
@@ -773,7 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 text: 'Informe sua matrícula cadastrada no sistema:',
                 input: 'text',
                 inputValue: prefilledMatricula,
-                inputPlaceholder: 'Ex: 99030487',
+                inputPlaceholder: 'Ex: 12345678',
                 showCancelButton: true,
                 confirmButtonColor: 'var(--sop-green)',
                 confirmButtonText: 'Confirmar',
@@ -795,71 +880,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 try {
-                    // Verificar se a matrícula existe — via função SECURITY DEFINER, ver
-                    // comentário equivalente no handler de login acima.
-                    const { data: user, error: userErr } = await sbClient
-                        .rpc('app_users_lookup_by_matricula', { p_matricula: matricula.trim() })
-                        .maybeSingle();
-
-                    if (userErr) throw userErr;
-
-                    if (!user) {
-                        Swal.fire('Matrícula Não Encontrada', 'A matrícula informada não está cadastrada no sistema.', 'error');
+                    // O servidor (login-matricula) registra o pedido para o admin com o nome real e
+                    // responde igual exista ou não a matrícula: a tela não revela de quem ela é
+                    // (revisão de segurança de 04/11/2026).
+                    const r = await chamarLoginMatricula({ acao: 'recuperar', matricula: matricula.trim() });
+                    if (!r.ok) {
+                        Swal.fire('Não foi possível enviar', r.erro || 'Tente novamente em instantes.', 'warning');
                         return;
                     }
 
-                    const nomeCompleto = `${user.nome} ${user.sobrenome || ''}`.trim().toUpperCase();
+                    // Número em config.js (ADMIN_WHATSAPP). Antes ficava fixo aqui um número de 8
+                    // dígitos que não existe no WhatsApp, e a mensagem nunca chegava.
+                    const foneAdmin = String(window.ADMIN_WHATSAPP || '').replace(/\D/g, '');
+                    const temWhatsapp = /^55\d{11}$/.test(foneAdmin);
+                    const adminMessage = `Olá! Esqueci minha senha do GECOPE. Poderia redefini-la para mim? Minha matrícula é *${matricula.trim()}*.`;
+                    const whatsappLink = `https://api.whatsapp.com/send?phone=${foneAdmin}&text=${encodeURIComponent(adminMessage)}`;
 
-                    const { isConfirmed } = await Swal.fire({
-                        title: 'Solicitar Recuperação?',
-                        html: `Deseja enviar uma solicitação de recuperação de senha para <strong>${nomeCompleto}</strong>?<br><br>O administrador do GECOPE será notificado para realizar a redefinição de sua senha.`,
-                        icon: 'question',
+                    Swal.fire({
+                        title: 'Solicitação registrada',
+                        html: 'Se a matrícula estiver cadastrada, o administrador do GECOPE foi avisado e vai redefinir sua senha.'
+                            + (temWhatsapp ? '<br><br>Você também pode acelerar o processo enviando uma mensagem direta ao administrador pelo WhatsApp.' : ''),
+                        icon: 'success',
+                        showConfirmButton: temWhatsapp,
                         showCancelButton: true,
-                        confirmButtonColor: 'var(--sop-green)',
-                        confirmButtonText: 'Sim, enviar solicitação',
-                        cancelButtonText: 'Cancelar'
+                        confirmButtonColor: '#25D366',
+                        confirmButtonText: '<i class="bi bi-whatsapp me-1"></i> Chamar no WhatsApp',
+                        cancelButtonText: 'Fechar'
+                    }).then((result) => {
+                        if (temWhatsapp && result.isConfirmed) {
+                            window.open(whatsappLink, '_blank');
+                        }
                     });
-
-                    if (isConfirmed) {
-                        Swal.fire({
-                            title: 'Processando...',
-                            allowOutsideClick: false,
-                            didOpen: () => {
-                                Swal.showLoading();
-                            }
-                        });
-
-                        // Criar notificação para o Admin
-                        const { error: notifErr } = await sbClient.from('app_notifications').insert([{
-                            type: 'new_user_request',
-                            payload: JSON.stringify({
-                                matricula: matricula.trim(),
-                                nome: `${nomeCompleto} - RECUPERAÇÃO DE SENHA`
-                            }),
-                            created_at: new Date().toISOString(),
-                            read: false
-                        }]);
-
-                        if (notifErr) throw notifErr;
-
-                        const adminMessage = `Olá! Esqueci minha senha do GECOPE. Poderia redefini-la para mim? Minha matrícula é *${matricula.trim()}* e meu nome é *${nomeCompleto}*.`;
-                        const encodedMessage = encodeURIComponent(adminMessage);
-                        const whatsappLink = `https://api.whatsapp.com/send?phone=558599030487&text=${encodedMessage}`;
-
-                        Swal.fire({
-                            title: 'Solicitação Enviada!',
-                            html: `A solicitação foi registrada no painel do administrador.<br><br>Você também pode acelerar o processo clicando no botão abaixo para enviar uma mensagem direta via WhatsApp para o Administrador.`,
-                            icon: 'success',
-                            showCancelButton: true,
-                            confirmButtonColor: '#25D366',
-                            confirmButtonText: '<i class="bi bi-whatsapp me-1"></i> Chamar no WhatsApp',
-                            cancelButtonText: 'Fechar'
-                        }).then((result) => {
-                            if (result.isConfirmed) {
-                                window.open(whatsappLink, '_blank');
-                            }
-                        });
-                    }
                 } catch (err) {
                     console.error(err);
                     Swal.fire('Erro', 'Não foi possível processar a solicitação no momento: ' + (err.message || err), 'error');
@@ -899,6 +950,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Só com sessão restaurada (aba recarregada já logada); visitante não consulta app_users
     // e quem faz login dispara a carga no próprio login (acima).
     if (sessionStorage.getItem('sop_user') && typeof garantirFiscaisCarregados === 'function') garantirFiscaisCarregados();
+    // Aba recarregada já logada: a troca obrigatória de senha continua valendo.
+    if (sessionStorage.getItem('sop_user')) verificarTrocaSenhaObrigatoria();
 
     // Garantir que o modal de cadastro esteja no final do body para evitar problemas de visibilidade
     try {
