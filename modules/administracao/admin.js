@@ -71,6 +71,7 @@
                                 created_at: n.created_at,
                                 notif_id: n.id,
                                 recuperacao: true,
+                                tem_conta: !!found,
                                 notification_raw: n
                             });
                             continue;
@@ -161,9 +162,14 @@
                     <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(n.matricula) || '-'}</span></td>
                     <td><span class="text-muted small">${dataSolic}</span></td>
                     <td class="text-end pe-4">
-                        <button class="btn btn-sm btn-outline-success" data-notif-id="${escapeHTML(n.notif_id)}" onclick="resolverRecuperacaoSenha(this.dataset.notifId)" title="Marcar como resolvido depois de redefinir a senha">
-                            <i class="bi bi-check2-circle me-1"></i> Resolvido
-                        </button>
+                        <div class="d-flex justify-content-end gap-2">
+                            ${n.tem_conta ? `<button class="btn btn-sm btn-warning" data-notif-id="${escapeHTML(n.notif_id)}" data-matricula="${escapeHTML(n.matricula)}" onclick="redefinirSenhaUsuario(this.dataset.matricula, this.dataset.notifId)" title="Gerar uma senha provisória para o usuário">
+                                <i class="bi bi-key me-1"></i> Redefinir senha
+                            </button>` : ''}
+                            <button class="btn btn-sm btn-outline-success" data-notif-id="${escapeHTML(n.notif_id)}" onclick="resolverRecuperacaoSenha(this.dataset.notifId)" title="Marcar como resolvido sem redefinir aqui">
+                                <i class="bi bi-check2-circle me-1"></i> Resolvido
+                            </button>
+                        </div>
                     </td>
                 `;
                     tbodyPending.appendChild(tr);
@@ -502,6 +508,86 @@
         }
     }
 
+    // Edge Function admin-redefinir-senha: confere no servidor que quem chama é admin, gera
+    // uma senha provisória, obriga a troca no próximo login e marca o pedido como resolvido.
+    // A senha só aparece nesta janela; não fica gravada em lugar nenhum.
+    async function redefinirSenhaUsuario(matricula, notifId) {
+        if (!matricula) return;
+        const conf = await Swal.fire({
+            title: 'Redefinir senha?',
+            html: `Será gerada uma <strong>senha provisória</strong> para a matrícula <strong>${escapeHTML(matricula)}</strong>.<br><br>A senha atual deixa de funcionar e, no próximo acesso, o usuário terá de criar uma senha nova.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Redefinir',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: 'var(--sop-green)'
+        });
+        if (!conf.isConfirmed) return;
+
+        Swal.fire({ title: 'Redefinindo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        try {
+            const { data: { session } } = await sbClient.auth.getSession();
+            if (!session) throw new Error('Sua sessão expirou. Entre novamente.');
+            const resp = await fetch(`${window.SUPABASE_URL}/functions/v1/admin-redefinir-senha`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': window.SUPABASE_KEY,
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ matricula, notif_id: notifId || null })
+            });
+            let r = null;
+            try { r = await resp.json(); } catch (_) { /* corpo não-JSON */ }
+            if (!r || !r.ok) throw new Error((r && r.erro) || `Falha ao redefinir (HTTP ${resp.status}).`);
+
+            let fone = String(r.telefone || '').replace(/\D/g, '');
+            if (fone.length === 10 || fone.length === 11) fone = '55' + fone;
+            const temFone = /^55\d{10,11}$/.test(fone);
+            const msg = `Olá! Sua senha do GECOPE foi redefinida.\nSenha provisória: ${r.senha}\nNo primeiro acesso você vai criar uma senha nova.`;
+
+            if (typeof loadAllUsers === 'function') loadAllUsers();
+
+            await Swal.fire({
+                title: 'Senha provisória gerada',
+                html: `
+                    <div class="text-start">
+                        <div class="mb-2">Usuário: <strong>${escapeHTML(r.nome || matricula)}</strong></div>
+                        <div class="input-group mb-2">
+                            <input id="senha-provisoria" class="form-control text-center fw-bold" style="font-family:monospace;font-size:1.1rem" readonly value="${escapeHTML(r.senha)}">
+                            <button class="btn btn-outline-secondary" type="button" id="btn-copiar-senha" title="Copiar"><i class="bi bi-clipboard"></i></button>
+                        </div>
+                        <div class="small text-muted">Anote ou envie agora: esta senha não será mostrada de novo. No primeiro acesso o usuário vai criar uma senha nova.</div>
+                    </div>`,
+                icon: 'success',
+                showConfirmButton: temFone,
+                confirmButtonText: '<i class="bi bi-whatsapp me-1"></i> Enviar pelo WhatsApp',
+                confirmButtonColor: '#25D366',
+                showCancelButton: true,
+                cancelButtonText: 'Fechar',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    const btn = document.getElementById('btn-copiar-senha');
+                    if (btn) btn.addEventListener('click', async () => {
+                        try {
+                            await navigator.clipboard.writeText(r.senha);
+                            btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+                        } catch (_) {
+                            const inp = document.getElementById('senha-provisoria');
+                            if (inp) { inp.select(); document.execCommand('copy'); }
+                        }
+                    });
+                }
+            }).then((res) => {
+                if (temFone && res.isConfirmed) {
+                    window.open(`https://api.whatsapp.com/send?phone=${fone}&text=${encodeURIComponent(msg)}`, '_blank');
+                }
+            });
+        } catch (e) {
+            Swal.fire('Não foi possível redefinir', e.message || String(e), 'error');
+        }
+    }
+
     async function resolverRecuperacaoSenha(notifId) {
         if (!notifId) return;
         if (!confirm('Marcar este pedido de recuperação como resolvido? Faça isso depois de redefinir a senha do usuário.')) return;
@@ -796,6 +882,7 @@
     window.aprovarFromNotification = aprovarFromNotification;
     window.recusarNotification = recusarNotification;
     window.resolverRecuperacaoSenha = resolverRecuperacaoSenha;
+    window.redefinirSenhaUsuario = redefinirSenhaUsuario;
     window.diagnosePendingFetch = diagnosePendingFetch;
     window.openAdminPendings = openAdminPendings;
 

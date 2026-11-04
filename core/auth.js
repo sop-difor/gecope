@@ -223,6 +223,7 @@ async function signInWithEmail(email, password, opts = {}) {
         // Sem o setTimeout de 500ms que havia aqui: signInWithPassword já resolveu e a sessão está
         // gravada; o atraso só empurrava a Início para depois.
         carregarDadosSupabase();
+        verificarTrocaSenhaObrigatoria();
         return true;
     } catch (err) {
         console.error('[ERRO] Exceção em signInWithEmail:', err);
@@ -231,6 +232,64 @@ async function signInWithEmail(email, password, opts = {}) {
             document.getElementById('landing-feedback').textContent = 'Erro ao autenticar: ' + (err.message || err);
         }
         return false;
+    }
+}
+
+// Senha provisória (gerada pelo admin em Administração > Redefinir senha, Edge Function
+// admin-redefinir-senha) marca user_metadata.trocar_senha = true. Enquanto a marca existir,
+// esta janela não sai da frente: o usuário cria a senha nova ou sai do sistema. Roda depois
+// do login e também quando a aba é recarregada já logada (fim do DOMContentLoaded abaixo).
+let _trocaSenhaAberta = false;
+async function verificarTrocaSenhaObrigatoria() {
+    if (_trocaSenhaAberta || !sbClient) return;
+    let user = null;
+    try {
+        const { data } = await sbClient.auth.getUser();
+        user = data && data.user;
+    } catch (_) { return; }
+    if (!user || !(user.user_metadata && user.user_metadata.trocar_senha)) return;
+
+    _trocaSenhaAberta = true;
+    try {
+        while (true) {
+            const r = await Swal.fire({
+                title: 'Crie sua nova senha',
+                html: `
+                    <div class="text-start small mb-2">Você entrou com uma senha provisória. Para continuar, crie uma senha nova (mínimo de 8 caracteres).</div>
+                    <input id="nova-senha-1" type="password" class="swal2-input" placeholder="Nova senha" autocomplete="new-password">
+                    <input id="nova-senha-2" type="password" class="swal2-input" placeholder="Repita a nova senha" autocomplete="new-password">`,
+                icon: 'info',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showCancelButton: true,
+                confirmButtonText: 'Salvar nova senha',
+                cancelButtonText: 'Sair',
+                confirmButtonColor: 'var(--sop-green)',
+                preConfirm: () => {
+                    const s1 = document.getElementById('nova-senha-1').value;
+                    const s2 = document.getElementById('nova-senha-2').value;
+                    if (s1.length < 8) { Swal.showValidationMessage('A senha precisa ter pelo menos 8 caracteres.'); return false; }
+                    if (s1 !== s2) { Swal.showValidationMessage('As duas senhas não são iguais.'); return false; }
+                    return s1;
+                }
+            });
+            if (!r.isConfirmed) { await signOutUser(); return; }
+
+            Swal.fire({ title: 'Salvando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const { error } = await sbClient.auth.updateUser({ password: r.value, data: { trocar_senha: false } });
+            if (!error) {
+                await Swal.fire('Senha alterada', 'Sua nova senha já está valendo.', 'success');
+                return;
+            }
+            console.error('[ERRO] Troca de senha obrigatória:', error.message);
+            const vazada = /pwned|leaked|compromised|weak/i.test(error.message || '');
+            await Swal.fire('Não foi possível salvar',
+                vazada ? 'Essa senha é fraca ou já apareceu em vazamentos públicos. Escolha outra.'
+                       : 'Tente de novo. Se continuar, escolha uma senha diferente da provisória.',
+                'error');
+        }
+    } finally {
+        _trocaSenhaAberta = false;
     }
 }
 
@@ -891,6 +950,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Só com sessão restaurada (aba recarregada já logada); visitante não consulta app_users
     // e quem faz login dispara a carga no próprio login (acima).
     if (sessionStorage.getItem('sop_user') && typeof garantirFiscaisCarregados === 'function') garantirFiscaisCarregados();
+    // Aba recarregada já logada: a troca obrigatória de senha continua valendo.
+    if (sessionStorage.getItem('sop_user')) verificarTrocaSenhaObrigatoria();
 
     // Garantir que o modal de cadastro esteja no final do body para evitar problemas de visibilidade
     try {
