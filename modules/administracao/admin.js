@@ -246,6 +246,9 @@
                             <button class="btn-action-icon" data-email="${escapeHTML(u.email)}" onclick="abrirModalEdicaoUsuario(this.dataset.email)" title="Editar Usuário">
                                 <i class="bi bi-pencil icon-cloud"></i>
                             </button>
+                            ${u.matricula ? `<button class="btn-action-icon" data-matricula="${escapeHTML(u.matricula)}" onclick="redefinirSenhaUsuario(this.dataset.matricula)" title="Redefinir senha">
+                                <i class="bi bi-key-fill" style="color:#d97706"></i>
+                            </button>` : ''}
                             <button class="btn-action-icon" data-email="${escapeHTML(u.email)}" onclick="excluirUsuario(this.dataset.email)" title="Excluir Usuário">
                                 <i class="bi bi-trash-fill icon-trash"></i>
                             </button>
