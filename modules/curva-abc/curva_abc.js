@@ -539,7 +539,7 @@
     var v = state.versaoCarregadaDb;
     if (!v || !v.arquivo_url) throw new Error("O arquivo original desta versão não está disponível. Envie a planilha do replanilhamento novamente.");
     await window.carregarBiblioteca("xlsx");
-    var resp = await fetch(v.arquivo_url);
+    var resp = await fetch(await window.urlAssinadaStorage(v.arquivo_url)); // bucket privado
     if (!resp.ok) throw new Error("Não consegui baixar o arquivo desta versão (HTTP " + resp.status + ").");
     var wb = XLSX.read(new Uint8Array(await resp.arrayBuffer()), { type: "array", cellDates: false });
     var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null, blankrows: false });
