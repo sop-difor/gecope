@@ -18,6 +18,7 @@ token_sigsop.txt
 
 # MCP local (contém token do Supabase — não versionar)
 .mcp.json
+.claude/settings.local.json
 
 # Artefatos gerados pelo sigsop_contratos.py (--csv / --supabase)
 __pycache__/
@@ -37,6 +38,9 @@ sql/reestruturacao_tabelas/**/*.xlsx
 
 # Saídas de diagnóstico do banco (metadados de RLS) — ficam só na máquina local
 resultados_diagnostico_*/
+resultados/
+resultado.csv
+Supabase Snippet*.csv
 
 # Planilhas de trabalho (orcamentos e rascunhos de replanilhamento), so locais
 planilhas/
