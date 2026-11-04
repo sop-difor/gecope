@@ -726,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'modalCadastrarComposicao', 'modalNovaVersaoComposicao', 'modalAtenderComposicao',
         'modalRecusarComposicao', 'modalCriarComposicaoAnalitica', 'modalBuscarItemComposicao',
         'modalComentarioOrcamento', 'modalComentarioComposicao', 'modalExportarComposicao',
-        'modalNovaVersao', 'modalNovoOrcamento', 'modalLogin', 'modalVincularFiscal'
+        'modalNovaVersao', 'modalNovoOrcamento', 'modalVincularFiscal'
     ];
     modaisParaMover.forEach(id => {
         const el = document.getElementById(id);

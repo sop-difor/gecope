@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 text: 'Informe sua matrícula cadastrada no sistema:',
                 input: 'text',
                 inputValue: prefilledMatricula,
-                inputPlaceholder: 'Ex: 99030487',
+                inputPlaceholder: 'Ex: 12345678',
                 showCancelButton: true,
                 confirmButtonColor: 'var(--sop-green)',
                 confirmButtonText: 'Confirmar',
@@ -830,19 +830,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
+                    // Número em config.js (ADMIN_WHATSAPP). Antes ficava fixo aqui um número de 8
+                    // dígitos que não existe no WhatsApp, e a mensagem nunca chegava.
+                    const foneAdmin = String(window.ADMIN_WHATSAPP || '').replace(/\D/g, '');
+                    const temWhatsapp = /^55\d{11}$/.test(foneAdmin);
                     const adminMessage = `Olá! Esqueci minha senha do GECOPE. Poderia redefini-la para mim? Minha matrícula é *${matricula.trim()}*.`;
-                    const whatsappLink = `https://api.whatsapp.com/send?phone=558599030487&text=${encodeURIComponent(adminMessage)}`;
+                    const whatsappLink = `https://api.whatsapp.com/send?phone=${foneAdmin}&text=${encodeURIComponent(adminMessage)}`;
 
                     Swal.fire({
                         title: 'Solicitação registrada',
-                        html: `Se a matrícula estiver cadastrada, o administrador do GECOPE foi avisado e vai redefinir sua senha.<br><br>Você também pode acelerar o processo enviando uma mensagem direta ao administrador pelo WhatsApp.`,
+                        html: 'Se a matrícula estiver cadastrada, o administrador do GECOPE foi avisado e vai redefinir sua senha.'
+                            + (temWhatsapp ? '<br><br>Você também pode acelerar o processo enviando uma mensagem direta ao administrador pelo WhatsApp.' : ''),
                         icon: 'success',
+                        showConfirmButton: temWhatsapp,
                         showCancelButton: true,
                         confirmButtonColor: '#25D366',
                         confirmButtonText: '<i class="bi bi-whatsapp me-1"></i> Chamar no WhatsApp',
                         cancelButtonText: 'Fechar'
                     }).then((result) => {
-                        if (result.isConfirmed) {
+                        if (temWhatsapp && result.isConfirmed) {
                             window.open(whatsappLink, '_blank');
                         }
                     });

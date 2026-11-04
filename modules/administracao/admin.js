@@ -2,8 +2,9 @@
     'use strict';
 
     // Administração: funções movidas de main.js
-    const SENHA_MESTRA = "sop2026";
-    const USERS = [ { username: 'admin', password: SENHA_MESTRA, isAdmin: true } ];
+    // O antigo "modo administrador" por senha fixa no código (alternarModoAdmin /
+    // handleLoginSubmit, senha publicada no site) foi removido na revisão de segurança de
+    // 04/11/2026: nenhum botão o chamava e o papel de admin vem só de app_users.role.
 
     function verificarAdminSalvo() {
         const isAdm = sessionStorage.getItem('is_admin_gecope');
@@ -14,52 +15,6 @@
         }
     }
 
-    function alternarModoAdmin() {
-        if (document.body.classList.contains('is-admin')) {
-            if (confirm("Deseja sair do modo Administrador?")) {
-                document.body.classList.remove('is-admin');
-                sessionStorage.removeItem('is_admin_gecope');
-                sessionStorage.setItem('sop_role', 'guest');
-                if (typeof applyRoleToUI === 'function') applyRoleToUI('guest');
-                alert("Modo de visualização ativado.");
-                if (document.querySelector('.modal.show')) location.reload();
-            }
-            return;
-        }
-        const modalEl = document.getElementById('modalLogin');
-        if (modalEl) {
-            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            modal.show();
-        } else {
-            const tentativa = prompt(" Digite a senha de administrador:");
-            if (tentativa === SENHA_MESTRA) {
-                document.body.classList.add('is-admin');
-                sessionStorage.setItem('is_admin_gecope', 'true');
-                alert(" Modo Administrador Ativado!");
-            } else if (tentativa !== null) { alert(" Senha incorreta."); }
-        }
-    }
-
-    function handleLoginSubmit(e) {
-        e.preventDefault();
-        const user = document.getElementById('login-username').value.trim();
-        const pass = document.getElementById('login-password').value;
-        const feedback = document.getElementById('login-feedback');
-        feedback.style.display = 'none';
-        const found = USERS.find(u => u.username === user && u.password === pass);
-        if (found) {
-            document.body.classList.add('is-admin');
-            sessionStorage.setItem('is_admin_gecope', 'true');
-            sessionStorage.setItem('sop_user', user);
-            sessionStorage.setItem('sop_role', 'admin');
-            if (typeof applyRoleToUI === 'function') applyRoleToUI('admin');
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modalLogin'));
-            if (modal) modal.hide();
-            alert(" Modo Administrador Ativado!");
-        } else {
-            feedback.style.display = 'block';
-        }
-    }
 
     // --- ADMIN DASHBOARD LOGIC ---
     async function loadAllUsers() {
@@ -103,6 +58,23 @@
                         const found = data.find(u => (u.matricula && matricula && String(u.matricula) === String(matricula)) || (u.email && email && u.email.toLowerCase() === email.toLowerCase()));
 
                         const isAlreadyInPendings = pendings.some(pu => pu.email === email || (pu.matricula && String(pu.matricula) === String(matricula)));
+
+                        // Pedido de "Esqueci minha senha": vem sempre de conta já aprovada, então o
+                        // filtro abaixo (só conta inexistente ou pendente) o escondia — nenhum pedido
+                        // de recuperação aparecia para o admin. Agora entra na lista com ação própria.
+                        if (nome && /RECUPERA[ÇC][ÃA]O DE SENHA/i.test(nome)) {
+                            notifPendings.push({
+                                id: found?.id || null,
+                                email: found ? found.email : null,
+                                matricula: matricula,
+                                nome: nome.replace(/\s*-\s*RECUPERA[ÇC][ÃA]O DE SENHA\s*$/i, ''),
+                                created_at: n.created_at,
+                                notif_id: n.id,
+                                recuperacao: true,
+                                notification_raw: n
+                            });
+                            continue;
+                        }
 
                         // Only surface if no app_user exists OR existing user is not active (not approved)
                         if (!isAlreadyInPendings && (!found || (found && found.role === 'pending'))) {
@@ -180,6 +152,23 @@
                 const nomeComp = (n.nome || 'N/A').toUpperCase();
                 const tr = document.createElement('tr');
                 const selectId = `role-notif-${n.notif_id || idx}`;
+                if (n.recuperacao) {
+                    tr.innerHTML = `
+                    <td class="ps-4">
+                        <div class="fw-bold text-dark">${escapeHTML(nomeComp)} <span class="badge bg-warning text-dark fw-normal ms-1"><i class="bi bi-key me-1"></i>Recuperação de senha</span></div>
+                        <div class="small text-muted">${n.email ? escapeHTML(n.email) : 'conta não encontrada'}</div>
+                    </td>
+                    <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(n.matricula) || '-'}</span></td>
+                    <td><span class="text-muted small">${dataSolic}</span></td>
+                    <td class="text-end pe-4">
+                        <button class="btn btn-sm btn-outline-success" data-notif-id="${escapeHTML(n.notif_id)}" onclick="resolverRecuperacaoSenha(this.dataset.notifId)" title="Marcar como resolvido depois de redefinir a senha">
+                            <i class="bi bi-check2-circle me-1"></i> Resolvido
+                        </button>
+                    </td>
+                `;
+                    tbodyPending.appendChild(tr);
+                    return;
+                }
                 tr.innerHTML = `
                     <td class="ps-4">
                         <div class="fw-bold text-dark">${escapeHTML(nomeComp)} <small class="text-muted">(notificação)</small></div>
@@ -513,6 +502,16 @@
         }
     }
 
+    async function resolverRecuperacaoSenha(notifId) {
+        if (!notifId) return;
+        if (!confirm('Marcar este pedido de recuperação como resolvido? Faça isso depois de redefinir a senha do usuário.')) return;
+        try {
+            const { error } = await sbClient.from('app_notifications').update({ read: true }).eq('id', notifId);
+            if (error) throw error;
+            if (typeof loadAllUsers === 'function') loadAllUsers();
+        } catch (e) { alert('Erro ao marcar como resolvido: ' + (e.message || String(e))); }
+    }
+
     async function recusarNotification(notifId) {
         if (!notifId) return;
         if (!confirm('Recusar esta solicitação?')) return;
@@ -780,8 +779,6 @@
 
     // Expose to window
     window.verificarAdminSalvo = verificarAdminSalvo;
-    window.alternarModoAdmin = alternarModoAdmin;
-    window.handleLoginSubmit = handleLoginSubmit;
     window.loadAllUsers = loadAllUsers;
     window.abrirModalVinculo = abrirModalVinculo;
     window.abrirModalNovoUsuario = abrirModalNovoUsuario;
@@ -798,13 +795,8 @@
     window.fetchNotifications = fetchNotifications;
     window.aprovarFromNotification = aprovarFromNotification;
     window.recusarNotification = recusarNotification;
+    window.resolverRecuperacaoSenha = resolverRecuperacaoSenha;
     window.diagnosePendingFetch = diagnosePendingFetch;
     window.openAdminPendings = openAdminPendings;
-
-    // Init actions
-    document.addEventListener('DOMContentLoaded', () => {
-        // Wire formLogin submit if present (keeps old behavior)
-        document.getElementById('formLogin')?.addEventListener('submit', handleLoginSubmit);
-    });
 
 })(window);
