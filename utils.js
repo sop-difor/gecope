@@ -113,20 +113,41 @@
         return !!(p && p.tipo !== 'sign' && BUCKETS_PRIVADOS.includes(p.bucket));
     }
 
-    async function urlAssinadaStorage(url, segundos = 300) {
+    // opcoes.download: o link já vem com Content-Disposition de anexo (baixa sem abrir aba).
+    async function urlAssinadaStorage(url, segundos = 300, opcoes = {}) {
         const p = partesUrlStorage(url);
         if (!p || p.tipo === 'sign' || !BUCKETS_PRIVADOS.includes(p.bucket)) return url;
-        const { data, error } = await window.sbClient.storage.from(p.bucket).createSignedUrl(p.path, segundos);
+        const { data, error } = await window.sbClient.storage.from(p.bucket)
+            .createSignedUrl(p.path, segundos, opcoes.download ? { download: true } : undefined);
         if (error || !data || !data.signedUrl) {
             throw new Error((error && error.message) || 'Não foi possível liberar o arquivo.');
         }
         return data.signedUrl;
     }
 
-    // Abre numa aba nova. A aba é aberta antes da espera (ainda dentro do clique) para o
-    // navegador não bloquear como pop-up.
+    // PDF e imagem abrem numa aba nova (o navegador mostra). O resto (planilha, Word, zip)
+    // baixa direto, sem aba: abrir aba para um .xlsx deixava uma aba about:blank sobrando.
+    // A aba é aberta antes da espera (ainda dentro do clique) para não ser bloqueada como pop-up.
+    const EXTENSOES_VISUALIZAVEIS = /\.(pdf|png|jpe?g|gif|webp|svg|txt)$/i;
+
     async function abrirArquivoStorage(url) {
         if (!ehArquivoPrivado(url)) { window.open(url, '_blank', 'noopener'); return; }
+        const p = partesUrlStorage(url);
+        if (!EXTENSOES_VISUALIZAVEIS.test(p.path)) {
+            try {
+                const assinada = await urlAssinadaStorage(url, 300, { download: true });
+                const a = document.createElement('a');
+                a.href = assinada;
+                a.rel = 'noopener';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch (e) {
+                console.error('[Storage] Falha ao baixar arquivo:', e);
+                alert('Não foi possível baixar o arquivo: ' + (e.message || e));
+            }
+            return;
+        }
         const aba = window.open('', '_blank');
         try {
             const assinada = await urlAssinadaStorage(url);
