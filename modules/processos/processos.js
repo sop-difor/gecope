@@ -212,7 +212,9 @@ let _renderReuniaoEmAndamento = false;
 
 // Contador de alerta exibido no botão da aba "Aprovados"
 function atualizarBadgeAbaAprovados() {
-    const qtd = (window.allData || []).filter(d => d.alerta_pre_diligencia).length;
+    // Apensos ficam escondidos dentro do principal na lista: contá-los aqui daria um número
+    // que o filtro não consegue mostrar.
+    const qtd = (window.allData || []).filter(d => d.alerta_pre_diligencia && !d.apensadoA).length;
 
     const badge = document.getElementById('badge-alerta-aprovados');
     if (badge) {
@@ -1050,8 +1052,9 @@ function renderAditivosBaseDetalhes() {
     listaPr.replaceChildren();
     const atual = ((document.getElementById('det_processo') || {}).value || '').trim();
     const cod = (b.codigoObra || '').trim();
+    // Apensos ficam fora: o valor deles está no principal (decisão de 05/11/2026).
     const outros = cod ? todos.filter(r =>
-        r.codigoObra && String(r.codigoObra).trim() === cod && r.processo !== atual
+        r.codigoObra && String(r.codigoObra).trim() === cod && r.processo !== atual && !r.apensadoA
         && r.status !== 'EXCLUÍDO' && !jaListados.has(String(r.processo || '').trim())) : [];
     if (!outros.length) { blocoPr.hidden = true; return; }
     blocoPr.hidden = false;
@@ -1329,6 +1332,10 @@ function mapProcessoRow(r) {
         avisoAtrasoEnviado: r.aviso_atraso_enviado || false,
         suite: r.suite || null,
         suite_data_chegada: r.suite_data_chegada || null,
+        // Apensamento (sql/add_apensamento_processos.sql): id do processo PRINCIPAL, ou null.
+        apensadoA: r.apensado_a || null,
+        apensadoEm: isoParaDate(r.apensado_em),
+        apensadoPor: r.apensado_por || null,
         criador: r.criador,
         created_at: isoParaDate(r.created_at),
         atualizado_por: r.atualizado_por,
@@ -2316,6 +2323,243 @@ if (document.readyState === 'loading') {
     gpInicializarFicha();
 }
 
+// ── APENSAMENTO ─────────────────────────────────────────────────────────────────────────
+// Um processo apensado aponta para o PRINCIPAL em `processos.apensado_a` (uuid). Regras no
+// banco (sql/add_apensamento_processos.sql, trigger trg_processos_apensamento): só admin/
+// gerente alteram, sem cadeia (principal não é apenso; quem tem apensos não vira apenso), e
+// principal excluído desapensa os filhos. Os vínculos antigos vêm do histórico do SUITE
+// (evento "Processo Apensado"), preenchidos pelo bloco [3] do script.
+// Aqui só a janela Gerenciar processo; a lista e as contagens (apenso escondido dentro do
+// principal, valores só no principal) são a fase 2.
+let apensosProcessoAtual = null;   // processo aberto no modal (objeto de window.allData)
+
+function podeApensarProcessos() {
+    return ['admin', 'gerente'].includes(getCurrentUserRole());
+}
+
+const _nupDigitos = s => String(s || '').replace(/\D/g, '');
+
+function processoPorId(id) {
+    return (window.allData || []).find(r => r.id === id) || null;
+}
+
+function apensosDe(id) {
+    if (!id) return [];
+    return (window.allData || []).filter(r => r.apensadoA === id && r.status !== 'EXCLUÍDO');
+}
+
+// "em 28/10/2026, detectado no SUITE" | "em 05/11/2026, por fulano@..."
+function origemApensoTexto(r) {
+    const quando = r.apensadoEm ? `em ${dateParaInput(r.apensadoEm)}` : '';
+    const quem = r.apensadoPor === 'SUITE' ? 'detectado no SUITE' : (r.apensadoPor ? `por ${r.apensadoPor}` : '');
+    return [quando, quem].filter(Boolean).join(', ');
+}
+
+// Troca o processo aberto no modal por outro (link para o principal ou para um apenso).
+function gpAbrirOutroProcesso(nup) {
+    const aviso = document.getElementById('gp-aviso-sujo');
+    if (aviso && !aviso.hidden && !confirm('Há alterações não salvas neste processo. Abrir o outro processo e descartá-las?')) return;
+    const el = gpModal();
+    const inst = el && bootstrap.Modal.getInstance(el);
+    if (!inst) { abrirDetalhes(nup); return; }
+    el.addEventListener('hidden.bs.modal', () => abrirDetalhes(nup), { once: true });
+    inst.hide();
+}
+
+function renderApensosDetalhes(row) {
+    apensosProcessoAtual = row;
+    const aviso = document.getElementById('det_apensos_principal');
+    const lista = document.getElementById('det_apensos_lista');
+    const vazio = document.getElementById('det_apensos_vazio');
+    const form = document.getElementById('det_apensos_form');
+    const nota = document.getElementById('det_apensos_nota');
+    const input = document.getElementById('det_apensar_nup');
+    const msg = document.getElementById('det_apensos_msg');
+    if (!aviso || !lista || !vazio || !form) return;
+
+    const pode = podeApensarProcessos();
+    if (nota) nota.hidden = pode;
+    aviso.replaceChildren();
+    lista.replaceChildren();
+    if (input) { input.value = ''; input.disabled = !pode; }
+    if (msg) { msg.textContent = 'Processos da mesma obra aparecem primeiro nas sugestões.'; msg.classList.remove('text-danger', 'text-success'); }
+
+    const el = (tag, cls, txt) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (txt !== undefined) e.textContent = txt;
+        return e;
+    };
+    const botaoNup = (nup) => {
+        const b = el('button', 'btn btn-link btn-sm p-0 gp-apenso-nup', nup);
+        b.type = 'button';
+        b.title = 'Abrir este processo';
+        b.addEventListener('click', () => gpAbrirOutroProcesso(nup));
+        return b;
+    };
+    const botaoDesapensar = (apenso) => {
+        const b = el('button', 'btn btn-outline-danger btn-sm');
+        b.type = 'button';
+        b.innerHTML = '<i class="bi bi-x-lg"></i> Desapensar';
+        b.title = `Desapensar o processo ${apenso.processo}`;
+        b.addEventListener('click', () => desapensarProcesso(apenso.id));
+        return b;
+    };
+
+    // Este processo é um APENSO: mostra o principal e nada mais (sem cadeia, não recebe apensos).
+    if (row.apensadoA) {
+        const pr = processoPorId(row.apensadoA);
+        aviso.hidden = false;
+        lista.hidden = true;
+        vazio.hidden = true;
+        form.hidden = true;
+        const linha = el('div', 'gp-apenso-aviso-linha');
+        linha.appendChild(el('i', 'bi bi-paperclip'));
+        const txt = el('span');
+        txt.appendChild(document.createTextNode('Este processo está apensado ao processo '));
+        if (pr) txt.appendChild(botaoNup(pr.processo));
+        else txt.appendChild(el('em', '', 'que você não tem acesso'));
+        const origem = origemApensoTexto(row);
+        if (origem) txt.appendChild(document.createTextNode(` (${origem})`));
+        txt.appendChild(document.createTextNode('.'));
+        linha.appendChild(txt);
+        if (pode) linha.appendChild(botaoDesapensar(row));
+        aviso.appendChild(linha);
+        aviso.appendChild(el('div', 'gp-apenso-aviso-nota', 'O status, os valores e o acompanhamento são os do processo principal.'));
+        return;
+    }
+
+    aviso.hidden = true;
+    const filhos = apensosDe(row.id).sort((a, b) => String(a.processo).localeCompare(String(b.processo)));
+    lista.hidden = filhos.length === 0;
+    vazio.hidden = filhos.length > 0;
+    filhos.forEach(f => {
+        const li = el('li', 'gp-apenso-item');
+        li.appendChild(botaoNup(f.processo));
+        // Status do apenso = status do principal (trg_processos_apenso_status).
+        const selo = el('span', 'gp-adit-selo ' + (classeBadgeStatus(row.status) || ''), formatStatusDisplay(row.status) || '—');
+        li.appendChild(selo);
+        const desc = el('span', 'gp-apenso-desc', f.descricao || '');
+        desc.title = f.descricao || '';
+        li.appendChild(desc);
+        li.appendChild(el('span', 'gp-apenso-origem', origemApensoTexto(f)));
+        li.appendChild(pode ? botaoDesapensar(f) : el('span'));
+        lista.appendChild(li);
+    });
+
+    form.hidden = !pode;
+    if (pode) preencherSugestoesApenso(row);
+}
+
+// Candidatos a apenso: não excluído, não é este, ainda não é apenso e não é principal de ninguém.
+function preencherSugestoesApenso(row) {
+    const dl = document.getElementById('det_apensar_sugestoes');
+    if (!dl) return;
+    const todos = window.allData || [];
+    const principais = new Set(todos.filter(r => r.apensadoA).map(r => r.apensadoA));
+    const cod = String(row.codigoObra || '').trim();
+    const cands = todos.filter(r => r.id !== row.id && r.status !== 'EXCLUÍDO'
+        && !r.apensadoA && !principais.has(r.id) && r.processo);
+    const mesmaObra = r => cod && String(r.codigoObra || '').trim() === cod;
+    cands.sort((a, b) => (mesmaObra(b) - mesmaObra(a)) || String(a.processo).localeCompare(String(b.processo)));
+    const frag = document.createDocumentFragment();
+    cands.forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.processo;
+        const desc = String(r.descricao || '').replace(/\s+/g, ' ').trim();
+        o.label = (mesmaObra(r) ? '★ mesma obra · ' : '') + (desc.length > 70 ? desc.slice(0, 70) + '…' : desc);
+        frag.appendChild(o);
+    });
+    dl.replaceChildren(frag);
+}
+
+function _mensagemErroApenso(error) {
+    const m = String((error && error.message) || error || '');
+    if (/apensado_a/.test(m) && /(does not exist|não existe|schema cache)/i.test(m)) {
+        return 'O banco ainda não tem o apensamento. Aplique sql/add_apensamento_processos.sql.';
+    }
+    return m || 'Erro desconhecido.';
+}
+
+async function apensarProcessoDetalhes() {
+    const row = apensosProcessoAtual;
+    const input = document.getElementById('det_apensar_nup');
+    const msg = document.getElementById('det_apensos_msg');
+    const btn = document.getElementById('btn-apensar');
+    if (!row || !input || !msg) return;
+    const falha = (t) => { msg.textContent = t; msg.classList.remove('text-success'); msg.classList.add('text-danger'); };
+
+    if (!podeApensarProcessos()) return falha('Apenas administradores e gerentes podem apensar processos.');
+    const alvoDig = _nupDigitos(input.value);
+    if (!alvoDig) return falha('Informe o NUP do processo a apensar.');
+
+    const achados = (window.allData || []).filter(r => r.status !== 'EXCLUÍDO' && _nupDigitos(r.processo) === alvoDig);
+    if (!achados.length) return falha('Processo não encontrado no GECOPE. Cadastre-o antes de apensar.');
+    if (achados.length > 1) return falha('Há mais de um processo com esse NUP no GECOPE. Corrija o cadastro antes de apensar.');
+    const alvo = achados[0];
+    if (alvo.id === row.id) return falha('Um processo não pode ser apensado a ele mesmo.');
+    if (alvo.apensadoA === row.id) return falha(`O processo ${alvo.processo} já está apensado a este.`);
+    if (alvo.apensadoA) {
+        const outro = processoPorId(alvo.apensadoA);
+        return falha(`O processo ${alvo.processo} já está apensado ao ${outro ? outro.processo : 'outro processo'}. Desapense-o lá primeiro.`);
+    }
+    if (apensosDe(alvo.id).length) return falha(`O processo ${alvo.processo} tem apensos próprios e não pode ser apensado.`);
+
+    if (btn) btn.disabled = true;
+    msg.classList.remove('text-danger', 'text-success');
+    msg.textContent = 'Apensando…';
+    try {
+        // `.select` confirma que a linha foi gravada: RLS que recusa UPDATE não dá erro, só 0 linhas.
+        const { data, error } = await sbClient.from('processos')
+            .update({ apensado_a: row.id }).eq('id', alvo.id).select('id');
+        if (error) return falha('Não foi possível apensar: ' + _mensagemErroApenso(error));
+        if (!data || !data.length) return falha('Não foi possível apensar: sem permissão para alterar esse processo.');
+
+        if (typeof registrarAtividade === 'function') {
+            try {
+                await registrarAtividade('PROCESSO', `apensou o processo Nº ${alvo.processo} ao processo Nº ${row.processo}`,
+                    row.processo, row.descricao || '', row.fiscal || '');
+            } catch (e) { console.error('Erro ao registrar atividade de apensamento:', e); }
+        }
+        await atualizarLinhaProcessoLocal(alvo.id);
+        renderApensosDetalhes(processoPorId(row.id) || row);
+        msg.textContent = `Processo ${alvo.processo} apensado.`;
+        msg.classList.add('text-success');
+    } catch (e) {
+        falha('Não foi possível apensar: ' + _mensagemErroApenso(e));
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function desapensarProcesso(apensoId) {
+    const apenso = processoPorId(apensoId);
+    const aberto = apensosProcessoAtual;
+    if (!apenso || !aberto) return;
+    if (!podeApensarProcessos()) { alert('Apenas administradores e gerentes podem desapensar processos.'); return; }
+    const principal = processoPorId(apenso.apensadoA);
+    const nomePrincipal = principal ? principal.processo : 'principal';
+    if (!confirm(`Desapensar o processo ${apenso.processo} do processo ${nomePrincipal}?\n\nEle volta a aparecer e a contar como um processo separado.`)) return;
+
+    try {
+        const { data, error } = await sbClient.from('processos')
+            .update({ apensado_a: null }).eq('id', apenso.id).select('id');
+        if (error) { alert('Não foi possível desapensar: ' + _mensagemErroApenso(error)); return; }
+        if (!data || !data.length) { alert('Não foi possível desapensar: sem permissão para alterar esse processo.'); return; }
+
+        if (typeof registrarAtividade === 'function') {
+            try {
+                await registrarAtividade('PROCESSO', `desapensou o processo Nº ${apenso.processo} do processo Nº ${nomePrincipal}`,
+                    nomePrincipal, (principal && principal.descricao) || '', (principal && principal.fiscal) || '');
+            } catch (e) { console.error('Erro ao registrar atividade de desapensamento:', e); }
+        }
+        await atualizarLinhaProcessoLocal(apenso.id);
+        renderApensosDetalhes(processoPorId(aberto.id) || aberto);
+    } catch (e) {
+        alert('Não foi possível desapensar: ' + _mensagemErroApenso(e));
+    }
+}
+
 async function abrirDetalhes(processoStr) {
     // garante que a role local esteja atualizada com o servidor
     await refreshUserRole();
@@ -2355,6 +2599,7 @@ async function abrirDetalhes(processoStr) {
     if (document.getElementById('det_municipio')) document.getElementById('det_municipio').value = row.municipio || '';
     if (document.getElementById('det_obra_status')) document.getElementById('det_obra_status').textContent = '';
     carregarBaseContratoDetalhes(row.codigoObra);
+    renderApensosDetalhes(row);
 
     // Seleciona pelo vínculo estável (fiscal_matricula); cai no nome só para processos
     // antigos ainda sem matrícula. "Não informado" é fallback de exibição, não é nome real.
@@ -2439,6 +2684,24 @@ async function abrirDetalhes(processoStr) {
             el.title = isAdmin ? '' : 'Restrito a administradores — use o botão Vincular para alterar o vínculo com a obra.';
         }
     });
+
+    // Apenso: o status é o do principal (trigger trg_processos_apenso_status,
+    // sql/add_apensamento_status.sql — o banco troca qualquer outro valor pelo do principal).
+    // Trava o select SEM `disabled`: campo desabilitado some do FormData e o payload lê
+    // formData.get("STATUS"). Incondicional, para destravar ao reabrir um processo comum.
+    const selStatus = document.getElementById('det_status');
+    if (selStatus) {
+        const herdado = !!row.apensadoA;
+        const principal = herdado ? processoPorId(row.apensadoA) : null;
+        selStatus.classList.toggle('gp-status-herdado', herdado);
+        selStatus.tabIndex = herdado ? -1 : 0;
+        if (herdado) selStatus.setAttribute('aria-disabled', 'true'); else selStatus.removeAttribute('aria-disabled');
+        selStatus.title = herdado
+            ? `Processo apensado: o status acompanha o principal${principal ? ' ' + principal.processo : ''}. Altere-o lá.`
+            : '';
+        const pill = document.getElementById('det_status_view');
+        if (pill) pill.title = selStatus.title;
+    }
 
     document.getElementById('msg-detalhes').style.display = 'none';
 
@@ -3766,6 +4029,21 @@ window.abrirBreakdownFiscal = abrirBreakdownFiscal;
 
 function updateReuniaoFilters(rows) { mtBase = rows; updateReuniao(); }
 
+// Principais com a linha de apensos aberta (id). Sobrevive aos re-renders da lista.
+const _apensosAbertos = new Set();
+function alternarApensosLista(btn) {
+    const id = btn && btn.dataset.principal;
+    if (!id || !mt.body) return;
+    const trs = mt.body.querySelectorAll(`tr.tr-apenso-row[data-apensos-de="${CSS.escape(id)}"]`);
+    if (!trs.length) return;
+    const abrir = trs[0].hidden;
+    trs.forEach(tr => { tr.hidden = !abrir; });
+    const principal = btn.closest('tr');
+    if (principal) principal.classList.toggle('tem-apensos-abertos', abrir);
+    btn.setAttribute('aria-expanded', String(abrir));
+    if (abrir) _apensosAbertos.add(id); else _apensosAbertos.delete(id);
+}
+
 function updateReuniao() {
     if (window.isResettingFilters) return; // Evita loop de re-render ao resetar filtros
     if (!mt.body) return;
@@ -3873,6 +4151,20 @@ function _updateReuniaoInterno() {
         }
     }
 
+    // Apensamento (decisão de 05/11/2026): o apenso sai da lista e, por consequência, das abas,
+    // da faixa de números, das metas, da exportação e da quebra por fiscal (que leem
+    // currentVisibleRows) — aparece dentro do principal (linhas .tr-apenso-row). Só some
+    // quando o principal está na mesma base; senão (fiscal sem acesso ao principal) o apenso
+    // ficaria invisível sem aviso, e continua como linha própria.
+    const idsNaBase = new Set(rows.map(d => d.id));
+    const apensosPorPrincipal = new Map();
+    rows.forEach(d => {
+        if (!d.apensadoA || !idsNaBase.has(d.apensadoA)) return;
+        if (!apensosPorPrincipal.has(d.apensadoA)) apensosPorPrincipal.set(d.apensadoA, []);
+        apensosPorPrincipal.get(d.apensadoA).push(d);
+    });
+    if (apensosPorPrincipal.size) rows = rows.filter(d => !(d.apensadoA && idsNaBase.has(d.apensadoA)));
+
     // Contagem das abas (com o recorte de perfil, sem os demais filtros) e filtro da aba.
     contarAbasProcessos(rows);
     // [PAGINAÇÃO] Filtro por Aba (Ativos vs Aprovados vs Arquivados)
@@ -3963,6 +4255,8 @@ function _updateReuniaoInterno() {
 
             rows = rows.filter(d => {
                 const proc = (d.processo || "").toLowerCase();
+                // Buscar o NUP de um apenso encontra o principal (onde ele está guardado).
+                const procApensos = (apensosPorPrincipal.get(d.id) || []).map(a => (a.processo || "").toLowerCase()).join(" ");
                 const contrat = normalizeText(d.contratante);
                 const desc = normalizeText(d.descricao);
                 const analistaNome = normalizeText(d.nomeAnalista);
@@ -3972,6 +4266,7 @@ function _updateReuniaoInterno() {
 
                 return compiledTerms.every(({ term, regex }) => {
                     return proc.includes(term) ||
+                        procApensos.includes(term) ||
                         regex.test(contratada) ||
                         regex.test(contrat) ||
                         regex.test(desc) ||
@@ -4134,8 +4429,21 @@ function _updateReuniaoInterno() {
     // Fora do laço de propósito: a permissão não muda de linha para linha, e temAutorizacao()
     // faz um JSON.parse por chamada — dentro do forEach isso era um parse por processo.
     const podeVerDetalhes = canSeeProcessActions();
+    // Termos da busca, para abrir sozinha a linha de apensos quando a busca bate num apenso.
+    const termosBuscaApenso = qRaw.toLowerCase().split(/\s+/).filter(Boolean);
 
     rows.forEach(d => {
+        const apensosDaLinha = apensosPorPrincipal.get(d.id) || null;
+        const apensosAbertos = !!apensosDaLinha && (_apensosAbertos.has(d.id)
+            || (termosBuscaApenso.length > 0 && apensosDaLinha.some(a =>
+                termosBuscaApenso.some(t => (a.processo || '').toLowerCase().includes(t)))));
+        const chipApensosHTML = apensosDaLinha
+            ? (() => {
+                const n = apensosDaLinha.length;
+                const rotulo = `${n} processo${n === 1 ? '' : 's'} apensado${n === 1 ? '' : 's'}: mostrar/ocultar`;
+                return `<button type="button" class="proc-apensos-chip" data-principal="${escapeHTML(d.id)}" aria-expanded="${apensosAbertos}" onclick="alternarApensosLista(this)" title="${rotulo}" aria-label="${rotulo}"><i class="bi bi-paperclip"></i></button>`;
+            })()
+            : '';
         const mIso = getMetaDate(d)?.toISOString().substring(0, 10) || "";
         const mSt = getMetaSt(d);
         let mCls = "badge-meta-sem";
@@ -4212,7 +4520,7 @@ function _updateReuniaoInterno() {
         const temAlertaDiligencia = !!(d.alerta_pre_diligencia || d.alerta_retorno_resolvido);
         const alertaIconeHTML = temAlertaDiligencia ? montarAlertaIconeHTML(d) : '';
         groupedHTML.push(`
-        <tr style="vertical-align: middle; --bs-table-bg: ${groupRowBgColor};" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${d.alerta_pre_diligencia ? ' tr-alerta-pre-diligencia' : ''}">
+        <tr style="vertical-align: middle; --bs-table-bg: ${groupRowBgColor};" data-numero="${escapeHTML(d.processo)}" class="tr-processo-row${d.alerta_pre_diligencia ? ' tr-alerta-pre-diligencia' : ''}${apensosAbertos ? ' tem-apensos-abertos' : ''}">
             <td class="text-center">
                 <div class="d-flex flex-column gap-1 align-items-center">
                     ${btnDetalhes}
@@ -4220,7 +4528,7 @@ function _updateReuniaoInterno() {
                 </div>
             </td>
             <td class="text-center"><i class="bi ${isPrioritario(d) ? 'bi-star-fill' : 'bi-star'} proc-star-prioritario" data-proc="${escapeHTML(d.processo)}" style="color: ${isPrioritario(d) ? 'var(--sop-orange)' : 'var(--sop-slate-200)'}; font-size: 1.1rem; cursor: ${uRole === 'admin' ? 'pointer' : 'not-allowed'};" title="${uRole === 'admin' ? (isPrioritario(d) ? 'Remover prioridade' : 'Marcar como prioritário') : 'Você não tem permissão'}"></i></td>
-            <td><div class="proc-nup-linha"><span class="proc-nup-num">${escapeHTML(d.processo)}</span>${botaoFichaObraHTML(d)}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
+            <td><div class="proc-nup-linha"><span class="proc-nup-num">${escapeHTML(d.processo)}</span>${botaoFichaObraHTML(d)}${chipApensosHTML}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
             <td class="text-center">
                 <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
                 <div style="font-size: 0.75rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
@@ -4243,6 +4551,43 @@ function _updateReuniaoInterno() {
             <td style="max-width: 200px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4;">${escapeHTML(d.contratada)}</td>
             <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: left;">${escapeHTML(d.descricao)}</td>
         </tr>`);
+
+        // Apensos: uma linha por apenso, logo abaixo do principal, nas MESMAS colunas da tabela
+        // (recuadas e ligadas ao principal por um traço de árvore). Sem `data-numero` de
+        // propósito: as varreduras do SUITE/diligência procuram tr[data-numero] e não devem
+        // tratá-las como processo da lista. Meta não se aplica (o acompanhamento é do principal).
+        if (apensosDaLinha) {
+            const ordenados = apensosDaLinha.slice()
+                .sort((a, b) => String(a.processo).localeCompare(String(b.processo)));
+            ordenados.forEach((a, i) => {
+                const ultimo = i === ordenados.length - 1;
+                const nupA = String(a.processo || '').replace(/\D/g, '');
+                // Status do apenso = status do principal (trg_processos_apenso_status). Mostra o do
+                // principal direto, para a tela já ficar certa antes de a linha do apenso ser recarregada.
+                const stA = classeBadgeStatus((d.status || '').toUpperCase().trim()) || 'text-bg-light';
+                const siglaA = a.suite ? String(a.suite).toUpperCase().trim() : '';
+                const iniciaisA = (a.analista || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('') || '-';
+                const verA = podeVerDetalhes ? `<button class="btn btn-sm btn-light border" onclick="abrirDetalhes('${escapeHTML(a.processo)}')" title="Ver detalhes do apenso"><i class="bi bi-eye-fill" style="color: var(--sop-blue);"></i></button>` : '';
+                const suiteA = `<a href="https://suite.ce.gov.br/consultar-processo/${nupA}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-light border" title="Abrir no SUITE"><i class="bi bi-box-arrow-up-right" style="color: var(--sop-green);"></i></a>`;
+                const quando = a.apensadoEm ? `apensado em ${dateParaInput(a.apensadoEm)}` : 'apensado';
+                groupedHTML.push(`
+        <tr class="tr-apenso-row${ultimo ? ' is-ultimo' : ''}" data-apensos-de="${escapeHTML(d.id)}"${apensosAbertos ? '' : ' hidden'}>
+            <td class="text-center"><div class="d-flex flex-column gap-1 align-items-center">${verA}${suiteA}</div></td>
+            <td class="proc-apenso-arvore" aria-hidden="true"><span></span></td>
+            <td>
+                <div class="proc-apenso-nup"><i class="bi bi-paperclip"></i><span>${escapeHTML(a.processo)}</span></div>
+                <div class="proc-apenso-meta" title="${escapeHTML(origemApensoTexto(a))}">${escapeHTML(quando)}${a.apensadoPor === 'SUITE' ? ' · SUITE' : ''}</div>
+            </td>
+            <td class="text-center"><span class="proc-apenso-vazio" title="A meta é acompanhada no processo principal">no principal</span></td>
+            <td class="text-center"><span class="badge rounded-pill ${stA} badge-custom-size" title="Mesmo status do principal">${escapeHTML(formatStatusDisplay(d.status))}</span></td>
+            <td class="text-center">${siglaA ? `<span class="badge rounded-pill bg-light text-dark border badge-custom-size">${escapeHTML(siglaA)}</span>` : '<span class="proc-apenso-vazio">—</span>'}</td>
+            <td class="text-center"><div class="proc-avatar proc-avatar-sm" title="${escapeHTML(a.analista || 'Não atribuído')}">${iniciaisA}</div></td>
+            <td class="text-center proc-apenso-txt">${dateParaInput(a.dataAbertura) || '—'}</td>
+            <td class="proc-apenso-txt">${escapeHTML(a.contratada)}</td>
+            <td class="proc-apenso-txt proc-apenso-desc">${escapeHTML(a.descricao)}</td>
+        </tr>`);
+            });
+        }
     });
     mt.body.innerHTML = groupedHTML.join("");
     try { if (rows.some(r => r.codigoObra)) agendarPrecargaFichaObra(); } catch (e) { /* pré-carga é só um adiantamento */ }

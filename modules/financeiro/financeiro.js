@@ -461,7 +461,10 @@ async function carregarDadosFinanceiro() {
     try {
         const origem = Array.isArray(window.allData) ? window.allData : [];
         window.financeiroData = origem
+            // `!d.apensadoA`: o principal carrega o valor de tudo; o apenso não soma
+            // (decisão de 05/11/2026, sql/add_apensamento_processos.sql).
             .filter(d => (d.status === 'APROVADO' || d.status === 'ARQUIVADO')
+                && !d.apensadoA
                 && d.repercFiscal !== 0
                 && d.repercGecope !== 0)
             .map(d => ({

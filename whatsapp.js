@@ -90,6 +90,8 @@
                                                                                 const atrasados = (window.allData || []).filter(d => {
                                                                                     const st = (d.status || '').toUpperCase();
                                                                                     if (['CONCLUÍDO', 'EXCLUÍDO', 'APROVADO'].includes(st)) return false;
+                                                                                    // Apenso anda junto com o principal no SUITE: o aviso é só do principal.
+                                                                                    if (d.apensadoA) return false;
 
                                                                                     const mSt = getMetaSt(d);
                                                                                     const foiEnviado = d.avisoAtrasoEnviado === true;

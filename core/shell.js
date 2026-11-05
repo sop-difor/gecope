@@ -85,7 +85,8 @@ function updateHome() {
 // Só os três contadores da Início — separados de updateHome() para poderem ser pintados assim
 // que window.allData chega, sem refazer saudação, data e a consulta de atividades.
 function updateHomeStats() {
-    const rows = window.allData || [];
+    // Apensos não contam: o principal carrega o acompanhamento (sql/add_apensamento_processos.sql).
+    const rows = (window.allData || []).filter(d => !d.apensadoA);
 
     // Em Andamento (não aprovado, não cancelado, etc)
     const emAndamento = rows.filter(d => {
