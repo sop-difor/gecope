@@ -1359,6 +1359,10 @@
   .modal .fc-ledger .fc-r.tot{margin-top:2px;padding-top:12px;border-top:1px solid rgba(var(--raise-rgb),.28)}
   .modal .fc-ledger .fc-r.tot dt{font-weight:700;color:var(--text-bright)}
   .modal .fc-ledger .fc-r.tot dd{font-size:21px;font-weight:600;color:var(--text-brightest)}
+  /* linhas de referência abaixo do total (Valor PI, valor do contrato) e notas do bloco Valores */
+  .modal .fc-ledger .fc-r.sub dt,.modal .fc-ledger .fc-r.sub dd{font-size:12px;color:var(--text-dim)}
+  .modal .fc-vnota{margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--text-dim)}
+  .modal .fc-vnota b{color:var(--text-bright);font-weight:600}
   .modal .adToggle.fc-more{margin-top:16px;width:100%;justify-content:space-between}
   .modal .fc-tri .adToggle.fc-more{margin-top:auto}
   .modal .fc-tri .fc-list{margin-bottom:14px}

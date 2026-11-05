@@ -4861,6 +4861,32 @@
             color: var(--text-heading);
             overflow-wrap: anywhere;
         }
+        /* Obras/fontes adicionais do processo (renderObrasVinculadasDetalhes, processos.js) */
+        .gp-campo-largo { grid-column: 1 / -1; }
+        .gp-obra-view-item + .gp-obra-view-item { margin-top: 0.2rem; }
+        .gp-obra-det { color: var(--text-muted); font-size: 0.8rem; }
+        .gp-obras-aviso {
+            margin-top: 0.9rem;
+            padding: 0.6rem 0.85rem;
+            border-radius: var(--radius-md, 8px);
+            border-left: 4px solid var(--gc-amber, #b7791f);
+            background: rgba(183, 121, 31, 0.09);
+            font-size: 0.82rem;
+        }
+        .gp-obras-aviso[hidden] { display: none; }
+        body.theme-dark .gp-obras-aviso { background: rgba(230, 170, 80, 0.13); }
+        .gp-obras-lista { display: grid; gap: 0.35rem; }
+        .gp-obras-lista[hidden] { display: none; }
+        .gp-obra-lab {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 0.25rem 0.6rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .gp-obra-lab .form-check-input { margin-top: 0; flex: none; align-self: center; }
+        .gp-obra-cod { font-weight: 600; font-variant-numeric: tabular-nums; }
         .gp-campo dd.is-vazio,
         .gp-descricao.is-vazio,
         .gp-fin-valor.is-vazio,
