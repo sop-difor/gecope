@@ -33,6 +33,17 @@
 // saída. Um processo que entra em AGUAR. ANÁLISE e depois deixa a GECOPE mantém esse status
 // indefinidamente, enquanto a coluna `suite` passa a mostrar a unidade nova (GEFOE, etc.).
 // Ver docs/revisoes/2026-09-22-processos.md, seção "O que ficou de fora".
+//
+// APENSAMENTO (05/11/2026 — sql/add_apensamento_processos.sql e add_apensamento_status.sql):
+//   * Quando um evento "Processo Apensado" com o texto "Este processo foi apensado ao NUP: X"
+//     chega PELA PRIMEIRA VEZ ao histórico (é gravado nesta rodada), o processo é apensado a X
+//     (`apensado_a`, `apensado_em` = data do evento, `apensado_por` = 'SUITE'). Só eventos NOVOS:
+//     olhar o histórico inteiro reapensaria a cada rodada um processo desapensado à mão. Os
+//     vínculos antigos foram preenchidos pelo bloco [3] de add_apensamento_processos.sql.
+//     O evento de DESAPENSAMENTO do SUITE ainda não foi visto — nada é desfeito aqui.
+//   * Apenso não passa por `decidirNovoStatus` nem pela volta do arquivamento: o status dele é
+//     o do principal, imposto pelo trigger trg_processos_apenso_status (calcular aqui só gerava
+//     um UPDATE inútil por rodada, que o banco desfazia).
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -178,8 +189,9 @@ async function salvarHistoricoSuite(
   nup: string,
   historia: any[],
 ) {
+  // Devolve quantos eventos foram gravados E quais (o apensamento só olha os novos).
   if (!Array.isArray(historia) || historia.length === 0) {
-    return 0
+    return { gravados: 0, novos: [] as any[] }
   }
 
   const chaves = await Promise.all(
@@ -211,7 +223,7 @@ async function salvarHistoricoSuite(
       erroExistentes.message,
     )
 
-    return 0
+    return { gravados: 0, novos: [] as any[] }
   }
 
   const conjuntoExistentes = new Set(
@@ -285,7 +297,7 @@ async function salvarHistoricoSuite(
     }))
 
   if (novos.length === 0) {
-    return 0
+    return { gravados: 0, novos: [] as any[] }
   }
 
   const { error } = await supabase
@@ -298,10 +310,33 @@ async function salvarHistoricoSuite(
       error.message,
     )
 
-    return 0
+    return { gravados: 0, novos: [] as any[] }
   }
 
-  return novos.length
+  return { gravados: novos.length, novos }
+}
+
+// ---------- apensamento ----------
+
+// Do lado do APENSO o SUITE escreve "Este processo foi apensado ao NUP: 43022.005252/2026-27. "
+// Devolve o NUP do principal (só dígitos) e a data do evento mais recente desse tipo, ou null.
+function apensamentoNosEventos(eventos: any[]) {
+  let achado: { nup: string; data: string } | null = null
+
+  for (const e of eventos) {
+    if (String(e?.nome ?? "") !== "Processo Apensado") continue
+
+    const m = /foi apensado ao NUP:\s*([0-9./-]+)/i.exec(String(e?.status ?? ""))
+    const nup = m ? m[1].replace(/\D/g, "") : ""
+    if (!nup) continue
+
+    const t = Date.parse(String(e?.data_evento ?? ""))
+    if (!achado || (!Number.isNaN(t) && t > Date.parse(achado.data))) {
+      achado = { nup, data: String(e?.data_evento ?? "") }
+    }
+  }
+
+  return achado
 }
 
 // ---------- regras de negócio ----------
@@ -461,7 +496,7 @@ serve(async (req) => {
   } = await supabase
     .from("processos")
     .select(
-      "id, processo, status, suite, analista, created_at, suite_data_chegada, status_pre_arquivamento, arquivado_check_em",
+      "id, processo, status, suite, analista, created_at, suite_data_chegada, status_pre_arquivamento, arquivado_check_em, apensado_a",
     )
 
   if (error) {
@@ -511,8 +546,29 @@ serve(async (req) => {
     )
   })
 
+  // Apensamento: NUP (só dígitos) -> ids não excluídos, e o vínculo atual de cada processo.
+  // `apensoDe` é atualizado na hora em que um vínculo novo é decidido (antes de qualquer await),
+  // para que dois processos do mesmo lote não formem uma cadeia que o trigger recusaria.
+  const ehExcluido = (s: unknown) =>
+    ["EXCLUÍDO", "EXCLUIDO"].includes(String(s || "").toUpperCase().trim())
+  const idsPorNup = new Map<string, string[]>()
+  const apensoDe = new Map<string, string | null>()
+  for (const p of processos || []) {
+    apensoDe.set(p.id, p.apensado_a ?? null)
+    if (ehExcluido(p.status)) continue
+    const dig = String(p.processo || "").replace(/\D/g, "")
+    if (!dig) continue
+    if (!idsPorNup.has(dig)) idsPorNup.set(dig, [])
+    idsPorNup.get(dig)!.push(p.id)
+  }
+  const temApensos = (id: string) => {
+    for (const v of apensoDe.values()) if (v === id) return true
+    return false
+  }
+
   let atualizados = 0
   let semMudanca = 0
+  let apensados = 0
   let naoEncontrados = 0
   let reativados = 0
   let eventosGravados = 0
@@ -561,12 +617,14 @@ serve(async (req) => {
       }
 
       // Grava só os eventos que ainda não existem (identidade lógica).
-      const novosEventos =
+      const historicoGravado =
         await salvarHistoricoSuite(
           p.id,
           String(p.processo),
           info.historia || [],
         )
+
+      const novosEventos = historicoGravado.gravados
 
       eventosGravados += novosEventos
 
@@ -603,6 +661,37 @@ serve(async (req) => {
           info.data_chegada_unidade
       }
 
+      // ---------- apensamento (só eventos gravados nesta rodada) ----------
+
+      const apensamento = apensamentoNosEventos(historicoGravado.novos)
+
+      if (apensamento && !apensoDe.get(p.id)) {
+        const ids = idsPorNup.get(apensamento.nup) || []
+        const principalId = ids.length === 1 ? ids[0] : null
+        const motivo =
+          ids.length === 0 ? "principal não cadastrado no GECOPE"
+          : ids.length > 1 ? "NUP do principal duplicado no GECOPE"
+          : principalId === p.id ? "aponta para si mesmo"
+          : apensoDe.get(principalId!) ? "principal também é apenso"
+          : temApensos(p.id) ? "este processo tem apensos"
+          : null
+
+        if (motivo) {
+          console.warn(
+            `[APENSO] ${p.processo} apensado no SUITE ao NUP ${apensamento.nup}, não vinculado: ${motivo}.`,
+          )
+        } else {
+          patch.apensado_a = principalId
+          patch.apensado_em = apensamento.data
+          patch.apensado_por = "SUITE"
+          apensoDe.set(p.id, principalId)
+          apensados++
+        }
+      }
+
+      // Apenso: o status é o do principal (trigger trg_processos_apenso_status).
+      const ehApenso = !!apensoDe.get(p.id)
+
       // ---------- arquivamento ----------
 
       if (eraArquivado) {
@@ -610,7 +699,8 @@ serve(async (req) => {
           new Date().toISOString()
 
         if (
-          siglaSuite !== "ARQUIVADO"
+          siglaSuite !== "ARQUIVADO" &&
+          !ehApenso
         ) {
           // Desarquivado no SUITE.
           patch.status =
@@ -628,7 +718,7 @@ serve(async (req) => {
 
           reativados++
         }
-      } else {
+      } else if (!ehApenso) {
         // ---------- regras de status ----------
 
         const novo =
@@ -698,6 +788,11 @@ serve(async (req) => {
           `[PROCESSO] Erro ao atualizar ${p.processo}:`,
           upErr.message,
         )
+        // O vínculo não foi gravado (ex.: trigger recusou): desfaz a marca em memória.
+        if (patch.apensado_a) {
+          apensoDe.set(p.id, null)
+          apensados--
+        }
       }
     },
   )
@@ -777,6 +872,9 @@ serve(async (req) => {
 
     eventos_historico_gravados:
       eventosGravados,
+
+    apensados_pelo_suite:
+      apensados,
 
     tempos_atualizados:
       temposAtualizados,

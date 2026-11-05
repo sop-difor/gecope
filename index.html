@@ -2897,6 +2897,42 @@
                                             </div>
                                         </div>
 
+                                        <!-- Processos apensados. NÃO é um [data-gp-secao]: apensar/desapensar grava na
+                                             hora (coluna processos.apensado_a), fora do "Salvar alterações" do rodapé.
+                                             Desenhado por renderApensosDetalhes (processos.js); só admin/gerente alteram
+                                             (trigger trg_processos_apensamento, sql/add_apensamento_processos.sql). -->
+                                        <div class="card border-0 shadow-sm mb-4 gp-section-card" id="det_apensos_card">
+                                            <div class="card-header bg-white py-3 gp-card-head">
+                                                <h6 class="gp-card-titulo"><span class="gp-card-icone"><i
+                                                            class="bi bi-paperclip"></i></span>Processos apensados</h6>
+                                                <span class="gp-restrito-nota" id="det_apensos_nota" hidden><i
+                                                        class="bi bi-lock"></i> Alteração restrita a administradores e gerentes</span>
+                                            </div>
+                                            <div class="card-body">
+                                                <div id="det_apensos_principal" class="gp-apenso-aviso" hidden></div>
+                                                <ul id="det_apensos_lista" class="gp-apensos-lista list-unstyled mb-0"></ul>
+                                                <p id="det_apensos_vazio" class="text-muted small mb-0" hidden>Nenhum
+                                                    processo apensado a este.</p>
+                                                <div id="det_apensos_form" class="gp-apensos-form mt-3" hidden>
+                                                    <label class="form-label small fw-bold text-muted mb-1"
+                                                        for="det_apensar_nup" style="font-size: 0.75rem;">Apensar
+                                                        processo a este (NUP)</label>
+                                                    <div class="d-flex gap-2 flex-wrap">
+                                                        <input type="text" class="form-control form-control-sm"
+                                                            id="det_apensar_nup" list="det_apensar_sugestoes"
+                                                            placeholder="Ex.: 43022.010554/2026-17" autocomplete="off"
+                                                            style="max-width: 280px;">
+                                                        <datalist id="det_apensar_sugestoes"></datalist>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm"
+                                                            id="btn-apensar" onclick="apensarProcessoDetalhes()"><i
+                                                                class="bi bi-paperclip"></i> Apensar</button>
+                                                    </div>
+                                                    <div id="det_apensos_msg" class="form-text" aria-live="polite">
+                                                        Processos da mesma obra aparecem primeiro nas sugestões.</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <!-- Descrição do objeto -->
                                         <div class="card border-0 shadow-sm mb-4 gp-section-card gp-secao"
                                             data-gp-secao="descricao" data-gp-modo="leitura">

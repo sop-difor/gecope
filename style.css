@@ -3210,6 +3210,102 @@
             color: var(--text-muted);
         }
 
+        /* Apensamento na lista: selo no principal e linha recolhível com os apensos
+           (_updateReuniaoInterno/alternarApensosLista em processos.js). */
+        /* Mesmo formato do .proc-ficha-btn, ao lado dele; só o ícone (a quantidade vai no title). */
+        .proc-apensos-chip {
+            flex: none;
+            display: inline-grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--sop-blue, #3d68a3);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+        }
+        .proc-apensos-chip:hover { border-color: var(--sop-blue, #3d68a3); background: rgba(61, 104, 163, 0.08); }
+        .proc-apensos-chip:focus-visible { outline: 2px solid var(--sop-blue, #3d68a3); outline-offset: 2px; }
+        .proc-apensos-chip[aria-expanded="true"] { background: rgba(61, 104, 163, 0.14); border-color: rgba(61, 104, 163, 0.35); }
+        body.theme-dark .proc-apensos-chip { color: #9cc0f0; }
+        body.theme-dark .proc-apensos-chip:hover,
+        body.theme-dark .proc-apensos-chip[aria-expanded="true"] { border-color: rgba(156, 192, 240, 0.45); background: rgba(156, 192, 240, 0.12); }
+
+        /* Linhas dos apensos: mesmas colunas da tabela, fundo levemente azulado e traço de
+           árvore (coluna Prior.) ligando ao principal. O principal com apensos abertos perde a
+           borda de baixo, formando um bloco. (A faixa azul à esquerda saiu a pedido, 05/11/2026.) */
+        .proc-table-wrap tbody tr.tr-apenso-row[hidden] { display: none; }
+        .proc-table-wrap tbody tr.tr-apenso-row {
+            --apenso-cor: var(--sop-blue, #3d68a3);
+            --bs-table-bg: rgba(61, 104, 163, 0.05);
+            vertical-align: middle;
+        }
+        /* Fundo sólido e igual em TODAS as células (Ações e árvore inclusive), de ponta a ponta:
+           o Bootstrap pinta cada <td> com var(--bs-table-bg) + um box-shadow interno, e a cor
+           semitransparente dava uma linha desigual. Aqui a cor é fixa e o box-shadow sai. */
+        .proc-table-wrap tbody tr.tr-apenso-row > td {
+            padding-top: 0.45rem;
+            padding-bottom: 0.45rem;
+            border-top: 0;
+            border-bottom: 1px solid #e3e9f2;
+            background-color: #f3f6fa !important;
+            box-shadow: none !important;
+        }
+        .proc-table-wrap tbody tr.tr-apenso-row.is-ultimo > td { border-bottom: 1px solid var(--sop-slate-200, #e2e8f0); }
+        .proc-table-wrap tbody tr.tr-processo-row.tem-apensos-abertos { border-bottom-color: transparent; }
+        .proc-table-wrap tbody tr.tr-apenso-row .btn-sm { padding: 0.1rem 0.35rem; font-size: 0.78rem; }
+
+        /* Traço de árvore: ├ nos intermediários, └ no último. */
+        .proc-apenso-arvore { position: relative; padding: 0 !important; }
+        .proc-apenso-arvore > span {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            border-left: 2px solid rgba(61, 104, 163, 0.4);
+        }
+        .tr-apenso-row.is-ultimo .proc-apenso-arvore > span { bottom: 50%; }
+        .proc-apenso-arvore > span::after {
+            content: "";
+            position: absolute;
+            top: calc(50% - 1px);
+            left: 0;
+            width: 22px;
+            border-top: 2px solid rgba(61, 104, 163, 0.4);
+        }
+        .tr-apenso-row.is-ultimo .proc-apenso-arvore > span::after { top: auto; bottom: -1px; }
+
+        .proc-apenso-nup {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: var(--text-heading);
+            white-space: nowrap;
+        }
+        .proc-apenso-nup > i { color: var(--sop-blue, #3d68a3); font-size: 0.85rem; }
+        .proc-apenso-meta { margin-top: 0.15rem; font-size: 0.72rem; color: var(--text-muted); }
+        .proc-apenso-vazio { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
+        .proc-apenso-txt { font-size: 0.78rem; color: var(--sop-slate-600, #475569); line-height: 1.4; }
+        .proc-apenso-desc { max-width: 280px; text-align: left; }
+        .proc-avatar.proc-avatar-sm { width: 28px; height: 28px; font-size: 0.78rem; opacity: 0.85; }
+
+        body.theme-dark .proc-table-wrap tbody tr.tr-apenso-row { --bs-table-bg: rgba(110, 160, 230, 0.07); }
+        body.theme-dark .proc-table-wrap tbody tr.tr-apenso-row > td {
+            border-bottom-color: rgba(156, 192, 240, 0.14);
+            background-color: rgba(156, 192, 240, 0.07) !important;
+        }
+        body.theme-dark .proc-table-wrap tbody tr.tr-apenso-row.is-ultimo > td { border-bottom-color: rgba(255, 255, 255, 0.12); }
+        body.theme-dark .proc-apenso-arvore > span,
+        body.theme-dark .proc-apenso-arvore > span::after { border-color: rgba(156, 192, 240, 0.45); }
+        body.theme-dark .proc-apenso-nup > i { color: #9cc0f0; }
+        body.theme-dark .proc-apenso-txt { color: rgba(255, 255, 255, 0.72); }
+
         /* Zebra striping sutil nas linhas da tabela de processos */
         #pane-reuniao table tbody tr.tr-processo-row:nth-child(even) {
             --bs-table-bg: var(--sop-slate-100, #f1f5f9);
@@ -4549,6 +4645,61 @@
         body.theme-dark .gp-adit-valor { color: #f1f5f9; }
         body.theme-dark .gp-adit-valor.gp-val-neg { color: #ff9b91; }
         body.theme-dark .gp-adit-valor.gp-val-pos { color: #6ee7a0; }
+
+        /* Status de apenso: travado (é o do principal). Sem `disabled` — ver abrirDetalhes. */
+        #det_status.gp-status-herdado { pointer-events: none; opacity: 0.65; }
+
+        /* Processos apensados (cartão #det_apensos_card, renderApensosDetalhes em processos.js).
+           O selo de status reaproveita .gp-adit-selo. */
+        .gp-apenso-item {
+            display: grid;
+            grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+            align-items: center;
+            gap: 0.2rem 0.9rem;
+            padding: 0.45rem 0;
+            border-top: 1px solid var(--sop-slate-200, #e2e8f0);
+            font-size: 0.8rem;
+        }
+        .gp-apenso-item:first-child { border-top: 0; }
+        .gp-apenso-nup {
+            font-size: 0.82rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .gp-apenso-desc {
+            color: var(--sop-slate-700, #334155);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .gp-apenso-origem { color: var(--text-muted); font-size: 0.74rem; white-space: nowrap; }
+        .gp-apenso-aviso {
+            padding: 0.7rem 0.9rem;
+            border-radius: var(--radius-md, 8px);
+            border-left: 4px solid var(--sop-blue, #3d68a3);
+            background: rgba(61, 104, 163, 0.08);
+            font-size: 0.85rem;
+        }
+        .gp-apenso-aviso[hidden] { display: none; }
+        .gp-apenso-aviso-linha {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem 0.75rem;
+        }
+        .gp-apenso-aviso-linha > span { flex: 1 1 260px; }
+        .gp-apenso-aviso-linha .gp-apenso-nup { vertical-align: baseline; }
+        .gp-apenso-aviso-nota { margin-top: 0.3rem; font-size: 0.76rem; color: var(--text-muted); }
+        @media (max-width: 640px) {
+            .gp-apenso-item { grid-template-columns: minmax(0, 1fr) auto; }
+            .gp-apenso-desc, .gp-apenso-origem { grid-column: 1 / -1; white-space: normal; }
+        }
+        body.theme-dark .gp-apenso-item { border-top-color: rgba(255, 255, 255, 0.14); }
+        body.theme-dark .gp-apenso-desc { color: rgba(255, 255, 255, 0.78); }
+        body.theme-dark .gp-apenso-origem,
+        body.theme-dark .gp-apenso-aviso-nota { color: rgba(255, 255, 255, 0.68); }
+        body.theme-dark .gp-apenso-aviso { background: rgba(110, 160, 230, 0.12); }
 
         .gp-lbl-row {
             display: flex;
