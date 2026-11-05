@@ -152,7 +152,9 @@ const CONTRATOS_COLS=['id_obra','nr_contrato_sop','codigo_obra','descricao_obra'
   'valor_atual_contrato','valor_atual','valor_original','total_aditivo','total_reajuste','total_realinhado',
   'dias_paralisado','data_fim_previsto','distrito_operacional','nr_contrato_ext','nr_contrato_sic','nr_os',
   'prazo_execucao','prazo_vigencia_contrato',
-  'data_fim_vigencia_contrato','cnpj_contratada','cnpj_contratante','atualizado_em'].join(',');
+  'data_fim_vigencia_contrato','cnpj_contratada','cnpj_contratante','atualizado_em',
+  // bloco Valores/Dados da obra da Ficha (revisão de 05/11/2026): a base tem fonte e valor PI em 100% das obras
+  'fonte_recurso','valor_pi'].join(',');
 // prazo_execucao/prazo_vigencia_contrato: prazo ORIGINAL contratado em dias (aba
 // Aditivos de prazo). nr_os: nº da ordem de serviço (bloco Detalhes do Resumo).
 const COMISSAO_COLS='id_obra,nome_completo,nome_referencia,tipo,matricula,atualizado_em';
@@ -370,7 +372,10 @@ function mapRow(r){
   // `valorContrato` (= valor_atual_contrato, igual em todas as obras do contrato) e
   // `nObras` são preenchidos no loadData. Métrica do mapa soma `valor` → sem contar o
   // contrato N vezes.
-  const valor=num(r.valor_atual)||num(r.valor_original)||num(r.valor_atual_contrato);
+  // valor_atual 0 é dado real (obra suprimida inteira por aditivo, ou obra sem valor próprio num
+  // contrato de várias obras) — antes caía no valor_original ou no do CONTRATO e a ficha mostrava,
+  // como "valor atual da obra", o contrato inteiro (ex.: 01652018SPS05). O fallback só vale sem dado.
+  const valor=r.valor_atual!=null?num(r.valor_atual):(num(r.valor_original)||num(r.valor_atual_contrato));
   return {id_obra:r.id_obra, contrato:r.nr_contrato_sop||r.codigo_obra||('#'+r.id_obra), codigo_obra:r.codigo_obra||'',
     objeto:r.descricao_obra||'—', tipo:r.descricao_tipo_contrato||'', contratada:r.contratada||'—', contratante:r.contratante||'—',
     municipioTxt:r.municipio||'', status:r.status_contrato||r.status_obra||'—', statusObra:r.status_obra||'—', ano, valor,
@@ -692,7 +697,8 @@ function showLoginRequired(msg){
 // reaproveitava, por até 1h, os dados da conta anterior) e o cache deixa de guardar respostas
 // parciais (ver fetchDadosBrutos).
 // v15: vist/agend passam a vir sem filtro de ids (escopo = base inteira). v14: novo campo `nobras` (obras por contrato na base inteira, p/ a carteira ativa).
-function cacheKey(scope){ return 'gecope_mapa_cache_v15_'+(SESSION_UID||'anon')+'_'+scope; }
+// v16: `rows` ganhou fonte_recurso/valor_pi (Ficha Obra, 05/11/2026).
+function cacheKey(scope){ return 'gecope_mapa_cache_v16_'+(SESSION_UID||'anon')+'_'+scope; }
 function readCache(scope){
   try{
     const raw=sessionStorage.getItem(cacheKey(scope)); if(!raw) return null;
@@ -4072,8 +4078,8 @@ function rsLineChart(pts){
 // ---- Aba "Ficha Obra" (remodelação de 04/10/2026 a partir do modelo ficha_obra.pdf do SIGSOP) ----
 // Os blocos seguem a ordem e as posições da ficha impressa: Dados do contrato → Dados da obra,
 // Prazos e Valores (3 colunas) → Comissão de fiscalização → Medições. O que a base não tem fica
-// de fora de propósito (Dt Propos./Orçam., Fonte de Rec., Valor PI, STP, Ajuste, divisão do
-// reajuste em Preço × Medição, Histórico). Os extras entram fora do corpo da ficha: a faixa de
+// de fora de propósito (Dt Propos./Orçam., STP, Ajuste, divisão do reajuste em Preço × Medição,
+// Histórico). Fonte de Rec. e Valor PI existem na base e entraram na ficha em 05/11/2026. Os extras entram fora do corpo da ficha: a faixa de
 // pontos de atenção só aparece quando há alerta; a curva de evolução fecha a página. Os aditivos
 // de valor/prazo (buildAdValorPane/buildAdPrazoPane, inalterados) viram detalhe recolhível dos
 // blocos Valores e Prazos.
@@ -4189,6 +4195,7 @@ function buildFichaPane(o,raw){
   }
   const bObra=fcSec('Dados da obra','obra',`<dl class="fc-list">
       ${lin('Código',fmtVal(raw.codigo_obra||o.codigo_obra))}
+      ${lin('Fonte de recurso',fmtVal(raw.fonte_recurso))}
       ${lin('Situação',stat(raw.status_obra,colObra))}
       ${lin('Município',fmtVal(raw.municipio||o.municipioTxt))}
       ${lin('Distrito operacional',fmtVal(raw.distrito_operacional))}
@@ -4201,15 +4208,39 @@ function buildFichaPane(o,raw){
       ${lin('Dias paralisados',`<span${paral>0?` style="color:${statusTextColor(TOKENS.statusStop)}"`:''}>${NUM.format(num(raw.dias_paralisado))}</span>`)}
       ${lin('Fim previsto',fimTxt)}
     </dl>${prazoList.length?toggleBtn('mFcAdPrazo',`Aditivos de prazo (${NUM.format(prazoList.length)})`):''}`,'fc-col');
-  // livro-caixa: original → aditivo → reajuste → atual, filete antes do total. Os valores vêm
-  // direto da base (valor atual é o do SIGSOP, não a soma das linhas — por isso sem sinais de "=").
+  // livro-caixa: original → aditivo → reajuste → realinhado → atual, filete antes do total. Tudo da
+  // própria linha da obra no SIGSOP (contratos_edificacao), que fecha em 100% das obras:
+  // original + total_aditivo + total_reajuste + total_realinhado = valor_atual (conferido em 05/11/2026).
+  // Revisão de 05/11/2026: antes o "Total aditivo" podia vir da Σ dos aditivos do contrato (`o.aditivo`)
+  // e o "Valor atual" do fallback de `o.valor` (valor original ou valor do CONTRATO quando a obra tinha
+  // 0) — as linhas deixavam de fechar. A Σ dos aditivos formalizados, quando difere, vira nota.
+  const aditBase=num(raw.total_aditivo);
+  const atualObra=num(raw.valor_atual);
+  const pi=num(raw.valor_pi);
+  // fontes da MESMA obra (o SIGSOP separa cada fonte de recurso num código com a mesma descrição)
+  const normD=s=>String(s||'').replace(/\s+/g,' ').trim().toUpperCase();
+  const fontes=multiObra?obrasDoContrato(o).filter(x=>x!==o&&normD(x.raw&&x.raw.descricao_obra)===normD(raw.descricao_obra)&&normD(raw.descricao_obra)):[];
+  const totalFontes=fontes.reduce((s,x)=>s+num(x.raw&&x.raw.valor_atual),atualObra);
+  let notaValores='';
+  if(!multiObra && valorList.length){
+    const repForm=valorList.reduce((s,a)=>s+num(a.valor_repercussao),0);
+    if(Math.abs(repForm-aditBase)>=0.01)
+      notaValores+=`<p class="fc-vnota">Os aditivos de valor formalizados somam ${signedBRL(repForm)}; o SIGSOP ainda registra ${signedBRL(aditBase)} nesta obra.</p>`;
+  }
+  if(fontes.length){
+    notaValores+=`<p class="fc-vnota">Esta obra tem ${NUM.format(fontes.length+1)} fontes de recurso: `
+      +[o,...fontes].map(x=>`${escHtml(x.codigo_obra)} (${escHtml((x.raw&&x.raw.fonte_recurso)||'fonte não informada')}) ${BRL2.format(num(x.raw&&x.raw.valor_atual))}`).join('; ')
+      +`. Total da obra: <b>${BRL2.format(totalFontes)}</b>.</p>`;
+  }
   const bValores=fcSec('Valores','valores',`<dl class="fc-list fc-ledger">
       ${lin('Valor original',BRL2.format(orig))}
-      ${lin('Total aditivo'+aditTip,signedBRL(adit))}
+      ${lin('Total aditivo'+aditTip,signedBRL(aditBase))}
       ${lin('Reajuste',BRL2.format(reaj))}
-      ${realin?lin('Total realinhado',BRL2.format(realin)):''}
-      ${lin(multiObra?'Valor atual da obra':'Valor atual',BRL2.format(num(o.valor)),'tot')}
-    </dl>${temAdValor?toggleBtn('mFcAdValor',`Aditivos de valor (${NUM.format(valorList.length+outrosList.length)})`):''}`,'fc-col');
+      ${lin('Total realinhado',BRL2.format(realin))}
+      ${lin(multiObra?'Valor atual da obra':'Valor atual',BRL2.format(atualObra),'tot')}
+      ${pi&&Math.abs(pi-atualObra)>=0.01?lin('Valor PI',BRL2.format(pi),'sub'):''}
+      ${multiObra?lin('Valor atual do contrato',BRL2.format(num(raw.valor_atual_contrato)),'sub'):''}
+    </dl>${notaValores}${temAdValor?toggleBtn('mFcAdValor',`Aditivos de valor (${NUM.format(valorList.length+outrosList.length)})`):''}`,'fc-col');
   const painelAd=(id,html)=>`<div id="${id}" class="fc-ad" hidden>${html}</div>`;
   const bTri=`<div class="fc-tri">${bObra}${bPrazos}${bValores}</div>`
     +(prazoList.length?painelAd('mFcAdPrazo',buildAdPrazoPane(o,raw)):'')

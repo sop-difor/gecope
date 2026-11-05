@@ -2855,8 +2855,17 @@
                                                         <div class="gp-campo"><dt>Município</dt>
                                                             <dd data-gp-v="det_municipio"></dd>
                                                         </div>
+                                                        <div class="gp-campo gp-campo-largo"><dt>Outras obras/fontes do processo</dt>
+                                                            <dd id="det_obras_view" class="is-vazio">—</dd>
+                                                        </div>
                                                     </dl>
                                                 </div>
+                                                <!-- Fonte irmã fora do vínculo / código de outro contrato (renderObrasVinculadasDetalhes).
+                                                     Fora das camadas: vale em leitura e em edição. -->
+                                                <div id="det_obras_aviso" class="gp-obras-aviso" role="status" hidden></div>
+                                                <!-- Guarda as obras adicionais ("COD1, COD2"); entra no Cancelar/"alterado" da seção.
+                                                     Gravado em processos.obras_adicionais por executarAcaoDetalhes. -->
+                                                <input type="hidden" id="det_obras_adicionais" value="">
                                                 <div class="gp-edit">
                                                     <div class="row g-3 align-items-end">
                                                         <div class="col-md-4">
@@ -2891,6 +2900,14 @@
                                                             <div id="det_obra_status" class="form-text">Restrito a
                                                                 administradores — vincula ou atualiza este processo a um
                                                                 contrato/obra do SIGSOP pelo Código da Obra.</div>
+                                                        </div>
+                                                        <div class="col-12" id="det_obras_wrap" hidden>
+                                                            <div class="form-label small fw-bold text-muted mb-1"
+                                                                style="font-size: 0.75rem;">Obras e fontes do contrato
+                                                                tratadas neste processo</div>
+                                                            <ul id="det_obras_lista" class="gp-obras-lista list-unstyled mb-0" hidden></ul>
+                                                            <div class="form-text">As obras marcadas somam a base de
+                                                                cálculo dos percentuais da Análise financeira.</div>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -612,11 +612,24 @@ async function buscarObraPorCodigo(codigo) {
     try {
         const { data: obra, error } = await sbClient
             .from('contratos_edificacao')
-            .select('id_obra, codigo_obra, descricao_obra, contratada, contratante, distrito_operacional, municipio')
+            .select('id_obra, codigo_obra, nr_contrato_sop, descricao_obra, contratada, contratante, distrito_operacional, municipio')
             .eq('codigo_obra', cod)
             .maybeSingle();
 
         if (error || !obra) return { encontrado: false };
+
+        // Fontes irmãs: outros códigos do mesmo contrato com a mesma descrição de obra (o SIGSOP
+        // separa as fontes de recurso de uma obra em códigos distintos). Falha aqui não bloqueia.
+        let fontesIrmas = [];
+        if (obra.nr_contrato_sop) {
+            const { data: irmas, error: errIrm } = await sbClient
+                .from('contratos_edificacao').select('codigo_obra, descricao_obra')
+                .eq('nr_contrato_sop', obra.nr_contrato_sop).neq('codigo_obra', obra.codigo_obra);
+            if (!errIrm && irmas) {
+                fontesIrmas = irmas.filter(o => mesmaDescricaoObra(o.descricao_obra, obra.descricao_obra))
+                    .map(o => o.codigo_obra).sort();
+            }
+        }
 
         let comissaoCompleta = [];
         if (obra.id_obra != null) {
@@ -645,7 +658,8 @@ async function buscarObraPorCodigo(codigo) {
             municipio: obra.municipio || '',
             fiscalSugerido: comissaoCompleta[0] ? comissaoCompleta[0].nome : '',
             fiscalSugeridoMatricula: comissaoCompleta[0] ? comissaoCompleta[0].matricula : null,
-            comissaoCompleta
+            comissaoCompleta,
+            fontesIrmas
         };
     } catch (e) {
         console.error('[ERRO] buscarObraPorCodigo:', e);
@@ -711,6 +725,8 @@ function montarListaComissaoHTML(comissaoCompleta, onClickFnName) {
 }
 
 // --- Cadastro (NOVO PROCESSO): busca por Código da Obra ---
+// Fontes irmãs achadas na última busca; só valem se o código do campo continuar o mesmo.
+let cadObrasAdicionais = { codigo: '', lista: [] };
 async function buscarObraCadastro() {
     await garantirFiscaisCarregados();
     const codigo = document.getElementById('cad_codigo_obra').value;
@@ -755,9 +771,12 @@ async function buscarObraCadastro() {
         nome: resultado.fiscalSugerido
     });
 
+    // Fontes irmãs entram junto no cadastro (o vínculo pode ser ajustado depois no Gerenciar processo).
+    cadObrasAdicionais = { codigo: codigo.trim().toUpperCase(), lista: resultado.fontesIrmas || [] };
     const descCurta = (resultado.descricao_obra || '').slice(0, 80);
     statusEl.className = 'form-text text-success';
-    statusEl.textContent = `Obra encontrada: ${descCurta}${(resultado.descricao_obra || '').length > 80 ? '…' : ''}`;
+    statusEl.textContent = `Obra encontrada: ${descCurta}${(resultado.descricao_obra || '').length > 80 ? '…' : ''}`
+        + (cadObrasAdicionais.lista.length ? ` · Outras fontes da mesma obra incluídas: ${cadObrasAdicionais.lista.join(', ')}` : '');
 
     if (resultado.comissaoCompleta.length > 1) {
         listaComissao.innerHTML = montarListaComissaoHTML(resultado.comissaoCompleta, 'selecionarFiscalCadastro');
@@ -835,68 +854,109 @@ async function buscarAditivosDoContrato(nrContrato) {
     }
 }
 
-async function buscarBaseContrato(codigo) {
-    const cod = (codigo || '').trim();
+// Obras/fontes tratadas pelo processo (05/11/2026). O processo guarda a obra principal em
+// `codigo_obra` e as demais DO MESMO CONTRATO em `obras_adicionais` (sql/add_obras_adicionais_processos.sql).
+// No SIGSOP, uma obra paga por duas fontes de recurso vira dois códigos com a mesma descrição
+// (06882026SEDUC01 = Tesouro, 06882026SEDUC02 = Convênio): são as "fontes irmãs".
+const OBRAS_CONTRATO_COLS = 'id_obra, id_contrato, codigo_obra, nr_contrato_sop, descricao_obra, fonte_recurso, status_obra, valor_original, total_reajuste, total_realinhado, valor_atual';
+
+function normalizarListaObras(lista) {
+    const vistos = new Set();
+    return (lista || []).map(c => String(c || '').trim().toUpperCase()).filter(c => c && !vistos.has(c) && vistos.add(c));
+}
+
+function mesmaDescricaoObra(a, b) {
+    const t = s => String(s || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    return !!t(a) && t(a) === t(b);
+}
+
+// Base de cálculo dos percentuais = soma das obras VINCULADAS ao processo (decisão do usuário,
+// 05/11/2026; antes era sempre o contrato inteiro, que dilui o % em contrato de muitas obras).
+//   - todas as obras do contrato vinculadas (inclui contrato de obra única) → base do CONTRATO,
+//     pela ficha_contrato, como antes (original + reajuste de preço + reajuste de medição formalizado);
+//   - parte das obras → Σ (valor_original + total_realinhado) das obras vinculadas. O reajuste de
+//     medição formalizado (aditivos_contrato) é do contrato e não se separa por obra: fica de fora,
+//     com aviso (em 05/11/2026 só 1 contrato tinha esse aditivo, e de obra única).
+// A base do contrato inteiro segue calculada (`totalContrato`) como referência do limite do art. 125.
+async function buscarBaseContrato(codigo, adicionais) {
+    const cod = (codigo || '').trim().toUpperCase();
     if (!cod) return { estado: 'vazio', motivo: 'sem-codigo' };
-    const emCache = baseContratoCache.get(cod);
+    const extras = normalizarListaObras(adicionais).filter(c => c !== cod);
+    const chave = [cod, ...[...extras].sort()].join('|');
+    const emCache = baseContratoCache.get(chave);
     if (emCache && Date.now() - emCache.em < BASE_CONTRATO_TTL_MS) return emCache.base;
 
     const n = v => Number(v) || 0;
+    const r2 = v => Number(v.toFixed(2));
     try {
         const { data: obra, error } = await sbClient
-            .from('contratos_edificacao')
-            .select('id_obra, id_contrato, nr_contrato_sop, valor_original, total_reajuste, total_realinhado')
-            .eq('codigo_obra', cod)
-            .maybeSingle();
+            .from('contratos_edificacao').select(OBRAS_CONTRATO_COLS)
+            .eq('codigo_obra', cod).maybeSingle();
         if (error) throw error;
         if (!obra) return { estado: 'vazio', motivo: 'nao-encontrada' };
 
         // Dispara já: corre em paralelo com a ficha. Nunca rejeita (trata o próprio erro).
         const pAditivos = buscarAditivosDoContrato(obra.nr_contrato_sop);
 
-        let ficha = null;
-        let obrasDoContrato = [];
-        if (obra.id_contrato != null) {
-            const [rFicha, rObras] = await Promise.all([
-                sbClient.from('ficha_contrato').select('valor_original, total_realinhado')
-                    .eq('id_contrato', obra.id_contrato).maybeSingle(),
-                sbClient.from('contratos_edificacao').select('id_obra')
-                    .eq('id_contrato', obra.id_contrato)
-            ]);
-            if (rFicha.error) throw rFicha.error;
-            if (rObras.error) throw rObras.error;
-            ficha = rFicha.data;
-            obrasDoContrato = rObras.data || [];
-        }
+        // Obras do contrato: pelo nº do contrato (chave também dos aditivos); sem ele, pelo id.
+        let qObras = null;
+        if (obra.nr_contrato_sop) qObras = sbClient.from('contratos_edificacao').select(OBRAS_CONTRATO_COLS).eq('nr_contrato_sop', obra.nr_contrato_sop);
+        else if (obra.id_contrato != null) qObras = sbClient.from('contratos_edificacao').select(OBRAS_CONTRATO_COLS).eq('id_contrato', obra.id_contrato);
+        const [rFicha, rObras] = await Promise.all([
+            obra.id_contrato != null
+                ? sbClient.from('ficha_contrato').select('valor_original, total_realinhado').eq('id_contrato', obra.id_contrato).maybeSingle()
+                : Promise.resolve({ data: null, error: null }),
+            qObras ? qObras.order('codigo_obra', { ascending: true }) : Promise.resolve({ data: [obra], error: null })
+        ]);
+        if (rFicha.error) throw rFicha.error;
+        if (rObras.error) throw rObras.error;
+        const ficha = rFicha.data;
+        const obrasDoContrato = (rObras.data && rObras.data.length) ? rObras.data : [obra];
 
-        // Base do SIGSOP (replanilhamento): valor original + reajuste de preço + reajuste de
-        // medição FORMALIZADO. Aditivos de valor e o acumulado de reajuste das obras ficam fora.
-        // base.reajuste = reajuste de medição formalizado; base.realinhamento = reajuste de preço
-        // (ficha_contrato.total_realinhado = Σ aditivos "Reajuste de Preço").
         const ads = await pAditivos;
         if (ads === null) return { estado: 'erro' };
 
-        let base;
+        const porCodigo = new Map(obrasDoContrato.map(o => [String(o.codigo_obra || '').toUpperCase(), o]));
+        const vinculadas = [obra, ...extras.map(c => porCodigo.get(c)).filter(Boolean)];
+        const foraDoContrato = extras.filter(c => !porCodigo.has(c));
+        const todas = vinculadas.length >= obrasDoContrato.length;
+
+        // Base do contrato inteiro (referência e, com todas as obras vinculadas, a própria base).
+        const somaObras = (lista, campo) => r2(lista.reduce((s, o) => s + n(o[campo]), 0));
+        let contrato;
         if (ficha && n(ficha.valor_original) > 0) {
-            base = {
-                estado: 'ok', origem: 'contrato', numero: obra.nr_contrato_sop || '',
-                obras: obrasDoContrato.length || 1,
-                original: n(ficha.valor_original), reajuste: ads.reajusteMedicao,
-                realinhamento: n(ficha.total_realinhado)
-            };
-        } else if (n(obra.valor_original) > 0) {
-            base = {
-                estado: 'ok', origem: 'obra', codigo: cod,
-                original: n(obra.valor_original), reajuste: ads.reajusteMedicao,
-                realinhamento: n(obra.total_realinhado)
-            };
+            contrato = { original: n(ficha.valor_original), reajuste: ads.reajusteMedicao, realinhamento: n(ficha.total_realinhado) };
         } else {
-            return { estado: 'vazio', motivo: 'sem-valor' };
+            contrato = { original: somaObras(obrasDoContrato, 'valor_original'), reajuste: ads.reajusteMedicao, realinhamento: somaObras(obrasDoContrato, 'total_realinhado') };
         }
-        base.total = Number((base.original + base.reajuste + base.realinhamento).toFixed(2));
-        base.codigoObra = cod;
-        base.aditivos = ads.valor;
-        baseContratoCache.set(cod, { em: Date.now(), base });
+        contrato.total = r2(contrato.original + contrato.reajuste + contrato.realinhamento);
+
+        let base;
+        if (todas) {
+            base = { origem: obrasDoContrato.length > 1 ? 'contrato' : (ficha ? 'contrato' : 'obra'), ...contrato };
+        } else {
+            base = {
+                origem: vinculadas.length > 1 ? 'obras' : 'obra',
+                original: somaObras(vinculadas, 'valor_original'),
+                reajuste: 0,
+                realinhamento: somaObras(vinculadas, 'total_realinhado'),
+                reajusteContratoFora: ads.reajusteMedicao
+            };
+            base.total = r2(base.original + base.realinhamento);
+        }
+        if (!(base.original > 0)) return { estado: 'vazio', motivo: 'sem-valor', obrasDoContrato, codigoObra: cod, vinculadas: vinculadas.map(o => o.codigo_obra) };
+
+        Object.assign(base, {
+            estado: 'ok', numero: obra.nr_contrato_sop || '', codigo: cod, codigoObra: cod,
+            obras: obrasDoContrato.length, totalContrato: contrato.total,
+            vinculadas: vinculadas.map(o => o.codigo_obra), foraDoContrato,
+            obrasDoContrato, aditivos: ads.valor,
+            // fontes irmãs da principal que o processo ainda NÃO vinculou
+            irmasFora: obrasDoContrato.filter(o => o.codigo_obra !== obra.codigo_obra
+                && mesmaDescricaoObra(o.descricao_obra, obra.descricao_obra)
+                && !vinculadas.some(v => v.codigo_obra === o.codigo_obra)).map(o => o.codigo_obra)
+        });
+        baseContratoCache.set(chave, { em: Date.now(), base });
         return base;
     } catch (e) {
         console.error('[ERRO] buscarBaseContrato:', e);
@@ -904,20 +964,121 @@ async function buscarBaseContrato(codigo) {
     }
 }
 
+// Lê as obras adicionais do campo escondido do Gerenciar processo ("COD1, COD2").
+function lerObrasAdicionaisDetalhes() {
+    const el = document.getElementById('det_obras_adicionais');
+    return el ? normalizarListaObras(el.value.split(',')) : [];
+}
+
+function escreverObrasAdicionaisDetalhes(lista) {
+    const el = document.getElementById('det_obras_adicionais');
+    if (el) el.value = normalizarListaObras(lista).join(', ');
+}
+
 // Zera a faixa (estado "carregando"), busca a base do código e repinta quando a resposta chega.
-function carregarBaseContratoDetalhes(codigo) {
+// `adicionais` omitido = lê do campo escondido (obras já vinculadas ao processo).
+function carregarBaseContratoDetalhes(codigo, adicionais) {
     const req = ++baseContratoReq;
     baseContratoDetalhes = { estado: 'carregando' };
     const comp = document.getElementById('det_base_comp');
     if (comp) comp.classList.remove('show');
     renderBaseContratoDetalhes();
     atualizarPercentuaisDetalhes();
-    return buscarBaseContrato(codigo).then(base => {
+    const extras = adicionais === undefined ? lerObrasAdicionaisDetalhes() : adicionais;
+    return buscarBaseContrato(codigo, extras).then(base => {
         if (req !== baseContratoReq) return;
         baseContratoDetalhes = base;
         renderBaseContratoDetalhes();
+        renderObrasVinculadasDetalhes();
         atualizarPercentuaisDetalhes();
+        if (typeof gpAtualizarResumo === 'function') gpAtualizarResumo();
     });
+}
+
+// Lista de obras do contrato com caixa de marcar (camada de edição do cartão "Obra vinculada") e
+// o resumo de leitura. A principal vem marcada e travada (troca-se pelo campo Código da Obra).
+// As caixas não têm id de propósito: ficam fora de GP_CAMPO_SEL/FormData; quem guarda a escolha é
+// o campo escondido det_obras_adicionais (entra no "alterado"/Cancelar da seção como qualquer campo).
+function renderObrasVinculadasDetalhes() {
+    const lista = document.getElementById('det_obras_lista');
+    const view = document.getElementById('det_obras_view');
+    const aviso = document.getElementById('det_obras_aviso');
+    const b = baseContratoDetalhes;
+    const obras = (b && b.obrasDoContrato) || [];
+    const principal = ((document.getElementById('det_codigo_obra') || {}).value || '').trim().toUpperCase();
+    const marcadas = new Set(lerObrasAdicionaisDetalhes());
+    const reais = v => 'R$ ' + formatCurrencyValue(Number(v) || 0);
+    const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
+    const pObra = obras.find(o => String(o.codigo_obra).toUpperCase() === principal);
+    const rotulo = o => {
+        const partes = [o.fonte_recurso || 'Fonte não informada', reais(o.valor_original)];
+        if (pObra && !mesmaDescricaoObra(o.descricao_obra, pObra.descricao_obra)) partes.push(String(o.descricao_obra || '').slice(0, 90));
+        return partes.join(' · ');
+    };
+
+    if (lista) {
+        lista.replaceChildren();
+        if (obras.length > 1) {
+            const podeAlterar = gpEhAdmin;
+            obras.forEach(o => {
+                const cod = String(o.codigo_obra || '').toUpperCase();
+                const li = el('li', 'gp-obra-item');
+                const lab = el('label', 'gp-obra-lab');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'form-check-input';
+                cb.value = cod;
+                cb.checked = cod === principal || marcadas.has(cod);
+                cb.disabled = cod === principal || !podeAlterar;
+                cb.addEventListener('change', () => {
+                    const atual = new Set(lerObrasAdicionaisDetalhes());
+                    if (cb.checked) atual.add(cod); else atual.delete(cod);
+                    escreverObrasAdicionaisDetalhes([...atual]);
+                    carregarBaseContratoDetalhes(principal);
+                    gpAtualizarResumo();
+                });
+                lab.appendChild(cb);
+                lab.appendChild(el('span', 'gp-obra-cod', o.codigo_obra + (cod === principal ? ' (principal)' : '')));
+                lab.appendChild(el('span', 'gp-obra-det', rotulo(o)));
+                li.appendChild(lab);
+                lista.appendChild(li);
+            });
+        }
+        lista.hidden = obras.length <= 1;
+        const wrap = document.getElementById('det_obras_wrap');
+        if (wrap) wrap.hidden = obras.length <= 1;
+    }
+
+    if (view) {
+        const extras = [...marcadas].filter(c => c !== principal);
+        view.replaceChildren();
+        if (!extras.length) {
+            view.textContent = obras.length > 1 ? 'Só a obra principal' : '—';
+            view.classList.add('is-vazio');
+        } else {
+            view.classList.remove('is-vazio');
+            extras.forEach(c => {
+                const o = obras.find(x => String(x.codigo_obra).toUpperCase() === c);
+                const linha = el('div', 'gp-obra-view-item');
+                linha.appendChild(el('strong', '', c));
+                if (o) linha.appendChild(el('span', 'gp-obra-det', ' · ' + rotulo(o)));
+                view.appendChild(linha);
+            });
+        }
+    }
+
+    if (aviso) {
+        const msgs = [];
+        if (b && b.estado === 'ok' && b.irmasFora && b.irmasFora.length) {
+            const v = b.irmasFora.length > 1;
+            msgs.push(`Esta obra tem ${v ? 'outras fontes' : 'outra fonte'} de recurso no SIGSOP (${b.irmasFora.join(', ')}), fora do vínculo e da base de cálculo. Para incluir, clique em Editar e marque ${v ? 'as fontes' : 'a fonte'} em "Obras e fontes do contrato".`);
+        }
+        if (b && b.foraDoContrato && b.foraDoContrato.length) {
+            msgs.push(`Fora do contrato da obra principal, ignorado no cálculo: ${b.foraDoContrato.join(', ')}.`);
+        }
+        aviso.textContent = msgs.join(' ');
+        aviso.hidden = !msgs.length;
+    }
 }
 
 function renderBaseContratoDetalhes() {
@@ -936,10 +1097,18 @@ function renderBaseContratoDetalhes() {
             ? 'Sem base: a obra não tem valor original cadastrado.'
             : 'Sem base: vincule a obra pelo Código da Obra.';
     } else if (b.origem === 'contrato') {
-        const obras = `${b.obras} ${b.obras === 1 ? 'obra' : 'obras'}`;
+        const obras = b.obras > 1 ? `todas as ${b.obras} obras/fontes` : '1 obra';
         origem = `${b.numero ? 'Contrato ' + b.numero : 'Contrato'} · ${obras}`;
     } else {
-        origem = `Obra ${b.codigo} · sem ficha de contrato`;
+        const lista = (b.vinculadas || [b.codigo]).join(' + ');
+        const deContrato = b.obras > 1 ? ` · ${b.vinculadas.length} de ${b.obras} obras/fontes do contrato` : ' · sem ficha de contrato';
+        origem = `${b.vinculadas && b.vinculadas.length > 1 ? 'Obras' : 'Obra'} ${lista}${deContrato}`;
+    }
+    if (b.estado === 'ok' && b.origem !== 'contrato' && b.obras > 1 && b.totalContrato > 0) {
+        origem += ` · contrato inteiro: R$ ${formatCurrencyValue(b.totalContrato)}`;
+    }
+    if (b.estado === 'ok' && Math.abs(b.reajusteContratoFora || 0) > 0.004) {
+        origem += ' · o reajuste de medição formalizado é do contrato e não entra na base parcial';
     }
     set('det_base_origem', origem);
     set('det_base_valor', b.estado === 'ok' ? reais(b.total) : '—');
@@ -1021,8 +1190,9 @@ function renderAditivosBaseDetalhes() {
     } else {
         const soma = Number(ads.reduce((s, a) => s + (Number(a.valor_repercussao) || 0), 0).toFixed(2));
         // O percentual só faz sentido quando a base também é do contrato inteiro.
-        const pct = (b.origem === 'contrato' && b.total > 0)
-            ? `${formatarPercentualBase(soma, b.total).texto} da base` : '';
+        // Os aditivos são do contrato inteiro: o % é sobre a base do contrato.
+        const pct = b.totalContrato > 0
+            ? `${formatarPercentualBase(soma, b.totalContrato).texto} da base do contrato` : '';
         resumoAd.textContent = ads.length > 1
             ? `Total ${gpReaisComSinal(soma)}${pct ? ' · ' + pct : ''}`
             : pct;
@@ -1051,10 +1221,13 @@ function renderAditivosBaseDetalhes() {
     const listaPr = document.getElementById('det_base_outros_lista');
     listaPr.replaceChildren();
     const atual = ((document.getElementById('det_processo') || {}).value || '').trim();
-    const cod = (b.codigoObra || '').trim();
+    // "Desta obra" = qualquer obra/fonte vinculada a este processo, como principal ou adicional.
+    const codigos = new Set((b.vinculadas || [b.codigoObra]).map(c => String(c || '').trim().toUpperCase()).filter(Boolean));
+    const tocaObra = r => [r.codigoObra, ...(r.obrasAdicionais || [])]
+        .some(c => c && codigos.has(String(c).trim().toUpperCase()));
     // Apensos ficam fora: o valor deles está no principal (decisão de 05/11/2026).
-    const outros = cod ? todos.filter(r =>
-        r.codigoObra && String(r.codigoObra).trim() === cod && r.processo !== atual && !r.apensadoA
+    const outros = codigos.size ? todos.filter(r =>
+        tocaObra(r) && r.processo !== atual && !r.apensadoA
         && r.status !== 'EXCLUÍDO' && !jaListados.has(String(r.processo || '').trim())) : [];
     if (!outros.length) { blocoPr.hidden = true; return; }
     blocoPr.hidden = false;
@@ -1154,8 +1327,12 @@ async function buscarObraDetalhes() {
         nome: resultado.fiscalSugerido
     });
 
+    // Obra trocada: as adicionais passam a ser as fontes irmãs da nova principal (mesma obra no
+    // SIGSOP com outra fonte de recurso). Outras obras do contrato o admin marca na lista.
+    escreverObrasAdicionaisDetalhes(resultado.fontesIrmas || []);
     statusEl.className = 'form-text text-success';
-    statusEl.textContent = 'Obra encontrada — revise os campos e clique em "Salvar Alterações" para confirmar o vínculo.';
+    statusEl.textContent = 'Obra encontrada — revise os campos e clique em "Salvar Alterações" para confirmar o vínculo.'
+        + ((resultado.fontesIrmas || []).length ? ` Fontes da mesma obra incluídas: ${resultado.fontesIrmas.join(', ')}.` : '');
     carregarBaseContratoDetalhes(codigo);
     // Os campos preenchidos acima moram em várias seções (Responsáveis, Descrição, Obra): a
     // camada de leitura delas precisa refletir o vínculo e marcá-las como alteradas.
@@ -1309,6 +1486,8 @@ function mapProcessoRow(r) {
         contratada: r.contratada || "Não informado",
         contratante: r.contratante || "Não informado",
         codigoObra: r.codigo_obra || null,
+        // Demais obras/fontes do mesmo contrato tratadas pelo processo (sql/add_obras_adicionais_processos.sql).
+        obrasAdicionais: Array.isArray(r.obras_adicionais) ? r.obras_adicionais.filter(Boolean) : [],
         distritoOperacional: r.distrito_operacional || null,
         municipio: r.municipio || null,
         analista: r.analista,
@@ -1852,6 +2031,9 @@ async function enviarParaPlanilha() {
         fiscal_matricula: fiscalCad.matricula,
         analista: formData.get("ANALISTA"),
         codigo_obra: safeVal('cad_codigo_obra').trim() || null,
+        // Só as fontes achadas para ESTE código (o usuário pode ter trocado o código depois de buscar).
+        obras_adicionais: (cadObrasAdicionais.codigo && cadObrasAdicionais.codigo === safeVal('cad_codigo_obra').trim().toUpperCase())
+            ? cadObrasAdicionais.lista : [],
         distrito_operacional: safeVal('cad_distrito').trim() || null,
         municipio: safeVal('cad_municipio').trim() || null,
 
@@ -2132,6 +2314,10 @@ function gpAplicarCampos(valores) {
     aplicarCorStatusSelect(document.getElementById('det_status'));
     calcularRepercussao();
     calcularDiasDevolucao();
+    // Cancelar no cartão "Obra vinculada": as caixas e a base dependem das obras restauradas.
+    if ('det_obras_adicionais' in valores || 'det_codigo_obra' in valores) {
+        carregarBaseContratoDetalhes((document.getElementById('det_codigo_obra') || {}).value);
+    }
 }
 
 function gpCapturarBaseline() {
@@ -2598,7 +2784,8 @@ async function abrirDetalhes(processoStr) {
     if (document.getElementById('det_distrito')) document.getElementById('det_distrito').value = row.distritoOperacional || '';
     if (document.getElementById('det_municipio')) document.getElementById('det_municipio').value = row.municipio || '';
     if (document.getElementById('det_obra_status')) document.getElementById('det_obra_status').textContent = '';
-    carregarBaseContratoDetalhes(row.codigoObra);
+    escreverObrasAdicionaisDetalhes(row.obrasAdicionais || []);
+    carregarBaseContratoDetalhes(row.codigoObra, row.obrasAdicionais || []);
     renderApensosDetalhes(row);
 
     // Seleciona pelo vínculo estável (fiscal_matricula); cai no nome só para processos
@@ -3029,6 +3216,9 @@ async function executarAcaoDetalhes(actionType) {
             contratada: formData.get("CONTRATADA"),
             analista: document.getElementById('det_analista').value,
             codigo_obra: document.getElementById('det_codigo_obra').value.trim() || null,
+            // A principal nunca se repete na lista de adicionais.
+            obras_adicionais: lerObrasAdicionaisDetalhes()
+                .filter(c => c !== document.getElementById('det_codigo_obra').value.trim().toUpperCase()),
             distrito_operacional: document.getElementById('det_distrito').value.trim() || null,
             municipio: document.getElementById('det_municipio').value.trim() || null,
 
