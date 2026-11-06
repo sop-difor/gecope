@@ -26,6 +26,39 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
             return false;
         }
 
+        // 0. Matrícula que já tem conta de login não cria outra (06/11/2026: o fiscal da
+        //    matrícula 70023512 se cadastrou de novo com um Gmail; a conta nova ficou sem
+        //    perfil, porque matrícula é UNIQUE em app_users, e ele seguiu sem acesso).
+        //    Fiscal pré-cadastrado pelo admin, sem login, passa normalmente.
+        //    Se a verificação falhar (rede, função fora do ar), segue o cadastro como antes.
+        try {
+            const v = await chamarLoginMatricula({ acao: 'verificar_cadastro', matricula });
+            if (v.ok && v.jaTemConta) {
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'Matrícula já cadastrada',
+                    html: `A matrícula <b>${matricula}</b> já tem uma conta no GECOPE.<br><br>` +
+                          'Entre com a matrícula e sua senha. Se não lembrar da senha, use ' +
+                          '<b>"Esqueci minha senha"</b> na tela de login.',
+                    confirmButtonColor: 'var(--sop-green)',
+                    confirmButtonText: 'Ir para o login'
+                });
+                const cReg = document.getElementById('container-register');
+                const cLogin = document.getElementById('container-login');
+                if (cReg && cLogin) { cReg.style.display = 'none'; cLogin.style.display = 'block'; }
+                const campoMat = document.getElementById('landing-matricula');
+                if (campoMat) campoMat.value = matricula;
+                return false;
+            }
+            if (!v.ok && v.limite) {
+                alert(v.erro);
+                return false;
+            }
+            if (!v.ok) console.warn('[SIGNUP] Verificação da matrícula falhou; seguindo o cadastro:', v.erro);
+        } catch (errVerif) {
+            console.warn('[SIGNUP] Não foi possível verificar a matrícula; seguindo o cadastro:', errVerif);
+        }
+
         // 1. Criar usuário no Auth
         const options = {
             email: email,
@@ -51,6 +84,21 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
         // para o reparo de registros já afetados por essa falha no passado.
         let appUsersSynced = false;
 
+        // 1b. Fiscal pré-cadastrado pelo admin (perfil com e-mail real, sem login) que se
+        //     cadastra com outro e-mail: a RLS não deixa esta conta ver o perfil e o INSERT
+        //     abaixo esbarra na matrícula UNIQUE. A RPC (sql/add_assumir_pre_cadastro.sql)
+        //     passa o perfil para este e-mail, como 'pending', guardando o e-mail e o papel
+        //     anteriores para o admin conferir. Sem sessão (confirmação de e-mail ligada) ou
+        //     qualquer outra resposta, segue o caminho antigo.
+        if (data?.session) {
+            const { data: assumir, error: assumirErr } = await sbClient.rpc('app_users_assumir_pre_cadastro', {
+                p_matricula: matricula, p_telefone: telefone || null
+            });
+            if (assumirErr) console.warn('[SIGNUP] app_users_assumir_pre_cadastro falhou:', assumirErr.message);
+            else if (assumir === 'assumido') appUsersSynced = true;
+        }
+
+        if (!appUsersSynced) {
         // 2. Buscar se já existe um registro fantasma pela matrícula
         const { data: existingGhost, error: searchError } = await sbClient
             .from('app_users')
@@ -103,6 +151,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
                 appUsersSynced = true;
             }
         }
+        } // fim do if (!appUsersSynced)
 
         const { error: noteError } = await sbClient.from('app_notifications').insert([{ type: 'new_user_request', payload: JSON.stringify({ matricula, nome: `${nome} ${sobrenome}`, email: email }), created_at: new Date().toISOString(), read: false }]);
         if (noteError) {
