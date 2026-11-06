@@ -5566,7 +5566,7 @@
         }
         .gp-linha-tempo.is-vertical .gp-marco:last-child::before { display: none; }
         .gp-linha-tempo.is-vertical .gp-marco::after { top: 0.05rem; left: 0; transform: none; }
-        .gp-linha-tempo.is-vertical .gp-marco-data { margin-top: 0; text-align: right; font-weight: 400; }
+        .gp-linha-tempo.is-vertical .gp-marco-data { margin-top: 0; text-align: right; font-weight: 400; font-size: 0.875rem; }
         @media (prefers-reduced-motion: reduce) {
             .gp-objeto-toggle .bi { transition: none; }
         }
