@@ -4755,6 +4755,63 @@
             .gp-base-toggle .bi { transition: none; }
         }
 
+        /* Seletor Total / Fonte 01 / Fonte 02 da Análise financeira (gpFontesRender, processos.js).
+           Só aparece com mais de uma obra/fonte vinculada. Fonte sem valor lançado fica tracejada. */
+        .gp-fontes {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.375rem 0.75rem;
+            margin: 0 0 0.875rem;
+        }
+        .gp-fontes[hidden] { display: none; }
+        .gp-fontes-botoes {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            padding: 0.1875rem;
+            border-radius: 8px;
+            background: var(--sop-slate-100, #f1f5f9);
+        }
+        .gp-fonte-btn {
+            min-height: 32px;
+            padding: 0.25rem 0.75rem;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--sop-slate-600, #475569);
+            cursor: pointer;
+        }
+        .gp-fonte-btn:hover { color: var(--text-heading, #0f172a); }
+        .gp-fonte-btn.is-vazia { border-style: dashed; border-color: var(--sop-slate-300, #cbd5e1); }
+        .gp-fonte-btn[aria-pressed="true"] {
+            background: #fff;
+            border-color: var(--sop-green, #007233);
+            color: var(--sop-green, #007233);
+            font-weight: 600;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+        }
+        .gp-fonte-btn:focus-visible {
+            outline: 2px solid var(--sop-green, #007233);
+            outline-offset: 2px;
+        }
+        .gp-fontes-nota {
+            font-size: 0.78rem;
+            color: var(--sop-slate-600, #475569);
+        }
+        body.theme-dark .gp-fontes-botoes { background: rgba(255, 255, 255, 0.06); }
+        body.theme-dark .gp-fonte-btn { color: rgba(255, 255, 255, 0.7); }
+        body.theme-dark .gp-fonte-btn:hover { color: #fff; }
+        body.theme-dark .gp-fonte-btn.is-vazia { border-color: rgba(255, 255, 255, 0.25); }
+        body.theme-dark .gp-fonte-btn[aria-pressed="true"] {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #6ee7a0;
+            color: #6ee7a0;
+        }
+        body.theme-dark .gp-fontes-nota { color: rgba(255, 255, 255, 0.6); }
+
         /* ── GERENCIAR PROCESSO: ficha em leitura, edição seção a seção ───────────
            Marcação em index.html (#modalDetalhes) e lógica em processos.js
            (gpEditarTudo/gpCancelarEdicao/gpAtualizarResumo). Cada [data-gp-secao]
