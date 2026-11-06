@@ -2656,7 +2656,7 @@
             </div>
 
             <div class="modal fade" id="modalDetalhes" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down gp-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-dark text-white">
                             <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Gerenciar processo</h5>
@@ -2667,56 +2667,10 @@
                             <form id="formDetalhes">
                                 <input type="hidden" name="action" id="detalheAction" value="update">
 
-                                <!-- Barra de identidade: sempre visível, independente da aba selecionada.
-                                     Lê-se como ficha (selo de status + tipologia); "Editar" revela os campos. -->
-                                <div class="gp-identity gp-secao mb-4 pb-3 border-bottom" data-gp-secao="identidade"
-                                    data-gp-modo="leitura">
-                                    <div class="d-flex flex-wrap align-items-end gap-4">
-                                        <div class="gp-identity-block">
-                                            <label class="gp-identity-label" for="det_processo">Processo Nº</label>
-                                            <input type="text" class="gp-identity-title" name="PROCESSO N."
-                                                id="det_processo" readonly tabindex="-1">
-                                        </div>
-                                        <div class="gp-identity-block">
-                                            <span class="gp-identity-label">Status atual<span
-                                                    class="gp-req text-danger"> *</span></span>
-                                            <div class="gp-view">
-                                                <span class="gp-status-pill" id="det_status_view">—</span>
-                                            </div>
-                                            <div class="gp-edit">
-                                                <select class="form-select gp-status-select" name="STATUS"
-                                                    id="det_status" aria-label="Status atual"
-                                                    onchange="onChangeStatusDetalhes(this)">
-                                                    <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
-                                                    <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
-                                                    <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
-                                                    <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
-                                                    <option value="APROVADO">APROVADO</option>
-                                                    <option value="ARQUIVADO">ARQUIVADO</option>
-                                                    <option value="CONTRATANTE">CONTRATANTE</option>
-                                                    <option value="DILIGÊNCIA">DILIGÊNCIA</option>
-                                                    <option value="EM ANÁLISE">EM ANÁLISE</option>
-                                                    <option value="EM REANÁLISE">EM REANÁLISE</option>
-                                                    <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE FISCAL</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="gp-identity-block flex-grow-1" style="min-width: 220px;">
-                                            <span class="gp-identity-label">Tipologia<span
-                                                    class="gp-req text-danger"> *</span></span>
-                                            <div class="gp-view">
-                                                <span class="gp-identity-valor" data-gp-v="det_tipo"></span>
-                                            </div>
-                                            <div class="gp-edit">
-                                                <input type="text" class="form-control" name="TIPO" id="det_tipo"
-                                                    aria-label="Tipologia">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Navegação por abas -->
-                                <ul class="nav gp-tabs mb-4" id="gpTabs" role="tablist">
+                                <!-- Navegação por abas: no topo da janela, centralizada (pedido do usuário, 06/11/2026).
+                                     A ficha do processo, logo abaixo, fica visível em todas as abas. -->
+                                <div class="gp-tabs-wrap">
+                                <ul class="nav gp-tabs" id="gpTabs" role="tablist">
                                     <li class="nav-item" role="presentation">
                                         <button class="nav-link active" id="gp-tab-geral-btn" data-bs-toggle="tab"
                                             data-bs-target="#gp-pane-geral" type="button" role="tab"
@@ -2750,231 +2704,330 @@
                                         </button>
                                     </li>
                                 </ul>
+                                </div>
 
-                                <div class="tab-content" id="gpTabsContent">
-
-                                    <!-- GERAL: ficha em leitura; cada seção abre para edição pelo botão "Editar".
-                                         Os campos (camada .gp-edit) são os mesmos de sempre — ids/names intactos,
-                                         porque validação, payload e automações leem por eles. A camada .gp-view
-                                         só exibe (ver gpAtualizarResumo em processos.js). -->
-                                    <div class="tab-pane fade show active" id="gp-pane-geral" role="tabpanel">
-
-                                        <!-- Responsáveis -->
-                                        <div class="card border-0 shadow-sm mb-4 gp-section-card gp-secao"
-                                            data-gp-secao="responsaveis" data-gp-modo="leitura">
-                                            <div class="card-header bg-white py-3 gp-card-head">
-                                                <h6 class="gp-card-titulo"><span class="gp-card-icone"><i
-                                                            class="bi bi-people"></i></span>Responsáveis</h6>
+                                <!-- FICHA DO PROCESSO (topo, sempre visível acima das abas; reorganizada em 06/11/2026
+                                     a pedido do usuário): tudo o que identifica o processo e a obra fica junto —
+                                     número, tipologia, status, objeto, responsáveis, obra vinculada e apensos. Abaixo
+                                     das abas ficam só os números (indicadores, financeiro, cronograma).
+                                     Cada bloco segue sendo um [data-gp-secao] com camadas .gp-view/.gp-edit; os
+                                     ids/names dos campos não mudaram (validação, payload e automações leem por eles). -->
+                                <div class="gp-hero">
+                                    <!-- Identidade: número, tipologia e status -->
+                                    <div class="gp-hero-id gp-secao" data-gp-secao="identidade" data-gp-modo="leitura">
+                                        <div class="gp-hero-linha">
+                                            <div class="gp-hero-nup">
+                                                <label class="gp-hero-rotulo" for="det_processo">Processo Nº</label>
+                                                <input type="text" class="gp-identity-title" name="PROCESSO N."
+                                                    id="det_processo" readonly tabindex="-1">
                                             </div>
-                                            <div class="card-body">
+                                            <div class="gp-hero-tipo">
+                                                <span class="gp-hero-rotulo" id="gp-tipo-rotulo">Tipologia<span
+                                                        class="gp-req text-danger"> *</span></span>
                                                 <div class="gp-view">
-                                                    <dl class="gp-ficha">
-                                                        <div class="gp-campo"><dt>Fiscal responsável</dt>
-                                                            <dd data-gp-v="det_fiscal"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Contratante</dt>
-                                                            <dd data-gp-v="det_contratante"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Contratada</dt>
-                                                            <dd data-gp-v="det_contratada"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Analista designado</dt>
-                                                            <dd data-gp-v="det_analista"></dd>
-                                                        </div>
-                                                    </dl>
+                                                    <span class="gp-hero-tipo-valor gp-identity-valor"
+                                                        data-gp-v="det_tipo"></span>
                                                 </div>
                                                 <div class="gp-edit">
-                                                    <div class="row g-3">
-                                                        <div class="col-md-3">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Fiscal Responsável <span
-                                                                    class="text-danger">*</span></label>
-                                                            <select
-                                                                class="form-select bg-light border-0 shadow-none gp-plain-field"
-                                                                name="FISCAL" id="det_fiscal" style="font-size: 0.9rem;">
-                                                                <option value="">Selecione...</option>
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-md-3">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Contratante <span
-                                                                    class="text-danger">*</span></label>
-                                                            <input type="text"
-                                                                class="form-control bg-light border-0 shadow-none gp-plain-field"
-                                                                name="CONTRATANTE" id="det_contratante"
-                                                                style="font-size: 0.9rem;">
-                                                        </div>
-                                                        <div class="col-md-3">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Contratada <span
-                                                                    class="text-danger">*</span></label>
-                                                            <input type="text"
-                                                                class="form-control bg-light border-0 shadow-none gp-plain-field"
-                                                                name="CONTRATADA" id="det_contratada"
-                                                                style="font-size: 0.9rem;">
-                                                        </div>
-                                                        <div class="col-md-3">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Analista Designado</label>
-                                                            <select
-                                                                class="form-select bg-light border-0 shadow-none gp-plain-field"
-                                                                name="ANALISTA" id="det_analista"
-                                                                style="font-size: 0.9rem;">
-                                                                <option value="">Selecione...</option>
-                                                                <option value="A">Ada</option>
-                                                                <option value="F">Felipe</option>
-                                                                <option value="H">Helder</option>
-                                                                <option value="N">Nildeno</option>
-                                                                <option value="P">Pedro</option>
-                                                                <option value="W">Walace</option>
-                                                            </select>
-                                                        </div>
-                                                    </div>
+                                                    <input type="text" class="form-control" name="TIPO" id="det_tipo"
+                                                        aria-labelledby="gp-tipo-rotulo">
+                                                </div>
+                                            </div>
+                                            <div class="gp-hero-status">
+                                                <span class="gp-hero-rotulo">Status atual<span
+                                                        class="gp-req text-danger"> *</span></span>
+                                                <div class="gp-view">
+                                                    <span class="gp-status-pill" id="det_status_view">—</span>
+                                                </div>
+                                                <div class="gp-edit">
+                                                    <select class="form-select gp-status-select" name="STATUS"
+                                                        id="det_status" aria-label="Status atual"
+                                                        onchange="onChangeStatusDetalhes(this)">
+                                                        <option value="AGUAR. ANÁLISE">AGUAR. ANÁLISE</option>
+                                                        <option value="AGUAR. APROVAÇÃO">AGUAR. APROVAÇÃO</option>
+                                                        <option value="AGUAR. REANÁLISE">AGUAR. REANÁLISE</option>
+                                                        <option value="ANÁLISE FISCAL">ANÁLISE FISCAL</option>
+                                                        <option value="APROVADO">APROVADO</option>
+                                                        <option value="ARQUIVADO">ARQUIVADO</option>
+                                                        <option value="CONTRATANTE">CONTRATANTE</option>
+                                                        <option value="DILIGÊNCIA">DILIGÊNCIA</option>
+                                                        <option value="EM ANÁLISE">EM ANÁLISE</option>
+                                                        <option value="EM REANÁLISE">EM REANÁLISE</option>
+                                                        <option value="DEVOLVIDO P/ REANÁLISE FISCAL">REANÁLISE FISCAL</option>
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    <!-- Objeto: o texto longo fica recolhido em 3 linhas; "Ler descrição completa"
+                                         só aparece quando ele não cabe (gpAjustarObjeto, processos.js). -->
+                                    <div class="gp-objeto gp-secao" data-gp-secao="descricao" data-gp-modo="leitura">
+                                        <span class="gp-hero-rotulo" id="gp-objeto-rotulo">Objeto<span
+                                                class="gp-req text-danger"> *</span></span>
+                                        <div class="gp-view">
+                                            <p class="gp-descricao mb-0" id="gp-objeto-texto" data-gp-v="det_descricao"
+                                                data-gp-fmt="texto" aria-labelledby="gp-objeto-rotulo"></p>
+                                            <button type="button" class="gp-objeto-toggle" id="gp-objeto-toggle"
+                                                data-gp-acao="objeto" aria-controls="gp-objeto-texto"
+                                                aria-expanded="false" hidden>
+                                                <span>Ler descrição completa</span> <i class="bi bi-chevron-down"
+                                                    aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                        <div class="gp-edit">
+                                            <textarea class="form-control" name="DESCRIÇÃO" id="det_descricao"
+                                                rows="6" aria-labelledby="gp-objeto-rotulo"
+                                                style="font-size: 0.9rem; min-height: 140px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
+                                        </div>
+                                    </div>
+
+                                    <!-- Responsáveis e Obra vinculada lado a lado; Processos apensados numa faixa
+                                         própria, na largura toda, para cada apenso caber numa linha. -->
+                                    <div class="gp-grupos">
+
+                                        <!-- Responsáveis -->
+                                        <section class="gp-grupo gp-secao" data-gp-secao="responsaveis"
+                                            data-gp-modo="leitura" aria-labelledby="gp-grupo-resp">
+                                            <h6 class="gp-grupo-titulo" id="gp-grupo-resp"><i class="bi bi-people"
+                                                    aria-hidden="true"></i>Responsáveis</h6>
+                                            <div class="gp-view">
+                                                <dl class="gp-dados gp-dados-2">
+                                                    <div class="gp-dado"><dt>Fiscal responsável</dt>
+                                                        <dd data-gp-v="det_fiscal"></dd>
+                                                    </div>
+                                                    <div class="gp-dado"><dt>Analista designado</dt>
+                                                        <dd data-gp-v="det_analista"></dd>
+                                                    </div>
+                                                    <div class="gp-dado"><dt>Contratante</dt>
+                                                        <dd data-gp-v="det_contratante"></dd>
+                                                    </div>
+                                                    <div class="gp-dado"><dt>Contratada</dt>
+                                                        <dd data-gp-v="det_contratada"></dd>
+                                                    </div>
+                                                </dl>
+                                            </div>
+                                            <div class="gp-edit">
+                                                <div class="row g-3">
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_fiscal"
+                                                            style="font-size: 0.75rem;">Fiscal Responsável <span
+                                                                class="text-danger">*</span></label>
+                                                        <select
+                                                            class="form-select bg-light border-0 shadow-none gp-plain-field"
+                                                            name="FISCAL" id="det_fiscal" style="font-size: 0.9rem;">
+                                                            <option value="">Selecione...</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_analista"
+                                                            style="font-size: 0.75rem;">Analista Designado</label>
+                                                        <select
+                                                            class="form-select bg-light border-0 shadow-none gp-plain-field"
+                                                            name="ANALISTA" id="det_analista"
+                                                            style="font-size: 0.9rem;">
+                                                            <option value="">Selecione...</option>
+                                                            <option value="A">Ada</option>
+                                                            <option value="F">Felipe</option>
+                                                            <option value="H">Helder</option>
+                                                            <option value="N">Nildeno</option>
+                                                            <option value="P">Pedro</option>
+                                                            <option value="W">Walace</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_contratante"
+                                                            style="font-size: 0.75rem;">Contratante <span
+                                                                class="text-danger">*</span></label>
+                                                        <input type="text"
+                                                            class="form-control bg-light border-0 shadow-none gp-plain-field"
+                                                            name="CONTRATANTE" id="det_contratante"
+                                                            style="font-size: 0.9rem;">
+                                                    </div>
+                                                    <div class="col-sm-6">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_contratada"
+                                                            style="font-size: 0.75rem;">Contratada <span
+                                                                class="text-danger">*</span></label>
+                                                        <input type="text"
+                                                            class="form-control bg-light border-0 shadow-none gp-plain-field"
+                                                            name="CONTRATADA" id="det_contratada"
+                                                            style="font-size: 0.9rem;">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
 
                                         <!-- Obra vinculada (SIGSOP): alterar o vínculo é restrito a administradores -->
-                                        <div class="card border-0 shadow-sm mb-4 gp-section-card gp-secao"
-                                            data-gp-secao="obra" data-gp-modo="leitura" data-gp-requer="admin">
-                                            <div class="card-header bg-white py-3 gp-card-head">
-                                                <h6 class="gp-card-titulo"><span class="gp-card-icone"><i
-                                                            class="bi bi-buildings"></i></span>Obra vinculada</h6>
-                                                <span class="gp-restrito-nota" hidden><i
-                                                        class="bi bi-lock"></i> Edição restrita a administradores</span>
+                                        <section class="gp-grupo gp-secao" data-gp-secao="obra" data-gp-modo="leitura"
+                                            data-gp-requer="admin" aria-labelledby="gp-grupo-obra">
+                                            <h6 class="gp-grupo-titulo" id="gp-grupo-obra"><i class="bi bi-buildings"
+                                                    aria-hidden="true"></i>Obra vinculada
+                                                <span class="gp-restrito-nota" hidden title="Edição restrita a administradores"><i
+                                                        class="bi bi-lock"></i> Só admin</span>
+                                            </h6>
+                                            <div class="gp-view">
+                                                <dl class="gp-dados gp-dados-2">
+                                                    <div class="gp-dado gp-dado-largo"><dt>Código da obra (SIGSOP)</dt>
+                                                        <dd class="gp-lista-cod" data-gp-v="det_codigo_obra"></dd>
+                                                    </div>
+                                                    <div class="gp-dado"><dt>Município</dt>
+                                                        <dd data-gp-v="det_municipio"></dd>
+                                                    </div>
+                                                    <div class="gp-dado"><dt>Distrito operacional</dt>
+                                                        <dd data-gp-v="det_distrito"></dd>
+                                                    </div>
+                                                    <div class="gp-dado gp-dado-largo"><dt>Outras obras/fontes do processo</dt>
+                                                        <dd id="det_obras_view" class="is-vazio">—</dd>
+                                                    </div>
+                                                </dl>
                                             </div>
-                                            <div class="card-body">
-                                                <div class="gp-view">
-                                                    <dl class="gp-ficha">
-                                                        <div class="gp-campo"><dt>Código da obra (SIGSOP)</dt>
-                                                            <dd data-gp-v="det_codigo_obra"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Distrito operacional</dt>
-                                                            <dd data-gp-v="det_distrito"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Município</dt>
-                                                            <dd data-gp-v="det_municipio"></dd>
-                                                        </div>
-                                                        <div class="gp-campo gp-campo-largo"><dt>Outras obras/fontes do processo</dt>
-                                                            <dd id="det_obras_view" class="is-vazio">—</dd>
-                                                        </div>
-                                                    </dl>
-                                                </div>
-                                                <!-- Fonte irmã fora do vínculo / código de outro contrato (renderObrasVinculadasDetalhes).
-                                                     Fora das camadas: vale em leitura e em edição. -->
-                                                <div id="det_obras_aviso" class="gp-obras-aviso" role="status" hidden></div>
-                                                <!-- Guarda as obras adicionais ("COD1, COD2"); entra no Cancelar/"alterado" da seção.
-                                                     Gravado em processos.obras_adicionais por executarAcaoDetalhes. -->
-                                                <input type="hidden" id="det_obras_adicionais" value="">
-                                                <div class="gp-edit">
-                                                    <div class="row g-3 align-items-end">
-                                                        <div class="col-md-4">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Código da Obra
-                                                                (SIGSOP)</label>
+                                            <!-- Fonte irmã fora do vínculo / código de outro contrato (renderObrasVinculadasDetalhes).
+                                                 Fora das camadas: vale em leitura e em edição. -->
+                                            <div id="det_obras_aviso" class="gp-obras-aviso" role="status" hidden></div>
+                                            <!-- Guarda as obras adicionais ("COD1, COD2"); fica DENTRO da seção "obra" para entrar no
+                                                 Cancelar/"alterado". Gravado em processos.obras_adicionais por executarAcaoDetalhes. -->
+                                            <input type="hidden" id="det_obras_adicionais" value="">
+                                            <div class="gp-edit">
+                                                <div class="row g-3 align-items-end">
+                                                    <div class="col-12">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_codigo_obra"
+                                                            style="font-size: 0.75rem;">Código da Obra
+                                                            (SIGSOP)</label>
+                                                        <div class="d-flex gap-2">
                                                             <input type="text"
                                                                 class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
                                                                 id="det_codigo_obra" placeholder="Ex.: 05872025SEDUC01">
-                                                        </div>
-                                                        <div class="col-md-3">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Distrito Operacional</label>
-                                                            <input type="text"
-                                                                class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
-                                                                id="det_distrito">
-                                                        </div>
-                                                        <div class="col-md-3">
-                                                            <label class="form-label small fw-bold text-muted"
-                                                                style="font-size: 0.75rem;">Município</label>
-                                                            <input type="text"
-                                                                class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
-                                                                id="det_municipio">
-                                                        </div>
-                                                        <div class="col-md-2">
                                                             <button type="button"
-                                                                class="btn btn-outline-primary btn-sm w-100"
+                                                                class="btn btn-outline-primary btn-sm flex-shrink-0 text-nowrap"
                                                                 id="btn-vincular-obra" onclick="buscarObraDetalhes()"><i
                                                                     class="bi bi-search"></i> Vincular</button>
                                                         </div>
-                                                        <div class="col-12">
-                                                            <div id="det_obra_status" class="form-text">Restrito a
-                                                                administradores — vincula ou atualiza este processo a um
-                                                                contrato/obra do SIGSOP pelo Código da Obra.</div>
-                                                        </div>
-                                                        <div class="col-12" id="det_obras_wrap" hidden>
-                                                            <div class="form-label small fw-bold text-muted mb-1"
-                                                                style="font-size: 0.75rem;">Obras e fontes do contrato
-                                                                tratadas neste processo</div>
-                                                            <ul id="det_obras_lista" class="gp-obras-lista list-unstyled mb-0" hidden></ul>
-                                                            <div class="form-text">As obras marcadas somam a base de
-                                                                cálculo dos percentuais da Análise financeira.</div>
-                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_distrito"
+                                                            style="font-size: 0.75rem;">Distrito Operacional</label>
+                                                        <input type="text"
+                                                            class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
+                                                            id="det_distrito">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small fw-bold text-muted"
+                                                            for="det_municipio"
+                                                            style="font-size: 0.75rem;">Município</label>
+                                                        <input type="text"
+                                                            class="form-control form-control-sm bg-light border-0 shadow-none gp-plain-field"
+                                                            id="det_municipio">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <div id="det_obra_status" class="form-text">Restrito a
+                                                            administradores — vincula ou atualiza este processo a um
+                                                            contrato/obra do SIGSOP pelo Código da Obra.</div>
+                                                    </div>
+                                                    <div class="col-12" id="det_obras_wrap" hidden>
+                                                        <div class="form-label small fw-bold text-muted mb-1"
+                                                            style="font-size: 0.75rem;">Obras e fontes do contrato
+                                                            tratadas neste processo</div>
+                                                        <ul id="det_obras_lista" class="gp-obras-lista list-unstyled mb-0" hidden></ul>
+                                                        <div class="form-text">As obras marcadas somam a base de
+                                                            cálculo dos percentuais da Análise financeira.</div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </section>
 
                                         <!-- Processos apensados. NÃO é um [data-gp-secao]: apensar/desapensar grava na
                                              hora (coluna processos.apensado_a), fora do "Salvar alterações" do rodapé.
                                              Desenhado por renderApensosDetalhes (processos.js); só admin/gerente alteram
                                              (trigger trg_processos_apensamento, sql/add_apensamento_processos.sql). -->
-                                        <div class="card border-0 shadow-sm mb-4 gp-section-card" id="det_apensos_card">
-                                            <div class="card-header bg-white py-3 gp-card-head">
-                                                <h6 class="gp-card-titulo"><span class="gp-card-icone"><i
-                                                            class="bi bi-paperclip"></i></span>Processos apensados</h6>
-                                                <span class="gp-restrito-nota" id="det_apensos_nota" hidden><i
-                                                        class="bi bi-lock"></i> Alteração restrita a administradores e gerentes</span>
-                                            </div>
-                                            <div class="card-body">
-                                                <div id="det_apensos_principal" class="gp-apenso-aviso" hidden></div>
-                                                <ul id="det_apensos_lista" class="gp-apensos-lista list-unstyled mb-0"></ul>
-                                                <p id="det_apensos_vazio" class="text-muted small mb-0" hidden>Nenhum
-                                                    processo apensado a este.</p>
-                                                <div id="det_apensos_form" class="gp-apensos-form mt-3" hidden>
-                                                    <label class="form-label small fw-bold text-muted mb-1"
-                                                        for="det_apensar_nup" style="font-size: 0.75rem;">Apensar
-                                                        processo a este (NUP)</label>
-                                                    <div class="d-flex gap-2 flex-wrap">
-                                                        <input type="text" class="form-control form-control-sm"
-                                                            id="det_apensar_nup" list="det_apensar_sugestoes"
-                                                            placeholder="Ex.: 43022.010554/2026-17" autocomplete="off"
-                                                            style="max-width: 280px;">
-                                                        <datalist id="det_apensar_sugestoes"></datalist>
-                                                        <button type="button" class="btn btn-outline-primary btn-sm"
-                                                            id="btn-apensar" onclick="apensarProcessoDetalhes()"><i
-                                                                class="bi bi-paperclip"></i> Apensar</button>
-                                                    </div>
-                                                    <div id="det_apensos_msg" class="form-text" aria-live="polite">
-                                                        Processos da mesma obra aparecem primeiro nas sugestões.</div>
+                                        <section class="gp-grupo" id="det_apensos_card" aria-labelledby="gp-grupo-apensos">
+                                            <h6 class="gp-grupo-titulo" id="gp-grupo-apensos"><i class="bi bi-paperclip"
+                                                    aria-hidden="true"></i>Processos apensados
+                                                <span class="gp-restrito-nota" id="det_apensos_nota" hidden
+                                                    title="Alteração restrita a administradores e gerentes"><i
+                                                        class="bi bi-lock"></i> Só admin/gerente</span>
+                                                <!-- Abre o campo de apensar (gpAbrirFormApenso); só para admin/gerente -->
+                                                <button type="button"
+                                                    class="btn btn-outline-primary btn-sm gp-apensos-abrir gp-btn-icone"
+                                                    id="det_apensos_abrir" data-gp-acao="apenso-abrir"
+                                                    aria-controls="det_apensos_form" aria-expanded="false"
+                                                    aria-label="Apensar processo" title="Apensar processo" hidden><i
+                                                        class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                                            </h6>
+                                            <div id="det_apensos_principal" class="gp-apenso-aviso" hidden></div>
+                                            <ul id="det_apensos_lista" class="gp-apensos-lista list-unstyled mb-0"></ul>
+                                            <p id="det_apensos_vazio" class="gp-vazio mb-0" hidden>Nenhum
+                                                processo apensado a este.</p>
+                                            <!-- Fechado até o clique em "Apensar processo" -->
+                                            <div id="det_apensos_form" class="gp-apensos-form" hidden>
+                                                <label class="form-label small fw-bold text-muted mb-1"
+                                                    for="det_apensar_nup" style="font-size: 0.75rem;">NUP do processo
+                                                    a apensar a este</label>
+                                                <div class="d-flex gap-2">
+                                                    <input type="text" class="form-control form-control-sm"
+                                                        id="det_apensar_nup" list="det_apensar_sugestoes"
+                                                        placeholder="Ex.: 43022.010554/2026-17" autocomplete="off">
+                                                    <datalist id="det_apensar_sugestoes"></datalist>
+                                                    <button type="button"
+                                                        class="btn btn-outline-primary btn-sm flex-shrink-0 text-nowrap"
+                                                        id="btn-apensar" onclick="apensarProcessoDetalhes()"><i
+                                                            class="bi bi-paperclip"></i> Apensar</button>
+                                                    <button type="button"
+                                                        class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                                                        data-gp-acao="apenso-fechar">Cancelar</button>
                                                 </div>
+                                                <div id="det_apensos_msg" class="form-text" aria-live="polite">
+                                                    Processos da mesma obra aparecem primeiro nas sugestões.</div>
                                             </div>
-                                        </div>
+                                        </section>
+                                    </div>
+                                </div>
 
-                                        <!-- Descrição do objeto -->
-                                        <div class="card border-0 shadow-sm mb-4 gp-section-card gp-secao"
-                                            data-gp-secao="descricao" data-gp-modo="leitura">
-                                            <div class="card-header bg-white py-3 gp-card-head">
-                                                <h6 class="gp-card-titulo"><span class="gp-card-icone"><i
-                                                            class="bi bi-file-text"></i></span>Descrição do objeto</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="gp-view">
-                                                    <p class="gp-descricao mb-0" data-gp-v="det_descricao"
-                                                        data-gp-fmt="texto"></p>
-                                                </div>
-                                                <div class="gp-edit">
-                                                    <label class="form-label small fw-bold text-muted"
-                                                        style="font-size: 0.75rem;">Descrição <span
-                                                            class="text-danger">*</span></label>
-                                                    <textarea class="form-control" name="DESCRIÇÃO" id="det_descricao"
-                                                        rows="7"
-                                                        style="font-size: 0.9rem; min-height: 150px; white-space: pre-wrap; word-wrap: break-word;"></textarea>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <div class="tab-content" id="gpTabsContent">
 
+                                    <!-- GERAL: os números do processo. Faixa de indicadores (espelhos de leitura,
+                                         gpAtualizarResumo/gpAtualizarIndicadores em processos.js) e, abaixo, a
+                                         análise financeira à esquerda e o cronograma à direita. -->
+                                    <div class="tab-pane fade show active" id="gp-pane-geral" role="tabpanel">
+
+                                        <section class="gp-kpis" aria-label="Resumo do processo">
+                                            <div class="gp-kpi gp-kpi-principal">
+                                                <span class="gp-kpi-rotulo">Repercussão GECOPE</span>
+                                                <span class="gp-kpi-valor" data-gp-v="det_reperc_g" data-gp-fmt="money"
+                                                    data-gp-sinal></span>
+                                                <span class="gp-kpi-sub"><span class="gp-pct is-na"
+                                                        data-gp-espelha="pct_reperc_g">—</span> da base</span>
+                                            </div>
+                                            <div class="gp-kpi">
+                                                <span class="gp-kpi-rotulo">Repercussão Fiscalização</span>
+                                                <span class="gp-kpi-valor" data-gp-v="det_reperc_f" data-gp-fmt="money"
+                                                    data-gp-sinal></span>
+                                                <span class="gp-kpi-sub"><span class="gp-pct is-na"
+                                                        data-gp-espelha="pct_reperc_f">—</span> da base</span>
+                                            </div>
+                                            <div class="gp-kpi">
+                                                <span class="gp-kpi-rotulo">Base de cálculo</span>
+                                                <span class="gp-kpi-valor" data-gp-espelha="det_base_valor">—</span>
+                                                <span class="gp-kpi-sub gp-kpi-sub-trunc"
+                                                    data-gp-espelha="det_base_origem">Carregando…</span>
+                                            </div>
+                                            <div class="gp-kpi" id="gp-kpi-meta" data-prazo="">
+                                                <span class="gp-kpi-rotulo">Meta fiscal</span>
+                                                <span class="gp-kpi-valor" data-gp-v="det_data_compromisso"></span>
+                                                <span class="gp-kpi-sub"><span class="gp-prazo" id="gp-kpi-prazo"
+                                                        hidden></span></span>
+                                            </div>
+                                        </section>
+
+                                        <div class="gp-layout">
+                                            <div class="gp-col-main">
                                         <!-- Análise financeira -->
-                                        <div class="card border-0 shadow-sm mb-4 gp-section-card gp-secao"
+                                        <div class="card border-0 shadow-sm gp-section-card gp-secao"
                                             data-gp-secao="financeira" data-gp-modo="leitura">
                                             <div class="card-header bg-white py-3 gp-card-head">
                                                 <h6 class="gp-card-titulo"><span class="gp-card-icone"><i
@@ -3023,61 +3076,54 @@
                                                     </div>
                                                 </div>
 
+                                                <!-- Leitura: Fiscalização × GECOPE lado a lado, linha a linha, para
+                                                     comparar o mesmo item sem procurar em dois painéis. -->
                                                 <div class="gp-view">
-                                                    <div class="gp-fin-grid">
-                                                        <section class="gp-fin-col" aria-label="Fiscalização">
-                                                            <span
-                                                                class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill"
-                                                                style="font-size: 0.75rem;">FISCALIZAÇÃO</span>
-                                                            <dl class="gp-fin-lista">
-                                                                <div class="gp-fin-linha">
-                                                                    <dt>Acréscimo</dt>
-                                                                    <dd class="gp-fin-valor" data-gp-v="det_acresc_f"
-                                                                        data-gp-fmt="money"></dd>
-                                                                    <dd class="gp-pct is-na" data-gp-espelha="pct_acresc_f">—</dd>
-                                                                </div>
-                                                                <div class="gp-fin-linha">
-                                                                    <dt>Supressão</dt>
-                                                                    <dd class="gp-fin-valor" data-gp-v="det_supress_f"
-                                                                        data-gp-fmt="money" data-gp-sinal></dd>
-                                                                    <dd class="gp-pct is-na" data-gp-espelha="pct_supress_f">—</dd>
-                                                                </div>
-                                                                <div class="gp-fin-linha is-total">
-                                                                    <dt>Repercussão</dt>
-                                                                    <dd class="gp-fin-valor" data-gp-v="det_reperc_f"
-                                                                        data-gp-fmt="money" data-gp-sinal></dd>
-                                                                    <dd class="gp-pct gp-pct-lg is-na"
-                                                                        data-gp-espelha="pct_reperc_f">—</dd>
-                                                                </div>
-                                                            </dl>
-                                                        </section>
-                                                        <section class="gp-fin-col" aria-label="GECOPE">
-                                                            <span
-                                                                class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill"
-                                                                style="font-size: 0.75rem;">GECOPE</span>
-                                                            <dl class="gp-fin-lista">
-                                                                <div class="gp-fin-linha">
-                                                                    <dt>Acréscimo</dt>
-                                                                    <dd class="gp-fin-valor" data-gp-v="det_acresc_g"
-                                                                        data-gp-fmt="money"></dd>
-                                                                    <dd class="gp-pct is-na" data-gp-espelha="pct_acresc_g">—</dd>
-                                                                </div>
-                                                                <div class="gp-fin-linha">
-                                                                    <dt>Supressão</dt>
-                                                                    <dd class="gp-fin-valor" data-gp-v="det_supress_g"
-                                                                        data-gp-fmt="money" data-gp-sinal></dd>
-                                                                    <dd class="gp-pct is-na" data-gp-espelha="pct_supress_g">—</dd>
-                                                                </div>
-                                                                <div class="gp-fin-linha is-total">
-                                                                    <dt>Repercussão</dt>
-                                                                    <dd class="gp-fin-valor" data-gp-v="det_reperc_g"
-                                                                        data-gp-fmt="money" data-gp-sinal></dd>
-                                                                    <dd class="gp-pct gp-pct-lg is-na"
-                                                                        data-gp-espelha="pct_reperc_g">—</dd>
-                                                                </div>
-                                                            </dl>
-                                                        </section>
-                                                    </div>
+                                                    <table class="gp-fin-tabela">
+                                                        <caption class="visually-hidden">Valores da Fiscalização e do
+                                                            GECOPE, com percentual sobre a base de cálculo</caption>
+                                                        <thead>
+                                                            <tr>
+                                                                <td></td>
+                                                                <th scope="col" colspan="2"><span
+                                                                        class="gp-fin-selo gp-fin-selo-f">FISCALIZAÇÃO</span></th>
+                                                                <th scope="col" colspan="2"><span
+                                                                        class="gp-fin-selo gp-fin-selo-g">GECOPE</span></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <th scope="row">Acréscimo</th>
+                                                                <td class="gp-fin-valor" data-gp-v="det_acresc_f"
+                                                                    data-gp-fmt="money"></td>
+                                                                <td class="gp-pct is-na" data-gp-espelha="pct_acresc_f">—</td>
+                                                                <td class="gp-fin-valor" data-gp-v="det_acresc_g"
+                                                                    data-gp-fmt="money"></td>
+                                                                <td class="gp-pct is-na" data-gp-espelha="pct_acresc_g">—</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <th scope="row">Supressão</th>
+                                                                <td class="gp-fin-valor" data-gp-v="det_supress_f"
+                                                                    data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-pct is-na" data-gp-espelha="pct_supress_f">—</td>
+                                                                <td class="gp-fin-valor" data-gp-v="det_supress_g"
+                                                                    data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-pct is-na" data-gp-espelha="pct_supress_g">—</td>
+                                                            </tr>
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr class="is-total">
+                                                                <th scope="row">Repercussão</th>
+                                                                <td class="gp-fin-valor" data-gp-v="det_reperc_f"
+                                                                    data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-pct is-na" data-gp-espelha="pct_reperc_f">—</td>
+                                                                <td class="gp-fin-valor" data-gp-v="det_reperc_g"
+                                                                    data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-pct is-na" data-gp-espelha="pct_reperc_g">—</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                    <p class="gp-fin-dif" id="gp-fin-dif" hidden></p>
                                                 </div>
 
                                                 <div class="gp-edit">
@@ -3085,14 +3131,12 @@
                                                         <!-- Fiscalização -->
                                                         <div class="col-md-6 border-end">
                                                             <div class="d-flex align-items-center mb-3">
-                                                                <span
-                                                                    class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill"
-                                                                    style="font-size: 0.75rem;">FISCALIZAÇÃO</span>
+                                                                <span class="gp-fin-selo gp-fin-selo-f">FISCALIZAÇÃO</span>
                                                             </div>
                                                             <div class="mb-3">
                                                                 <div class="gp-lbl-row">
-                                                                    <label
-                                                                        class="form-label small text-muted">Acréscimo</label>
+                                                                    <label class="form-label small text-muted"
+                                                                        for="det_acresc_f">Acréscimo</label>
                                                                     <span class="gp-pct is-na" id="pct_acresc_f">—</span>
                                                                 </div>
                                                                 <div class="input-group input-group-sm">
@@ -3102,8 +3146,8 @@
                                                             </div>
                                                             <div class="mb-3">
                                                                 <div class="gp-lbl-row">
-                                                                    <label
-                                                                        class="form-label small text-muted">Supressão</label>
+                                                                    <label class="form-label small text-muted"
+                                                                        for="det_supress_f">Supressão</label>
                                                                     <span class="gp-pct is-na" id="pct_supress_f">—</span>
                                                                 </div>
                                                                 <div class="input-group input-group-sm">
@@ -3114,6 +3158,7 @@
                                                             </div>
                                                             <div class="bg-light p-3 rounded-3 gp-repercussao-box">
                                                                 <label class="form-label small fw-bold text-muted mb-1"
+                                                                    for="det_reperc_f"
                                                                     style="font-size: 0.75rem;">Repercussão</label>
                                                                 <div class="gp-reperc-linha">
                                                                     <input type="text"
@@ -3128,14 +3173,12 @@
                                                         <!-- GECOPE -->
                                                         <div class="col-md-6">
                                                             <div class="d-flex align-items-center mb-3">
-                                                                <span
-                                                                    class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill"
-                                                                    style="font-size: 0.75rem;">GECOPE</span>
+                                                                <span class="gp-fin-selo gp-fin-selo-g">GECOPE</span>
                                                             </div>
                                                             <div class="mb-3">
                                                                 <div class="gp-lbl-row">
-                                                                    <label
-                                                                        class="form-label small text-muted">Acréscimo</label>
+                                                                    <label class="form-label small text-muted"
+                                                                        for="det_acresc_g">Acréscimo</label>
                                                                     <span class="gp-pct is-na" id="pct_acresc_g">—</span>
                                                                 </div>
                                                                 <div class="input-group input-group-sm">
@@ -3145,8 +3188,8 @@
                                                             </div>
                                                             <div class="mb-3">
                                                                 <div class="gp-lbl-row">
-                                                                    <label
-                                                                        class="form-label small text-muted">Supressão</label>
+                                                                    <label class="form-label small text-muted"
+                                                                        for="det_supress_g">Supressão</label>
                                                                     <span class="gp-pct is-na" id="pct_supress_g">—</span>
                                                                 </div>
                                                                 <div class="input-group input-group-sm">
@@ -3157,6 +3200,7 @@
                                                             </div>
                                                             <div class="bg-light p-3 rounded-3 gp-repercussao-box">
                                                                 <label class="form-label small fw-bold text-success mb-1"
+                                                                    for="det_reperc_g"
                                                                     style="font-size: 0.75rem;">Repercussão</label>
                                                                 <div class="gp-reperc-linha">
                                                                     <input type="text"
@@ -3172,8 +3216,10 @@
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <!-- Cronograma e metas -->
+                                            </div><!-- /.gp-col-main -->
+                                            <div class="gp-col-side">
+                                        <!-- Cronograma e metas: em leitura, linha do tempo vertical na ordem em que o
+                                             processo anda; marco sem data fica vazado. -->
                                         <div class="card border-0 shadow-sm gp-section-card gp-secao"
                                             data-gp-secao="cronograma" data-gp-modo="leitura">
                                             <div class="card-header bg-white py-3 gp-card-head">
@@ -3183,29 +3229,33 @@
                                             </div>
                                             <div class="card-body">
                                                 <div class="gp-view">
-                                                    <dl class="gp-ficha gp-ficha-datas">
-                                                        <div class="gp-campo"><dt>Data de abertura</dt>
-                                                            <dd data-gp-v="det_data_abertura"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Recebimento</dt>
-                                                            <dd data-gp-v="det_data_recebimento"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Meta fiscal</dt>
-                                                            <dd data-gp-v="det_data_compromisso"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Aprovação GECOPE</dt>
-                                                            <dd data-gp-v="det_data_aprovacao"></dd>
-                                                        </div>
-                                                        <div class="gp-campo"><dt>Devolução p/ correções</dt>
-                                                            <dd data-gp-v="det_data_devolucao"
-                                                                data-gp-extra="det_badge_dias_dev"></dd>
-                                                        </div>
-                                                    </dl>
+                                                    <ol class="gp-linha-tempo is-vertical">
+                                                        <li class="gp-marco"><span class="gp-marco-rotulo">Abertura</span>
+                                                            <span class="gp-marco-data" data-gp-v="det_data_abertura"></span>
+                                                        </li>
+                                                        <li class="gp-marco"><span class="gp-marco-rotulo">Recebimento</span>
+                                                            <span class="gp-marco-data" data-gp-v="det_data_recebimento"></span>
+                                                        </li>
+                                                        <li class="gp-marco gp-marco-meta"><span
+                                                                class="gp-marco-rotulo">Meta fiscal</span>
+                                                            <span class="gp-marco-data" data-gp-v="det_data_compromisso"></span>
+                                                        </li>
+                                                        <li class="gp-marco gp-marco-dev"><span
+                                                                class="gp-marco-rotulo">Devolução p/ correções</span>
+                                                            <span class="gp-marco-data" data-gp-v="det_data_devolucao"
+                                                                data-gp-extra="det_badge_dias_dev"></span>
+                                                        </li>
+                                                        <li class="gp-marco gp-marco-fim"><span
+                                                                class="gp-marco-rotulo">Aprovação GECOPE</span>
+                                                            <span class="gp-marco-data" data-gp-v="det_data_aprovacao"></span>
+                                                        </li>
+                                                    </ol>
                                                 </div>
                                                 <div class="gp-edit">
-                                                    <div class="row g-3 row-cols-2 row-cols-md-5">
+                                                    <div class="row g-3 row-cols-2">
                                                         <div class="col">
                                                             <label class="form-label small text-muted mb-1"
+                                                                for="det_data_abertura"
                                                                 style="font-size: 0.75rem;">Data Abertura</label>
                                                             <input type="text"
                                                                 class="form-control form-control-sm mask-date"
@@ -3214,6 +3264,7 @@
                                                         </div>
                                                         <div class="col">
                                                             <label class="form-label small text-muted mb-1"
+                                                                for="det_data_recebimento"
                                                                 style="font-size: 0.75rem;">Recebimento</label>
                                                             <input type="text"
                                                                 class="form-control form-control-sm mask-date"
@@ -3222,6 +3273,7 @@
                                                         </div>
                                                         <div class="col">
                                                             <label class="form-label small text-muted mb-1"
+                                                                for="det_data_compromisso"
                                                                 style="font-size: 0.75rem;">Meta Fiscal</label>
                                                             <input type="text"
                                                                 class="form-control form-control-sm mask-date border-warning-subtle"
@@ -3230,14 +3282,7 @@
                                                         </div>
                                                         <div class="col">
                                                             <label class="form-label small text-muted mb-1"
-                                                                style="font-size: 0.75rem;">Aprovação GECOPE</label>
-                                                            <input type="text"
-                                                                class="form-control form-control-sm mask-date border-success-subtle"
-                                                                name="DATA APROVAÇÃO GECOPE" id="det_data_aprovacao"
-                                                                placeholder="dd/mm/aaaa">
-                                                        </div>
-                                                        <div class="col">
-                                                            <label class="form-label small text-muted mb-1"
+                                                                for="det_data_devolucao"
                                                                 style="font-size: 0.75rem;">Devolução p/ Correções</label>
                                                             <div class="position-relative">
                                                                 <input type="text"
@@ -3251,10 +3296,21 @@
                                                                     dias</span>
                                                             </div>
                                                         </div>
+                                                        <div class="col">
+                                                            <label class="form-label small text-muted mb-1"
+                                                                for="det_data_aprovacao"
+                                                                style="font-size: 0.75rem;">Aprovação GECOPE</label>
+                                                            <input type="text"
+                                                                class="form-control form-control-sm mask-date border-success-subtle"
+                                                                name="DATA APROVAÇÃO GECOPE" id="det_data_aprovacao"
+                                                                placeholder="dd/mm/aaaa">
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                            </div><!-- /.gp-col-side -->
+                                        </div><!-- /.gp-layout -->
                                     </div>
 
                                     <!-- ANÁLISE DOCUMENTAL: checklist de documentação mínima do aditivo -->
