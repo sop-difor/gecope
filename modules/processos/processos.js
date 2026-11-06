@@ -823,31 +823,25 @@ const baseContratoCache = new Map(); // codigo_obra -> { em, base } (só bases v
 let baseContratoDetalhes = { estado: 'vazio', motivo: 'sem-codigo' };
 let baseContratoReq = 0; // descarta resposta de uma consulta que ficou velha (modal reaberto/Vincular)
 
-// Aditivos formalizados do contrato (SIGSOP), numa consulta só. Devolve
-//   { valor, reajusteMedicao }  ou  null (a consulta falhou).
+// Aditivos de valor formalizados do contrato (SIGSOP). Devolve { valor } ou null (a consulta falhou).
 // - valor: aditivos DE VALOR, do mais recente ao mais antigo — tipo_aditivo começando em "Valor"
 //   (Valor; Valor e vigência; Valor e execução; Valor, vigência e execução). Ficam de fora os de
 //   prazo/execução/vigência e os reajustes: o reajuste já compõe a base, listá-lo duplicaria.
-// - reajusteMedicao: Σ dos aditivos "Reajuste de Medição". É a parcela D da base do SIGSOP e só
-//   conta depois de formalizada; o acumulado de contratos_edificacao.total_reajuste NÃO é a base
-//   (contrato 05732024SEDUC: 1.007.267,24 lá, 0,00 formalizado, e o SIGSOP calcula sobre 0,00).
-// Sem número de contrato => { valor: [], reajusteMedicao: 0 }.
+// O reajuste de medição (parcela D da base) NÃO vem daqui: é contratos_edificacao.total_reajuste,
+// formalizado ou não (decisão do usuário, 06/11/2026 — o SIGSOP do 05832025SEDUC usa D = 739.064,44
+// sem nenhum aditivo "Reajuste de Medição"). Antes somavam-se só os aditivos formalizados.
+// Sem número de contrato => { valor: [] }.
 async function buscarAditivosDoContrato(nrContrato) {
     const nr = (nrContrato || '').toString().trim();
-    if (!nr) return { valor: [], reajusteMedicao: 0 };
+    if (!nr) return { valor: [] };
     try {
         const { data, error } = await sbClient.from('aditivos_contrato').select(GP_ADIT_COLS)
             .eq('nr_contrato_sop', nr)
-            .or('tipo_aditivo.ilike.valor%,tipo_aditivo.ilike.reajuste%medi%');
+            .ilike('tipo_aditivo', 'valor%');
         if (error) throw error;
-        const linhas = data || [];
-        const ehReajusteMedicao = a => /^reajuste.*medi/i.test(a.tipo_aditivo || '');
         const dataDe = a => a.data_publicacao || a.data_assinatura || '';
-        const valor = linhas.filter(a => !ehReajusteMedicao(a))
-            .sort((a, b) => dataDe(b).localeCompare(dataDe(a)));
-        const reajusteMedicao = Number(linhas.filter(ehReajusteMedicao)
-            .reduce((s, a) => s + (Number(a.valor_aprovado) || 0), 0).toFixed(2));
-        return { valor, reajusteMedicao };
+        const valor = (data || []).slice().sort((a, b) => dataDe(b).localeCompare(dataDe(a)));
+        return { valor };
     } catch (e) {
         console.error('[ERRO] buscarAditivosDoContrato:', e);
         return null;
@@ -873,10 +867,10 @@ function mesmaDescricaoObra(a, b) {
 // Base de cálculo dos percentuais = soma das obras VINCULADAS ao processo (decisão do usuário,
 // 05/11/2026; antes era sempre o contrato inteiro, que dilui o % em contrato de muitas obras).
 //   - todas as obras do contrato vinculadas (inclui contrato de obra única) → base do CONTRATO,
-//     pela ficha_contrato, como antes (original + reajuste de preço + reajuste de medição formalizado);
-//   - parte das obras → Σ (valor_original + total_realinhado) das obras vinculadas. O reajuste de
-//     medição formalizado (aditivos_contrato) é do contrato e não se separa por obra: fica de fora,
-//     com aviso (em 05/11/2026 só 1 contrato tinha esse aditivo, e de obra única).
+//     pela ficha_contrato (original + reajuste de preço) + Σ total_reajuste das obras (reajuste de medição);
+//   - parte das obras → Σ (valor_original + total_reajuste + total_realinhado) das obras vinculadas.
+// Nomes dos campos: `reajuste` = reajuste de MEDIÇÃO (total_reajuste); `realinhamento` = reajuste
+// de PREÇO (total_realinhado).
 // A base do contrato inteiro segue calculada (`totalContrato`) como referência do limite do art. 125.
 async function buscarBaseContrato(codigo, adicionais) {
     const cod = (codigo || '').trim().toUpperCase();
@@ -925,9 +919,9 @@ async function buscarBaseContrato(codigo, adicionais) {
         const somaObras = (lista, campo) => r2(lista.reduce((s, o) => s + n(o[campo]), 0));
         let contrato;
         if (ficha && n(ficha.valor_original) > 0) {
-            contrato = { original: n(ficha.valor_original), reajuste: ads.reajusteMedicao, realinhamento: n(ficha.total_realinhado) };
+            contrato = { original: n(ficha.valor_original), reajuste: somaObras(obrasDoContrato, 'total_reajuste'), realinhamento: n(ficha.total_realinhado) };
         } else {
-            contrato = { original: somaObras(obrasDoContrato, 'valor_original'), reajuste: ads.reajusteMedicao, realinhamento: somaObras(obrasDoContrato, 'total_realinhado') };
+            contrato = { original: somaObras(obrasDoContrato, 'valor_original'), reajuste: somaObras(obrasDoContrato, 'total_reajuste'), realinhamento: somaObras(obrasDoContrato, 'total_realinhado') };
         }
         contrato.total = r2(contrato.original + contrato.reajuste + contrato.realinhamento);
 
@@ -938,11 +932,10 @@ async function buscarBaseContrato(codigo, adicionais) {
             base = {
                 origem: vinculadas.length > 1 ? 'obras' : 'obra',
                 original: somaObras(vinculadas, 'valor_original'),
-                reajuste: 0,
-                realinhamento: somaObras(vinculadas, 'total_realinhado'),
-                reajusteContratoFora: ads.reajusteMedicao
+                reajuste: somaObras(vinculadas, 'total_reajuste'),
+                realinhamento: somaObras(vinculadas, 'total_realinhado')
             };
-            base.total = r2(base.original + base.realinhamento);
+            base.total = r2(base.original + base.reajuste + base.realinhamento);
         }
         if (!(base.original > 0)) return { estado: 'vazio', motivo: 'sem-valor', obrasDoContrato, codigoObra: cod, vinculadas: vinculadas.map(o => o.codigo_obra) };
 
@@ -1115,9 +1108,6 @@ function renderBaseContratoDetalhes() {
     }
     if (b.estado === 'ok' && b.origem !== 'contrato' && b.obras > 1 && b.totalContrato > 0) {
         origem += ` · contrato inteiro: R$ ${formatCurrencyValue(b.totalContrato)}`;
-    }
-    if (b.estado === 'ok' && Math.abs(b.reajusteContratoFora || 0) > 0.004) {
-        origem += ' · o reajuste de medição formalizado é do contrato e não entra na base parcial';
     }
     set('det_base_origem', origem);
     set('det_base_valor', b.estado === 'ok' ? reais(b.total) : '—');
