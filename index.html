@@ -2998,17 +2998,17 @@
                                         <section class="gp-kpis" aria-label="Resumo do processo">
                                             <div class="gp-kpi gp-kpi-principal">
                                                 <span class="gp-kpi-rotulo">Repercussão GECOPE</span>
-                                                <span class="gp-kpi-valor" data-gp-v="det_reperc_g" data-gp-fmt="money"
-                                                    data-gp-sinal></span>
+                                                <!-- Sempre o total do processo (soma das fontes), mesmo com uma fonte
+                                                     escolhida na Análise financeira: preenchido por gpAtualizarIndicadores. -->
+                                                <span class="gp-kpi-valor" id="gp-kpi-reperc-g"></span>
                                                 <span class="gp-kpi-sub"><span class="gp-pct is-na"
-                                                        data-gp-espelha="pct_reperc_g">—</span> da base</span>
+                                                        id="gp-kpi-reperc-g-pct">—</span> da base</span>
                                             </div>
                                             <div class="gp-kpi">
                                                 <span class="gp-kpi-rotulo">Repercussão Fiscalização</span>
-                                                <span class="gp-kpi-valor" data-gp-v="det_reperc_f" data-gp-fmt="money"
-                                                    data-gp-sinal></span>
+                                                <span class="gp-kpi-valor" id="gp-kpi-reperc-f"></span>
                                                 <span class="gp-kpi-sub"><span class="gp-pct is-na"
-                                                        data-gp-espelha="pct_reperc_f">—</span> da base</span>
+                                                        id="gp-kpi-reperc-f-pct">—</span> da base</span>
                                             </div>
                                             <div class="gp-kpi">
                                                 <span class="gp-kpi-rotulo">Base de cálculo</span>
@@ -3074,6 +3074,17 @@
                                                             <ul class="gp-adit-lista" id="det_base_outros_lista"></ul>
                                                         </div>
                                                     </div>
+                                                </div>
+
+                                                <!-- Valores por fonte (06/11/2026): só aparece com mais de uma obra/fonte vinculada.
+                                                     "Total" mostra a soma; cada fonte mostra e edita os próprios valores. A divisão
+                                                     fica no campo escondido det_valores_fontes (JSON, sem name: fora do FormData,
+                                                     dentro do baseline/Cancelar da seção). Ver gpFontes* em processos.js. -->
+                                                <input type="hidden" id="det_valores_fontes" value="">
+                                                <div class="gp-fontes" id="gp_fontes" hidden>
+                                                    <div class="gp-fontes-botoes" id="gp_fontes_botoes" role="group"
+                                                        aria-label="Valores por fonte de recurso"></div>
+                                                    <div class="gp-fontes-nota" id="gp_fontes_nota" aria-live="polite"></div>
                                                 </div>
 
                                                 <!-- Leitura: tabela simples de 4 colunas (item | Fiscalização | GECOPE | Diferença), colunas

@@ -1031,9 +1031,16 @@ function renderObrasVinculadasDetalhes() {
                 cb.checked = cod === principal || marcadas.has(cod);
                 cb.disabled = cod === principal || !podeAlterar;
                 cb.addEventListener('change', () => {
+                    // Desmarcar uma fonte com valores lançados tira esses valores do total.
+                    if (!cb.checked && gpFonteTemValor(gpLerValoresFontes()[cod])
+                        && !confirm(`A obra/fonte ${cod} tem acréscimo/supressão lançados na Análise financeira. Desvinculá-la tira esses valores do total do processo. Continuar?`)) {
+                        cb.checked = true;
+                        return;
+                    }
                     const atual = new Set(lerObrasAdicionaisDetalhes());
                     if (cb.checked) atual.add(cod); else atual.delete(cod);
                     escreverObrasAdicionaisDetalhes([...atual]);
+                    gpFontesAjustarLista();
                     carregarBaseContratoDetalhes(principal);
                     gpAtualizarResumo();
                 });
@@ -1079,6 +1086,8 @@ function renderObrasVinculadasDetalhes() {
         aviso.textContent = msgs.join(' ');
         aviso.hidden = !msgs.length;
     }
+    // Rótulos e base de cada fonte do seletor da Análise financeira dependem das obras carregadas.
+    gpFontesRender();
 }
 
 function renderBaseContratoDetalhes() {
@@ -1256,7 +1265,8 @@ function formatarPercentualBase(valor, base) {
 // Repinta os 6 percentuais (Fiscalização/GECOPE × Acréscimo/Supressão/Repercussão) a partir dos
 // campos de valor. Chamada a cada tecla (via calcularRepercussao) e quando a base muda.
 function atualizarPercentuaisDetalhes() {
-    const b = baseContratoDetalhes;
+    // Com uma fonte escolhida no seletor da Análise financeira, a base é a daquela fonte.
+    const b = gpBaseSelecao();
     const temBase = b.estado === 'ok' && b.total > 0;
     const reais = v => 'R$ ' + formatCurrencyValue(v);
     const valorDe = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
@@ -1273,7 +1283,7 @@ function atualizarPercentuaisDetalhes() {
                 const { texto, sinal } = formatarPercentualBase(valor, b.total);
                 el.textContent = texto;
                 el.classList.add(sinal > 0 ? 'is-pos' : sinal < 0 ? 'is-neg' : 'is-zero');
-                el.title = `${reais(valor)} ÷ ${reais(b.total)} (base de cálculo)`;
+                el.title = `${reais(valor)} ÷ ${reais(b.total)} (base de cálculo${b.daFonte ? ' da fonte' : ''})`;
             } else {
                 el.textContent = b.estado === 'carregando' ? '…' : '—';
                 el.classList.add('is-na');
@@ -1330,6 +1340,7 @@ async function buscarObraDetalhes() {
     // Obra trocada: as adicionais passam a ser as fontes irmãs da nova principal (mesma obra no
     // SIGSOP com outra fonte de recurso). Outras obras do contrato o admin marca na lista.
     escreverObrasAdicionaisDetalhes(resultado.fontesIrmas || []);
+    gpFontesAjustarLista();
     statusEl.className = 'form-text text-success';
     statusEl.textContent = 'Obra encontrada — revise os campos e clique em "Salvar Alterações" para confirmar o vínculo.'
         + ((resultado.fontesIrmas || []).length ? ` Fontes da mesma obra incluídas: ${resultado.fontesIrmas.join(', ')}.` : '');
@@ -1506,6 +1517,8 @@ function mapProcessoRow(r) {
         acrescGecope: Number(r.acresc_gecope) || 0,
         supressGecope: Number(r.supress_gecope) || 0,
         repercGecope: Number(r.reperc_gecope) || 0,
+        // Divisão por fonte (sql/add_valores_por_fonte_processos.sql); os campos acima são o total.
+        valoresPorFonte: (r.valores_por_fonte && typeof r.valores_por_fonte === 'object') ? r.valores_por_fonte : null,
         analiseAprofundada: r.analise_aprofundada !== undefined ? !!r.analise_aprofundada : true,
         prioritario: r.prioritario || false,
         avisoAtrasoEnviado: r.aviso_atraso_enviado || false,
@@ -2312,6 +2325,8 @@ function gpAplicarCampos(valores) {
         if (el) el.value = valores[id];
     });
     aplicarCorStatusSelect(document.getElementById('det_status'));
+    // Divisão por fonte restaurada: os campos visíveis voltam a mostrar a fonte escolhida.
+    if ('det_valores_fontes' in valores) gpFontesAjustarLista({ silencioso: true });
     calcularRepercussao();
     calcularDiasDevolucao();
     // Cancelar no cartão "Obra vinculada": as caixas e a base dependem das obras restauradas.
@@ -2328,8 +2343,11 @@ function gpCapturarBaseline() {
 }
 
 function gpSecaoAlterada(secao) {
+    // Campos marcados data-gp-fonte-espelho são só a vista da fonte escolhida: quem diz se a
+    // Análise financeira mudou, nesse caso, é o JSON det_valores_fontes.
     return gpCamposDe(secao).some(el =>
-        el.id !== 'det_processo' && (el.id in gpBaseline) && gpBaseline[el.id] !== el.value);
+        el.id !== 'det_processo' && !el.dataset.gpFonteEspelho
+        && (el.id in gpBaseline) && gpBaseline[el.id] !== el.value);
 }
 
 function gpResetarModos() {
@@ -2516,8 +2534,34 @@ function gpAtualizarIndicadores() {
 
     // Coluna "Diferença" da tabela da Análise financeira: GECOPE − Fiscalização, linha a linha.
     const v = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
-    const b = baseContratoDetalhes;
+    const b = gpBaseSelecao();
     const temBase = b && b.estado === 'ok' && b.total > 0;
+
+    // Faixa do topo: sempre o total do processo (soma das fontes), sobre a base do processo.
+    const bp = baseContratoDetalhes;
+    const temBaseProc = bp && bp.estado === 'ok' && bp.total > 0;
+    const tot = gpFontesParaSalvar().totais;
+    [['f', tot.acresc_fiscal + tot.supress_fiscal], ['g', tot.acresc_gecope + tot.supress_gecope]].forEach(([col, bruto]) => {
+        const r = Number(bruto.toFixed(2));
+        const val = document.getElementById(`gp-kpi-reperc-${col}`);
+        const pct = document.getElementById(`gp-kpi-reperc-${col}-pct`);
+        if (val) {
+            val.textContent = (r < 0 ? '−' : '') + 'R$ ' + formatCurrencyValue(Math.abs(r));
+            val.classList.toggle('gp-val-neg', r < -0.004);
+            val.classList.toggle('gp-val-pos', r > 0.004);
+        }
+        if (pct) {
+            pct.classList.remove('is-pos', 'is-neg', 'is-zero', 'is-na');
+            if (temBaseProc) {
+                const { texto, sinal } = formatarPercentualBase(r, bp.total);
+                pct.textContent = texto;
+                pct.classList.add(sinal > 0 ? 'is-pos' : sinal < 0 ? 'is-neg' : 'is-zero');
+            } else {
+                pct.textContent = bp && bp.estado === 'carregando' ? '…' : '—';
+                pct.classList.add('is-na');
+            }
+        }
+    });
     const valores = {
         acresc: [v('det_acresc_f'), v('det_acresc_g')],
         supress: [v('det_supress_f'), v('det_supress_g')]
@@ -2546,6 +2590,238 @@ function gpAtualizarIndicadores() {
             }
         }
     });
+}
+
+// ── VALORES POR FONTE (06/11/2026) ─────────────────────────────────────────────────────────
+// Processo com mais de uma obra/fonte vinculada (codigo_obra + obras_adicionais) lança acréscimo e
+// supressão de cada fonte em separado. A divisão fica no campo escondido det_valores_fontes (JSON
+// { codigo: { acresc_fiscal, supress_fiscal, acresc_gecope, supress_gecope } }) e é gravada em
+// processos.valores_por_fonte; as seis colunas de sempre recebem o TOTAL (soma das fontes
+// vinculadas), então Financeiro, painéis e relatórios não mudam.
+// Os campos visíveis det_acresc_*/det_supress_* mostram o que está escolhido no seletor: "Total"
+// (soma, só leitura) ou uma fonte (editável; cada tecla volta para o JSON). Com uma fonte só, nada
+// disso aparece e os campos funcionam como antes.
+const GP_FONTE_CAMPOS = {
+    acresc_fiscal: 'det_acresc_f', supress_fiscal: 'det_supress_f',
+    acresc_gecope: 'det_acresc_g', supress_gecope: 'det_supress_g'
+};
+let gpFonteSel = 'total';
+
+function gpFontesLista() {
+    const principal = ((document.getElementById('det_codigo_obra') || {}).value || '').trim();
+    return normalizarListaObras([principal, ...lerObrasAdicionaisDetalhes()]);
+}
+
+function gpFontesMulti() { return gpFontesLista().length > 1; }
+
+function gpLerValoresFontes() {
+    const el = document.getElementById('det_valores_fontes');
+    if (!el || !el.value) return {};
+    try {
+        const obj = JSON.parse(el.value);
+        return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (_) { return {}; }
+}
+
+function gpEscreverValoresFontes(obj) {
+    const el = document.getElementById('det_valores_fontes');
+    if (el) el.value = obj && Object.keys(obj).length ? JSON.stringify(obj) : '';
+}
+
+const gpFonteZerada = () => ({ acresc_fiscal: 0, supress_fiscal: 0, acresc_gecope: 0, supress_gecope: 0 });
+
+function gpFonteNormalizada(v) {
+    const z = gpFonteZerada();
+    Object.keys(z).forEach(k => { z[k] = Number((Number(v && v[k]) || 0).toFixed(2)); });
+    return z;
+}
+
+function gpFonteTemValor(v) {
+    return !!v && Object.keys(GP_FONTE_CAMPOS).some(k => Math.abs(Number(v[k]) || 0) >= 0.005);
+}
+
+// Soma só as fontes vinculadas agora (uma desmarcada sai do total, mas o valor fica no JSON
+// enquanto a janela estiver aberta, para voltar se ela for marcada de novo).
+function gpTotaisFontes(obj, lista) {
+    const t = gpFonteZerada();
+    (lista || gpFontesLista()).forEach(c => {
+        const v = obj[c];
+        if (v) Object.keys(t).forEach(k => { t[k] += Number(v[k]) || 0; });
+    });
+    Object.keys(t).forEach(k => { t[k] = Number(t[k].toFixed(2)); });
+    return t;
+}
+
+function gpLerCamposValores() {
+    const v = {};
+    Object.entries(GP_FONTE_CAMPOS).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        v[k] = el ? parseMoneyInput(el.value) : 0;
+    });
+    return v;
+}
+
+// "Fonte 01" quando os códigos só diferem nos 2 dígitos finais (06882026SEDUC01/02, as fontes irmãs
+// do SIGSOP); senão o próprio código (obras diferentes do mesmo contrato).
+function gpRotuloFonte(cod, lista) {
+    const prefixo = c => c.slice(0, -2);
+    const irmas = lista.every(c => /\d{2}$/.test(c) && prefixo(c) === prefixo(lista[0]));
+    return irmas ? `Fonte ${cod.slice(-2)}` : cod;
+}
+
+function gpObraDaFonte(cod) {
+    const b = baseContratoDetalhes;
+    const obras = (b && b.obrasDoContrato) || [];
+    return obras.find(o => String(o.codigo_obra || '').toUpperCase() === cod) || null;
+}
+
+// Denominador dos percentuais do que está na tela: a base do processo no "Total"; com uma fonte
+// escolhida, a base daquela obra (valor original + reajuste de preço, como numa base parcial).
+function gpBaseSelecao() {
+    const b = baseContratoDetalhes;
+    if (gpFonteSel === 'total' || !gpFontesMulti() || !b || b.estado !== 'ok') return b;
+    const o = gpObraDaFonte(gpFonteSel);
+    if (!o) return { estado: 'vazio' };
+    const total = Number(((Number(o.valor_original) || 0) + (Number(o.total_realinhado) || 0)).toFixed(2));
+    return total > 0 ? { estado: 'ok', total, daFonte: true } : { estado: 'vazio' };
+}
+
+// Ao abrir o processo (antes do baseline). Sem divisão gravada e com valores já lançados, o que
+// havia é atribuído à obra principal — até 06/11/2026 só dava para lançar uma fonte.
+function gpFontesIniciar(row) {
+    gpFonteSel = 'total';
+    const obj = {};
+    const salvo = row && row.valoresPorFonte;
+    if (salvo) Object.keys(salvo).forEach(c => { obj[String(c).toUpperCase()] = gpFonteNormalizada(salvo[c]); });
+    gpEscreverValoresFontes(obj);
+    gpFontesAjustarLista({ silencioso: true });
+}
+
+// Garante uma entrada por fonte vinculada e repinta. Chamada ao abrir, ao marcar/desmarcar obra e
+// ao trocar a principal. Passando de várias fontes para uma, a que sobrou volta a ser o campo comum.
+function gpFontesAjustarLista({ silencioso = false } = {}) {
+    const lista = gpFontesLista();
+    const obj = gpLerValoresFontes();
+    if (lista.length > 1) {
+        if (!Object.keys(obj).some(c => lista.includes(c))) {
+            // Ainda sem divisão: os valores que estão nos campos ficam com a principal.
+            obj[lista[0]] = gpFonteNormalizada(gpLerCamposValores());
+        }
+        lista.forEach(c => { if (!obj[c]) obj[c] = gpFonteZerada(); });
+        if (gpFonteSel !== 'total' && !lista.includes(gpFonteSel)) gpFonteSel = 'total';
+        gpEscreverValoresFontes(obj);
+    } else if (Object.keys(obj).length) {
+        // Voltou a uma fonte só: os campos passam a ser os valores dela.
+        const unica = lista[0] && obj[lista[0]] ? obj[lista[0]] : gpTotaisFontes(obj, lista);
+        gpFonteSel = 'total';
+        gpEscreverValoresFontes({});
+        gpEscreverCamposValores(unica);
+    }
+    gpFontesAplicarSelecao({ silencioso });
+}
+
+function gpEscreverCamposValores(v) {
+    const fmt = n => (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Object.entries(GP_FONTE_CAMPOS).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = fmt(v[k]);
+    });
+}
+
+function gpFontesAplicarSelecao({ silencioso = false } = {}) {
+    const multi = gpFontesMulti();
+    const campos = Object.values(GP_FONTE_CAMPOS).concat(['det_reperc_f', 'det_reperc_g'])
+        .map(id => document.getElementById(id)).filter(Boolean);
+    campos.forEach(el => {
+        // Com divisão, quem diz se a seção foi alterada é o JSON; os campos são só a vista atual.
+        if (multi) el.dataset.gpFonteEspelho = '1'; else delete el.dataset.gpFonteEspelho;
+    });
+    if (multi) {
+        const obj = gpLerValoresFontes();
+        gpEscreverCamposValores(gpFonteSel === 'total' ? gpTotaisFontes(obj) : gpFonteNormalizada(obj[gpFonteSel]));
+    }
+    Object.values(GP_FONTE_CAMPOS).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const travado = multi && gpFonteSel === 'total';
+        el.readOnly = travado;
+        el.classList.toggle('bg-body-secondary', travado);
+        el.title = travado ? 'Soma das fontes. Escolha uma fonte acima para lançar os valores dela.' : '';
+    });
+    gpFontesRender();
+    calcularRepercussao();
+    if (!silencioso) gpAtualizarResumo();
+}
+
+function gpFontesRender() {
+    const box = document.getElementById('gp_fontes');
+    const botoes = document.getElementById('gp_fontes_botoes');
+    const nota = document.getElementById('gp_fontes_nota');
+    if (!box || !botoes || !nota) return;
+    const lista = gpFontesLista();
+    box.hidden = lista.length <= 1;
+    botoes.replaceChildren();
+    nota.textContent = '';
+    if (lista.length <= 1) return;
+
+    const obj = gpLerValoresFontes();
+    const botao = (chave, rotulo, dica, vazio) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'gp-fonte-btn';
+        b.dataset.gpAcao = 'fonte';
+        b.dataset.fonte = chave;
+        b.textContent = rotulo;
+        if (dica) b.title = dica;
+        if (vazio) b.classList.add('is-vazia');
+        b.setAttribute('aria-pressed', gpFonteSel === chave ? 'true' : 'false');
+        botoes.appendChild(b);
+    };
+    botao('total', 'Total', 'Soma de todas as fontes vinculadas', false);
+    lista.forEach(c => {
+        const o = gpObraDaFonte(c);
+        const dica = [c, o && o.fonte_recurso].filter(Boolean).join(' · ');
+        botao(c, gpRotuloFonte(c, lista), dica, !gpFonteTemValor(obj[c]));
+    });
+
+    if (gpFonteSel === 'total') {
+        const semValor = lista.filter(c => !gpFonteTemValor(obj[c])).map(c => gpRotuloFonte(c, lista));
+        nota.textContent = `Soma das ${lista.length} fontes.`
+            + (semValor.length ? ` Sem valores lançados: ${semValor.join(', ')}.` : '');
+    } else {
+        const o = gpObraDaFonte(gpFonteSel);
+        const base = gpBaseSelecao();
+        nota.textContent = [gpFonteSel, o && o.fonte_recurso,
+            base && base.estado === 'ok' ? `% sobre a base da fonte: R$ ${formatCurrencyValue(base.total)}` : '']
+            .filter(Boolean).join(' · ');
+    }
+}
+
+function gpFontesEscolher(chave) {
+    if (!chave || chave === gpFonteSel) return;
+    gpFonteSel = chave;
+    gpFontesAplicarSelecao();
+}
+
+// Tecla num dos quatro campos com uma fonte escolhida: o valor volta para o JSON.
+function gpFontesSincronizarCampo(ev) {
+    const id = ev && ev.target && ev.target.id;
+    if (!id || !Object.values(GP_FONTE_CAMPOS).includes(id)) return;
+    if (!gpFontesMulti() || gpFonteSel === 'total') return;
+    const obj = gpLerValoresFontes();
+    obj[gpFonteSel] = gpFonteNormalizada(gpLerCamposValores());
+    gpEscreverValoresFontes(obj);
+    gpFontesRender();
+}
+
+// Para o payload de executarAcaoDetalhes: { totais, porFonte } — porFonte null com uma fonte só.
+function gpFontesParaSalvar() {
+    const lista = gpFontesLista();
+    if (lista.length <= 1) return { totais: gpLerCamposValores(), porFonte: null };
+    const obj = gpLerValoresFontes();
+    const porFonte = {};
+    lista.forEach(c => { porFonte[c] = gpFonteNormalizada(obj[c]); });
+    return { totais: gpTotaisFontes(porFonte, lista), porFonte };
 }
 
 // Objeto recolhido em 3 linhas; o botão só aparece quando o texto não cabe. Só dá para medir com
@@ -2582,6 +2858,7 @@ function gpInicializarFicha() {
             case 'editar-tudo': gpEditarTudo(); break;
             case 'cancelar-edicao': gpCancelarEdicao(); break;
             case 'objeto': gpAlternarObjeto(); break;
+            case 'fonte': gpFontesEscolher(btn.dataset.fonte); break;
             case 'apenso-abrir': {
                 const form = document.getElementById('det_apensos_form');
                 gpAbrirFormApenso(!!(form && form.hidden));
@@ -2601,6 +2878,8 @@ function gpInicializarFicha() {
 
     const form = document.getElementById('formDetalhes');
     if (form) {
+        // Antes do resumo: o valor digitado numa fonte precisa estar no JSON quando ele repinta.
+        form.addEventListener('input', gpFontesSincronizarCampo);
         form.addEventListener('input', gpAtualizarResumo);
         form.addEventListener('change', gpAtualizarResumo);
     }
@@ -2937,6 +3216,8 @@ async function abrirDetalhes(processoStr) {
     document.getElementById('det_acresc_g').value = toInputMoney(row.acrescGecope);
     document.getElementById('det_supress_g').value = toInputMoney(row.supressGecope);
     document.getElementById('det_reperc_g').value = toInputMoney(row.repercGecope);
+    // Divisão por fonte (seletor Total/Fonte 01/Fonte 02 da Análise financeira).
+    gpFontesIniciar(row);
 
     // Garante que o cálculo seja refletido visualmente logo ao abrir
     setTimeout(() => { calcularRepercussao('det'); }, 50);
@@ -3331,6 +3612,11 @@ async function executarAcaoDetalhes(actionType) {
         const formData = new FormData(form);
 
         const fiscalDet = lerFiscalSelecionado(document.getElementById('det_fiscal'));
+        // Com mais de uma fonte, as colunas de valor recebem a SOMA das fontes (os campos da tela
+        // podem estar mostrando só uma) e a divisão vai para valores_por_fonte.
+        const fin = gpFontesParaSalvar();
+        const t = fin.totais;
+        const r2 = n => Number(n.toFixed(2));
 
         const updates = {
             tipo: formData.get("TIPO"),
@@ -3354,12 +3640,12 @@ async function executarAcaoDetalhes(actionType) {
             data_aprovacao_gecope: dataParaISO(formData.get("DATA APROVAÇÃO GECOPE")),
             data_devolucao_correcoes: dataParaISO(formData.get("DATA DEVOLUO CORREES")),
 
-            acresc_fiscal: parseMoneyInput(document.getElementById('det_acresc_f').value),
-            supress_fiscal: parseMoneyInput(document.getElementById('det_supress_f').value),
-            reperc_fiscal: parseMoneyInput(document.getElementById('det_reperc_f').value),
-            acresc_gecope: parseMoneyInput(document.getElementById('det_acresc_g').value),
-            supress_gecope: parseMoneyInput(document.getElementById('det_supress_g').value),
-            reperc_gecope: parseMoneyInput(document.getElementById('det_reperc_g').value),
+            acresc_fiscal: t.acresc_fiscal,
+            supress_fiscal: t.supress_fiscal,
+            reperc_fiscal: r2(t.acresc_fiscal + t.supress_fiscal),
+            acresc_gecope: t.acresc_gecope,
+            supress_gecope: t.supress_gecope,
+            reperc_gecope: r2(t.acresc_gecope + t.supress_gecope),
 
             // Audit: Atualização (Mantém o registro de quem mexeu por último)
             atualizado_por: sessionStorage.getItem('sop_user_name') || 'Usuário Desconhecido'
@@ -3372,6 +3658,10 @@ async function executarAcaoDetalhes(actionType) {
         // status "sem ter mexido nele" desfazia, em silêncio, o que o SUITE tinha atualizado
         // nesse intervalo (ex.: editar só o fiscal e voltar o processo de AGUAR. ANÁLISE para o
         // status velho). Só vai para o banco se a pessoa realmente o alterou. — 08/10/2026
+        // Só entra no payload quando há divisão (ou havia e deixou de haver): processo de uma
+        // fonte nem toca na coluna.
+        if (fin.porFonte || registroOriginal.valoresPorFonte) updates.valores_por_fonte = fin.porFonte;
+
         const statusEnviado = (updates.status || '').toString().trim().toUpperCase();
         const statusExibido = (registroOriginal.status || '').toString().trim().toUpperCase();
         if (statusEnviado === statusExibido) delete updates.status;
