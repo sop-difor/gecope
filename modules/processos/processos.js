@@ -1283,7 +1283,7 @@ function atualizarPercentuaisDetalhes() {
                 const { texto, sinal } = formatarPercentualBase(valor, b.total);
                 el.textContent = texto;
                 el.classList.add(sinal > 0 ? 'is-pos' : sinal < 0 ? 'is-neg' : 'is-zero');
-                el.title = `${reais(valor)} ÷ ${reais(b.total)} (base de cálculo${b.daFonte ? ' da fonte' : ''})`;
+                el.title = `${reais(valor)} ÷ ${reais(b.total)} (base de cálculo)`;
             } else {
                 el.textContent = b.estado === 'carregando' ? '…' : '—';
                 el.classList.add('is-na');
@@ -2675,15 +2675,11 @@ function gpObraDaFonte(cod) {
     return obras.find(o => String(o.codigo_obra || '').toUpperCase() === cod) || null;
 }
 
-// Denominador dos percentuais do que está na tela: a base do processo no "Total"; com uma fonte
-// escolhida, a base daquela obra (valor original + reajuste de preço, como numa base parcial).
+// Denominador dos percentuais do que está na tela. Também com uma fonte escolhida é a base do
+// PROCESSO (soma das obras vinculadas / contrato), não a da obra: decisão do usuário, 06/11/2026 —
+// assim o % de cada fonte soma direto no % do total.
 function gpBaseSelecao() {
-    const b = baseContratoDetalhes;
-    if (gpFonteSel === 'total' || !gpFontesMulti() || !b || b.estado !== 'ok') return b;
-    const o = gpObraDaFonte(gpFonteSel);
-    if (!o) return { estado: 'vazio' };
-    const total = Number(((Number(o.valor_original) || 0) + (Number(o.total_realinhado) || 0)).toFixed(2));
-    return total > 0 ? { estado: 'ok', total, daFonte: true } : { estado: 'vazio' };
+    return baseContratoDetalhes;
 }
 
 // Ao abrir o processo (antes do baseline). Sem divisão gravada e com valores já lançados, o que
@@ -2790,9 +2786,7 @@ function gpFontesRender() {
             + (semValor.length ? ` Sem valores lançados: ${semValor.join(', ')}.` : '');
     } else {
         const o = gpObraDaFonte(gpFonteSel);
-        const base = gpBaseSelecao();
-        nota.textContent = [gpFonteSel, o && o.fonte_recurso,
-            base && base.estado === 'ok' ? `% sobre a base da fonte: R$ ${formatCurrencyValue(base.total)}` : '']
+        nota.textContent = [gpFonteSel, o && o.fonte_recurso, '% sobre a base de cálculo do processo']
             .filter(Boolean).join(' · ');
     }
 }
