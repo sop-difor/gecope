@@ -5364,99 +5364,70 @@
             #det_apensos_card .gp-apenso-item > :nth-child(5) { grid-column: 3; grid-row: 1 / span 3; align-self: center; }
         }
 
-        /* Análise financeira em leitura: dois blocos de colunas, Fiscalização (neutro) e GECOPE
-           (verde suave), separados por uma coluna vazia (.gp-esp). Cada bloco tem cabeçalho com
-           selo, subtítulos "Valor" / "% da base" e cantos arredondados; .gp-ini/.gp-fim marcam a
-           1ª e a última célula do bloco. O rótulo da linha fica fora dos blocos. */
-        #modalDetalhes {
-            --gp-fin-f: #f3f5f8;
-            --gp-fin-f-borda: #e3e8ef;
-            --gp-fin-g: #edf6f0;
-            --gp-fin-g-borda: #cfe6d7;
-        }
-        body.theme-dark #modalDetalhes {
-            --gp-fin-f: rgba(255, 255, 255, 0.045);
-            --gp-fin-f-borda: rgba(255, 255, 255, 0.12);
-            --gp-fin-g: rgba(110, 231, 160, 0.07);
-            --gp-fin-g-borda: rgba(110, 231, 160, 0.22);
-        }
+        /* Análise financeira em leitura: tabela simples de 4 colunas (item | Fiscalização | GECOPE |
+           Diferença). table-layout fixo: as três colunas numéricas têm a mesma largura e tudo fica
+           alinhado à direita; o % da base vai pequeno sob cada valor. Sem fundo colorido — só filetes
+           entre as linhas e um filete duplo antes do total (pedido do usuário, 06/11/2026). */
         .gp-fin-tabela {
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
+            table-layout: fixed;
+            border-collapse: collapse;
             font-variant-numeric: tabular-nums;
         }
-        .gp-fin-tabela .gp-f { background: var(--gp-fin-f); }
-        .gp-fin-tabela .gp-g { background: var(--gp-fin-g); }
-        .gp-fin-tabela .gp-esp { width: 1.25rem; padding: 0; background: none; border: 0; }
-        .gp-fin-tabela .gp-fin-canto { padding: 0; border: 0; }
-
-        /* Cabeçalho do bloco: selo centralizado */
-        .gp-fin-tabela .gp-fin-grupo {
-            padding: 0.75rem 1rem 0.35rem;
-            text-align: center;
-            border-radius: 12px 12px 0 0;
-        }
-        .gp-fin-tabela .gp-fin-grupo.gp-f { box-shadow: inset 0 1px 0 var(--gp-fin-f-borda), inset 1px 0 0 var(--gp-fin-f-borda), inset -1px 0 0 var(--gp-fin-f-borda); }
-        .gp-fin-tabela .gp-fin-grupo.gp-g { box-shadow: inset 0 1px 0 var(--gp-fin-g-borda), inset 1px 0 0 var(--gp-fin-g-borda), inset -1px 0 0 var(--gp-fin-g-borda); }
-
-        /* Subtítulos Valor / % da base */
-        .gp-fin-subs th {
-            padding: 0.15rem 1rem 0.55rem;
+        .gp-fin-tabela .gp-fin-c-rot { width: 22%; }
+        .gp-fin-tabela thead th {
+            padding: 0 0 0.6rem 1rem;
             text-align: right;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-muted);
+            font-size: var(--gc-fs-rotulo);
+            font-weight: 700;
+            color: var(--text-heading);
+            border-bottom: 2px solid var(--gp-linha);
         }
-
-        /* Rótulo da linha (fora dos blocos) */
+        .gp-fin-tabela thead td { border-bottom: 2px solid var(--gp-linha); }
         .gp-fin-tabela th[scope="row"] {
-            padding: 0.8rem 1.25rem 0.8rem 0;
+            padding: 0.8rem 1rem 0.8rem 0;
             text-align: left;
-            white-space: nowrap;
+            vertical-align: top;
             font-size: var(--gc-fs-rotulo);
             font-weight: 500;
             color: var(--text-muted);
-            border-top: 1px solid var(--gp-linha);
         }
-        .gp-fin-tabela tbody tr:first-child th[scope="row"] { border-top-color: transparent; }
-
-        /* Células de valor e % */
-        .gp-fin-tabela td.gp-f,
-        .gp-fin-tabela td.gp-g {
-            padding: 0.8rem 1rem;
+        .gp-fin-tabela tbody td {
+            padding: 0.8rem 0 0.8rem 1rem;
             text-align: right;
-            white-space: nowrap;
+            vertical-align: top;
         }
-        .gp-fin-tabela tbody td.gp-f,
-        .gp-fin-tabela tfoot td.gp-f { border-top: 1px solid var(--gp-fin-f-borda); }
-        .gp-fin-tabela tbody td.gp-g,
-        .gp-fin-tabela tfoot td.gp-g { border-top: 1px solid var(--gp-fin-g-borda); }
-        /* Bordas laterais de cada bloco, em todas as linhas */
-        .gp-fin-tabela .gp-f.gp-ini { box-shadow: inset 1px 0 0 var(--gp-fin-f-borda); }
-        .gp-fin-tabela .gp-f.gp-fim { box-shadow: inset -1px 0 0 var(--gp-fin-f-borda); }
-        .gp-fin-tabela .gp-g.gp-ini { box-shadow: inset 1px 0 0 var(--gp-fin-g-borda); }
-        .gp-fin-tabela .gp-g.gp-fim { box-shadow: inset -1px 0 0 var(--gp-fin-g-borda); }
-        .gp-fin-tabela td.gp-fin-valor { font-size: 0.9rem; font-weight: 500; color: var(--text-heading); }
-        .gp-fin-tabela td.gp-pct { width: 6.5rem; font-size: var(--gc-fs-rotulo); font-weight: 500; }
-
-        /* Linha de total: fecha o bloco embaixo (cantos arredondados) */
-        .gp-fin-tabela .is-total th[scope="row"] {
-            border-top: 2px solid var(--sop-slate-300, #cbd5e1);
-            font-weight: 700;
+        .gp-fin-tabela tbody tr + tr > * { border-top: 1px solid var(--gp-linha); }
+        .gp-fin-tabela td .gp-fin-valor {
+            display: block;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            line-height: 1.3;
+            white-space: nowrap;
             color: var(--text-heading);
         }
-        .gp-fin-tabela .is-total td.gp-f { border-top: 2px solid var(--gp-fin-f-borda); }
-        .gp-fin-tabela .is-total td.gp-g { border-top: 2px solid var(--gp-fin-g-borda); }
-        .gp-fin-tabela .is-total td.gp-f.gp-ini { border-bottom-left-radius: 12px; box-shadow: inset 1px 0 0 var(--gp-fin-f-borda), inset 0 -1px 0 var(--gp-fin-f-borda); }
-        .gp-fin-tabela .is-total td.gp-f.gp-fim { border-bottom-right-radius: 12px; box-shadow: inset -1px 0 0 var(--gp-fin-f-borda), inset 0 -1px 0 var(--gp-fin-f-borda); }
-        .gp-fin-tabela .is-total td.gp-g.gp-ini { border-bottom-left-radius: 12px; box-shadow: inset 1px 0 0 var(--gp-fin-g-borda), inset 0 -1px 0 var(--gp-fin-g-borda); }
-        .gp-fin-tabela .is-total td.gp-g.gp-fim { border-bottom-right-radius: 12px; box-shadow: inset -1px 0 0 var(--gp-fin-g-borda), inset 0 -1px 0 var(--gp-fin-g-borda); }
-        .gp-fin-tabela .is-total td.gp-fin-valor { font-size: 1rem; font-weight: 700; }
-        .gp-fin-tabela .is-total td.gp-pct { font-weight: 700; }
-        .gp-fin-tabela .is-total td.gp-val-neg { color: #b42318; }
-        .gp-fin-tabela .is-total td.gp-val-pos { color: var(--gc-acao); }
-        .gp-fin-tabela td.gp-fin-valor.gp-val-neg { color: #b42318; }
+        .gp-fin-tabela td .gp-pct {
+            display: block;
+            min-height: 1.2em;
+            margin-top: 0.15rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: default;
+        }
+        .gp-fin-tabela .gp-fin-valor.gp-val-neg { color: #b42318; }
+        .gp-fin-tabela .gp-fin-valor.gp-val-pos { color: var(--gc-acao); }
+        .gp-fin-tabela .gp-fin-valor.is-vazio { color: var(--text-muted); font-weight: 400; }
+
+        /* Total: filete duplo acima e valores em negrito */
+        .gp-fin-tabela tfoot th[scope="row"],
+        .gp-fin-tabela tfoot td {
+            padding-top: 0.85rem;
+            border-top: 3px double var(--sop-slate-300, #cbd5e1);
+        }
+        .gp-fin-tabela tfoot td { padding: 0.85rem 0 0.2rem 1rem; text-align: right; vertical-align: top; }
+        .gp-fin-tabela tfoot th[scope="row"] { font-weight: 700; color: var(--text-heading); }
+        .gp-fin-tabela tfoot .gp-fin-valor { font-size: 1rem; font-weight: 700; }
+        .gp-fin-tabela tfoot .gp-pct { font-weight: 700; }
         .gp-fin-selo {
             display: inline-block;
             padding: 0.3rem 0.8rem;
@@ -5485,17 +5456,14 @@
         .gp-fin-dif[hidden] { display: none; }
         .gp-fin-dif strong { font-variant-numeric: tabular-nums; }
         @container gpcorpo (max-width: 600px) {
-            .gp-fin-tabela td.gp-f,
-            .gp-fin-tabela td.gp-g,
-            .gp-fin-subs th { padding-inline: 0.45rem; white-space: normal; }
-            .gp-fin-tabela .gp-esp { width: 0.5rem; }
-            .gp-fin-tabela th[scope="row"] { padding-right: 0.5rem; white-space: normal; }
-            .gp-fin-tabela td.gp-fin-valor,
-            .gp-fin-tabela .is-total td.gp-fin-valor { font-size: var(--gc-fs-rotulo); }
-            .gp-fin-tabela td.gp-pct { width: auto; }
-            .gp-fin-selo { padding: 0.25rem 0.55rem; }
-        }
-        /* Cronograma em leitura: linha do tempo. Marco sem data fica vazado; a cor do ponto
+            .gp-fin-tabela .gp-fin-c-rot { width: 25%; }
+            .gp-fin-tabela thead th,
+            .gp-fin-tabela tbody td,
+            .gp-fin-tabela tfoot td { padding-left: 0.5rem; }
+            .gp-fin-tabela th[scope="row"] { padding-right: 0.4rem; }
+            .gp-fin-tabela td .gp-fin-valor,
+            .gp-fin-tabela tfoot .gp-fin-valor { font-size: var(--gc-fs-piso); white-space: normal; }
+        }        /* Cronograma em leitura: linha do tempo. Marco sem data fica vazado; a cor do ponto
            diz o que o marco é (meta = prazo, devolução = retorno para correção, aprovação). */
         .gp-linha-tempo {
             display: grid;
@@ -5616,10 +5584,10 @@
         body.theme-dark .gp-grupo-titulo > .bi { color: #6ee7a0; }
         body.theme-dark .gp-grupo.gp-secao[data-gp-modo="edicao"] { background: rgba(110, 231, 160, 0.06); }
         body.theme-dark .gp-fin-selo-g { background: rgba(110, 231, 160, 0.12); border-color: rgba(110, 231, 160, 0.3); color: #6ee7a0; }
-        body.theme-dark .gp-fin-tabela .is-total th[scope="row"] { border-top-color: rgba(255, 255, 255, 0.28); }
-        body.theme-dark .gp-fin-tabela td.gp-fin-valor.gp-val-neg { color: #ff9b91; }
-        body.theme-dark .gp-fin-tabela .is-total td.gp-val-neg { color: #ff9b91; }
-        body.theme-dark .gp-fin-tabela .is-total td.gp-val-pos { color: #6ee7a0; }
+        body.theme-dark .gp-fin-tabela tfoot th[scope="row"],
+        body.theme-dark .gp-fin-tabela tfoot td { border-top-color: rgba(255, 255, 255, 0.28); }
+        body.theme-dark .gp-fin-tabela .gp-fin-valor.gp-val-neg { color: #ff9b91; }
+        body.theme-dark .gp-fin-tabela .gp-fin-valor.gp-val-pos { color: #6ee7a0; }
         body.theme-dark .gp-objeto-toggle { color: #6ee7a0; }
         body.theme-dark .gp-marco-fim { --gp-marco-cor: #6ee7a0; }
         body.theme-dark .gp-marco-meta { --gp-marco-cor: #e0a63a; }
