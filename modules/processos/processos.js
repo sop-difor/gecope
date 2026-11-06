@@ -2514,25 +2514,38 @@ function gpAtualizarIndicadores() {
         chip.hidden = !texto;
     }
 
-    const dif = document.getElementById('gp-fin-dif');
-    if (dif) {
-        const v = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
-        const f = v('det_acresc_f') + v('det_supress_f');
-        const g = v('det_acresc_g') + v('det_supress_g');
+    // Coluna "Diferença" da tabela da Análise financeira: GECOPE − Fiscalização, linha a linha.
+    const v = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
+    const b = baseContratoDetalhes;
+    const temBase = b && b.estado === 'ok' && b.total > 0;
+    const valores = {
+        acresc: [v('det_acresc_f'), v('det_acresc_g')],
+        supress: [v('det_supress_f'), v('det_supress_g')]
+    };
+    valores.reperc = [valores.acresc[0] + valores.supress[0], valores.acresc[1] + valores.supress[1]];
+    Object.keys(valores).forEach(k => {
+        const cel = document.getElementById(`gp-dif-${k}`);
+        const pctEl = document.getElementById(`gp-dif-${k}-pct`);
+        if (!cel) return;
+        const [f, g] = valores[k];
         const d = Number((g - f).toFixed(2));
-        const temValores = Math.abs(f) > 0.004 || Math.abs(g) > 0.004;
-        dif.hidden = !temValores;
-        if (temValores) {
-            const b = baseContratoDetalhes;
-            const pct = (b && b.estado === 'ok' && b.total > 0) ? ` (${formatarPercentualBase(d, b.total).texto} da base)` : '';
-            dif.replaceChildren();
-            dif.appendChild(document.createTextNode('Diferença GECOPE − Fiscalização: '));
-            const forte = document.createElement('strong');
-            forte.className = d < -0.004 ? 'gp-val-neg' : d > 0.004 ? 'gp-val-pos' : '';
-            forte.textContent = Math.abs(d) < 0.005 ? 'nenhuma' : gpReaisComSinal(d) + pct;
-            dif.appendChild(forte);
+        const nada = Math.abs(f) < 0.005 && Math.abs(g) < 0.005;
+        cel.classList.remove('gp-val-neg', 'gp-val-pos', 'is-vazio');
+        if (nada) cel.classList.add('is-vazio');
+        else if (d < -0.004) cel.classList.add('gp-val-neg');
+        else if (d > 0.004) cel.classList.add('gp-val-pos');
+        cel.textContent = nada ? '—' : gpReaisComSinal(d);
+        if (pctEl) {
+            pctEl.classList.remove('is-pos', 'is-neg', 'is-zero', 'is-na');
+            if (!nada && temBase) {
+                const { texto, sinal } = formatarPercentualBase(d, b.total);
+                pctEl.textContent = texto;
+                pctEl.classList.add(sinal > 0 ? 'is-pos' : sinal < 0 ? 'is-neg' : 'is-zero');
+            } else {
+                pctEl.textContent = '';
+            }
         }
-    }
+    });
 }
 
 // Objeto recolhido em 3 linhas; o botão só aparece quando o texto não cabe. Só dá para medir com

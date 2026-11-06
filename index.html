@@ -3076,54 +3076,48 @@
                                                     </div>
                                                 </div>
 
-                                                <!-- Leitura: Fiscalização × GECOPE lado a lado, linha a linha, para
-                                                     comparar o mesmo item sem procurar em dois painéis. -->
+                                                <!-- Leitura: tabela simples de 4 colunas (item | Fiscalização | GECOPE | Diferença), colunas
+                                                     numéricas de mesma largura e alinhadas à direita; o % da base fica pequeno sob cada valor.
+                                                     Sem fundo colorido (pedido do usuário, 06/11/2026). A Diferença (GECOPE − Fiscalização) de
+                                                     cada linha é calculada por gpAtualizarIndicadores (processos.js). -->
                                                 <div class="gp-view">
                                                     <table class="gp-fin-tabela">
-                                                        <caption class="visually-hidden">Valores da Fiscalização e do
-                                                            GECOPE, com percentual sobre a base de cálculo</caption>
+                                                        <caption class="visually-hidden">Valores da Fiscalização e do GECOPE, diferença entre eles
+                                                            e percentual sobre a base de cálculo</caption>
+                                                        <colgroup>
+                                                            <col class="gp-fin-c-rot"><col><col><col>
+                                                        </colgroup>
                                                         <thead>
                                                             <tr>
                                                                 <td></td>
-                                                                <th scope="col" colspan="2"><span
-                                                                        class="gp-fin-selo gp-fin-selo-f">FISCALIZAÇÃO</span></th>
-                                                                <th scope="col" colspan="2"><span
-                                                                        class="gp-fin-selo gp-fin-selo-g">GECOPE</span></th>
+                                                                <th scope="col">Fiscalização</th>
+                                                                <th scope="col">GECOPE</th>
+                                                                <th scope="col" title="GECOPE − Fiscalização">Diferença</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             <tr>
                                                                 <th scope="row">Acréscimo</th>
-                                                                <td class="gp-fin-valor" data-gp-v="det_acresc_f"
-                                                                    data-gp-fmt="money"></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_acresc_f">—</td>
-                                                                <td class="gp-fin-valor" data-gp-v="det_acresc_g"
-                                                                    data-gp-fmt="money"></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_acresc_g">—</td>
+                                                                <td><span class="gp-fin-valor" data-gp-v="det_acresc_f" data-gp-fmt="money"></span><span class="gp-pct is-na" data-gp-espelha="pct_acresc_f">—</span></td>
+                                                                <td><span class="gp-fin-valor" data-gp-v="det_acresc_g" data-gp-fmt="money"></span><span class="gp-pct is-na" data-gp-espelha="pct_acresc_g">—</span></td>
+                                                                <td class="gp-fin-dif-cel"><span class="gp-fin-valor" id="gp-dif-acresc">—</span><span class="gp-pct" id="gp-dif-acresc-pct"></span></td>
                                                             </tr>
                                                             <tr>
                                                                 <th scope="row">Supressão</th>
-                                                                <td class="gp-fin-valor" data-gp-v="det_supress_f"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_supress_f">—</td>
-                                                                <td class="gp-fin-valor" data-gp-v="det_supress_g"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_supress_g">—</td>
+                                                                <td><span class="gp-fin-valor" data-gp-v="det_supress_f" data-gp-fmt="money" data-gp-sinal></span><span class="gp-pct is-na" data-gp-espelha="pct_supress_f">—</span></td>
+                                                                <td><span class="gp-fin-valor" data-gp-v="det_supress_g" data-gp-fmt="money" data-gp-sinal></span><span class="gp-pct is-na" data-gp-espelha="pct_supress_g">—</span></td>
+                                                                <td class="gp-fin-dif-cel"><span class="gp-fin-valor" id="gp-dif-supress">—</span><span class="gp-pct" id="gp-dif-supress-pct"></span></td>
                                                             </tr>
                                                         </tbody>
                                                         <tfoot>
                                                             <tr class="is-total">
                                                                 <th scope="row">Repercussão</th>
-                                                                <td class="gp-fin-valor" data-gp-v="det_reperc_f"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_reperc_f">—</td>
-                                                                <td class="gp-fin-valor" data-gp-v="det_reperc_g"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_reperc_g">—</td>
+                                                                <td><span class="gp-fin-valor" data-gp-v="det_reperc_f" data-gp-fmt="money" data-gp-sinal></span><span class="gp-pct is-na" data-gp-espelha="pct_reperc_f">—</span></td>
+                                                                <td><span class="gp-fin-valor" data-gp-v="det_reperc_g" data-gp-fmt="money" data-gp-sinal></span><span class="gp-pct is-na" data-gp-espelha="pct_reperc_g">—</span></td>
+                                                                <td class="gp-fin-dif-cel"><span class="gp-fin-valor" id="gp-dif-reperc">—</span><span class="gp-pct" id="gp-dif-reperc-pct"></span></td>
                                                             </tr>
                                                         </tfoot>
                                                     </table>
-                                                    <p class="gp-fin-dif" id="gp-fin-dif" hidden></p>
                                                 </div>
 
                                                 <div class="gp-edit">
