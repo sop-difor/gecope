@@ -3076,50 +3076,57 @@
                                                     </div>
                                                 </div>
 
-                                                <!-- Leitura: Fiscalização × GECOPE lado a lado, linha a linha, para
-                                                     comparar o mesmo item sem procurar em dois painéis. -->
+                                                <!-- Leitura: dois blocos de colunas, Fiscalização e GECOPE, cada um com fundo próprio e
+                                                     subtítulos Valor / % da base; a coluna .gp-esp só separa os blocos. O mesmo item fica
+                                                     na mesma linha para comparar direto. Ids/espelhos iguais aos de antes. -->
                                                 <div class="gp-view">
                                                     <table class="gp-fin-tabela">
-                                                        <caption class="visually-hidden">Valores da Fiscalização e do
-                                                            GECOPE, com percentual sobre a base de cálculo</caption>
+                                                        <caption class="visually-hidden">Valores da Fiscalização e do GECOPE, com percentual
+                                                            sobre a base de cálculo</caption>
                                                         <thead>
                                                             <tr>
-                                                                <td></td>
-                                                                <th scope="col" colspan="2"><span
+                                                                <td class="gp-fin-canto"></td>
+                                                                <th scope="colgroup" colspan="2" class="gp-f gp-fin-grupo"><span
                                                                         class="gp-fin-selo gp-fin-selo-f">FISCALIZAÇÃO</span></th>
-                                                                <th scope="col" colspan="2"><span
+                                                                <td class="gp-esp" aria-hidden="true"></td>
+                                                                <th scope="colgroup" colspan="2" class="gp-g gp-fin-grupo"><span
                                                                         class="gp-fin-selo gp-fin-selo-g">GECOPE</span></th>
+                                                            </tr>
+                                                            <tr class="gp-fin-subs">
+                                                                <td class="gp-fin-canto"></td>
+                                                                <th scope="col" class="gp-f gp-ini">Valor</th>
+                                                                <th scope="col" class="gp-f gp-fim">% da base</th>
+                                                                <td class="gp-esp" aria-hidden="true"></td>
+                                                                <th scope="col" class="gp-g gp-ini">Valor</th>
+                                                                <th scope="col" class="gp-g gp-fim">% da base</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             <tr>
                                                                 <th scope="row">Acréscimo</th>
-                                                                <td class="gp-fin-valor" data-gp-v="det_acresc_f"
-                                                                    data-gp-fmt="money"></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_acresc_f">—</td>
-                                                                <td class="gp-fin-valor" data-gp-v="det_acresc_g"
-                                                                    data-gp-fmt="money"></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_acresc_g">—</td>
+                                                                <td class="gp-f gp-ini gp-fin-valor" data-gp-v="det_acresc_f" data-gp-fmt="money"></td>
+                                                                <td class="gp-f gp-fim gp-pct is-na" data-gp-espelha="pct_acresc_f">—</td>
+                                                                <td class="gp-esp" aria-hidden="true"></td>
+                                                                <td class="gp-g gp-ini gp-fin-valor" data-gp-v="det_acresc_g" data-gp-fmt="money"></td>
+                                                                <td class="gp-g gp-fim gp-pct is-na" data-gp-espelha="pct_acresc_g">—</td>
                                                             </tr>
                                                             <tr>
                                                                 <th scope="row">Supressão</th>
-                                                                <td class="gp-fin-valor" data-gp-v="det_supress_f"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_supress_f">—</td>
-                                                                <td class="gp-fin-valor" data-gp-v="det_supress_g"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_supress_g">—</td>
+                                                                <td class="gp-f gp-ini gp-fin-valor" data-gp-v="det_supress_f" data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-f gp-fim gp-pct is-na" data-gp-espelha="pct_supress_f">—</td>
+                                                                <td class="gp-esp" aria-hidden="true"></td>
+                                                                <td class="gp-g gp-ini gp-fin-valor" data-gp-v="det_supress_g" data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-g gp-fim gp-pct is-na" data-gp-espelha="pct_supress_g">—</td>
                                                             </tr>
                                                         </tbody>
                                                         <tfoot>
                                                             <tr class="is-total">
                                                                 <th scope="row">Repercussão</th>
-                                                                <td class="gp-fin-valor" data-gp-v="det_reperc_f"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_reperc_f">—</td>
-                                                                <td class="gp-fin-valor" data-gp-v="det_reperc_g"
-                                                                    data-gp-fmt="money" data-gp-sinal></td>
-                                                                <td class="gp-pct is-na" data-gp-espelha="pct_reperc_g">—</td>
+                                                                <td class="gp-f gp-ini gp-fin-valor" data-gp-v="det_reperc_f" data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-f gp-fim gp-pct is-na" data-gp-espelha="pct_reperc_f">—</td>
+                                                                <td class="gp-esp" aria-hidden="true"></td>
+                                                                <td class="gp-g gp-ini gp-fin-valor" data-gp-v="det_reperc_g" data-gp-fmt="money" data-gp-sinal></td>
+                                                                <td class="gp-g gp-fim gp-pct is-na" data-gp-espelha="pct_reperc_g">—</td>
                                                             </tr>
                                                         </tfoot>
                                                     </table>
