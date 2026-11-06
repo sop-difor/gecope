@@ -13,6 +13,14 @@
 //   { acao: "recuperar", matricula }
 //       -> sempre { ok: true }  (não revela se a matrícula existe)
 //       Se existir, registra o pedido em app_notifications com o nome real, para o admin.
+//   { acao: "verificar_cadastro", matricula }
+//       -> { ok: true, jaTemConta: boolean }
+//       Chamada pela tela de cadastro ANTES do auth.signUp (06/11/2026, caso matrícula
+//       70023512): quem já tem conta de login não deve criar outra com outro e-mail.
+//       Só devolve o booleano (sem nome nem e-mail); a RPC matricula_tem_conta exige
+//       perfil + login, de modo que fiscal pré-cadastrado sem login ainda pode se cadastrar.
+//       Revela que a matrícula tem conta — o próprio cadastro já revelava (matrícula é
+//       UNIQUE) — e tem limite de tentativas próprio.
 //
 // Limite próprio de tentativas (tabela login_matricula_tentativas, só service_role),
 // porque todo login passa a sair deste servidor e o limite por IP do Auth não separa
@@ -34,7 +42,10 @@ const ORIGENS_PERMITIDAS = [
 const LIMITES = {
   login: { porMatricula: 5, porIp: 30, janelaMin: 15 },
   recuperar: { porMatricula: 3, porIp: 10, janelaMin: 60 },
+  cadastro: { porMatricula: 5, porIp: 20, janelaMin: 15 },
 } as const;
+
+type Acao = keyof typeof LIMITES;
 
 const MSG_LOGIN_INVALIDO = "Matrícula ou senha inválidas.";
 const MSG_MUITAS_TENTATIVAS = "Muitas tentativas. Aguarde alguns minutos e tente de novo.";
@@ -62,10 +73,10 @@ const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-async function excedeuLimite(acao: "login" | "recuperar", matricula: string, ip: string): Promise<boolean> {
+async function excedeuLimite(acao: Acao, matricula: string, ip: string): Promise<boolean> {
   const lim = LIMITES[acao];
   const desde = new Date(Date.now() - lim.janelaMin * 60_000).toISOString();
-  // Para login conta só as falhas; para recuperar, todos os pedidos.
+  // Para login conta só as falhas; para recuperar e cadastro, todos os pedidos.
   const base = () => {
     let q = admin.from("login_matricula_tentativas").select("id", { count: "exact", head: true })
       .eq("acao", acao).gte("criado_em", desde);
@@ -84,7 +95,7 @@ async function excedeuLimite(acao: "login" | "recuperar", matricula: string, ip:
   return (porMat.count ?? 0) >= lim.porMatricula || (porIp.count ?? 0) >= lim.porIp;
 }
 
-async function registrar(acao: "login" | "recuperar", matricula: string, ip: string, sucesso: boolean) {
+async function registrar(acao: Acao, matricula: string, ip: string, sucesso: boolean) {
   const { error } = await admin.from("login_matricula_tentativas").insert({ acao, matricula, ip, sucesso });
   if (error) console.error("Erro registrando tentativa:", error);
   // Limpeza oportunista: o que passou de 1 dia não serve a nenhum limite.
@@ -160,6 +171,17 @@ async function acaoRecuperar(matricula: string, ip: string, cors: Record<string,
   return json({ ok: true }, cors);
 }
 
+async function acaoVerificarCadastro(matricula: string, ip: string, cors: Record<string, string>) {
+  if (await excedeuLimite("cadastro", matricula, ip)) {
+    // limite: true diz ao front que deve parar (qualquer outro erro, ele segue o cadastro).
+    return json({ ok: false, limite: true, erro: MSG_MUITAS_TENTATIVAS }, cors);
+  }
+  await registrar("cadastro", matricula, ip, true);
+  const { data, error } = await admin.rpc("matricula_tem_conta", { p_matricula: matricula });
+  if (error) throw error;
+  return json({ ok: true, jaTemConta: data === true }, cors);
+}
+
 function json(body: unknown, cors: Record<string, string>, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -192,6 +214,7 @@ Deno.serve(async (req: Request) => {
       return await acaoLogin(matricula, senha, ip, cors);
     }
     if (body.acao === "recuperar") return await acaoRecuperar(matricula, ip, cors);
+    if (body.acao === "verificar_cadastro") return await acaoVerificarCadastro(matricula, ip, cors);
     return json({ ok: false, erro: "Ação inválida." }, cors, 400);
   } catch (erro) {
     console.error("Erro em login-matricula:", erro);

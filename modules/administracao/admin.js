@@ -117,28 +117,37 @@
             pendings.forEach(u => {
                 const dataSolic = u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : 'N/A';
                 const nomeComp = (`${(u.nome || '')} ${(u.sobrenome || '')}`.trim() || u.full_name || 'N/A').toUpperCase();
+                // Pré-cadastro assumido por uma conta nova com outro e-mail
+                // (app_users_assumir_pre_cadastro, sql/add_assumir_pre_cadastro.sql): o admin
+                // confere se é a pessoa certa; "Recusar" devolve e-mail e papel anteriores.
+                const assumiu = !!u.pre_cadastro_assumido_em;
+                const papelAnterior = assumiu ? (u.pre_cadastro_papel_anterior || '') : '';
+                const avisoAssumiu = assumiu ? `
+                        <div class="small mt-1"><span class="badge bg-warning text-dark fw-normal"><i class="bi bi-exclamation-triangle me-1"></i>Assumiu pré-cadastro</span>
+                        <span class="text-muted">e-mail anterior: ${escapeHTML(u.pre_cadastro_email_anterior || '-')}${papelAnterior ? ` · papel anterior: ${escapeHTML(papelAnterior.toUpperCase())}` : ''}. Confira se o pedido é mesmo desta pessoa antes de aprovar.</span></div>` : '';
+                const opcoesPapel = ['externo', 'fiscal', 'eletrica', 'gerente', 'admin']
+                    .map(p => `<option value="${p}"${p === papelAnterior ? ' selected' : ''}>${p === 'eletrica' ? 'ELÉTRICA' : p.toUpperCase()}</option>`).join('');
+                const acaoRecusar = assumiu
+                    ? `onclick="desfazerPreCadastroAssumido(${Number(u.id)})" title="Recusar e devolver o pré-cadastro"`
+                    : `onclick="excluirUsuario(this.dataset.email)" title="Recusar"`;
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="ps-4">
                         <div class="fw-bold text-dark">${escapeHTML(nomeComp)}</div>
-                        <div class="small text-muted">${escapeHTML(u.email)}</div>
+                        <div class="small text-muted">${escapeHTML(u.email)}</div>${avisoAssumiu}
                     </td>
                     <td><span class="badge bg-light text-dark border fw-normal">${escapeHTML(u.matricula) || '-'}</span></td>
                     <td><span class="text-muted small">${dataSolic}</span></td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-2">
                             <select class="form-select form-select-sm" style="width: 120px;" id="role-pending-${u.id}">
-                                <option value="externo">EXTERNO</option>
-                                <option value="fiscal">FISCAL</option>
-                                <option value="eletrica">ELÉTRICA</option>
-                                <option value="gerente">GERENTE</option>
-                                <option value="admin">ADMIN</option>
+                                ${opcoesPapel}
                             </select>
                             <button class="btn btn-sm btn-success" data-email="${escapeHTML(u.email)}" data-role-select-id="role-pending-${u.id}" onclick="aprovarUsuario(this.dataset.email, document.getElementById(this.dataset.roleSelectId).value)">
                                 <i class="bi bi-check-lg me-1"></i> Aprovar
                             </button>
-                            <button class="btn btn-sm btn-outline-danger" data-email="${escapeHTML(u.email)}" onclick="excluirUsuario(this.dataset.email)" title="Recusar">
+                            <button class="btn btn-sm btn-outline-danger" data-email="${escapeHTML(u.email)}" ${acaoRecusar}>
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
@@ -420,7 +429,13 @@
                     }
                 }
             }
-            const { error } = await sbClient.from('app_users').update({ role: role }).eq('email', email);
+            // Aprovado: o aviso de "assumiu pré-cadastro" já cumpriu o papel e sai da linha.
+            const { error } = await sbClient.from('app_users').update({
+                role: role,
+                pre_cadastro_email_anterior: null,
+                pre_cadastro_papel_anterior: null,
+                pre_cadastro_assumido_em: null
+            }).eq('email', email);
             if (error) throw error;
             if (!skipConfirm) alert('Usuário aprovado com sucesso!');
             loadAllUsers(); if (typeof fetchPendingCount === 'function') fetchPendingCount();
@@ -448,6 +463,32 @@
             const { error } = await sbClient.from('app_users').delete().eq('email', email);
             if (error) throw error; alert('Usuário removido.'); loadAllUsers(); if (typeof fetchPendingCount === 'function') fetchPendingCount();
         } catch (e) { alert('Erro ao excluir: ' + e.message); }
+    }
+
+    // "Recusar" de um pré-cadastro assumido (sql/add_assumir_pre_cadastro.sql): não exclui o
+    // perfil — devolve o e-mail e o papel que o admin tinha cadastrado. A conta de login criada
+    // no cadastro continua no Auth, sem perfil, e não dá acesso a nada.
+    async function desfazerPreCadastroAssumido(id) {
+        try {
+            const { data: u, error: errBusca } = await sbClient.from('app_users')
+                .select('id, email, matricula, pre_cadastro_email_anterior, pre_cadastro_papel_anterior')
+                .eq('id', id).maybeSingle();
+            if (errBusca) throw errBusca;
+            if (!u || !u.pre_cadastro_email_anterior) return alert('Este pedido não tem pré-cadastro anterior para devolver.');
+            const papel = u.pre_cadastro_papel_anterior || 'fiscal';
+            if (!confirm(`Recusar o pedido de ${u.email} e devolver a matrícula ${u.matricula} ao pré-cadastro ` +
+                `(${u.pre_cadastro_email_anterior}, ${papel.toUpperCase()})?`)) return;
+            const { error } = await sbClient.from('app_users').update({
+                email: u.pre_cadastro_email_anterior,
+                role: papel,
+                pre_cadastro_email_anterior: null,
+                pre_cadastro_papel_anterior: null,
+                pre_cadastro_assumido_em: null
+            }).eq('id', id);
+            if (error) throw error;
+            alert('Pedido recusado. O pré-cadastro foi devolvido como estava.');
+            loadAllUsers(); if (typeof fetchPendingCount === 'function') fetchPendingCount();
+        } catch (e) { alert('Erro ao recusar: ' + e.message); }
     }
 
     async function aprovarFromNotification(notifId, role, matricula, nome, emailCadastro) {
@@ -877,6 +918,7 @@
     window.abrirModalNovoUsuario = abrirModalNovoUsuario;
     window.aprovarUsuario = aprovarUsuario;
     window.excluirUsuario = excluirUsuario;
+    window.desfazerPreCadastroAssumido = desfazerPreCadastroAssumido;
     window.filterAdminUsers = filterAdminUsers;
     window.updateUserRole = updateUserRole;
     window.carregarAutorizacoesEspeciais = carregarAutorizacoesEspeciais;
