@@ -2786,7 +2786,7 @@ function gpFontesRender() {
             + (semValor.length ? ` Sem valores lançados: ${semValor.join(', ')}.` : '');
     } else {
         const o = gpObraDaFonte(gpFonteSel);
-        nota.textContent = [gpFonteSel, o && o.fonte_recurso, '% sobre a base de cálculo do processo']
+        nota.textContent = [gpFonteSel, o && o.fonte_recurso]
             .filter(Boolean).join(' · ');
     }
 }
