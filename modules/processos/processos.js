@@ -2480,81 +2480,6 @@ function gpAtualizarResumo() {
     });
     const aviso = document.getElementById('gp-aviso-sujo');
     if (aviso) aviso.hidden = alteradas === 0;
-
-    gpAtualizarIndicadores();
-    gpAjustarObjeto();
-}
-
-// Faixa de indicadores do topo da aba Geral: os valores são espelhos (data-gp-v/espelha, acima);
-// aqui só o que precisa de conta — a situação da Meta fiscal e a diferença GECOPE − Fiscalização.
-// Mesma regra de getMetaSt (lista de processos): aprovado = cumprida; data passada = atrasada.
-function gpAtualizarIndicadores() {
-    const parseBr = txt => {
-        const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(txt || '').trim());
-        return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
-    };
-
-    const tile = document.getElementById('gp-kpi-meta');
-    const chip = document.getElementById('gp-kpi-prazo');
-    if (tile && chip) {
-        const meta = parseBr((document.getElementById('det_data_compromisso') || {}).value);
-        const status = String((document.getElementById('det_status') || {}).value || '').toUpperCase();
-        let estado = '', texto = '';
-        if (status.includes('APROVADO') && !status.includes('AGUAR')) {
-            estado = 'ok'; texto = 'Cumprida';
-        } else if (meta) {
-            const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-            const dias = Math.round((meta - hoje) / 86400000);
-            if (dias < 0) { estado = 'atrasada'; texto = `Atrasada há ${-dias} ${dias === -1 ? 'dia' : 'dias'}`; }
-            else if (dias === 0) { estado = 'alerta'; texto = 'Vence hoje'; }
-            else { estado = dias <= 3 ? 'alerta' : 'ok'; texto = `Faltam ${dias} ${dias === 1 ? 'dia' : 'dias'}`; }
-        }
-        tile.dataset.prazo = estado;
-        chip.textContent = texto;
-        chip.hidden = !texto;
-    }
-
-    const dif = document.getElementById('gp-fin-dif');
-    if (dif) {
-        const v = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
-        const f = v('det_acresc_f') + v('det_supress_f');
-        const g = v('det_acresc_g') + v('det_supress_g');
-        const d = Number((g - f).toFixed(2));
-        const temValores = Math.abs(f) > 0.004 || Math.abs(g) > 0.004;
-        dif.hidden = !temValores;
-        if (temValores) {
-            const b = baseContratoDetalhes;
-            const pct = (b && b.estado === 'ok' && b.total > 0) ? ` (${formatarPercentualBase(d, b.total).texto} da base)` : '';
-            dif.replaceChildren();
-            dif.appendChild(document.createTextNode('Diferença GECOPE − Fiscalização: '));
-            const forte = document.createElement('strong');
-            forte.className = d < -0.004 ? 'gp-val-neg' : d > 0.004 ? 'gp-val-pos' : '';
-            forte.textContent = Math.abs(d) < 0.005 ? 'nenhuma' : gpReaisComSinal(d) + pct;
-            dif.appendChild(forte);
-        }
-    }
-}
-
-// Objeto recolhido em 3 linhas; o botão só aparece quando o texto não cabe. Só dá para medir com
-// o modal visível, por isso também roda no 'shown.bs.modal' (gpInicializarFicha).
-function gpAjustarObjeto() {
-    const p = document.getElementById('gp-objeto-texto');
-    const btn = document.getElementById('gp-objeto-toggle');
-    if (!p || !btn || !p.offsetParent) return;
-    if (p.classList.contains('is-aberto')) { btn.hidden = false; return; }
-    btn.hidden = p.scrollHeight <= p.clientHeight + 2;
-}
-
-function gpAlternarObjeto(forcar) {
-    const p = document.getElementById('gp-objeto-texto');
-    const btn = document.getElementById('gp-objeto-toggle');
-    if (!p || !btn) return;
-    const aberto = typeof forcar === 'boolean' ? forcar : !p.classList.contains('is-aberto');
-    p.classList.toggle('is-aberto', aberto);
-    btn.setAttribute('aria-expanded', aberto ? 'true' : 'false');
-    const rot = btn.querySelector('span');
-    if (rot) rot.textContent = aberto ? 'Recolher descrição' : 'Ler descrição completa';
-    gpAjustarObjeto();
 }
 
 function gpInicializarFicha() {
@@ -2568,23 +2493,8 @@ function gpInicializarFicha() {
         switch (btn.dataset.gpAcao) {
             case 'editar-tudo': gpEditarTudo(); break;
             case 'cancelar-edicao': gpCancelarEdicao(); break;
-            case 'objeto': gpAlternarObjeto(); break;
-            case 'apenso-abrir': {
-                const form = document.getElementById('det_apensos_form');
-                gpAbrirFormApenso(!!(form && form.hidden));
-                break;
-            }
-            case 'apenso-fechar': {
-                const input = document.getElementById('det_apensar_nup');
-                if (input) input.value = '';
-                gpAbrirFormApenso(false);
-                break;
-            }
         }
     });
-    modal.addEventListener('shown.bs.modal', gpAjustarObjeto);
-    // Cada processo abre com o objeto recolhido.
-    modal.addEventListener('hidden.bs.modal', () => gpAlternarObjeto(false));
 
     const form = document.getElementById('formDetalhes');
     if (form) {
@@ -2642,23 +2552,7 @@ function gpAbrirOutroProcesso(nup) {
     inst.hide();
 }
 
-// O campo de apensar fica fechado; o botão "Apensar processo" do cabeçalho do bloco o abre
-// (decisão do usuário, 06/11/2026). Sem apensos, quem pode apensar vê só o botão.
-function gpAbrirFormApenso(abrir) {
-    const form = document.getElementById('det_apensos_form');
-    const btn = document.getElementById('det_apensos_abrir');
-    if (!form) return;
-    form.hidden = !abrir;
-    if (btn) btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
-    if (abrir) {
-        const input = document.getElementById('det_apensar_nup');
-        if (input) input.focus();
-    }
-}
-
-// `manterForm`: ao re-desenhar depois de apensar/desapensar, o campo continua como estava
-// (aberto, com a mensagem de sucesso visível); ao abrir outro processo, começa fechado.
-function renderApensosDetalhes(row, { manterForm = false } = {}) {
+function renderApensosDetalhes(row) {
     apensosProcessoAtual = row;
     const aviso = document.getElementById('det_apensos_principal');
     const lista = document.getElementById('det_apensos_lista');
@@ -2667,13 +2561,10 @@ function renderApensosDetalhes(row, { manterForm = false } = {}) {
     const nota = document.getElementById('det_apensos_nota');
     const input = document.getElementById('det_apensar_nup');
     const msg = document.getElementById('det_apensos_msg');
-    const btnAbrir = document.getElementById('det_apensos_abrir');
     if (!aviso || !lista || !vazio || !form) return;
 
     const pode = podeApensarProcessos();
-    const formAberto = manterForm && !form.hidden;
     if (nota) nota.hidden = pode;
-    if (btnAbrir) btnAbrir.hidden = true;
     aviso.replaceChildren();
     lista.replaceChildren();
     if (input) { input.value = ''; input.disabled = !pode; }
@@ -2693,12 +2584,10 @@ function renderApensosDetalhes(row, { manterForm = false } = {}) {
         return b;
     };
     const botaoDesapensar = (apenso) => {
-        // Só o ícone (pedido do usuário, 06/11/2026); o nome vai no aria-label e na dica.
-        const b = el('button', 'btn btn-outline-danger btn-sm gp-btn-icone');
+        const b = el('button', 'btn btn-outline-danger btn-sm');
         b.type = 'button';
-        b.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+        b.innerHTML = '<i class="bi bi-x-lg"></i> Desapensar';
         b.title = `Desapensar o processo ${apenso.processo}`;
-        b.setAttribute('aria-label', b.title);
         b.addEventListener('click', () => desapensarProcesso(apenso.id));
         return b;
     };
@@ -2729,8 +2618,7 @@ function renderApensosDetalhes(row, { manterForm = false } = {}) {
     aviso.hidden = true;
     const filhos = apensosDe(row.id).sort((a, b) => String(a.processo).localeCompare(String(b.processo)));
     lista.hidden = filhos.length === 0;
-    // Quem pode apensar não precisa do aviso "nenhum": o botão já diz o que dá para fazer.
-    vazio.hidden = filhos.length > 0 || pode;
+    vazio.hidden = filhos.length > 0;
     filhos.forEach(f => {
         const li = el('li', 'gp-apenso-item');
         li.appendChild(botaoNup(f.processo));
@@ -2745,8 +2633,7 @@ function renderApensosDetalhes(row, { manterForm = false } = {}) {
         lista.appendChild(li);
     });
 
-    if (btnAbrir) btnAbrir.hidden = !pode;
-    gpAbrirFormApenso(pode && formAberto);
+    form.hidden = !pode;
     if (pode) preencherSugestoesApenso(row);
 }
 
@@ -2821,7 +2708,7 @@ async function apensarProcessoDetalhes() {
             } catch (e) { console.error('Erro ao registrar atividade de apensamento:', e); }
         }
         await atualizarLinhaProcessoLocal(alvo.id);
-        renderApensosDetalhes(processoPorId(row.id) || row, { manterForm: true });
+        renderApensosDetalhes(processoPorId(row.id) || row);
         msg.textContent = `Processo ${alvo.processo} apensado.`;
         msg.classList.add('text-success');
     } catch (e) {
@@ -2853,7 +2740,7 @@ async function desapensarProcesso(apensoId) {
             } catch (e) { console.error('Erro ao registrar atividade de desapensamento:', e); }
         }
         await atualizarLinhaProcessoLocal(apenso.id);
-        renderApensosDetalhes(processoPorId(aberto.id) || aberto, { manterForm: true });
+        renderApensosDetalhes(processoPorId(aberto.id) || aberto);
     } catch (e) {
         alert('Não foi possível desapensar: ' + _mensagemErroApenso(e));
     }
