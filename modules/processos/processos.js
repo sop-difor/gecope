@@ -864,14 +864,12 @@ function mesmaDescricaoObra(a, b) {
     return !!t(a) && t(a) === t(b);
 }
 
-// Base de cálculo dos percentuais = soma das obras VINCULADAS ao processo (decisão do usuário,
-// 05/11/2026; antes era sempre o contrato inteiro, que dilui o % em contrato de muitas obras).
-//   - todas as obras do contrato vinculadas (inclui contrato de obra única) → base do CONTRATO,
-//     pela ficha_contrato (original + reajuste de preço) + Σ total_reajuste das obras (reajuste de medição);
-//   - parte das obras → Σ (valor_original + total_reajuste + total_realinhado) das obras vinculadas.
+// Base de cálculo dos percentuais = CONTRATO INTEIRO, ainda que o processo vincule só parte das
+// obras (decisão do usuário, 09/11/2026 — revoga a de 05/11/2026, que usava a soma das obras
+// vinculadas). Pela ficha_contrato (original + reajuste de preço) + Σ total_reajuste das obras
+// (reajuste de medição); sem ficha, Σ (valor_original + total_reajuste + total_realinhado) das obras.
 // Nomes dos campos: `reajuste` = reajuste de MEDIÇÃO (total_reajuste); `realinhamento` = reajuste
-// de PREÇO (total_realinhado).
-// A base do contrato inteiro segue calculada (`totalContrato`) como referência do limite do art. 125.
+// de PREÇO (total_realinhado). `totalContrato` = `total` (mantido para quem já o lê).
 async function buscarBaseContrato(codigo, adicionais) {
     const cod = (codigo || '').trim().toUpperCase();
     if (!cod) return { estado: 'vazio', motivo: 'sem-codigo' };
@@ -915,7 +913,7 @@ async function buscarBaseContrato(codigo, adicionais) {
         const foraDoContrato = extras.filter(c => !porCodigo.has(c));
         const todas = vinculadas.length >= obrasDoContrato.length;
 
-        // Base do contrato inteiro (referência e, com todas as obras vinculadas, a própria base).
+        // Base do contrato inteiro.
         const somaObras = (lista, campo) => r2(lista.reduce((s, o) => s + n(o[campo]), 0));
         let contrato;
         if (ficha && n(ficha.valor_original) > 0) {
@@ -925,18 +923,9 @@ async function buscarBaseContrato(codigo, adicionais) {
         }
         contrato.total = r2(contrato.original + contrato.reajuste + contrato.realinhamento);
 
-        let base;
-        if (todas) {
-            base = { origem: obrasDoContrato.length > 1 ? 'contrato' : (ficha ? 'contrato' : 'obra'), ...contrato };
-        } else {
-            base = {
-                origem: vinculadas.length > 1 ? 'obras' : 'obra',
-                original: somaObras(vinculadas, 'valor_original'),
-                reajuste: somaObras(vinculadas, 'total_reajuste'),
-                realinhamento: somaObras(vinculadas, 'total_realinhado')
-            };
-            base.total = r2(base.original + base.reajuste + base.realinhamento);
-        }
+        // Base = sempre o contrato inteiro (decisão do usuário, 09/11/2026), mesmo com só parte das
+        // obras vinculadas. `todas` só muda o texto de origem.
+        const base = { origem: (obrasDoContrato.length > 1 || ficha) ? 'contrato' : 'obra', todasVinculadas: todas, ...contrato };
         if (!(base.original > 0)) return { estado: 'vazio', motivo: 'sem-valor', obrasDoContrato, codigoObra: cod, vinculadas: vinculadas.map(o => o.codigo_obra) };
 
         Object.assign(base, {
@@ -1071,7 +1060,7 @@ function renderObrasVinculadasDetalhes() {
         const msgs = [];
         if (b && b.estado === 'ok' && b.irmasFora && b.irmasFora.length) {
             const v = b.irmasFora.length > 1;
-            msgs.push(`Esta obra tem ${v ? 'outras fontes' : 'outra fonte'} de recurso no SIGSOP (${b.irmasFora.join(', ')}), fora do vínculo e da base de cálculo. Para incluir, clique em Editar e marque ${v ? 'as fontes' : 'a fonte'} em "Obras e fontes do contrato".`);
+            msgs.push(`Esta obra tem ${v ? 'outras fontes' : 'outra fonte'} de recurso no SIGSOP (${b.irmasFora.join(', ')}), fora do vínculo deste processo. Para incluir, clique em Editar e marque ${v ? 'as fontes' : 'a fonte'} em "Obras e fontes do contrato".`);
         }
         if (b && b.foraDoContrato && b.foraDoContrato.length) {
             msgs.push(`Fora do contrato da obra principal, ignorado no cálculo: ${b.foraDoContrato.join(', ')}.`);
@@ -1099,15 +1088,15 @@ function renderBaseContratoDetalhes() {
             ? 'Sem base: a obra não tem valor original cadastrado.'
             : 'Sem base: vincule a obra pelo Código da Obra.';
     } else if (b.origem === 'contrato') {
-        const obras = b.obras > 1 ? `todas as ${b.obras} obras/fontes` : '1 obra';
-        origem = `${b.numero ? 'Contrato ' + b.numero : 'Contrato'} · ${obras}`;
+        const contrato = b.numero ? 'Contrato ' + b.numero : 'Contrato';
+        if (b.obras <= 1) origem = `${contrato} · 1 obra`;
+        else if (b.todasVinculadas) origem = `${contrato} · todas as ${b.obras} obras/fontes`;
+        else {
+            const lista = (b.vinculadas || [b.codigo]).join(' + ');
+            origem = `${contrato} inteiro (${b.obras} obras/fontes) · processo trata ${b.vinculadas.length > 1 ? 'das obras' : 'da obra'} ${lista}`;
+        }
     } else {
-        const lista = (b.vinculadas || [b.codigo]).join(' + ');
-        const deContrato = b.obras > 1 ? ` · ${b.vinculadas.length} de ${b.obras} obras/fontes do contrato` : ' · sem ficha de contrato';
-        origem = `${b.vinculadas && b.vinculadas.length > 1 ? 'Obras' : 'Obra'} ${lista}${deContrato}`;
-    }
-    if (b.estado === 'ok' && b.origem !== 'contrato' && b.obras > 1 && b.totalContrato > 0) {
-        origem += ` · contrato inteiro: R$ ${formatCurrencyValue(b.totalContrato)}`;
+        origem = `Obra ${b.codigo} · sem ficha de contrato`;
     }
     set('det_base_origem', origem);
     set('det_base_valor', b.estado === 'ok' ? reais(b.total) : '—');
