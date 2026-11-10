@@ -3038,20 +3038,23 @@
                                                      Fica fora das camadas: é referência e vale em leitura e em edição. -->
                                                 <div class="gp-base" id="det_base" data-estado="carregando"
                                                     aria-live="polite">
+                                                    <!-- Uma linha só: rótulo + etiquetas da origem + botão. O valor da base fica
+                                                         na composição (linha de total) e na dica do ⓘ — não disputa com a análise. -->
                                                     <div class="gp-base-topo">
-                                                        <div class="gp-base-info">
-                                                            <span class="gp-base-titulo">Base de cálculo</span>
-                                                            <span class="gp-base-origem" id="det_base_origem">Carregando…</span>
-                                                        </div>
-                                                        <div class="gp-base-resumo">
-                                                            <span class="gp-base-valor" id="det_base_valor">—</span>
-                                                            <button type="button" class="gp-base-toggle"
-                                                                id="det_base_toggle" data-bs-toggle="collapse"
-                                                                data-bs-target="#det_base_comp" aria-expanded="false"
-                                                                aria-controls="det_base_comp" hidden>
-                                                                Ver composição <i class="bi bi-chevron-down"></i>
-                                                            </button>
-                                                        </div>
+                                                        <span class="gp-base-titulo">
+                                                            Base de cálculo
+                                                            <i class="bi bi-info-circle gp-base-ajuda" id="det_base_ajuda" tabindex="0" role="img"
+                                                                title="Valor sobre o qual são calculados os percentuais de acréscimo, supressão e repercussão: valor original + reajuste de medição + reajuste de preço do contrato inteiro."
+                                                                aria-label="Valor sobre o qual são calculados os percentuais de acréscimo, supressão e repercussão: valor original + reajuste de medição + reajuste de preço do contrato inteiro."></i>
+                                                        </span>
+                                                        <!-- Preenchido por renderBaseContratoDetalhes(): etiquetas (contrato · obras · obra do processo) ou mensagem de estado. -->
+                                                        <div class="gp-base-origem" id="det_base_origem">Carregando…</div>
+                                                        <button type="button" class="gp-base-toggle"
+                                                            id="det_base_toggle" data-bs-toggle="collapse"
+                                                            data-bs-target="#det_base_comp" aria-expanded="false"
+                                                            aria-controls="det_base_comp" hidden>
+                                                            Ver composição <i class="bi bi-chevron-down"></i>
+                                                        </button>
                                                     </div>
                                                     <div class="collapse gp-base-comp" id="det_base_comp">
                                                         <dl class="gp-base-lista">
@@ -3061,12 +3064,14 @@
                                                             <dd id="det_base_reajuste">—</dd>
                                                             <dt>Reajuste de preço</dt>
                                                             <dd id="det_base_realinhamento">—</dd>
+                                                            <dt class="gp-base-lista-total">Base de cálculo</dt>
+                                                            <dd class="gp-base-lista-total" id="det_base_valor">—</dd>
                                                         </dl>
                                                         <!-- Preenchidos por renderAditivosBaseDetalhes() (processos.js) -->
                                                         <div class="gp-base-bloco" id="det_base_aditivos" hidden>
                                                             <div class="gp-base-bloco-titulo">Aditivos de valor já formalizados</div>
                                                             <div class="gp-base-bloco-resumo" id="det_base_adit_resumo"></div>
-                                                            <ul class="gp-adit-lista" id="det_base_adit_lista"></ul>
+                                                            <div class="gp-adit-tabela-wrap" id="det_base_adit_lista"></div>
                                                             <div class="gp-base-bloco-nota" id="det_base_adit_nota"></div>
                                                         </div>
                                                         <div class="gp-base-bloco" id="det_base_outros" hidden>
@@ -3103,7 +3108,7 @@
                                                                 <td></td>
                                                                 <th scope="col">Fiscalização</th>
                                                                 <th scope="col">GECOPE</th>
-                                                                <th scope="col" title="GECOPE − Fiscalização">Diferença</th>
+                                                                <th scope="col" title="GECOPE − Fiscalização">Diferença<span class="gp-fin-th-sub">GECOPE − Fiscalização</span></th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>

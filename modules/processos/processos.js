@@ -1080,25 +1080,59 @@ function renderBaseContratoDetalhes() {
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
     box.dataset.estado = b.estado;
 
-    let origem = '';
-    if (b.estado === 'carregando') origem = 'Carregando…';
-    else if (b.estado === 'erro') origem = 'Não foi possível carregar a base. Feche e abra o processo para tentar de novo.';
+    // Origem: em estado ok, etiquetas curtas (ícone · rótulo · valor); nos demais, uma frase.
+    // Tudo por textContent — os códigos vêm do banco.
+    const origemEl = document.getElementById('det_base_origem');
+    const etiquetas = [];
+    let mensagem = '';
+    if (b.estado === 'carregando') mensagem = 'Carregando…';
+    else if (b.estado === 'erro') mensagem = 'Não foi possível carregar a base. Feche e abra o processo para tentar de novo.';
     else if (b.estado === 'vazio') {
-        origem = b.motivo === 'sem-valor'
+        mensagem = b.motivo === 'sem-valor'
             ? 'Sem base: a obra não tem valor original cadastrado.'
             : 'Sem base: vincule a obra pelo Código da Obra.';
     } else if (b.origem === 'contrato') {
-        const contrato = b.numero ? 'Contrato ' + b.numero : 'Contrato';
-        if (b.obras <= 1) origem = `${contrato} · 1 obra`;
-        else if (b.todasVinculadas) origem = `${contrato} · todas as ${b.obras} obras/fontes`;
+        etiquetas.push(['Contrato', b.numero || '—']);
+        if (b.obras <= 1) etiquetas.push(['', '1 obra']);
+        else if (b.todasVinculadas) etiquetas.push(['', `todas as ${b.obras} obras/fontes`]);
         else {
-            const lista = (b.vinculadas || [b.codigo]).join(' + ');
-            origem = `${contrato} inteiro (${b.obras} obras/fontes) · processo trata ${b.vinculadas.length > 1 ? 'das obras' : 'da obra'} ${lista}`;
+            const lista = b.vinculadas || [b.codigo];
+            etiquetas.push(['', `${b.obras} obras/fontes`]);
+            etiquetas.push([lista.length > 1 ? 'Obras' : 'Obra', lista.join(' + ')]);
         }
     } else {
-        origem = `Obra ${b.codigo} · sem ficha de contrato`;
+        etiquetas.push(['Obra', b.codigo || '—']);
+        etiquetas.push(['', 'sem ficha de contrato']);
     }
-    set('det_base_origem', origem);
+    // O valor da base saiu do destaque: vai para a dica do ⓘ (e para a linha de total da composição).
+    const ajuda = document.getElementById('det_base_ajuda');
+    if (ajuda) {
+        const dica = (b.estado === 'ok' ? `Base de cálculo: ${reais(b.total)}. ` : '')
+            + 'É sobre ela que se calculam os percentuais de acréscimo, supressão e repercussão: '
+            + 'valor original + reajuste de medição + reajuste de preço do contrato inteiro.';
+        ajuda.title = dica;
+        ajuda.setAttribute('aria-label', dica);
+    }
+    if (origemEl) {
+        origemEl.replaceChildren();
+        origemEl.classList.toggle('is-msg', !etiquetas.length);
+        if (!etiquetas.length) origemEl.textContent = mensagem;
+        // Linha única com reticências se faltar espaço: a dica guarda o texto completo.
+        origemEl.title = etiquetas.length
+            ? etiquetas.map(([r, v]) => (r ? r + ' ' : '') + v).join(' · ')
+                + (b.origem === 'contrato' && b.obras > 1 && !b.todasVinculadas ? ' (obras tratadas por este processo)' : '')
+            : '';
+        // "Contrato 08742024SOP · 18 obras/fontes · Obra do processo 08742024SOP04"
+        etiquetas.forEach(([rotulo, valor]) => {
+            const item = document.createElement('span');
+            item.className = 'gp-base-item';
+            if (rotulo) item.appendChild(document.createTextNode(rotulo + ' '));
+            const v = document.createElement('strong');
+            v.textContent = valor;
+            item.appendChild(v);
+            origemEl.appendChild(item);
+        });
+    }
     set('det_base_valor', b.estado === 'ok' ? reais(b.total) : '—');
     set('det_base_original', b.estado === 'ok' ? reais(b.original) : '—');
     set('det_base_reajuste', b.estado === 'ok' ? reais(b.reajuste) : '—');
@@ -1176,33 +1210,98 @@ function renderAditivosBaseDetalhes() {
     } else if (!ads.length) {
         resumoAd.textContent = 'Nenhum aditivo de valor formalizado neste contrato.';
     } else {
-        const soma = Number(ads.reduce((s, a) => s + (Number(a.valor_repercussao) || 0), 0).toFixed(2));
-        // O percentual só faz sentido quando a base também é do contrato inteiro.
-        // Os aditivos são do contrato inteiro: o % é sobre a base do contrato.
-        const pct = b.totalContrato > 0
-            ? `${formatarPercentualBase(soma, b.totalContrato).texto} da base do contrato` : '';
-        resumoAd.textContent = ads.length > 1
-            ? `Total ${gpReaisComSinal(soma)}${pct ? ' · ' + pct : ''}`
-            : pct;
-        ads.forEach(a => {
+        // Acumulado (10/11/2026): Acréscimo, Supressão e Repercussão somados com os valores
+        // APROVADOS PELA GECOPE do processo de cada aditivo (acresc_/supress_/reperc_gecope) — são
+        // eles que vão para a formalização. Só quando o processo não está no GECOPE (ou não tem
+        // valor GECOPE) vale o que o SIGSOP registrou no aditivo. Supressão sempre negativa (no
+        // processo já é; em aditivos_contrato vem positiva, com repercussão = aprovado − supressão).
+        const valoresAditivo = (a, proc) => {
+            if (proc && (Math.abs(Number(proc.acrescGecope) || 0) > 0.004 || Math.abs(Number(proc.supressGecope) || 0) > 0.004)) {
+                const acr = Number(proc.acrescGecope) || 0;
+                const sup = -Math.abs(Number(proc.supressGecope) || 0);
+                return { acr, sup, rep: Number((acr + sup).toFixed(2)), fonte: 'GECOPE' };
+            }
+            const acr = Number(a.valor_aprovado) || 0;
+            const sup = -Math.abs(Number(a.valor_supressao) || 0);
+            const rep = a.valor_repercussao !== null && a.valor_repercussao !== undefined
+                ? Number(a.valor_repercussao) || 0 : Number((acr + sup).toFixed(2));
+            return { acr, sup, rep, fonte: 'SIGSOP' };
+        };
+        const acum = { acr: 0, sup: 0, rep: 0 };
+        let usouSigsop = false;
+        const linhas = ads.map(a => {
             const protocolo = String(a.nr_protocolo || '').trim();
             const proc = protocolo ? porNumero.get(protocolo) : null;
             if (protocolo) jaListados.add(protocolo);
+            const v = valoresAditivo(a, proc);
+            acum.acr += v.acr; acum.sup += v.sup; acum.rep += v.rep;
+            if (v.fonte === 'SIGSOP') usouSigsop = true;
             const dataProc = proc ? dateParaInput(proc.dataAprovacao) : '';
             const dataAd = gpDataBr(a.data_publicacao || a.data_assinatura);
-            listaAd.appendChild(linha({
-                processo: protocolo || (a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : 'Aditivo'),
-                dica: [a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : '', a.tipo_aditivo || ''].filter(Boolean).join(' · '),
-                status: proc ? (proc.status || '—') : 'Formalizado',
-                selo: proc ? classeBadgeStatus(proc.status) : '',
-                data: dataProc || (dataAd !== '—' ? dataAd : ''),
-                dataDica: dataProc ? 'Data de aprovação' : 'Data de publicação do aditivo',
-                valor: Number(a.valor_repercussao) || 0
-            }));
+            // Linha da tabela: processo | status | acréscimo | supressão | repercussão.
+            // Aditivo, tipo e data ficam na dica do processo; valor vindo do SIGSOP ganha um "*".
+            const tr = el('tr');
+            const tdNome = el('td', 'gp-adit-nome');
+            tdNome.appendChild(document.createTextNode(
+                protocolo || (a.nr_aditivo ? `Aditivo ${a.nr_aditivo}` : 'Aditivo')));
+            if (v.fonte === 'SIGSOP') tdNome.appendChild(el('span', 'gp-adit-tab-ast', '*'));
+            const dataTxt = dataProc ? `Aprovado em ${dataProc}` : (dataAd !== '—' ? `Publicado em ${dataAd}` : '');
+            tdNome.title = [a.nr_aditivo ? `${a.nr_aditivo}º aditivo` : '', a.tipo_aditivo || '', dataTxt,
+                v.fonte === 'SIGSOP' ? (proc ? 'Processo sem valores GECOPE lançados: valores do SIGSOP'
+                    : 'Processo não encontrado no GECOPE: valores do SIGSOP') : '']
+                .filter(Boolean).join(' · ');
+            tr.appendChild(tdNome);
+            const tdSt = el('td');
+            tdSt.appendChild(el('span', 'gp-adit-selo ' + (proc ? classeBadgeStatus(proc.status) : ''),
+                proc ? (proc.status || '—') : 'Formalizado'));
+            tr.appendChild(tdSt);
+            [v.acr, v.sup, v.rep].forEach(val => tr.appendChild(el('td', classeValor(val), gpReaisComSinal(val))));
+            return tr;
         });
-        if (b.origem === 'contrato' && b.obras > 1) {
-            notaAd.textContent = 'Aditivos do contrato, reunindo todas as obras.';
-        }
+        ['acr', 'sup', 'rep'].forEach(k => { acum[k] = Number(acum[k].toFixed(2)); });
+        // Os aditivos são do contrato inteiro: o % é sobre a base do contrato.
+        const pct = v => b.totalContrato > 0 ? formatarPercentualBase(v, b.totalContrato).texto : '';
+        resumoAd.replaceChildren();
+        const qtd = ads.length;
+        resumoAd.appendChild(el('div', 'gp-adit-acum-intro',
+            `Soma ${qtd > 1 ? `dos ${qtd} aditivos formalizados` : 'do aditivo formalizado'}`
+            + `${b.origem === 'contrato' && b.obras > 1 ? ' no contrato (todas as obras/fontes)' : ''}, `
+            + 'considerando os valores aprovados pela GECOPE em cada processo — os que efetivamente '
+            + 'foram levados à formalização.'
+            + (usouSigsop ? ' Onde o processo não tem esses valores no GECOPE, vale o registrado no SIGSOP (marcado com *).' : '')));
+        const grade = el('div', 'gp-adit-acum gp-adit-acum-total');
+        [['Acréscimo acumulado', acum.acr], ['Supressão acumulada', acum.sup], ['Repercussão acumulada', acum.rep]]
+            .forEach(([rotulo, valor]) => {
+                const item = el('div', 'gp-adit-acum-item');
+                item.appendChild(el('span', 'gp-adit-acum-rotulo', rotulo));
+                const linhaValor = el('span', 'gp-adit-acum-linha');
+                linhaValor.appendChild(el('span', classeValor(valor), gpReaisComSinal(valor)));
+                const p = pct(valor);
+                if (p) {
+                    linhaValor.appendChild(el('span', 'gp-adit-acum-pct', p));
+                    const info = el('i', 'bi bi-info-circle gp-adit-acum-info');
+                    const dicaPct = `Percentual calculado sobre o valor do contrato inteiro (base de cálculo: R$ ${formatCurrencyValue(b.totalContrato)}).`;
+                    info.title = dicaPct;
+                    info.setAttribute('aria-label', dicaPct);
+                    info.setAttribute('role', 'img');
+                    info.tabIndex = 0;
+                    linhaValor.appendChild(info);
+                }
+                item.appendChild(linhaValor);
+                grade.appendChild(item);
+            });
+        resumoAd.appendChild(grade);
+        const tabela = el('table', 'gp-adit-tabela');
+        const thead = el('thead');
+        const trH = el('tr');
+        [['Processo', ''], ['Status', ''], ['Acréscimo', 'is-num'], ['Supressão', 'is-num'], ['Repercussão', 'is-num']]
+            .forEach(([t, cls]) => { const th = el('th', cls, t); th.scope = 'col'; trH.appendChild(th); });
+        thead.appendChild(trH);
+        tabela.appendChild(thead);
+        const tbody = el('tbody');
+        linhas.forEach(tr => tbody.appendChild(tr));
+        tabela.appendChild(tbody);
+        listaAd.appendChild(tabela);
     }
 
     // (2) outros processos desta obra no GECOPE que ainda não são aditivo formalizado
@@ -2513,6 +2612,11 @@ function gpAtualizarIndicadores() {
 
     // Coluna "Diferença" da tabela da Análise financeira: GECOPE − Fiscalização, linha a linha.
     const v = id => { const el = document.getElementById(id); return el ? parseMoneyInput(el.value) : 0; };
+    // Valor zerado (e o % dele) fica em tom apagado: o olho vai para o que tem valor.
+    document.querySelectorAll('.gp-fin-tabela td').forEach(td => {
+        const val = td.querySelector('.gp-fin-valor[data-gp-v]');
+        if (val) td.classList.toggle('is-zero', Math.abs(v(val.dataset.gpV)) < 0.005);
+    });
     const b = gpBaseSelecao();
     const temBase = b && b.estado === 'ok' && b.total > 0;
 
@@ -2553,14 +2657,17 @@ function gpAtualizarIndicadores() {
         const [f, g] = valores[k];
         const d = Number((g - f).toFixed(2));
         const nada = Math.abs(f) < 0.005 && Math.abs(g) < 0.005;
-        cel.classList.remove('gp-val-neg', 'gp-val-pos', 'is-vazio');
+        // Valores iguais (e não nulos): "Sem diferença" no lugar de R$ 0,00 / 0,00%.
+        const igual = !nada && Math.abs(d) < 0.005;
+        cel.classList.remove('gp-val-neg', 'gp-val-pos', 'is-vazio', 'is-igual');
         if (nada) cel.classList.add('is-vazio');
+        else if (igual) cel.classList.add('is-igual');
         else if (d < -0.004) cel.classList.add('gp-val-neg');
         else if (d > 0.004) cel.classList.add('gp-val-pos');
-        cel.textContent = nada ? '—' : gpReaisComSinal(d);
+        cel.textContent = nada ? '—' : igual ? 'Sem diferença' : gpReaisComSinal(d);
         if (pctEl) {
             pctEl.classList.remove('is-pos', 'is-neg', 'is-zero', 'is-na');
-            if (!nada && temBase) {
+            if (!nada && !igual && temBase) {
                 const { texto, sinal } = formatarPercentualBase(d, b.total);
                 pctEl.textContent = texto;
                 pctEl.classList.add(sinal > 0 ? 'is-pos' : sinal < 0 ? 'is-neg' : 'is-zero');
@@ -5128,7 +5235,7 @@ function _updateReuniaoInterno() {
                 <div class="mt-1 text-muted" style="font-size: 0.75rem; font-weight: 500;"><i class="bi bi-calendar3 me-1"></i>${dias} dias</div>
             </td>
             <td style="max-width: 200px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4;">${escapeHTML(d.contratada)}</td>
-            <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: left;">${escapeHTML(d.descricao)}</td>
+            <td style="max-width: 280px; font-size: 0.82rem; color: var(--sop-slate-700); line-height: 1.4; text-align: justify; hyphens: auto;" lang="pt-BR">${escapeHTML(d.descricao)}</td>
         </tr>`);
 
         // Apensos: uma linha por apenso, logo abaixo do principal, nas MESMAS colunas da tabela

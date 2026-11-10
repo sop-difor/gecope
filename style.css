@@ -3292,7 +3292,7 @@
         .proc-apenso-meta { margin-top: 0.15rem; font-size: 0.72rem; color: var(--text-muted); }
         .proc-apenso-vazio { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
         .proc-apenso-txt { font-size: 0.78rem; color: var(--sop-slate-600, #475569); line-height: 1.4; }
-        .proc-apenso-desc { max-width: 280px; text-align: left; }
+        .proc-apenso-desc { max-width: 280px; text-align: justify; hyphens: auto; }
         .proc-avatar.proc-avatar-sm { width: 28px; height: 28px; font-size: 0.78rem; opacity: 0.85; }
 
         body.theme-dark .proc-table-wrap tbody tr.tr-apenso-row { --bs-table-bg: rgba(110, 160, 230, 0.07); }
@@ -4494,42 +4494,67 @@
         .gp-base[data-estado="erro"] {
             border-left-color: #b7791f;
         }
+        /* Faixa compacta, uma linha: "Base de cálculo ⓘ │ Contrato X · N obras/fontes · Obra do processo Y   Ver composição ⌄".
+           Quebra naturalmente em telas estreitas. O valor só aparece na composição e na dica. */
         .gp-base-topo {
             display: flex;
             flex-wrap: wrap;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 0.25rem 1.5rem;
-        }
-        .gp-base-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.125rem;
-            min-width: 0;
+            align-items: center;
+            gap: 0.35rem 0.9rem;
         }
         .gp-base-titulo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding-right: 0.9rem;
+            border-right: 1px solid var(--sop-slate-200, #e2e8f0);
             font-size: 0.8rem;
             font-weight: 600;
             color: var(--text-heading, #0f172a);
+            white-space: nowrap;
         }
+        .gp-base-ajuda {
+            cursor: help;
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--sop-slate-500, #64748b);
+        }
+        .gp-base-ajuda:hover,
+        .gp-base-ajuda:focus-visible { color: var(--text-heading, #0f172a); }
+        .gp-base-topo { flex-wrap: nowrap; }
         .gp-base-origem {
-            font-size: 0.8rem;
+            flex: 1 1 0;
+            min-width: 0;
+            font-size: 0.78rem;
+            line-height: 1.5;
             color: var(--sop-slate-600, #475569);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .gp-base-resumo {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.125rem;
+        .gp-base-origem.is-msg { white-space: normal; }
+        /* Só em tela de celular a faixa volta a quebrar em linhas. */
+        @media (max-width: 575.98px) {
+            .gp-base-topo { flex-wrap: wrap; }
+            .gp-base-titulo { border-right: 0; padding-right: 0; }
+            .gp-base-origem { flex-basis: 100%; order: 3; white-space: normal; }
         }
-        .gp-base-valor {
-            font-size: 1.15rem;
-            font-weight: 600;
-            line-height: 1.2;
-            font-variant-numeric: tabular-nums;
+        .gp-base-item + .gp-base-item::before {
+            content: "·";
+            margin: 0 0.4rem;
+            color: var(--sop-slate-400, #94a3b8);
+        }
+        .gp-base-item strong {
+            font-weight: 500;
             color: var(--text-heading, #0f172a);
+            font-variant-numeric: tabular-nums;
+            overflow-wrap: anywhere;
         }
         .gp-base-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-left: auto;
             padding: 0;
             border: 0;
             background: none;
@@ -4537,6 +4562,7 @@
             font-weight: 500;
             color: var(--sop-green, #007233);
             cursor: pointer;
+            white-space: nowrap;
         }
         .gp-base-toggle:hover { text-decoration: underline; }
         .gp-base-toggle:focus-visible {
@@ -4563,8 +4589,15 @@
             font-variant-numeric: tabular-nums;
             color: var(--text-heading, #0f172a);
         }
+        /* Linha de total = a base de cálculo, fechando a soma acima. */
+        .gp-base-lista .gp-base-lista-total {
+            margin-top: 0.2rem;
+            padding-top: 0.35rem;
+            border-top: 1px solid var(--sop-slate-200, #e2e8f0);
+            font-weight: 600;
+            color: var(--text-heading, #0f172a);
+        }
         @media (max-width: 575.98px) {
-            .gp-base-resumo { align-items: flex-start; }
             .gp-base-lista { margin-left: 0; }
         }
 
@@ -4587,6 +4620,103 @@
             color: var(--sop-slate-600, #475569);
         }
         .gp-base-bloco-nota:empty { display: none; }
+        /* Acumulado dos aditivos formalizados (Acréscimo · Supressão · Repercussão, valores GECOPE). */
+        .gp-adit-acum {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem 0.9rem;
+            margin-top: 0.4rem;
+        }
+        .gp-adit-acum-item { display: flex; flex-direction: column; min-width: 0; }
+        .gp-adit-acum-item .gp-adit-valor { text-align: left; min-width: 0; font-weight: 600; }
+        .gp-adit-acum-rotulo { font-size: 0.72rem; }
+        .gp-adit-acum-linha {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 0.15rem 0.4rem;
+        }
+        .gp-adit-acum-pct {
+            font-size: 0.75rem;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .gp-adit-acum-pct::before { content: "("; }
+        .gp-adit-acum-pct::after { content: ")"; }
+        .gp-adit-acum-info {
+            font-size: 0.75rem;
+            cursor: help;
+            opacity: 0.7;
+        }
+        .gp-adit-acum-info:hover,
+        .gp-adit-acum-info:focus-visible { opacity: 1; }
+        .gp-adit-acum-intro {
+            font-size: 0.75rem;
+            line-height: 1.45;
+            text-align: justify;
+            hyphens: auto;
+        }
+        /* Total em destaque discreto: faixa com fundo leve, separada dos cartões abaixo. */
+        .gp-adit-acum-total {
+            margin-top: 0.5rem;
+            padding: 0.55rem 0.75rem;
+            border-radius: 0.5rem;
+            background: var(--sop-slate-50, #f8fafc);
+            border: 1px solid var(--sop-slate-200, #e2e8f0);
+        }
+        /* Na caixa do acumulado, cada total fica centralizado na própria coluna. */
+        .gp-adit-acum-total .gp-adit-acum-item { align-items: center; text-align: center; }
+        .gp-adit-acum-total .gp-adit-acum-linha { justify-content: center; }
+        .gp-adit-acum-total .gp-adit-acum-item .gp-adit-valor { text-align: center; }
+        /* Tabela dos aditivos formalizados: processo | status | acréscimo | supressão | repercussão. */
+        .gp-adit-tabela-wrap {
+            margin-top: 0.5rem;
+            overflow-x: auto;
+        }
+        .gp-adit-tabela-wrap:empty { display: none; }
+        .gp-adit-tabela {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .gp-adit-tabela th {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--sop-slate-600, #475569);
+            border-bottom: 1px solid var(--sop-slate-200, #e2e8f0);
+            text-align: left;
+            white-space: nowrap;
+        }
+        .gp-adit-tabela td {
+            padding: 0.4rem 0.5rem;
+            border-top: 1px solid var(--sop-slate-200, #e2e8f0);
+            vertical-align: middle;
+        }
+        .gp-adit-tabela tbody tr:first-child td { border-top: 0; }
+        .gp-adit-tabela th:first-child,
+        .gp-adit-tabela td:first-child { padding-left: 0; }
+        .gp-adit-tabela th:last-child,
+        .gp-adit-tabela td:last-child { padding-right: 0; }
+        .gp-adit-tabela .is-num,
+        .gp-adit-tabela td.gp-adit-valor { text-align: right; white-space: nowrap; min-width: 0; }
+        .gp-adit-tabela td.gp-adit-nome { white-space: nowrap; cursor: help; }
+        .gp-adit-tab-ast { margin-left: 0.15rem; color: var(--sop-slate-600, #475569); }
+        @media (max-width: 575.98px) {
+            .gp-adit-acum { grid-template-columns: minmax(0, 1fr); }
+        }
+        body.theme-dark .gp-adit-acum-total {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.14);
+        }
+        body.theme-dark .gp-adit-acum-intro,
+        body.theme-dark .gp-adit-tabela th,
+        body.theme-dark .gp-adit-tab-ast { color: rgba(255, 255, 255, 0.68); }
+        body.theme-dark .gp-adit-tabela th,
+        body.theme-dark .gp-adit-tabela td { border-color: rgba(255, 255, 255, 0.14); }
         .gp-adit-lista {
             list-style: none;
             margin: 0.5rem 0 0;
@@ -4738,11 +4868,19 @@
         body.theme-dark .gp-base[data-estado="vazio"],
         body.theme-dark .gp-base[data-estado="erro"] { border-left-color: #e0a63a; }
         body.theme-dark .gp-base-titulo,
-        body.theme-dark .gp-base-valor,
+        body.theme-dark .gp-base-item strong,
+        body.theme-dark .gp-base-ajuda:hover,
+        body.theme-dark .gp-base-ajuda:focus-visible,
         body.theme-dark .gp-base-lista dd { color: #f1f5f9; }
         body.theme-dark .gp-base-origem,
+        body.theme-dark .gp-base-ajuda,
         body.theme-dark .gp-base-lista dt { color: rgba(255, 255, 255, 0.68); }
-        body.theme-dark .gp-base-lista { border-top-color: rgba(255, 255, 255, 0.14); }
+        body.theme-dark .gp-base-item + .gp-base-item::before { color: rgba(255, 255, 255, 0.4); }
+        body.theme-dark .gp-base-titulo,
+        body.theme-dark .gp-base-lista,
+        body.theme-dark .gp-base-lista dt.gp-base-lista-total,
+        body.theme-dark .gp-base-lista dd.gp-base-lista-total { border-color: rgba(255, 255, 255, 0.14); }
+        body.theme-dark .gp-base-lista dt.gp-base-lista-total { color: #f1f5f9; }
         body.theme-dark .gp-base-toggle { color: #6ee7a0; }
         body.theme-dark .gp-pct.is-pos { color: #6ee7a0; }
         body.theme-dark .gp-pct.is-neg { color: #ff9b91; }
@@ -5427,64 +5565,105 @@
            entre as linhas e um filete duplo antes do total (pedido do usuário, 06/11/2026). */
         .gp-fin-tabela {
             width: 100%;
-            table-layout: fixed;
+            table-layout: auto; /* colunas pelo conteúdo: valor + % cabem lado a lado */
             border-collapse: collapse;
             font-variant-numeric: tabular-nums;
         }
-        .gp-fin-tabela .gp-fin-c-rot { width: 22%; }
+        .gp-fin-tabela .gp-fin-c-rot { width: 1%; } /* encolhe até o rótulo mais longo */
+        .gp-fin-tabela th[scope="row"] { white-space: nowrap; }
+        /* Valor e % sempre na mesma linha (a célula não quebra; só em janela estreita, abaixo). */
+        .gp-fin-tabela tbody td,
+        .gp-fin-tabela tfoot td { white-space: nowrap; }
+        /* Cabeçalho no padrão da tabela de aditivos: rótulo pequeno, maiúsculo e discreto. */
         .gp-fin-tabela thead th {
-            padding: 0 0 0.6rem 1rem;
+            padding: 0 0 0.5rem 1rem;
             text-align: right;
-            font-size: var(--gc-fs-rotulo);
-            font-weight: 700;
-            color: var(--text-heading);
-            border-bottom: 2px solid var(--gp-linha);
+            vertical-align: bottom;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--sop-slate-600, #475569);
+            border-bottom: 1px solid var(--gp-linha);
         }
-        .gp-fin-tabela thead td { border-bottom: 2px solid var(--gp-linha); }
+        .gp-fin-tabela thead td { border-bottom: 1px solid var(--gp-linha); }
+        .gp-fin-th-sub {
+            display: block;
+            margin-top: 0.1rem;
+            font-size: 0.66rem;
+            font-weight: 400;
+            letter-spacing: 0;
+            text-transform: none;
+            opacity: 0.8;
+        }
         .gp-fin-tabela th[scope="row"] {
-            padding: 0.8rem 1rem 0.8rem 0;
+            padding: 0.65rem 1rem 0.65rem 0;
             text-align: left;
             vertical-align: top;
-            font-size: var(--gc-fs-rotulo);
+            font-size: 0.875rem;
             font-weight: 500;
-            color: var(--text-muted);
+            color: var(--text-heading);
         }
         .gp-fin-tabela tbody td {
-            padding: 0.8rem 0 0.8rem 1rem;
+            padding: 0.65rem 0 0.65rem 1rem;
             text-align: right;
             vertical-align: top;
         }
         .gp-fin-tabela tbody tr + tr > * { border-top: 1px solid var(--gp-linha); }
         .gp-fin-tabela td .gp-fin-valor {
             display: block;
-            font-size: 0.9375rem;
+            font-size: 0.9rem;
             font-weight: 500;
             line-height: 1.3;
             white-space: nowrap;
             color: var(--text-heading);
         }
+        /* Valor e % na mesma linha, "R$ 191.219,84 (+1,64%)"; só em janela estreita (container query) o % desce. */
+        .gp-fin-tabela td > .gp-fin-valor,
+        .gp-fin-tabela td > .gp-pct {
+            display: inline-block;
+            vertical-align: baseline;
+        }
         .gp-fin-tabela td .gp-pct {
-            display: block;
-            min-height: 1.2em;
-            margin-top: 0.15rem;
-            font-size: 0.75rem;
+            min-height: 0;
+            margin: 0 0 0 0.35rem;
+            font-size: 0.72rem;
             font-weight: 500;
+            white-space: nowrap;
             cursor: default;
         }
+        .gp-fin-tabela td .gp-pct:not(:empty):not(.is-na)::before { content: "("; }
+        .gp-fin-tabela td .gp-pct:not(:empty):not(.is-na)::after { content: ")"; }
+        .gp-fin-tabela td .gp-pct:empty { display: none; }
         .gp-fin-tabela .gp-fin-valor.gp-val-neg { color: #b42318; }
         .gp-fin-tabela .gp-fin-valor.gp-val-pos { color: var(--gc-acao); }
         .gp-fin-tabela .gp-fin-valor.is-vazio { color: var(--text-muted); font-weight: 400; }
+        /* Zerado: valor e % apagados. */
+        .gp-fin-tabela td.is-zero .gp-fin-valor,
+        .gp-fin-tabela td.is-zero .gp-pct { color: var(--text-muted); font-weight: 400; opacity: 0.75; }
+        /* Diferença nula entre valores iguais: selo discreto com ✓. */
+        .gp-fin-tabela .gp-fin-valor.is-igual {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+        .gp-fin-tabela .gp-fin-valor.is-igual::before {
+            content: "\2713";
+            margin-right: 0.3rem;
+            color: var(--gc-acao);
+        }
 
-        /* Total: filete duplo acima e valores em negrito */
+        /* Total: um filete firme acima, valores em negrito */
         .gp-fin-tabela tfoot th[scope="row"],
         .gp-fin-tabela tfoot td {
-            padding-top: 0.85rem;
-            border-top: 3px double var(--sop-slate-300, #cbd5e1);
+            padding-top: 0.75rem;
+            border-top: 2px solid var(--sop-slate-300, #cbd5e1);
         }
-        .gp-fin-tabela tfoot td { padding: 0.85rem 0 0.2rem 1rem; text-align: right; vertical-align: top; }
+        .gp-fin-tabela tfoot td { padding: 0.75rem 0 0.2rem 1rem; text-align: right; vertical-align: top; }
         .gp-fin-tabela tfoot th[scope="row"] { font-weight: 700; color: var(--text-heading); }
-        .gp-fin-tabela tfoot .gp-fin-valor { font-size: 1rem; font-weight: 700; }
-        .gp-fin-tabela tfoot .gp-pct { font-weight: 700; }
+        .gp-fin-tabela tfoot .gp-fin-valor { font-size: 0.95rem; font-weight: 700; }
+        .gp-fin-tabela tfoot .gp-fin-valor.is-igual { font-size: 0.8rem; font-weight: 600; }
+        .gp-fin-tabela tfoot .gp-pct { font-weight: 600; }
         .gp-fin-selo {
             display: inline-block;
             padding: 0.3rem 0.8rem;
@@ -5513,7 +5692,8 @@
         .gp-fin-dif[hidden] { display: none; }
         .gp-fin-dif strong { font-variant-numeric: tabular-nums; }
         @container gpcorpo (max-width: 600px) {
-            .gp-fin-tabela .gp-fin-c-rot { width: 25%; }
+            .gp-fin-tabela tbody td,
+            .gp-fin-tabela tfoot td { white-space: normal; }
             .gp-fin-tabela thead th,
             .gp-fin-tabela tbody td,
             .gp-fin-tabela tfoot td { padding-left: 0.5rem; }
@@ -5645,6 +5825,8 @@
         body.theme-dark .gp-fin-tabela tfoot td { border-top-color: rgba(255, 255, 255, 0.28); }
         body.theme-dark .gp-fin-tabela .gp-fin-valor.gp-val-neg { color: #ff9b91; }
         body.theme-dark .gp-fin-tabela .gp-fin-valor.gp-val-pos { color: #6ee7a0; }
+        body.theme-dark .gp-fin-tabela thead th { color: rgba(255, 255, 255, 0.68); }
+        body.theme-dark .gp-fin-tabela .gp-fin-valor.is-igual::before { color: #6ee7a0; }
         body.theme-dark .gp-objeto-toggle { color: #6ee7a0; }
         body.theme-dark .gp-marco-fim { --gp-marco-cor: #6ee7a0; }
         body.theme-dark .gp-marco-meta { --gp-marco-cor: #e0a63a; }
