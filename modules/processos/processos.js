@@ -5107,7 +5107,7 @@ function _updateReuniaoInterno() {
                 </div>
             </td>
             <td class="text-center"><i class="bi ${isPrioritario(d) ? 'bi-star-fill' : 'bi-star'} proc-star-prioritario" data-proc="${escapeHTML(d.processo)}" style="color: ${isPrioritario(d) ? 'var(--sop-orange)' : 'var(--sop-slate-200)'}; font-size: 1.1rem; cursor: ${uRole === 'admin' ? 'pointer' : 'not-allowed'};" title="${uRole === 'admin' ? (isPrioritario(d) ? 'Remover prioridade' : 'Marcar como prioritário') : 'Você não tem permissão'}"></i></td>
-            <td><div class="proc-nup-linha"><span class="proc-nup-num">${escapeHTML(d.processo)}</span>${botaoFichaObraHTML(d)}${chipApensosHTML}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
+            <td><div class="proc-nup-linha"><span class="proc-nup-num">${escapeHTML(d.processo)}</span>${botaoCopiarProcessoHTML(d)}${botaoFichaObraHTML(d)}${chipApensosHTML}</div><div class="mt-1" style="font-size: 0.76rem; color: var(--sop-slate-700); line-height: 1.4;"><i class="bi bi-person-fill me-1"></i>${escapeHTML(fiscalNome)}${avisoVinculoHTML}</div></td>
             <td class="text-center">
                 <div class="mb-1"><span class="badge rounded-pill ${mCls} badge-meta-size">${mSt}</span></div>
                 <div style="font-size: 0.75rem; color: var(--sop-blue); white-space: nowrap; text-align: center; ${metaStyle}" onclick="${metaOnclick}" title="${uRole === 'admin' ? 'Alterar Meta' : 'Você não tem permissão'}">
@@ -5842,6 +5842,50 @@ const FICHA_OBRA_AVISOS = {
 };
 const _fichaObra = { overlay: null, frame: null, pronta: false, pedido: null };
 
+// Botão de copiar o número do processo, ao lado do NUP na lista.
+function botaoCopiarProcessoHTML(d) {
+    const nup = String(d.processo || '');
+    if (!nup) return '';
+    return `<button type="button" class="proc-copiar-btn" data-copiar-proc="${escapeHTML(nup)}" title="Copiar número do processo" aria-label="${escapeHTML(`Copiar o número do processo ${nup}`)}"><i class="bi bi-copy" aria-hidden="true"></i></button>`;
+}
+
+async function _copiarTexto(texto) {
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(texto);
+        return;
+    }
+    // http sem contexto seguro: cai no execCommand
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (!ok) throw new Error('execCommand falhou');
+}
+
+async function copiarNumeroProcesso(btn) {
+    const nup = btn.dataset.copiarProc || '';
+    const icone = btn.querySelector('i');
+    let ok = true;
+    try { await _copiarTexto(nup); } catch (e) { ok = false; }
+    clearTimeout(btn._copiarTimer);
+    btn.classList.toggle('is-copiado', ok);
+    btn.classList.toggle('is-erro', !ok);
+    if (icone) icone.className = ok ? 'bi bi-check2' : 'bi bi-x-lg';
+    btn.title = ok ? 'Copiado!' : 'Não foi possível copiar';
+    btn.setAttribute('aria-label', ok ? `Número ${nup} copiado` : 'Não foi possível copiar o número');
+    btn._copiarTimer = setTimeout(() => {
+        btn.classList.remove('is-copiado', 'is-erro');
+        if (icone) icone.className = 'bi bi-copy';
+        btn.title = 'Copiar número do processo';
+        btn.setAttribute('aria-label', `Copiar o número do processo ${nup}`);
+    }, 1800);
+}
+
 function botaoFichaObraHTML(d) {
     const temObra = !!d.codigoObra;
     const rotulo = temObra ? 'Abrir a ficha da obra' : 'Processo sem obra vinculada';
@@ -5980,6 +6024,12 @@ if (mt.body) {
         if (!_fichaObra.frame && e.target.closest?.('.proc-ficha-btn:not([aria-disabled="true"])')) precarregarFichaObra();
     }));
     mt.body.addEventListener('click', (e) => {
+        const btnCopiar = e.target.closest('.proc-copiar-btn');
+        if (btnCopiar) {
+            e.stopPropagation();
+            copiarNumeroProcesso(btnCopiar);
+            return;
+        }
         const btn = e.target.closest('.proc-ficha-btn');
         if (!btn) return;
         e.stopPropagation();
