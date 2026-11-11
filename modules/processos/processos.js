@@ -3665,18 +3665,31 @@ async function executarAcaoDetalhes(actionType) {
             }
         }
 
-        // 2.3 Se o Status for AGUAR. APROVAÇÃO ou APROVADO, ACRÉSCIMO, SUPRESSÃO e APROVAÇÃO GECOPE obrigatórios
-        if (statusAtual === 'AGUAR. APROVAÇÃO' || statusAtual === 'APROVADO') {
+        // 2.3 Requisitos para aprovar (status AGUAR. APROVAÇÃO ou APROVADO): ACRÉSCIMO e
+        // SUPRESSÃO (GECOPE), data de APROVAÇÃO GECOPE e ANALISTA (regra do analista desde
+        // 11/11/2026). Vale também para AGUAR. APROVAÇÃO porque é dele que a sincronizar-suite
+        // passa sozinha a APROVADO — barrar só o APROVADO deixaria a aprovação automática passar.
+        const ehStatusDeAprovacao = statusAtual === 'AGUAR. APROVAÇÃO' || statusAtual === 'APROVADO';
+        if (ehStatusDeAprovacao) {
             const valAcrescG = document.getElementById('det_acresc_g').value.trim();
             const valSupressG = document.getElementById('det_supress_g').value.trim();
             const valAprovacaoG = document.getElementById('det_data_aprovacao').value.trim();
+            const elAnalista = document.getElementById('det_analista');
+            const valAnalista = elAnalista ? elAnalista.value.trim() : '';
 
-            if (!valAcrescG || !valSupressG || !valAprovacaoG) {
+            const faltando = [];
+            if (!valAcrescG) faltando.push('ACRÉSCIMO (GECOPE)');
+            if (!valSupressG) faltando.push('SUPRESSÃO (GECOPE)');
+            if (!valAprovacaoG) faltando.push('APROVAÇÃO GECOPE (data)');
+            if (!valAnalista) faltando.push('ANALISTA DESIGNADO');
+
+            if (faltando.length) {
                 mostrarAbaGerenciarProcesso('gp-tab-geral-btn');
-                // Abre as duas seções envolvidas (financeira e cronograma), já que o aviso cita ambas.
+                // Abre as seções envolvidas (financeira, cronograma, responsáveis).
                 if (!valAcrescG || !valSupressG) gpRevelarCampo('det_acresc_g');
                 if (!valAprovacaoG) gpRevelarCampo('det_data_aprovacao');
-                alert(`Para o status "${statusAtual}", os campos de ACRÉSCIMO (GECOPE), SUPRESSÃO (GECOPE) e APROVAÇÃO GECOPE devem estar preenchidos.`);
+                if (!valAnalista) gpRevelarCampo(elAnalista || 'det_analista');
+                alert(`Para o status "${statusAtual}", preencha: ${faltando.join(', ')}.`);
                 return;
             }
         }
@@ -3687,6 +3700,54 @@ async function executarAcaoDetalhes(actionType) {
             alert('É obrigatório preencher o Checklist de Documentação do Aditivo antes de salvar o processo com este status.');
             abrirModalChecklistAditivo();
             return;
+        }
+
+        // 2.5 Curva ABC obrigatória para AGUAR. APROVAÇÃO/APROVADO (desde 11/11/2026):
+        // o processo precisa ter Curva ABC importada e, na versão ATUAL (maior `versao`),
+        // todos os itens da classe A analisados — status_analise "ok" ou "inconsistencia";
+        // nenhum "pendente". A classe é a gravada na importação (curva_abc_itens.classe).
+        // Consulta na hora de salvar (o resumo do cartão carrega em paralelo e pode não
+        // ter terminado). Erro de leitura bloqueia: sem confirmar, não aprova.
+        if (ehStatusDeAprovacao) {
+            let versaoAtual = null;
+            let pendentesA = 0;
+            try {
+                const { data: versoes, error } = await sbClient
+                    .from('curva_abc_versoes')
+                    .select('id, versao')
+                    .eq('processo_id', String(idUnico))
+                    .order('versao', { ascending: false })
+                    .limit(1);
+                if (error) throw error;
+                versaoAtual = (versoes && versoes[0]) || null;
+
+                if (versaoAtual) {
+                    const { count, error: errItens } = await sbClient
+                        .from('curva_abc_itens')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('versao_id', versaoAtual.id)
+                        .eq('classe', 'A')
+                        .eq('status_analise', 'pendente');
+                    if (errItens) throw errItens;
+                    pendentesA = count || 0;
+                }
+            } catch (e) {
+                console.error('Erro ao verificar Curva ABC do processo:', e);
+                alert('Não foi possível verificar a Curva ABC do processo. Tente salvar novamente.');
+                return;
+            }
+            if (!versaoAtual) {
+                mostrarAbaGerenciarProcesso('gp-tab-tecnica-btn');
+                alert(`Para o status "${statusAtual}", é obrigatório importar a Curva ABC do processo (aba Análise Técnica).`);
+                return;
+            }
+            if (pendentesA > 0) {
+                mostrarAbaGerenciarProcesso('gp-tab-tecnica-btn');
+                const versaoTxt = String(versaoAtual.versao).padStart(2, '0');
+                alert(`Para o status "${statusAtual}", todos os itens da classe A da Curva ABC (versão ${versaoTxt}) devem estar analisados. `
+                    + `Ainda há ${pendentesA} item(ns) da classe A pendente(s) — marque cada um como OK ou Inconsistência.`);
+                return;
+            }
         }
 
         const formData = new FormData(form);
