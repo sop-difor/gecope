@@ -21,6 +21,7 @@
     <!-- NOSSO NOVO ARQUIVO DE ESTILOS MODULARIZADO (A Mágica acontece aqui!) -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="modules/curva-abc/conferencia.css">
+    <link rel="stylesheet" href="modules/curva-abc/comparacao.css">
 
     <!-- Scripts Críticos e Bibliotecas (Mantidos) -->
     <link rel="preconnect" href="https://qexdnxqmiaarzwwwrcor.supabase.co" crossorigin>
@@ -2008,6 +2009,11 @@
                             <span class="cv-spacer"></span>
                             <span class="cv-eyebrow" id="cv-tblN"></span>
                             <span class="cv-tbar-actions" style="display:flex;gap:10px;flex-wrap:wrap">
+                                <button class="cv-ghost" id="cv-btnOkLote" type="button" style="display:none"
+                                    title="Marca como OK os itens sem nenhuma alteração em relação à versão anterior, onde foram analisados como OK">
+                                    <i class="bi bi-check2-all"></i> <span id="cv-btnOkLoteTxt">OK em lote</span>
+                                </button>
+                                <select id="cv-filtroCmp" style="display:none" aria-label="Filtrar pela comparação com a versão anterior"></select>
                                 <input type="text" id="cv-busca" placeholder="Filtrar por conta, código ou descrição"
                                     style="min-width:300px">
                             </span>
@@ -5174,6 +5180,8 @@
                                                                     <script src="modules/administracao/admin.js"></script>
                                                                     <script src="modules/curva-abc/conferencia_motor.js"></script>
                                                                     <script src="modules/curva-abc/conferencia.js"></script>
+                                                                    <script src="modules/curva-abc/comparacao_motor.js"></script>
+                                                                    <script src="modules/curva-abc/comparacao.js"></script>
                                                                     <script src="modules/curva-abc/curva_abc.js"></script>
                                                                     <script src="modules/curva-abc/curva_abc_processo.js"></script>
                                                                     <script src="modules/tabelas/tabelas.js"></script>

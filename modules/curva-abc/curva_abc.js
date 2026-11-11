@@ -14,7 +14,8 @@
     aoaAprovado: null, /* matriz completa da planilha enviada (serviços inalterados incluídos) — usada na Conferência Orçamentária */
     tipoPlanilha: null, avisoPlanilha: "", /* "completa" | "alteracoes" | null (ConferenciaMotor.tipoPlanilha) */
     /* vínculo com um processo (Gerenciar Processo): curva_abc_versoes/curva_abc_itens */
-    processoVinculado: null, versaoCarregadaDb: null, versaoMaisRecenteDoVinculo: null, somenteLeitura: false
+    processoVinculado: null, versaoCarregadaDb: null, versaoMaisRecenteDoVinculo: null, somenteLeitura: false,
+    versoesDoVinculo: [] /* todas as versões do processo vinculado (mais nova primeiro) — usada pela comparação entre versões */
   };
 
   /* ---------- utilidades ---------- */
@@ -135,6 +136,7 @@
     state.versaoCarregadaDb = null; /* upload novo: ainda não foi salvo como versão de nenhum processo */
     state.aoaAprovado = aoa;
     cvConfLimpar();
+    cvCmpLimpar(); /* upload novo ainda não é versão salva: nada a comparar */
     cvClassificarPlanilha(aoa);
     var h = acharLinhaCabecalho(aoa);
     state.headerRow = h;
@@ -466,7 +468,7 @@
       { key: "rank", title: "#", cls: "cv-rank", mostrar: true, render: function (x) { return '<td class="cv-rank">' + x.pos + '</td>'; } },
       { key: "conta", title: "Conta", cls: "cv-conta", mostrar: true, render: function (x) { return '<td class="cv-conta">' + esc(x.conta) + '</td>'; } },
       { key: "comp", title: "Comp.", cls: "cv-conta", mostrar: true, render: function (x) { return '<td class="cv-conta">' + esc(x.comp) + '</td>'; } },
-      { key: "desc", title: "Descrição", cls: "", mostrar: true, render: function (x) { return '<td class="cv-desc">' + esc(x.desc) + '</td>'; } },
+      { key: "desc", title: "Descrição", cls: "", mostrar: true, render: function (x) { return '<td class="cv-desc">' + esc(x.desc) + (cvCmpAtiva() ? window.CvComparacao.botao(x) : "") + '</td>'; } },
       { key: "un", title: "UN", cls: "cv-center", mostrar: true, render: function (x) { return '<td class="cv-center">' + esc(x.un) + '</td>'; } },
       { key: "qtd", title: "Qtd.", cls: "cv-num", mostrar: true, render: function (x) { return '<td class="cv-num">' + qty(x.qtdBase) + '</td>'; } },
       { key: "acrescQ", title: "Acresc.", cls: "cv-num", mostrar: mostrarAcresc, render: function (x) { return '<td class="cv-num">' + qty(x.acrescQ) + '</td>'; } },
@@ -492,8 +494,12 @@
   function desenhaTabela() {
     var it = state.curva;
     var f = norm($("cv-busca").value);
+    cvAtualizarControlesCmp();
+    var fc = cvFiltroCmp();
     var lista = f ? it.filter(function (x) { return norm(x.desc).indexOf(f) > -1 || norm(x.conta).indexOf(f) > -1 || norm(x.comp).indexOf(f) > -1; })
-      : it.slice(0, state.limite);
+      : (fc ? it.slice() : it.slice(0, state.limite));
+    if (fc) lista = lista.filter(function (x) { return window.CvComparacao.filtrar(x, fc); });
+    state.listaVisivel = lista; /* a janela da comparação navega por estes itens */
     var colunas = montarColunasTabela();
     var colunasVisiveis = colunas.filter(function (col) { return col.mostrar; });
     var numCols = colunasVisiveis.length + (state.processoVinculado ? 2 : 0) + (cvConfAtiva() ? 1 : 0);
@@ -501,7 +507,7 @@
     renderCabecalhoTabela();
     for (var i = 0; i < lista.length; i++) {
       var x = lista[i];
-      if (!f && ultimo && ultimo !== x.classe) {
+      if (!f && !fc && ultimo && ultimo !== x.classe) {
         rows.push('<tr class="cv-cut"><td colspan="' + numCols + '">corte da classe ' + ultimo + ' para a classe ' + x.classe + ' &nbsp;·&nbsp; acumulado ' + pct(lista[i - 1].pctAcum) + '</td></tr>');
       }
       ultimo = x.classe;
@@ -511,10 +517,10 @@
       var celulas = colunasVisiveis.map(function (col) { return col.render(x); }).join("");
       rows.push('<tr class="' + linhaClasse + '">' + celulas + (cvConfAtiva() ? window.CvConferencia.celula(x.conta) : "") + (state.processoVinculado ? colunasAnalise(x) : "") + '</tr>');
     }
-    if (!rows.length) rows.push('<tr><td colspan="' + numCols + '" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca.</td></tr>');
+    if (!rows.length) rows.push('<tr><td colspan="' + numCols + '" style="padding:18px">Nenhum item corresponde ao filtro. Ajuste o texto da busca' + (fc ? " ou o filtro da comparação" : "") + '.</td></tr>');
     $("cv-tbody").innerHTML = rows.join("");
-    $("cv-tblN").textContent = f
-      ? lista.length + " item(ns) encontrado(s) na busca"
+    $("cv-tblN").textContent = (f || fc)
+      ? lista.length + " item(ns) encontrado(s)" + (f && fc ? " na busca e no filtro" : (f ? " na busca" : " no filtro"))
       : (lista.length < it.length ? "exibindo os " + lista.length + " maiores de " + it.length : it.length + " itens");
   }
 
@@ -547,6 +553,82 @@
     state.aoaAprovado = aoa;
     return state.aoaAprovado;
   }
+  /* ---------- Comparação entre versões (janelas: modules/curva-abc/comparacao.js) ---------- */
+  function cvCmpAtiva() { return !!(window.CvComparacao && window.CvComparacao.ativa()); }
+  function cvCmpLimpar() { if (window.CvComparacao) window.CvComparacao.limpar(); }
+  function cvCmpContexto() {
+    return {
+      versoes: state.versoesDoVinculo,
+      versaoAtual: state.versaoCarregadaDb,
+      itensAtuais: function () { return state.curva; },
+      itensVisiveis: function () { return state.listaVisivel || state.curva; },
+      podeEditar: function () { return cvPodeEscrever() && !state.somenteLeitura; },
+      gravarStatus: cvGravarStatusItem,         /* (dbId, status) -> null | mensagem de erro */
+      gravarComentario: cvGravarComentarioItem, /* (dbId, html)   -> null | mensagem de erro */
+      aoAtualizar: function () { if (state.curva && state.curva.length) desenhaTabela(); }
+    };
+  }
+  /* só com versão salva do processo em tela e alguma versão anterior a ela */
+
+  /* filtro "Comparação" e botão "OK em lote" na barra da tabela (só com a comparação ligada) */
+  function cvFiltroCmp() {
+    var sel = $("cv-filtroCmp");
+    return (sel && cvCmpAtiva() && sel.value) ? sel.value : "";
+  }
+  function cvAtualizarControlesCmp() {
+    var sel = $("cv-filtroCmp"), btn = $("cv-btnOkLote"), ativa = cvCmpAtiva();
+    if (sel) {
+      sel.style.display = ativa ? "" : "none";
+      if (ativa) {
+        var atual = sel.value, ops = window.CvComparacao.opcoesFiltro();
+        if (atual && !ops.some(function (o) { return o.v === atual; })) atual = "";
+        sel.innerHTML = '<option value="">Comparação com ' + esc(window.CvComparacao.versaoBase()) + ': todos</option>'
+          + ops.map(function (o) { return '<option value="' + o.v + '">' + esc(o.rot) + " (" + o.n + ")</option>"; }).join("");
+        sel.value = atual;
+      } else sel.value = "";
+    }
+    if (btn) {
+      var n = ativa && cvPodeEscrever() && !state.somenteLeitura ? window.CvComparacao.candidatosOkLote().length : 0;
+      btn.style.display = n ? "" : "none";
+      var t = $("cv-btnOkLoteTxt"); if (t) t.textContent = "OK em lote (" + n + ")";
+    }
+  }
+  /* marca como OK, de uma vez, os itens iguais aos da versão anterior que lá foram analisados como OK */
+  async function cvOkEmLote() {
+    if (!cvCmpAtiva() || !cvPodeEscrever() || state.somenteLeitura) return;
+    var itens = window.CvComparacao.candidatosOkLote();
+    if (!itens.length) return;
+    var nA = itens.filter(function (x) { return x.classe === "A"; }).length, vb = esc(window.CvComparacao.versaoBase());
+    var ok = await cvConfirmar("Marcar " + itens.length + " ite" + (itens.length > 1 ? "ns" : "m") + " como OK?",
+      "São itens <b>sem nenhuma alteração</b> de quantidade ou valor em relação à " + vb + ", onde foram analisados como <b>OK</b>"
+      + (nA ? " (" + nA + " da classe A)" : "") + ". Itens já analisados nesta versão não são alterados.",
+      { confirmarTexto: "Sim, marcar como OK" });
+    if (!ok) return;
+    var btn = $("cv-btnOkLote"); if (btn) btn.disabled = true;
+    var patch = {
+      status_analise: "ok",
+      analisado_por: sessionStorage.getItem("sop_user_name") || ((typeof getCurrentUserEmail === "function") ? getCurrentUserEmail() : "") || "Usuário",
+      analisado_em: new Date().toISOString()
+    };
+    var feitos = 0, erroMsg = null;
+    try {
+      for (var i = 0; i < itens.length; i += 200) {
+        var parte = itens.slice(i, i + 200);
+        var r = await sbClient.from("curva_abc_itens").update(patch).in("id", parte.map(function (x) { return x.dbId; })).eq("status_analise", "pendente");
+        if (r.error) { erroMsg = r.error.message; break; }
+        parte.forEach(function (x) { x.statusAnalise = "ok"; });
+        feitos += parte.length;
+      }
+    } catch (ex) { erroMsg = "Verifique sua conexão com a internet e tente novamente."; }
+    if (btn) btn.disabled = false;
+    desenhaTabela();
+    if (typeof carregarCurvaAbcResumo === "function" && state.processoVinculado) carregarCurvaAbcResumo(state.processoVinculado.processo, state.processoVinculado.id);
+    if (erroMsg) cvAlerta("Erro ao marcar em lote", (feitos ? feitos + " item(ns) foram marcados antes do erro. " : "") + esc(erroMsg));
+    else if (typeof registrarAtividade === "function" && state.processoVinculado) {
+      registrarAtividade("PROCESSO", "marcou " + feitos + " item(ns) da Curva ABC como OK em lote (sem alteração desde a " + window.CvComparacao.versaoBase() + ")", state.processoVinculado.processo);
+    }
+  }
+
   function cvConfAtiva() { return !!(window.CvConferencia && window.CvConferencia.ativa()); }
   function cvConfLimpar() { if (window.CvConferencia) window.CvConferencia.limpar(); }
   function cvAbrirConferencia() {
@@ -698,6 +780,7 @@
     state.cols = []; state.dados = []; state.arquivoOriginal = null; state.aoaAprovado = null;
     state.tipoPlanilha = null; state.avisoPlanilha = "";
     cvConfLimpar();
+    cvCmpLimpar(); /* outra versão em tela: a comparação anterior não vale mais */
     state.curva = itens;
     state.total = Number(versaoRegistro.total_valor) || itens.reduce(function (s, x) { return s + x.ord; }, 0);
     state.fA = Number(versaoRegistro.criterio_a) || 80;
@@ -717,6 +800,9 @@
     $("cv-params").style.display = "";
 
     render();
+    /* havendo versão anterior, já liga a comparação: cada serviço ganha o botão que
+       compara as quantidades (não bloqueia a abertura da versão) */
+    if (window.CvComparacao && state.processoVinculado) window.CvComparacao.preparar(cvCmpContexto());
   }
 
   async function vincularProcesso(processoStrDigitado) {
@@ -736,6 +822,7 @@
     });
     $("cv-btnConf").style.display = "none";
     cvConfLimpar();
+    cvCmpLimpar();
     $("cv-tbody").innerHTML = "";
     $("cv-chart").innerHTML = "";
     var busca = $("cv-busca"); if (busca) busca.value = "";
@@ -792,7 +879,9 @@
     state.processoVinculado = null;
     state.versaoCarregadaDb = null;
     state.versaoMaisRecenteDoVinculo = null;
+    state.versoesDoVinculo = [];
     state.somenteLeitura = false;
+    if (window.CvComparacao) window.CvComparacao.esquecer();
     pane.classList.remove("tem-vinculo");
     atualizarVinculoUI();
     resetVisualizacao();
@@ -800,6 +889,8 @@
 
   async function carregarCurvaAbcDoProcesso(processoId, processoStr, versaoId, descricao, forcarNova) {
     limpaErro();
+    /* outro processo: a comparação (e o cache de versões de base) do anterior não vale aqui */
+    if (window.CvComparacao && (!state.processoVinculado || String(state.processoVinculado.id) !== String(processoId))) window.CvComparacao.esquecer();
     state.processoVinculado = { id: processoId, processo: processoStr, descricao: descricao || "" };
     pane.classList.add("tem-vinculo");
     atualizarVinculoUI();
@@ -812,6 +903,7 @@
     if (error) { erro("Erro ao consultar Curva ABC do processo: " + esc(error.message)); return; }
 
     state.versaoMaisRecenteDoVinculo = (data && data.length) ? data[0] : null;
+    state.versoesDoVinculo = data || [];
 
     if (forcarNova || !data || !data.length) {
       /* nenhuma versão salva ainda (ou o analista pediu explicitamente uma nova
@@ -920,6 +1012,7 @@
       }
 
       state.versaoMaisRecenteDoVinculo = insVersao.data;
+      state.versoesDoVinculo = [insVersao.data].concat(state.versoesDoVinculo || []);
       await carregarVersaoDb(insVersao.data, false);
       if (typeof carregarCurvaAbcResumo === "function") {
         carregarCurvaAbcResumo(state.processoVinculado.processo, state.processoVinculado.id);
@@ -964,18 +1057,47 @@
       if (desmarcando) novoStatus = "pendente";
     }
 
+    var msg = await cvGravarStatusItem(dbId, novoStatus);
+    if (msg) cvAlerta("Erro ao salvar", esc(msg));
+  }
+
+  /* grava o status de um item (sem perguntas); devolve null ou a mensagem de erro.
+     Usada pela tabela e pela janela da comparação de versões. */
+  async function cvGravarStatusItem(dbId, novoStatus) {
+    if (!cvPodeEscrever() || state.somenteLeitura) return "Sem permissão para alterar esta versão.";
+    var item = cvEncontrarItemPorDbId(dbId);
+    if (!item) return "Item não encontrado.";
     var patch = {
       status_analise: novoStatus,
       analisado_por: sessionStorage.getItem("sop_user_name") || ((typeof getCurrentUserEmail === "function") ? getCurrentUserEmail() : "") || "Usuário",
       analisado_em: new Date().toISOString()
     };
-    var { error } = await sbClient.from("curva_abc_itens").update(patch).eq("id", dbId);
-    if (error) { cvAlerta("Erro ao salvar", esc(error.message)); return; }
+    try {
+      var { error } = await sbClient.from("curva_abc_itens").update(patch).eq("id", dbId);
+      if (error) return error.message;
+    } catch (ex) { return "Verifique sua conexão com a internet e tente novamente."; }
     item.statusAnalise = novoStatus;
     desenhaTabela();
     if (typeof carregarCurvaAbcResumo === "function" && state.processoVinculado) {
       carregarCurvaAbcResumo(state.processoVinculado.processo, state.processoVinculado.id);
     }
+    return null;
+  }
+
+  /* grava o comentário de um item (sem alertas); devolve null ou a mensagem de erro */
+  async function cvGravarComentarioItem(dbId, valorHtml) {
+    if (!cvPodeEscrever() || state.somenteLeitura) return "Sem permissão para alterar esta versão.";
+    var item = cvEncontrarItemPorDbId(dbId);
+    if (!item) return "Item não encontrado.";
+    var novo = cvTextoSemHtml(valorHtml || "").trim() ? sanitizeRichHTML(valorHtml.trim()) : null;
+    if (item.comentario === novo) return null;
+    try {
+      var { error } = await sbClient.from("curva_abc_itens").update({ comentario: novo }).eq("id", dbId);
+      if (error) return error.message;
+    } catch (ex) { return "Verifique sua conexão com a internet e tente novamente."; }
+    item.comentario = novo;
+    desenhaTabela();
+    return null;
   }
 
   async function cvSalvarComentarioItem(dbId, valorHtml) {
@@ -1036,9 +1158,13 @@
   $("cv-qtdCustom").addEventListener("change", calcular);
   $("cv-qtdCustom").addEventListener("input", calcular);
   $("cv-btnConf").addEventListener("click", cvAbrirConferencia);
+  if ($("cv-filtroCmp")) $("cv-filtroCmp").addEventListener("change", desenhaTabela);
+  if ($("cv-btnOkLote")) $("cv-btnOkLote").addEventListener("click", cvOkEmLote);
   $("cv-tbody").addEventListener("click", function (e) {
     var b = e.target.closest("[data-conf-conta]");
     if (b && window.CvConferencia) window.CvConferencia.detalhe(b.getAttribute("data-conf-conta"));
+    var c = e.target.closest("[data-cmp-id]");
+    if (c && window.CvComparacao) window.CvComparacao.detalhe(Number(c.getAttribute("data-cmp-id")));
   });
   $("cv-btnXlsx").addEventListener("click", baixarXlsx);
   $("cv-btnPrint").addEventListener("click", function () { window.print(); });
