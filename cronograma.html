@@ -1981,7 +1981,10 @@ function sanitizeRich(html) {
 }
 
 // ── Conversão entre o formato usado no app (camelCase) e as colunas do Supabase (snake_case) ──
-function analistaFromRow(row) { return { id: row.id, nome: row.nome, matricula: row.matricula || '', cargo: row.cargo || '' }; }
+// `sigla` e `ativo` são mantidos pela aba Administração (sql/add_sigla_cronograma_analistas.sql):
+// lidos aqui para o sync com Processos, mas de propósito FORA de analistaToRow — o upsert do
+// Cronograma não pode sobrescrevê-los.
+function analistaFromRow(row) { return { id: row.id, nome: row.nome, matricula: row.matricula || '', cargo: row.cargo || '', sigla: row.sigla || '' }; }
 function analistaToRow(a)     { return { id: a.id, nome: a.nome, matricula: a.matricula || '', cargo: a.cargo || '' }; }
 
 function tarefaFromRow(row) {
@@ -3683,12 +3686,9 @@ function mascaraProcesso(el) {
 // - qualquer outro status (aprovado, arquivado, devolvido...)  → se a
 //   tarefa já existia sincronizada, é concluída automaticamente.
 //
-// Mapeamento letra→analista: o campo "analista" em Processos hoje é só uma
-// letra (N, W, P, H, A, F). Como as 6 pessoas cadastradas no Cronograma têm
-// iniciais distintas, usamos uma tabela fixa. Se um novo analista for
-// cadastrado com uma letra já usada, o mapeamento precisa ser atualizado
-// aqui manualmente.
-const LETRA_PARA_ANALISTA = { N: 'Nildeno', W: 'Walace', P: 'Pedro', H: 'Helder', A: 'Ada', F: 'Felipe' };
+// Mapeamento sigla→analista: o campo "analista" em Processos guarda a sigla
+// (ex.: W) cadastrada na aba Administração, seção Analistas — coluna `sigla`
+// de cronograma_analistas.
 
 function classificarStatusProcesso(statusRaw) {
   const s = (statusRaw || '').toString().toUpperCase().trim();
@@ -3720,8 +3720,7 @@ async function sincronizarComProcessos() {
 
     encontrados.add(p.processo);
     const letra = (p.analista || '').toString().trim().toUpperCase();
-    const nomeAnalista = LETRA_PARA_ANALISTA[letra] || null;
-    const analistaObj = nomeAnalista ? analistas.find(a => a.nome === nomeAnalista) : null;
+    const analistaObj = letra ? analistas.find(a => (a.sigla || '').toUpperCase() === letra) : null;
 
     let t = tarefas.find(x => x.origemSync && x.processo === p.processo);
 

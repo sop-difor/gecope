@@ -772,6 +772,83 @@
                             </div>
                         </div>
 
+                        <!-- ANALISTAS (cadastro usado em Processos e no Cronograma — tabela cronograma_analistas,
+                             sql/add_sigla_cronograma_analistas.sql; lógica em modules/administracao/admin.js) -->
+                        <div class="card admin-accordion-card">
+                            <div class="admin-section-header" role="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseAnalistas" aria-expanded="false"
+                                onclick="if (typeof carregarAnalistasAdmin === 'function') carregarAnalistasAdmin()">
+                                <div class="admin-section-header-left">
+                                    <div class="admin-section-icon" style="background:#0d9488;"><i
+                                            class="bi bi-person-badge-fill"></i></div>
+                                    <span class="admin-section-name">Analistas</span>
+                                </div>
+                                <i class="bi bi-chevron-down text-muted"></i>
+                            </div>
+
+                            <div id="collapseAnalistas" class="collapse">
+                                <div class="card-body bg-light p-3">
+                                    <div class="small text-muted fw-bold mb-3"><i class="bi bi-info-circle me-1"></i>
+                                        A sigla é o que fica gravado no processo (ex.: W). Só aparece como opção de
+                                        "Analista Designado" em Processos quem tem sigla e está ativo. Desativar não
+                                        apaga o nome dos processos antigos.
+                                    </div>
+
+                                    <div class="card border-0 shadow-sm p-3 mb-4" style="border-radius: 12px;">
+                                        <input type="hidden" id="analista-admin-id">
+                                        <div class="row g-3 align-items-end">
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold" for="analista-admin-nome">Nome</label>
+                                                <input id="analista-admin-nome" class="form-control" maxlength="60">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label small fw-bold" for="analista-admin-sigla">Sigla</label>
+                                                <input id="analista-admin-sigla" class="form-control text-uppercase" maxlength="3"
+                                                    placeholder="Ex.: M">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold" for="analista-admin-cargo">Cargo</label>
+                                                <input id="analista-admin-cargo" class="form-control" maxlength="60" value="Analista">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold" for="analista-admin-matricula">Matrícula</label>
+                                                <input id="analista-admin-matricula" class="form-control" maxlength="20">
+                                            </div>
+                                        </div>
+                                        <div class="text-end mt-3">
+                                            <button class="btn btn-outline-secondary btn-sm me-2" id="analista-admin-cancelar"
+                                                style="display:none;" onclick="limparFormAnalistaAdmin()">Cancelar edição</button>
+                                            <button class="btn btn-success fw-bold btn-sm" id="analista-admin-salvar"
+                                                onclick="salvarAnalistaAdmin()">
+                                                <i class="bi bi-plus-lg me-1"></i> Adicionar analista
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="proc-table-wrap" style="max-height: 40vh; overflow-y: auto;">
+                                        <table class="table align-middle mb-0 bg-white w-100">
+                                            <thead>
+                                                <tr>
+                                                    <th class="ps-4">Nome</th>
+                                                    <th>Sigla</th>
+                                                    <th>Cargo</th>
+                                                    <th>Processos</th>
+                                                    <th>Situação</th>
+                                                    <th class="text-end pe-4">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="analistas-admin-table-body">
+                                                <tr>
+                                                    <td colspan="6" class="text-center py-4 text-muted small">Abra
+                                                        esta seção pra carregar.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- GESTÃO INTEGRADA DE NOTIFICAÇÕES (UNIFICADO) -->
                         <div class="card admin-accordion-card">
                             <div class="admin-section-header" role="button" data-bs-toggle="collapse"
@@ -2838,13 +2915,7 @@
                                                             class="form-select bg-light border-0 shadow-none gp-plain-field"
                                                             name="ANALISTA" id="det_analista"
                                                             style="font-size: 0.9rem;">
-                                                            <option value="">Selecione...</option>
-                                                            <option value="A">Ada</option>
-                                                            <option value="F">Felipe</option>
-                                                            <option value="H">Helder</option>
-                                                            <option value="N">Nildeno</option>
-                                                            <option value="P">Pedro</option>
-                                                            <option value="W">Walace</option>
+                                                            <option value="">Selecione...</option><!-- opções: cadastro de analistas (Administração), via shared/analistas.js -->
                                                         </select>
                                                     </div>
                                                     <div class="col-sm-6">
@@ -4594,13 +4665,7 @@
                                                                     Designado</label>
                                                                 <select name="ANALISTA" id="cad_analista"
                                                                     class="form-select">
-                                                                    <option value="">Selecione...</option>
-                                                                    <option value="A">Ada</option>
-                                                                    <option value="F">Felipe</option>
-                                                                    <option value="H">Helder</option>
-                                                                    <option value="N">Nildeno</option>
-                                                                    <option value="P">Pedro</option>
-                                                                    <option value="W">Walace</option>
+                                                                    <option value="">Selecione...</option><!-- opções: cadastro de analistas (Administração), via shared/analistas.js -->
                                                                 </select>
                                                             </div>
                                                             <div class="col-md-6">
@@ -5172,6 +5237,7 @@
                                                                     <script src="config.js"></script>
                                                                     <script src="database.js"></script>
                                                                     <script src="utils.js"></script>
+                                                                    <script src="shared/analistas.js"></script>
                                                                     <script src="core/auth.js"></script>
                                                                     <script src="core/shell.js"></script>
                                                                     <script src="shared/fullscreen.js"></script>

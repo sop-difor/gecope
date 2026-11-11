@@ -23,6 +23,7 @@
 | Índices econômicos para preço retroativo | `modules/composicoes/app.js` |
 | SINAPI, SEINFRA, ORSE ou BDI | `modules/tabelas/tabelas.js` |
 | Usuários, aprovação ou autorizações | `modules/administracao/admin.js` |
+| Cadastro de analistas (nome ↔ sigla gravada em `processos.analista`) | Seção "Analistas" da Administração (`modules/administracao/admin.js`), tabela `cronograma_analistas` (colunas `sigla`/`ativo`, `sql/add_sigla_cronograma_analistas.sql`). Leitura e listas de seleção em `shared/analistas.js` (`GecopeAnalistas`), usado por Processos; o Cronograma lê a `sigla` direto. Não há mais nomes de analista fixos no código. |
 | Histórico/feed de atividades | `modules/atividades/atividades.js` |
 | Seleções múltiplas em filtros | `shared/multiselect.js` |
 | Aprovar/recusar comentário ou excluir arquivo | `shared/crud-genericos.js` |
@@ -78,7 +79,7 @@
 | `modules/composicoes/composicoes.js` | Biblioteca analítica de composições: cadastro, versões, referências, cálculos, comentários e relatórios. Usa CRUD genérico, Storage e WhatsApp. Todo INSERT precisa enviar `criador_email` (= e-mail do JWT): o RLS de `composicoes_biblioteca` o exige e o dono é decidido só por ele (`isItemOwner` em `core/auth.js`). `codigo` é UNIQUE na tabela toda (inclui a SOP). |
 | `modules/composicoes/app.js` | Integra a Edge Function `get-economic-indices` para consultar índices econômicos e atualizar cálculos de preço retroativo. |
 | `modules/tabelas/tabelas.js` | Consulta e detalhamento de referências SINAPI, SEINFRA e ORSE, com filtros, BDI/desconto e links/relatórios de referência. |
-| `modules/administracao/admin.js` | Administração de usuários: aprovação, papéis, autorizações especiais, notificações e cadastro de fiscais. |
+| `modules/administracao/admin.js` | Administração de usuários: aprovação, papéis, autorizações especiais, cadastro de analistas, notificações e cadastro de fiscais. |
 | `modules/atividades/atividades.js` | Registro e listagem do feed de atividades e resumo exibido na home; é chamado por vários módulos. |
 
 ## Entradas independentes

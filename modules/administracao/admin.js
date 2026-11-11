@@ -804,6 +804,154 @@
         }
     }
 
+    // ===== Analistas (cadastro usado em Processos e no Cronograma) =====
+    // Tabela public.cronograma_analistas (sql/add_sigla_cronograma_analistas.sql). A sigla é o
+    // valor gravado em processos.analista; shared/analistas.js traduz sigla → nome nas telas.
+    // Não há exclusão aqui: as tarefas do Cronograma apontam para o id do analista e os
+    // processos antigos para a sigla — para tirar alguém das listas, desative.
+    let _analistasAdmin = [];
+
+    async function carregarAnalistasAdmin() {
+        const tbody = document.getElementById('analistas-admin-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted small"><div class="spinner-border spinner-border-sm me-2"></div>Carregando...</td></tr>';
+        try {
+            const { data, error } = await sbClient.from('cronograma_analistas')
+                .select('id, nome, sigla, cargo, matricula, ativo')
+                .order('nome', { ascending: true });
+            if (error) throw error;
+            _analistasAdmin = data || [];
+
+            // Quantos processos (não excluídos) cada sigla tem — 1 contagem leve por sigla.
+            const contagens = await Promise.all(_analistasAdmin.map(async a => {
+                if (!a.sigla) return 0;
+                const { count } = await sbClient.from('processos').select('id', { count: 'exact', head: true })
+                    .eq('analista', a.sigla).is('excluido_por', null);
+                return count || 0;
+            }));
+            _analistasAdmin.forEach((a, i) => { a._processos = contagens[i]; });
+
+            if (_analistasAdmin.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted small">Nenhum analista cadastrado.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = _analistasAdmin.map(a => {
+                const ativo = a.ativo !== false;
+                const situacao = ativo
+                    ? '<span class="badge bg-success-subtle text-success border">Ativo</span>'
+                    : '<span class="badge bg-light text-muted border">Inativo</span>';
+                const sigla = a.sigla
+                    ? `<span class="badge bg-light text-dark border fw-bold">${escapeHTML(a.sigla)}</span>`
+                    : '<span class="small text-muted">— só Cronograma</span>';
+                return `
+                <tr class="${ativo ? '' : 'text-muted'}">
+                    <td class="ps-4"><div class="small fw-bold">${escapeHTML(a.nome)}</div>
+                        ${a.matricula ? `<div class="small text-muted">${escapeHTML(a.matricula)}</div>` : ''}</td>
+                    <td>${sigla}</td>
+                    <td><div class="small">${escapeHTML(a.cargo || '')}</div></td>
+                    <td><div class="small">${a._processos}</div></td>
+                    <td>${situacao}</td>
+                    <td class="text-end pe-4">
+                        <button class="btn-action-icon" data-id="${escapeHTML(a.id)}" onclick="editarAnalistaAdmin(this.dataset.id)" title="Editar">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn-action-icon" data-id="${escapeHTML(a.id)}" onclick="alternarAtivoAnalistaAdmin(this.dataset.id)"
+                            title="${ativo ? 'Desativar' : 'Reativar'}">
+                            <i class="bi ${ativo ? 'bi-toggle-on text-success' : 'bi-toggle-off'}"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger small">Erro ao carregar: ${escapeHTML(e.message)}</td></tr>`;
+        }
+    }
+
+    function limparFormAnalistaAdmin() {
+        ['id', 'nome', 'sigla', 'matricula'].forEach(c => { const el = document.getElementById(`analista-admin-${c}`); if (el) el.value = ''; });
+        const cargo = document.getElementById('analista-admin-cargo'); if (cargo) cargo.value = 'Analista';
+        const sigla = document.getElementById('analista-admin-sigla'); if (sigla) sigla.disabled = false;
+        const btn = document.getElementById('analista-admin-salvar');
+        if (btn) btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Adicionar analista';
+        const cancelar = document.getElementById('analista-admin-cancelar'); if (cancelar) cancelar.style.display = 'none';
+    }
+
+    function editarAnalistaAdmin(id) {
+        const a = _analistasAdmin.find(x => x.id === id);
+        if (!a) return;
+        document.getElementById('analista-admin-id').value = a.id;
+        document.getElementById('analista-admin-nome').value = a.nome || '';
+        document.getElementById('analista-admin-cargo').value = a.cargo || '';
+        document.getElementById('analista-admin-matricula').value = a.matricula || '';
+        const sigla = document.getElementById('analista-admin-sigla');
+        sigla.value = a.sigla || '';
+        // Trocar a sigla de quem já tem processos deixaria esses processos sem nome.
+        sigla.disabled = !!a.sigla && a._processos > 0;
+        sigla.title = sigla.disabled ? `Sigla em uso em ${a._processos} processo(s); não pode ser alterada.` : '';
+        document.getElementById('analista-admin-salvar').innerHTML = '<i class="bi bi-check-lg me-1"></i> Salvar alterações';
+        document.getElementById('analista-admin-cancelar').style.display = '';
+        document.getElementById('analista-admin-nome').focus();
+    }
+
+    async function salvarAnalistaAdmin() {
+        const id = document.getElementById('analista-admin-id').value;
+        const nome = document.getElementById('analista-admin-nome').value.trim();
+        const sigla = document.getElementById('analista-admin-sigla').value.trim().toUpperCase();
+        const cargo = document.getElementById('analista-admin-cargo').value.trim();
+        const matricula = document.getElementById('analista-admin-matricula').value.trim();
+
+        if (!nome) { alert('Informe o nome.'); return; }
+        if (sigla && !/^[A-Z0-9]{1,3}$/.test(sigla)) { alert('A sigla deve ter de 1 a 3 letras ou números (ex.: M).'); return; }
+        if (!id && !sigla) { alert('Informe a sigla — é ela que fica gravada no processo.'); return; }
+        const dono = sigla && _analistasAdmin.find(a => a.sigla === sigla && a.id !== id);
+        if (dono) { alert(`A sigla ${sigla} já é de ${dono.nome}. Escolha outra.`); return; }
+
+        const payload = { nome, sigla: sigla || null, cargo, matricula };
+        try {
+            let error;
+            if (id) {
+                ({ error } = await sbClient.from('cronograma_analistas').update(payload).eq('id', id));
+            } else {
+                const novoId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                ({ error } = await sbClient.from('cronograma_analistas').insert([{ id: novoId, ativo: true, ...payload }]));
+            }
+            if (error) throw error;
+            limparFormAnalistaAdmin();
+            await _aposMudarAnalistas();
+        } catch (e) {
+            const msg = /cronograma_analistas_sigla_unica|duplicate key/i.test(e.message || '')
+                ? `A sigla ${sigla} já está em uso.` : e.message;
+            alert('Erro ao salvar analista: ' + msg);
+        }
+    }
+
+    async function alternarAtivoAnalistaAdmin(id) {
+        const a = _analistasAdmin.find(x => x.id === id);
+        if (!a) return;
+        const ativar = a.ativo === false;
+        const aviso = ativar
+            ? `Reativar ${a.nome}? Volta a aparecer como opção em Processos.`
+            : `Desativar ${a.nome}? Sai das opções de "Analista Designado"; os ${a._processos} processo(s) dele continuam com o nome.`;
+        if (!confirm(aviso)) return;
+        try {
+            const { error } = await sbClient.from('cronograma_analistas').update({ ativo: ativar }).eq('id', id);
+            if (error) throw error;
+            await _aposMudarAnalistas();
+        } catch (e) {
+            alert('Erro ao alterar situação: ' + e.message);
+        }
+    }
+
+    // Recarrega a tabela da Administração e as listas de seleção de Processos nesta sessão.
+    async function _aposMudarAnalistas() {
+        if (window.GecopeAnalistas) {
+            GecopeAnalistas.invalidar();
+            await GecopeAnalistas.carregar();
+            if (typeof window.preencherSelectsAnalista === 'function') window.preencherSelectsAnalista();
+        }
+        await carregarAnalistasAdmin();
+    }
+
     // Notifications polling (admin) — marca como lida toda notificação não lida que não
     // seja pedido de novo usuário (essas ficam não lidas de propósito, para aparecerem em
     // fetchPendingCount/openAdminPendings). Nada aqui é exibido na tela.
@@ -924,6 +1072,11 @@
     window.carregarAutorizacoesEspeciais = carregarAutorizacoesEspeciais;
     window.concederAutorizacoesSelecionadas = concederAutorizacoesSelecionadas;
     window.revogarAutorizacao = revogarAutorizacao;
+    window.carregarAnalistasAdmin = carregarAnalistasAdmin;
+    window.limparFormAnalistaAdmin = limparFormAnalistaAdmin;
+    window.editarAnalistaAdmin = editarAnalistaAdmin;
+    window.salvarAnalistaAdmin = salvarAnalistaAdmin;
+    window.alternarAtivoAnalistaAdmin = alternarAtivoAnalistaAdmin;
     window.startNotificationsPoll = startNotificationsPoll;
     window.stopNotificationsPoll = stopNotificationsPoll;
     window.fetchPendingCount = fetchPendingCount;

@@ -1556,13 +1556,9 @@ function mapProcessoRow(r) {
         prazoDias = Math.round((dataAprov - dataAbertura) / (1000 * 60 * 60 * 24));
     }
 
-    let nomeAnalista = r.analista;
-    if (r.analista === "N") nomeAnalista = "Nildeno";
-    else if (r.analista === "W") nomeAnalista = "Walace";
-    else if (r.analista === "H") nomeAnalista = "Helder";
-    else if (r.analista === "P") nomeAnalista = "Pedro";
-    else if (r.analista === "F") nomeAnalista = "Felipe";
-    else if (r.analista === "A") nomeAnalista = "Ada";
+    // Sigla → nome pelo cadastro da Administração (shared/analistas.js). A lista é carregada
+    // antes de mapear as linhas (carregarDadosSupabase / atualizarLinhaProcessoLocal).
+    const nomeAnalista = window.GecopeAnalistas ? GecopeAnalistas.nome(r.analista) : r.analista;
 
     return {
         id: r.id,
@@ -1645,6 +1641,7 @@ async function atualizarLinhaProcessoLocal(id) {
     // esta função existe para evitar. Agora o catch cobre só a busca da linha; falha de
     // renderização é reportada, não vira recarga.
     try {
+        await GecopeAnalistas.carregar();
         const { data, error } = await sbClient.from('processos').select('*').eq('id', id).single();
         if (error || !data) throw error || new Error('Linha não encontrada após salvar.');
 
@@ -1697,6 +1694,15 @@ const _interfacePronta = (document.readyState === 'loading'
 ).then(() => new Promise(r => setTimeout(r, 0)));
 function aguardarInterfacePronta() { return _interfacePronta; }
 
+// Monta as opções de "Analista Designado" (cadastro e detalhes) a partir do cadastro da
+// Administração. O de detalhes é refeito a cada abertura, com o valor do processo.
+function preencherSelectsAnalista() {
+    GecopeAnalistas.preencherSelect(document.getElementById('cad_analista'), '');
+    const det = document.getElementById('det_analista');
+    if (det) GecopeAnalistas.preencherSelect(det, det.value);
+}
+window.preencherSelectsAnalista = preencherSelectsAnalista;
+
 async function carregarDadosSupabase() {
     if (_carregarDadosPromise) return _carregarDadosPromise;
     _carregarDadosPromise = _carregarDadosSupabaseInterno()
@@ -1740,6 +1746,9 @@ async function _carregarDadosSupabaseInterno() {
             }
         }
     })();
+
+    // Cadastro de analistas (sigla → nome) para mapProcessoRow; também em paralelo à varredura.
+    const analistasP = GecopeAnalistas.carregar();
 
     let data = null;
     try {
@@ -1842,6 +1851,8 @@ async function _carregarDadosSupabaseInterno() {
     }
 
     await identificacaoFiscalP;
+    await analistasP;
+    preencherSelectsAnalista();
 
     if (!Array.isArray(data)) return;
 
@@ -2242,22 +2253,13 @@ async function enviarParaPlanilha() {
             });
         }
 
-        // Notificação para Analistas Específicos
-        const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO', 'ADA'];
-
-        let analistaExtenso = formData.get("ANALISTA") || "";
-        if (analistaExtenso === "N") analistaExtenso = "Nildeno";
-        else if (analistaExtenso === "W") analistaExtenso = "Walace";
-        else if (analistaExtenso === "P") analistaExtenso = "Pedro";
-        else if (analistaExtenso === "F") analistaExtenso = "Felipe";
-        else if (analistaExtenso === "H") analistaExtenso = "Helder";
-        else if (analistaExtenso === "A") analistaExtenso = "Ada";
-
-        const analistaNome = analistaExtenso.toUpperCase();
+        // Notificação para o analista designado (qualquer um do cadastro da Administração)
+        const siglaAnalista = formData.get("ANALISTA") || "";
+        const analistaNome = String(GecopeAnalistas.nome(siglaAnalista) || "").toUpperCase();
         const usuarioAtual = (sessionStorage.getItem('sop_user_name') || "").toUpperCase();
 
-        // Dispara se for um dos alvos e não for auto-atribuição
-        if (analistasAlvo.some(alvo => analistaNome.includes(alvo))) {
+        // Dispara se for um analista cadastrado e não for auto-atribuição
+        if (GecopeAnalistas.existe(siglaAnalista)) {
             const ehAutoAtribuicao = usuarioAtual && (analistaNome.includes(usuarioAtual) || usuarioAtual.includes(analistaNome));
 
             if (!ehAutoAtribuicao) {
@@ -3284,7 +3286,7 @@ async function abrirDetalhes(processoStr) {
     document.getElementById('det_data_compromisso').value = dateParaInput(row.dataCompromissoFiscal);
     document.getElementById('det_data_aprovacao').value = dateParaInput(row.dataAprovacao);
     if (document.getElementById('det_data_recebimento')) document.getElementById('det_data_recebimento').value = dateParaInput(row.dataRecebimento);
-    if (document.getElementById('det_analista')) document.getElementById('det_analista').value = row.analista;
+    if (document.getElementById('det_analista')) GecopeAnalistas.preencherSelect(document.getElementById('det_analista'), row.analista || '');
 
     const elDevolucao = document.getElementById('det_data_devolucao');
     if (elDevolucao) { elDevolucao.value = dateParaInput(row.dataDevolucaoCorrecoes); calcularDiasDevolucao(); }
@@ -3973,29 +3975,13 @@ async function executarAcaoDetalhes(actionType) {
             }
 
             // Notificação para Analistas Específicos (Se mudou o analista ou se foi marcado agora)
-            const analistasAlvo = ['NILDENO', 'HELDER', 'FELIPE', 'WALACE', 'PEDRO', 'ADA'];
-
-            let aAtualExtenso = updates.analista || "";
-            if (aAtualExtenso === "N") aAtualExtenso = "Nildeno";
-            else if (aAtualExtenso === "W") aAtualExtenso = "Walace";
-            else if (aAtualExtenso === "P") aAtualExtenso = "Pedro";
-            else if (aAtualExtenso === "F") aAtualExtenso = "Felipe";
-            else if (aAtualExtenso === "H") aAtualExtenso = "Helder";
-            else if (aAtualExtenso === "A") aAtualExtenso = "Ada";
-            const analistaAtual = aAtualExtenso.toUpperCase();
-
-            let aAnteriorExtenso = registroOriginal.analista || "";
-            if (aAnteriorExtenso === "N") aAnteriorExtenso = "Nildeno";
-            else if (aAnteriorExtenso === "W") aAnteriorExtenso = "Walace";
-            else if (aAnteriorExtenso === "P") aAnteriorExtenso = "Pedro";
-            else if (aAnteriorExtenso === "F") aAnteriorExtenso = "Felipe";
-            else if (aAnteriorExtenso === "H") aAnteriorExtenso = "Helder";
-            else if (aAnteriorExtenso === "A") aAnteriorExtenso = "Ada";
-            const analistaAnterior = aAnteriorExtenso.toUpperCase();
+            const siglaAtual = updates.analista || "";
+            const analistaAtual = String(GecopeAnalistas.nome(siglaAtual) || "").toUpperCase();
+            const analistaAnterior = String(GecopeAnalistas.nome(registroOriginal.analista || "") || "").toUpperCase();
 
             const usuarioAtual = (sessionStorage.getItem('sop_user_name') || "").toUpperCase();
 
-            if (analistaAtual && analistaAtual !== analistaAnterior && analistasAlvo.some(alvo => analistaAtual.includes(alvo))) {
+            if (analistaAtual && analistaAtual !== analistaAnterior && GecopeAnalistas.existe(siglaAtual)) {
                 const ehAutoAtribuicao = usuarioAtual && (analistaAtual.includes(usuarioAtual) || usuarioAtual.includes(analistaAtual));
 
                 if (!ehAutoAtribuicao) {
