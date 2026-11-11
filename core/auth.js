@@ -5,6 +5,122 @@
    FUNES DE AUTENTICAO (SUPABASE)
 -------------------------------------------------------------- */
 
+/* --------------------------------------------------------------
+   MENSAGENS DE AUTENTICAÇÃO EM PORTUGUÊS
+   O Supabase Auth devolve as mensagens em inglês (ex.: "Password should contain at least
+   one character of each: abc..., ABC..., 0123..., !@#..."), e elas iam direto para a tela.
+   Aqui ficam as regras de senha mostradas ao usuário e a tradução dos erros. (11/11/2026)
+-------------------------------------------------------------- */
+
+const SENHA_TAMANHO_MINIMO = 8;
+const REGRAS_SENHA = [
+    { id: 'tamanho',   texto: `Ter pelo menos ${SENHA_TAMANHO_MINIMO} caracteres`, ok: s => s.length >= SENHA_TAMANHO_MINIMO },
+    { id: 'minuscula', texto: 'Ter pelo menos uma letra minúscula (a-z)',          ok: s => /[a-z]/.test(s) },
+    { id: 'maiuscula', texto: 'Ter pelo menos uma letra maiúscula (A-Z)',          ok: s => /[A-Z]/.test(s) },
+    { id: 'numero',    texto: 'Ter pelo menos um número (0-9)',                    ok: s => /[0-9]/.test(s) },
+    { id: 'simbolo',   texto: 'Ter pelo menos um símbolo, como ! @ # $ % & * ? -', ok: s => /[^A-Za-z0-9\s]/.test(s) }
+];
+
+// Lista as regras que a senha ainda não cumpre (vazia = senha aceita pelas regras do GECOPE).
+function regrasSenhaPendentes(senha) {
+    const s = String(senha || '');
+    return REGRAS_SENHA.filter(r => !r.ok(s));
+}
+
+function _escHtmlAuth(t) {
+    return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// HTML com o que falta na senha, para o SweetAlert. `pendentes` = saída de regrasSenhaPendentes.
+function htmlRegrasSenha(pendentes, intro) {
+    const itens = pendentes.map(r => `<li>${_escHtmlAuth(r.texto)}</li>`).join('');
+    return `<div style="text-align:left">${intro || 'A senha escolhida não atende às regras de segurança. Ela precisa:'}` +
+           `<ul style="margin:8px 0 8px 18px;padding:0">${itens}</ul>` +
+           '<small style="color:#6b7280">Exemplo de senha válida: <b>Obra@2026</b> (não use este exemplo).</small></div>';
+}
+
+// Traduz um erro do Supabase Auth (ou de rede) para uma mensagem clara em português.
+// Devolve { titulo, texto, html? }. `ctx.senha` permite dizer exatamente o que falta na senha.
+function traduzirErroAuth(error, ctx = {}) {
+    const msg = String((error && (error.message || error.msg || error.error_description)) || error || '');
+    const code = String((error && (error.code || error.error_code)) || '');
+    const m = msg.toLowerCase();
+
+    // Senha fraca: falta tipo de caractere, tamanho ou aparece em vazamentos públicos.
+    if (code === 'weak_password' || /password should|password must|weak password|pwned|leaked/.test(m)) {
+        if (/pwned|leaked|compromised/.test(m) || (error?.reasons || []).includes('pwned')) {
+            return {
+                titulo: 'Senha insegura',
+                texto: 'Essa senha já apareceu em vazamentos de dados na internet e não pode ser usada. Escolha outra senha, que você não use em outros sites.'
+            };
+        }
+        let pendentes = ctx.senha != null ? regrasSenhaPendentes(ctx.senha) : [];
+        if (!pendentes.length) {
+            // Senha não informada aqui: monta a lista a partir do que o Supabase exigiu.
+            const minLen = (m.match(/at least (\d+) characters/) || [])[1];
+            if (minLen) pendentes.push({ texto: `Ter pelo menos ${minLen} caracteres` });
+            if (/one character of each/.test(m)) pendentes.push(...REGRAS_SENHA.filter(r => r.id !== 'tamanho'));
+            if (!pendentes.length) pendentes = REGRAS_SENHA.slice();
+        }
+        return {
+            titulo: 'Senha fora do padrão',
+            texto: 'A senha não atende às regras de segurança: ' + pendentes.map(r => r.texto.charAt(0).toLowerCase() + r.texto.slice(1)).join('; ') + '.',
+            html: htmlRegrasSenha(pendentes)
+        };
+    }
+    if (code === 'same_password' || /should be different from the old/.test(m)) {
+        return { titulo: 'Senha repetida', texto: 'A nova senha precisa ser diferente da senha atual. Escolha outra.' };
+    }
+    if (code === 'user_already_exists' || code === 'email_exists' || /already registered|already been registered|already exists/.test(m)) {
+        return {
+            titulo: 'E-mail já cadastrado',
+            texto: 'Já existe uma conta com este e-mail. Volte para a tela de login e entre com sua matrícula e senha. Se não lembrar da senha, use "Esqueci minha senha".'
+        };
+    }
+    if (code === 'email_address_invalid' || (code === 'validation_failed' && /email/.test(m)) || /invalid.*email|email.*invalid|unable to validate email/.test(m)) {
+        return { titulo: 'E-mail inválido', texto: 'O e-mail informado não é válido. Confira se foi digitado corretamente (exemplo: nome.sobrenome@sop.ce.gov.br).' };
+    }
+    if (code === 'invalid_credentials' || /invalid login credentials/.test(m)) {
+        return { titulo: 'Não foi possível entrar', texto: 'Matrícula/e-mail ou senha incorretos. Confira os dados e tente de novo. Se esqueceu a senha, use "Esqueci minha senha".' };
+    }
+    if (code === 'email_not_confirmed' || /email not confirmed/.test(m)) {
+        return { titulo: 'E-mail não confirmado', texto: 'Seu e-mail ainda não foi confirmado. Abra a mensagem de confirmação enviada para sua caixa de entrada (veja também o spam) e tente de novo.' };
+    }
+    if (code === 'signup_disabled' || /signups not allowed|signup.*disabled/.test(m)) {
+        return { titulo: 'Cadastro indisponível', texto: 'Novos cadastros estão temporariamente desativados. Procure o administrador do GECOPE.' };
+    }
+    if (/rate limit|too many requests|for security purposes, you can only request/.test(m) || /^over_.*rate_limit$/.test(code)) {
+        return { titulo: 'Muitas tentativas', texto: 'Foram feitas muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.' };
+    }
+    if (code === 'session_expired' || code === 'session_not_found' || /jwt expired|session.*(missing|expired|not found)/.test(m)) {
+        return { titulo: 'Sessão expirada', texto: 'Sua sessão expirou. Entre novamente no sistema.' };
+    }
+    if (/failed to fetch|networkerror|network request failed|load failed/.test(m)) {
+        return { titulo: 'Sem conexão', texto: 'Não foi possível falar com o servidor. Verifique sua conexão com a internet e tente novamente.' };
+    }
+    return {
+        titulo: 'Algo deu errado',
+        texto: 'Não foi possível concluir a operação agora. Tente novamente em instantes. Se o problema continuar, procure o administrador do GECOPE' +
+               (msg ? ` e informe a mensagem técnica: "${msg}".` : '.')
+    };
+}
+
+// Mostra o erro traduzido num SweetAlert (cai para alert() se o Swal não estiver carregado).
+async function mostrarErroAuth(error, ctx = {}) {
+    const t = traduzirErroAuth(error, ctx);
+    if (window.Swal) {
+        await Swal.fire({
+            icon: 'warning',
+            title: t.titulo,
+            ...(t.html ? { html: t.html } : { text: t.texto }),
+            confirmButtonColor: 'var(--sop-green)',
+            confirmButtonText: 'Entendi'
+        });
+    } else {
+        alert(`${t.titulo}\n\n${t.texto}`);
+    }
+}
+
 // Cadastro reformulado: NOME, SOBRENOME, MATRICULA, SENHA
 async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email) {
     try {
@@ -22,7 +138,39 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
         matricula = String(matricula || '').trim().replace(/[^A-Za-z0-9-]/g, '').slice(0, 20);
 
         if (!nome || !sobrenome || !matricula) {
-            alert('Nome, sobrenome e matrícula devem conter apenas letras, números e espaços.');
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Confira seus dados',
+                html: '<div style="text-align:left">Preencha todos os campos obrigatórios:<ul style="margin:8px 0 0 18px;padding:0">' +
+                      '<li><b>Nome</b> e <b>Sobrenome</b>: apenas letras, espaços, apóstrofo, ponto ou hífen.</li>' +
+                      '<li><b>Matrícula</b>: apenas números e letras, sem espaços.</li></ul></div>',
+                confirmButtonColor: 'var(--sop-green)',
+                confirmButtonText: 'Entendi'
+            });
+            return false;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'E-mail inválido',
+                text: 'Informe um e-mail válido, de preferência o institucional (exemplo: nome.sobrenome@sop.ce.gov.br).',
+                confirmButtonColor: 'var(--sop-green)',
+                confirmButtonText: 'Entendi'
+            });
+            return false;
+        }
+
+        // Confere a senha antes de ir ao servidor, para explicar em português o que falta.
+        const pendentesSenha = regrasSenhaPendentes(senha);
+        if (pendentesSenha.length) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Senha fora do padrão',
+                html: htmlRegrasSenha(pendentesSenha),
+                confirmButtonColor: 'var(--sop-green)',
+                confirmButtonText: 'Entendi'
+            });
             return false;
         }
 
@@ -51,7 +199,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
                 return false;
             }
             if (!v.ok && v.limite) {
-                alert(v.erro);
+                await Swal.fire({ icon: 'warning', title: 'Muitas tentativas', text: v.erro, confirmButtonColor: 'var(--sop-green)', confirmButtonText: 'Entendi' });
                 return false;
             }
             if (!v.ok) console.warn('[SIGNUP] Verificação da matrícula falhou; seguindo o cadastro:', v.erro);
@@ -70,7 +218,7 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
 
         if (error) {
             console.error('[SIGNUP] Erro no Auth.signUp:', error);
-            alert('Erro ao realizar cadastro (Auth): ' + (error.message || String(error)));
+            await mostrarErroAuth(error, { senha });
             return false;
         }
 
@@ -162,13 +310,34 @@ async function signUpRequest(nome, sobrenome, matricula, senha, telefone, email)
             // Não mascara o problema com a mensagem de sucesso: a conta de login (Auth) foi
             // criada, mas o perfil (app_users) não foi gravado/atualizado corretamente — se o
             // admin aprovar mesmo assim, o acesso continuará falhando por e-mail divergente.
-            alert(`Sua conta de acesso foi criada, mas houve uma falha ao registrar seu perfil no sistema.\n\nPor favor, entre em contato com o administrador informando sua matrícula (${matricula}) e o e-mail usado no cadastro (${email}) para que ele possa concluir seu cadastro manualmente.`);
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Cadastro incompleto',
+                html: 'Sua conta de acesso foi criada, mas houve uma falha ao registrar seu perfil no sistema.<br><br>' +
+                      'Entre em contato com o administrador do GECOPE informando sua matrícula ' +
+                      `(<b>${_escHtmlAuth(matricula)}</b>) e o e-mail usado no cadastro (<b>${_escHtmlAuth(email)}</b>) ` +
+                      'para que ele conclua seu cadastro manualmente.',
+                confirmButtonColor: 'var(--sop-green)',
+                confirmButtonText: 'Entendi'
+            });
             return true;
         }
 
-        alert(`Solicitação enviada para a matrícula ${matricula}.\nAguarde aprovação do Admin!`);
+        await Swal.fire({
+            icon: 'success',
+            title: 'Solicitação enviada',
+            html: `Seu pedido de acesso para a matrícula <b>${_escHtmlAuth(matricula)}</b> foi enviado.<br><br>` +
+                  'Agora é só aguardar: o administrador do GECOPE vai analisar e liberar seu acesso. ' +
+                  'Depois disso, entre com sua matrícula e a senha que você acabou de criar.',
+            confirmButtonColor: 'var(--sop-green)',
+            confirmButtonText: 'Ok'
+        });
         return true;
-    } catch (err) { console.error(err); alert('Erro inesperado ao solicitar acesso.'); return false; }
+    } catch (err) {
+        console.error(err);
+        await mostrarErroAuth(err, { senha });
+        return false;
+    }
 }
 
 async function signInWithEmail(email, password, opts = {}) {
@@ -203,7 +372,7 @@ async function signInWithEmail(email, password, opts = {}) {
             console.error('[ERRO] Falha Auth:', error.message);
             if (!opts.silent) {
                 document.getElementById('landing-feedback').style.display = 'block';
-                document.getElementById('landing-feedback').textContent = error.message;
+                document.getElementById('landing-feedback').textContent = traduzirErroAuth(error).texto;
             }
             return false;
         }
@@ -278,7 +447,7 @@ async function signInWithEmail(email, password, opts = {}) {
         console.error('[ERRO] Exceção em signInWithEmail:', err);
         if (!opts.silent) {
             document.getElementById('landing-feedback').style.display = 'block';
-            document.getElementById('landing-feedback').textContent = 'Erro ao autenticar: ' + (err.message || err);
+            document.getElementById('landing-feedback').textContent = traduzirErroAuth(err).texto;
         }
         return false;
     }
@@ -304,7 +473,8 @@ async function verificarTrocaSenhaObrigatoria() {
             const r = await Swal.fire({
                 title: 'Crie sua nova senha',
                 html: `
-                    <div style="text-align:left;font-size:.9rem;color:#374151;margin-bottom:6px">Você entrou com uma senha provisória. Para continuar, crie uma senha nova (mínimo de 8 caracteres).</div>
+                    <div style="text-align:left;font-size:.9rem;color:#374151;margin-bottom:6px">Você entrou com uma senha provisória. Para continuar, crie uma senha nova. Ela precisa:
+                        <ul style="margin:6px 0 0 18px;padding:0">${REGRAS_SENHA.map(r => `<li>${r.texto}</li>`).join('')}</ul></div>
                     <input id="nova-senha-1" type="password" class="swal2-input" style="color:#111827;background:#fff" placeholder="Nova senha" autocomplete="new-password">
                     <input id="nova-senha-2" type="password" class="swal2-input" style="color:#111827;background:#fff" placeholder="Repita a nova senha" autocomplete="new-password">`,
                 icon: 'info',
@@ -317,8 +487,9 @@ async function verificarTrocaSenhaObrigatoria() {
                 preConfirm: () => {
                     const s1 = document.getElementById('nova-senha-1').value;
                     const s2 = document.getElementById('nova-senha-2').value;
-                    if (s1.length < 8) { Swal.showValidationMessage('A senha precisa ter pelo menos 8 caracteres.'); return false; }
-                    if (s1 !== s2) { Swal.showValidationMessage('As duas senhas não são iguais.'); return false; }
+                    const faltam = regrasSenhaPendentes(s1);
+                    if (faltam.length) { Swal.showValidationMessage('A senha ainda precisa: ' + faltam.map(f => f.texto.charAt(0).toLowerCase() + f.texto.slice(1)).join('; ') + '.'); return false; }
+                    if (s1 !== s2) { Swal.showValidationMessage('As duas senhas digitadas não são iguais. Digite a mesma senha nos dois campos.'); return false; }
                     return s1;
                 }
             });
@@ -331,11 +502,7 @@ async function verificarTrocaSenhaObrigatoria() {
                 return;
             }
             console.error('[ERRO] Troca de senha obrigatória:', error.message);
-            const vazada = /pwned|leaked|compromised|weak/i.test(error.message || '');
-            await Swal.fire('Não foi possível salvar',
-                vazada ? 'Essa senha é fraca ou já apareceu em vazamentos públicos. Escolha outra.'
-                       : 'Tente de novo. Se continuar, escolha uma senha diferente da provisória.',
-                'error');
+            await mostrarErroAuth(error, { senha: r.value });
         }
     } finally {
         _trocaSenhaAberta = false;
@@ -962,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 } catch (err) {
                     console.error(err);
-                    Swal.fire('Erro', 'Não foi possível processar a solicitação no momento: ' + (err.message || err), 'error');
+                    { const t = traduzirErroAuth(err); Swal.fire(t.titulo, 'Não foi possível registrar seu pedido de nova senha. ' + t.texto, 'error'); }
                 }
             }
         });

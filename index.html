@@ -112,7 +112,11 @@
                             <div class="mb-3"><input id="reg-email" type="email" placeholder="E-mail Institucional"
                                     class="form-control landing-input" required /></div>
                             <div class="mb-3"><input id="reg-senha" type="password" placeholder="Senha"
-                                    class="form-control landing-input" required /></div>
+                                    class="form-control landing-input" autocomplete="new-password"
+                                    aria-describedby="reg-senha-regras" required />
+                                <div id="reg-senha-regras" class="form-text mt-1" style="font-size: 0.75rem; line-height: 1.3; color: #94a3b8;">
+                                    Mínimo de 8 caracteres, com letra maiúscula, letra minúscula, número e símbolo (ex.: ! @ # $ %).</div>
+                            </div>
                             <div class="mb-3">
                                 <input id="reg-telefone" type="tel" placeholder="WhatsApp (DDD+Núm)"
                                     class="form-control landing-input" maxlength="15" />
